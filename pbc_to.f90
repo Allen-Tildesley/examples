@@ -1,5 +1,5 @@
 ! pbc_to.f90
-SUBROUTINE pbc_to ( r )
+SUBROUTINE pbc ( r )
   ! Periodic boundary conditions for truncated octahedron
 
   ! The box is centred at the origin. 
@@ -18,4 +18,4 @@ SUBROUTINE pbc_to ( r )
   corr = 0.5 * AINT ( r75 * SUM ( ABS ( r(:) ) ) )
   r(:) = r(:) - SIGN ( corr, r(:) )
 
-END SUBROUTINE pbc_to
+END SUBROUTINE pbc

@@ -1,5 +1,5 @@
 ! pbc_rh.f90
-SUBROUTINE pbc_rh ( r )
+SUBROUTINE pbc ( r )
   ! Periodic boundary conditions for rhombus
 
   ! Periodic corrections are applied in two dimensions x, y.
@@ -19,7 +19,7 @@ SUBROUTINE pbc_rh ( r )
   r(1) = r(1) - ANINT ( r(1) - rrt3 * r(2) ) - ANINT ( rrt32 * r(2) ) * 0.5
   r(2) = r(2) - ANINT ( rrt32 * r(2) ) * rt32
 
-END SUBROUTINE pbc_rh
+END SUBROUTINE pbc
 
 
 

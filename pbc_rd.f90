@@ -1,5 +1,5 @@
 ! pbc_rd.f90
-SUBROUTINE pbc_rd ( r )
+SUBROUTINE pbc ( r )
   ! Periodic boundary conditions for rhombic dodecahedron
 
   ! The box is centred at the origin. 
@@ -25,4 +25,4 @@ SUBROUTINE pbc_rd ( r )
   r(2) = r(2) - SIGN ( corr, r(2) )
   r(3) = r(3) - SIGN ( corr, r(3) ) * rt2
 
-END SUBROUTINE pbc_rd
+END SUBROUTINE pbc
