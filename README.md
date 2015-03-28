@@ -1,4 +1,4 @@
-# examples
+# Examples
 These programs accompany the book
 "Computer Simulation of Liquids" by M. P. Allen and D. J. Tildesley,
 second edition, to be published by Oxford University Press.
