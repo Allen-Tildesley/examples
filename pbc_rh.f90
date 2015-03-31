@@ -1,12 +1,13 @@
 ! pbc_rh.f90
-SUBROUTINE pbc ( r )
-  ! Periodic boundary conditions for rhombus
+! Periodic boundary conditions for rhombus
+SUBROUTINE pbc ( r ) 
 
   ! Periodic corrections are applied in two dimensions x, y.
   ! In most applications the molecules will be confined in the
   ! z direction by real walls rather than by periodic boundaries.
   ! The box is centred at the origin. 
-  ! The x axis lies along the side of the rhombus, which is of unit length
+  ! The x axis lies along the side of the rhombus.
+  ! The side of the rhombus is of unit length.
   ! The acute angle of the rhombus is sixty degrees
   ! Ref: Talbot J, private communication (1987)
 

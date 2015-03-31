@@ -1,6 +1,6 @@
 ! pbc_rd.f90
+! Periodic boundary conditions for rhombic dodecahedron
 SUBROUTINE pbc ( r )
-  ! Periodic boundary conditions for rhombic dodecahedron
 
   ! The box is centred at the origin. 
   ! The x and y axes join the centres of opposite faces of the dodecahedron.
@@ -14,8 +14,8 @@ SUBROUTINE pbc ( r )
   IMPLICIT NONE
   REAL, DIMENSION(3), INTENT(inout) :: r ! Argument
 
-  REAL            :: corr
   REAL, PARAMETER :: rt2 = SQRT(2.0), rrt2 = 1.0 / rt2
+  REAL            :: corr
 
   r(1) = r(1) - ANINT ( r(1) )
   r(2) = r(2) - ANINT ( r(2) )

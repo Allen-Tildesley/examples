@@ -1,598 +1,139 @@
 ! md_hard.f90
+! Molecular dynamics of hard spheres
 PROGRAM md_hard
-! Placeholder for f90 program
-
-********************************************************************************
-** FICHE F.10.  HARD SPHERE MOLECULAR DYNAMICS PROGRAM                        **
-** This FORTRAN code is intended to illustrate points made in the text.       **
-** To our knowledge it works correctly.  However it is the responsibility of  **
-** the user to test it, if it is to be used in a research application.        **
-********************************************************************************
-
-
-
-
-        COMMON / BLOCK1 / RX, RY, RZ, VX, VY, VZ
-        COMMON / BLOCK2 / COLTIM, PARTNR
-
-C    *******************************************************************
-C    ** MOLECULAR DYNAMICS OF HARD SPHERE ATOMS.                      **
-C    **                                                               **
-C    ** THIS PROGRAM TAKES IN A HARD-SPHERE CONFIGURATION (POSITIONS  **
-C    ** AND VELOCITIES), CHECKS FOR OVERLAPS, AND THEN CONDUCTS A     **
-C    ** MOLECULAR DYNAMICS SIMULATION RUN FOR A SPECIFIED NUMBER OF   **
-C    ** COLLISIONS.  THE PROGRAM IS FAIRLY EFFICIENT, BUT USES NO     **
-C    ** SPECIAL NEIGHBOUR LISTS, SO IS RESTRICTED TO A SMALL NUMBER   **
-C    ** OF PARTICLES (<500).  IT IS ALWAYS ASSUMED THAT COLLISIONS    **
-C    ** CAN BE PREDICTED BY LOOKING AT NEAREST NEIGHBOUR PARTICLES IN **
-C    ** THE MINIMUM IMAGE CONVENTION OF PERIODIC BOUNDARIES.          **
-C    ** THE BOX IS TAKEN TO BE OF UNIT LENGTH.                        **
-C    ** HOWEVER, RESULTS ARE GIVEN IN UNITS WHERE SIGMA=1, KT=1.      **
-C    **                                                               **
-C    ** PRINCIPAL VARIABLES:                                          **
-C    **                                                               **
-C    ** INTEGER N                    NUMBER OF ATOMS                  **
-C    ** REAL    RX(N),RY(N),RZ(N)    ATOM POSITIONS                   **
-C    ** REAL    VX(N),VY(N),VZ(N)    ATOM VELOCITIES                  **
-C    ** REAL    COLTIM(N)            TIME TO NEXT COLLISION           **
-C    ** INTEGER PARTNR(N)            COLLISION PARTNER                **
-C    ** REAL    SIGMA                ATOM DIAMETER                    **
-C    **                                                               **
-C    ** ROUTINES REFERENCED:                                          **
-C    **                                                               **
-C    ** SUBROUTINE READCN ( CNFILE )                                  **
-C    **    READS IN CONFIGURATION                                     **
-C    ** SUBROUTINE CHECK ( SIGMA, OVRLAP, E )                         **
-C    **    CHECKS CONFIGURATION AND CALCULATES ENERGY                 **
-C    ** SUBROUTINE UPLIST ( SIGMA, I )                                **
-C    **    SEEKS COLLISIONS WITH J>I                                  **
-C    ** SUBROUTINE DNLIST ( SIGMA, I )                                **
-C    **    SEEKS COLLISIONS WITH J<I                                  **
-C    ** SUBROUTINE BUMP ( SIGMA, I, J, W )                            **
-C    **    DOES COLLISION DYNAMICS AND CALCULATES COLLISION VIRIAL    **
-C    ** SUBROUTINE WRITCN ( CNFILE )                                  **
-C    **    WRITES OUT CONFIGURATION                                   **
-C    *******************************************************************
-
-        INTEGER     N
-        PARAMETER ( N = 108 )
-
-        REAL        TIMBIG
-        PARAMETER ( TIMBIG = 1.0E10 )
-
-        REAL        RX(N), RY(N), RZ(N), VX(N), VY(N), VZ(N)
-        REAL        COLTIM(N)
-        INTEGER     PARTNR(N)
-        REAL        SIGMA
-
-        INTEGER     I, J, K, NCOLL, COLL
-        REAL        DENSTY, DIJ, TIJ, T, RATE
-        REAL        E, EN, ENKT, W, PVNKT1, ACW, TEMP, TBC
-        CHARACTER   TITLE*80, CNFILE*30
-        LOGICAL     OVRLAP
-
-C    *******************************************************************
-
-        WRITE(*,'(1H1,'' **** PROGRAM SPHERE ****               '')')
-        WRITE(*,'(//  '' MOLECULAR DYNAMICS OF HARD SPHERES     '')')
-        WRITE(*,'(//  '' RESULTS IN UNITS KT = SIGMA = 1        '')')
-
-C    ** READ IN BASIC SIMULATION PARAMETERS **
-
-        WRITE(*,'('' ENTER RUN TITLE                            '')')
-        READ (*,'(A)') TITLE
-        WRITE(*,'('' ENTER REDUCED DENSITY (N/V)*SIGMA**3       '')')
-        READ (*,*) DENSTY
-        WRITE(*,'('' ENTER NUMBER OF COLLISIONS REQUIRED        '')')
-        READ (*,*) NCOLL
-        WRITE(*,'('' ENTER CONFIGURATION FILENAME               '')')
-        READ (*,'(A)') CNFILE
-
-        WRITE(*,'('' RUN TITLE              '',A)'    ) TITLE
-        WRITE(*,'('' REDUCED DENSITY IS     '',F15.5)') DENSTY
-        WRITE(*,'('' COLLISIONS REQUIRED    '',I15)'  ) NCOLL
-        WRITE(*,'('' CONFIGURATION FILENAME '',A)'    ) CNFILE
-
-        SIGMA = ( DENSTY / REAL(N) ) ** ( 1.0 / 3.0 )
-
-C    ** READ IN CONFIGURATION **
-
-        CALL READCN ( CNFILE )
-
-C    ** CHECK FOR PARTICLE OVERLAPS **
-C    ** CALCULATE ENERGY            **
-
-        CALL CHECK ( SIGMA, OVRLAP, E )
-
-        IF ( OVRLAP ) STOP 'PARTICLE OVERLAP IN INITIAL CONFIGURATION'
-
-        EN = E / REAL ( N )
-        TEMP = 2.0 * EN / 3.0
-        WRITE(*,'('' TEMPERATURE          '',F15.5)') TEMP
-        ENKT = EN / TEMP
-        WRITE(*,'('' INITIAL E/NKT        '',F15.5)') ENKT
-
-C    ** SET UP INITIAL COLLISION LISTS COLTIM AND PARTNR **
-
-        DO 10 I = 1, N
-
-           COLTIM(I) = TIMBIG
-           PARTNR(I) = N
-
-10      CONTINUE
-
-        DO 20 I = 1, N
-
-           CALL UPLIST ( SIGMA, I )
-
-20      CONTINUE
-
-C    ** ZERO VIRIAL ACCUMULATOR **
-
-        ACW = 0.0
-
-        WRITE(*,'(//'' **** START OF DYNAMICS **** '')')
-
-C    *******************************************************************
-C    ** MAIN LOOP BEGINS                                              **
-C    *******************************************************************
-
-        T = 0.0
-
-        DO 1000 COLL = 1, NCOLL
-
-C       ** LOCATE MINIMUM COLLISION TIME **
-
-           TIJ = TIMBIG
-
-           DO 200 K = 1, N
-
-              IF ( COLTIM(K) .LT. TIJ ) THEN
-
-                 TIJ = COLTIM(K)
-                 I   = K
-
-              ENDIF
-
-200        CONTINUE
-
-           J = PARTNR(I)
-
-C       ** MOVE PARTICLES FORWARD BY TIME TIJ **
-C       ** AND REDUCE COLLISION TIMES         **
-C       ** APPLY PERIODIC BOUNDARIES          **
-
-           T = T + TIJ
-
-           DO 300 K = 1, N
-
-              COLTIM(K) = COLTIM(K) - TIJ
-              RX(K) = RX(K) + VX(K) * TIJ
-              RY(K) = RY(K) + VY(K) * TIJ
-              RZ(K) = RZ(K) + VZ(K) * TIJ
-              RX(K) = RX(K) - ANINT ( RX(K) )
-              RY(K) = RY(K) - ANINT ( RY(K) )
-              RZ(K) = RZ(K) - ANINT ( RZ(K) )
-
-300        CONTINUE
-
-C       ** COMPUTE COLLISION DYNAMICS **
-
-           CALL BUMP ( SIGMA, I, J, W )
-
-           ACW = ACW + W
-
-C       ** RESET COLLISION LISTS FOR     **
-C       ** THOSE PARTICLES WHICH NEED IT **
-
-           DO 400 K = 1, N
-
-              IF ( ( K .EQ. I ) .OR. ( PARTNR(K) .EQ. I ) .OR.
-     :             ( K .EQ. J ) .OR. ( PARTNR(K) .EQ. J )     ) THEN
-
-                 CALL UPLIST ( SIGMA, K )
-
-              ENDIF
-
-400        CONTINUE
-
-           CALL DNLIST ( SIGMA, I )
-           CALL DNLIST ( SIGMA, J )
-
-1000    CONTINUE
-
-C    *******************************************************************
-C    ** MAIN LOOP ENDS.                                               **
-C    *******************************************************************
-
-        WRITE(*,'(//'' **** END OF DYNAMICS **** '')')
-
-        WRITE(*,'(/'' FINAL COLLIDING PAIR '',2I5)') I, J
-
-C    ** CHECK FOR PARTICLE OVERLAPS **
-
-        CALL CHECK ( SIGMA, OVRLAP, E )
-
-        IF ( OVRLAP ) THEN
-
-           WRITE(*,'('' PARTICLE OVERLAP IN FINAL CONFIGURATION '')')
-
+  USE md_hard_module
+  use io_module
+  IMPLICIT NONE
+
+  ! Takes in a hard-sphere configuration (positions and velocities)
+  ! Checks for overlaps    
+  ! Conducts molecular dynamics simulation for specified number of collisions
+  ! Uses no special neighbour lists
+  ! ... so is restricted to small number of atoms
+  ! Assumes that collisions can be predicted by looking at 
+  ! nearest neighbour particles in periodic boundaries
+  ! ... so is unsuitable for low densities
+  ! Box is taken to be of unit length.                       
+  ! However, input configuration, output configuration and all
+  ! results are given in units sigma = 1, kT = 1, mass = 1
+
+  REAL                        :: sigma   ! atomic diameter (in units where box=1)
+  REAL                        :: box     ! box length (in units where sigma=1)
+  REAL                        :: density ! reduced density n*sigma**3/box**3
+  CHARACTER(len=7), PARAMETER :: prefix = 'md_hard'
+  character(len=7), parameter :: cnfinp = '.cnfinp', cnfout = '.cnfout'
+
+  INTEGER   ::  i, j, k, ncoll, coll
+  REAL      ::  tij, t, rate, kinetic_energy
+  real, dimension(3) :: total_momentum
+  REAL      ::  virial, pvnkt1, acvirial, temperature, tbc, sigma_sq
+
+  NAMELIST /run_parameters/ ncoll
+
+  WRITE(*,'(''md_hard'')')
+  WRITE(*,'(''Molecular dynamics of hard spheres'')')
+  WRITE(*,'(''Results in units kT = sigma = 1'')')
+
+  READ(*,nml=run_parameters)
+  WRITE(*,'(''Collisions required'',t40,i15)'  ) ncoll
+
+  call read_cnf_atoms ( prefix//cnfinp, n, box )
+  WRITE(*,'(''Number of particles'',t40,i15)') n
+  WRITE(*,'(''Box (in sigma units)'',t40,f15.5)') box
+  sigma = 1.0
+  WRITE(*,'(''Sigma (in sigma units)'',t40,f15.5)') sigma
+  density = real (n) * ( sigma / box ) ** 3
+  WRITE(*,'(''Reduced density'',t40,f15.5)') density
+
+  ALLOCATE ( r(3,n), v(3,n), coltime(n), partner(n) )
+
+  call read_cnf_atoms ( prefix//cnfinp, n, box, r, v )
+  total_momentum = sum(v,dim=2)
+  total_momentum = total_momentum / real(n)
+  write(*,'(''Net momentum'',t40,3f15.5)') total_momentum
+  v = v - spread(total_momentum,dim=1,ncopies=3)
+  kinetic_energy = 0.5 * SUM ( v**2 )
+  temperature = 2.0 * kinetic_energy / REAL ( 3*(n-1) )
+  WRITE(*,'(''Initial temperature (sigma units)'',t40,f15.5)') temperature
+
+  ! Convert to box units
+  r(:,:) = r(:,:) / box
+  v(:,:) = v(:,:) / box
+  r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
+  sigma = sigma / box
+  sigma_sq = sigma ** 2
+  WRITE(*,'(''Sigma (in box units)'',t40,f15.5)'  ) sigma
+
+  IF ( overlap ( sigma_sq ) ) THEN
+     STOP 'particle overlap in initial configuration'
+  END IF
+
+  coltime(:) = HUGE(1.0)
+  partner(:) = n
+
+  DO i = 1, n
+     CALL update ( i, i+1, n, sigma_sq ) ! initial search for collision partners >i
+  END DO
+
+  acvirial = 0.0 ! zero virial accumulator
+
+  WRITE(*,'(''Start of dynamics'')')
+
+  t = 0.0
+
+  DO coll = 1, ncoll ! Start of main loop
+
+     i   = MINLOC ( coltime, dim=1 ) ! locate minimum collision time
+     j   = partner(i)                ! collision partner
+     tij = coltime(i)                ! time to collision
+
+     t          = t          + tij           ! advance time by tij
+     coltime(:) = coltime(:) - tij           ! reduce times to next collision by tij
+     r(:,:)     = r(:,:)     + tij * v(:,:)  ! advance all particles by tij
+     r(:,:)     = r(:,:) - ANINT ( r(:,:) )  ! apply periodic boundaries
+
+     CALL collide ( i, j, sigma_sq, virial ) ! compute collision dynamics
+
+     acvirial = acvirial + virial
+
+     DO k = 1, n
+        IF ( ( k == i ) .OR. ( partner(k) == i ) .OR. ( k == j ) .OR. ( partner(k) == j ) ) THEN
+           CALL update ( k, k+1, n, sigma_sq ) ! search for partners >k
         ENDIF
+     END DO
 
-C    ** WRITE OUT CONFIGURATION **
+     CALL update ( i, 1, i-1, sigma_sq ) ! search for partners <i
+     CALL update ( j, 1, j-1, sigma_sq ) ! search for partners <j
 
-        CALL WRITCN ( CNFILE )
+  END DO ! End of main loop
 
-C     ** WRITE OUT INTERESTING INFORMATION **
+  WRITE(*,'(''End of dynamics'')')
+  WRITE(*,'(''Final colliding pair '',2i5)') i, j
 
-        PVNKT1 = ACW / REAL ( N ) / 3.0 / T / TEMP
-        EN = E / REAL ( N )
-        ENKT = EN / TEMP
-        T = T * SQRT ( TEMP ) / SIGMA
-        RATE = REAL ( NCOLL ) / T
-        TBC  = REAL ( N ) / RATE / 2.0
+  IF ( overlap ( sigma_sq ) ) THEN
+     WRITE(*,'(''Particle overlap in final configuration'')')
+  ENDIF
 
-        WRITE(*,'('' FINAL TIME IS          '',F15.8)') T
-        WRITE(*,'('' COLLISION RATE IS      '',F15.8)') RATE
-        WRITE(*,'('' MEAN COLLISION TIME    '',F15.8)') TBC
-        WRITE(*,'('' FINAL E/NKT IS         '',F15.8)') ENKT
-        WRITE(*,'('' PV/NKT - 1 IS          '',F15.8)') PVNKT1
+  kinetic_energy = 0.5 * SUM ( v**2 ) ! in box units
+  temperature = 2.0 * kinetic_energy / REAL ( 3*(n-1) ) ! in box units
+  pvnkt1 = acvirial / REAL ( n ) / 3.0 / t / temperature ! dimensionless
+  t = t * SQRT ( temperature ) / sigma ! in sigma units
+  rate = REAL ( ncoll ) / t ! in sigma units
+  tbc  = REAL ( n ) / rate / 2.0 ! in sigma units
+  temperature = temperature * box**2 ! in sigma units
 
-        STOP
-        END
+  WRITE(*,'(''Final temperature (sigma units)'',t40,f15.5)') temperature
+  WRITE(*,'(''PV/NkT - 1 is'',t40,f15.8)') pvnkt1
+  WRITE(*,'(''Final time (sigma units)'',t40,f15.8)') t
+  WRITE(*,'(''Collision rate (sigma units)'',t40,f15.8)') rate
+  WRITE(*,'(''Mean collision time (sigma units)'',t40,f15.8)') tbc
 
+! Convert from box units
+  r(:,:) = r(:,:) * box
+  v(:,:) = v(:,:) * box
+  call write_cnf_atoms ( prefix//cnfout, n, box, r, v )
 
+  DEALLOCATE ( r, v, coltime, partner )
 
-        SUBROUTINE CHECK ( SIGMA, OVRLAP, E )
-
-        COMMON / BLOCK1 / RX, RY, RZ, VX, VY, VZ
-        COMMON / BLOCK2 / COLTIM, PARTNR
-
-C    *******************************************************************
-C    ** TESTS FOR PAIR OVERLAPS AND CALCULATES KINETIC ENERGY.        **
-C    *******************************************************************
-
-        INTEGER     N
-        PARAMETER ( N = 108 )
-
-        REAL        RX(N), RY(N), RZ(N), VX(N), VY(N), VZ(N)
-        REAL        COLTIM(N)
-        INTEGER     PARTNR(N)
-
-        REAL        SIGMA, E
-        LOGICAL     OVRLAP
-
-        INTEGER     I, J
-        REAL        RXI, RYI, RZI, RXIJ, RYIJ, RZIJ, RIJSQ, SIGSQ, RIJ
-        REAL        TOL
-        PARAMETER ( TOL = 1.0E-4 )
-
-C    *******************************************************************
-
-        SIGSQ  = SIGMA ** 2
-        OVRLAP = .FALSE.
-        E = 0.0
-
-        DO 100 I = 1, N - 1
-
-           RXI = RX(I)
-           RYI = RY(I)
-           RZI = RZ(I)
-
-           DO 99 J = I + 1, N
-
-              RXIJ = RXI - RX(J)
-              RYIJ = RYI - RY(J)
-              RZIJ = RZI - RZ(J)
-              RXIJ = RXIJ - ANINT ( RXIJ )
-              RYIJ = RYIJ - ANINT ( RYIJ )
-              RZIJ = RZIJ - ANINT ( RZIJ )
-              RIJSQ = RXIJ ** 2 + RYIJ ** 2 + RZIJ ** 2
-
-              IF ( RIJSQ .LT. SIGSQ ) THEN
-
-                 RIJ = SQRT ( RIJSQ / SIGSQ )
-                 WRITE(*,'('' I,J,RIJ/SIGMA = '',2I5,F15.8)')
-     :              I, J, RIJ
-
-                 IF ( ( 1.0 - RIJ ) .GT. TOL ) OVRLAP = .TRUE.
-
-              ENDIF
-
-99         CONTINUE
-
-100     CONTINUE
-
-        DO 200 I = 1, N
-
-           E = E + VX(I) ** 2 + VY(I) ** 2 + VZ(I) ** 2
-
-200     CONTINUE
-
-        E = 0.5 * E
-
-        RETURN
-        END
-
-
-
-        SUBROUTINE UPLIST ( SIGMA, I )
-
-        COMMON / BLOCK1 / RX, RY, RZ, VX, VY, VZ
-        COMMON / BLOCK2 / COLTIM, PARTNR
-
-C    *******************************************************************
-C    ** LOOKS FOR COLLISIONS WITH ATOMS J > I                         **
-C    *******************************************************************
-
-        INTEGER     N
-        PARAMETER ( N = 108 )
-
-        REAL        TIMBIG
-        PARAMETER ( TIMBIG = 1.0E10 )
-
-        INTEGER     I
-        REAL        SIGMA
-        REAL        RX(N), RY(N), RZ(N), VX(N), VY(N), VZ(N)
-        REAL        COLTIM(N)
-        INTEGER     PARTNR(N)
-
-        INTEGER     J
-        REAL        RXI, RYI, RZI, RXIJ, RYIJ, RZIJ
-        REAL        VXI, VYI, VZI, VXIJ, VYIJ, VZIJ
-        REAL        RIJSQ, VIJSQ, BIJ, TIJ, DISCR, SIGSQ
-
-C    *******************************************************************
-
-        IF ( I .EQ. N ) RETURN
-
-        SIGSQ = SIGMA ** 2
-        COLTIM(I) = TIMBIG
-        RXI = RX(I)
-        RYI = RY(I)
-        RZI = RZ(I)
-        VXI = VX(I)
-        VYI = VY(I)
-        VZI = VZ(I)
-
-        DO 100 J = I + 1, N
-
-           RXIJ = RXI - RX(J)
-           RYIJ = RYI - RY(J)
-           RZIJ = RZI - RZ(J)
-           RXIJ = RXIJ - ANINT ( RXIJ )
-           RYIJ = RYIJ - ANINT ( RYIJ )
-           RZIJ = RZIJ - ANINT ( RZIJ )
-           VXIJ = VXI - VX(J)
-           VYIJ = VYI - VY(J)
-           VZIJ = VZI - VZ(J)
-           BIJ  = RXIJ * VXIJ + RYIJ * VYIJ + RZIJ * VZIJ
-
-           IF ( BIJ .LT. 0.0 ) THEN
-
-              RIJSQ = RXIJ ** 2 + RYIJ ** 2 + RZIJ ** 2
-              VIJSQ = VXIJ ** 2 + VYIJ ** 2 + VZIJ ** 2
-              DISCR = BIJ ** 2 - VIJSQ * ( RIJSQ - SIGSQ )
-
-              IF ( DISCR .GT. 0.0 ) THEN
-
-                 TIJ = ( -BIJ - SQRT ( DISCR ) ) / VIJSQ
-
-                 IF ( TIJ .LT. COLTIM(I) ) THEN
-
-                    COLTIM(I) = TIJ
-                    PARTNR(I) = J
-
-                 ENDIF
-
-              ENDIF
-
-           ENDIF
-
-100     CONTINUE
-
-        RETURN
-        END
-
-
-
-        SUBROUTINE DNLIST ( SIGMA, J )
-
-        COMMON / BLOCK1 / RX, RY, RZ, VX, VY, VZ
-        COMMON / BLOCK2 / COLTIM, PARTNR
-
-C    *******************************************************************
-C    ** LOOKS FOR COLLISIONS WITH ATOMS I < J                         **
-C    *******************************************************************
-
-        INTEGER     N
-        PARAMETER ( N = 108 )
-
-        REAL        TIMBIG
-        PARAMETER ( TIMBIG = 1.E10 )
-
-        INTEGER     J
-        REAL        SIGMA
-        REAL        RX(N), RY(N), RZ(N), VX(N), VY(N), VZ(N)
-        REAL        COLTIM(N)
-        INTEGER     PARTNR(N)
-
-        INTEGER     I
-        REAL        RXJ, RYJ, RZJ, RXIJ, RYIJ, RZIJ
-        REAL        VXJ, VYJ, VZJ, VXIJ, VYIJ, VZIJ
-        REAL        RIJSQ, VIJSQ, BIJ, TIJ, DISCR, SIGSQ
-
-C    *******************************************************************
-
-        IF ( J .EQ. 1 ) RETURN
-
-        SIGSQ = SIGMA ** 2
-        RXJ = RX(J)
-        RYJ = RY(J)
-        RZJ = RZ(J)
-        VXJ = VX(J)
-        VYJ = VY(J)
-        VZJ = VZ(J)
-
-        DO 100 I = 1, J - 1
-
-           RXIJ = RX(I) - RXJ
-           RYIJ = RY(I) - RYJ
-           RZIJ = RZ(I) - RZJ
-           RXIJ = RXIJ - ANINT ( RXIJ )
-           RYIJ = RYIJ - ANINT ( RYIJ )
-           RZIJ = RZIJ - ANINT ( RZIJ )
-           VXIJ = VX(I) - VXJ
-           VYIJ = VY(I) - VYJ
-           VZIJ = VZ(I) - VZJ
-           BIJ  = RXIJ * VXIJ + RYIJ * VYIJ + RZIJ * VZIJ
-
-           IF ( BIJ .LT. 0.0 ) THEN
-
-              RIJSQ = RXIJ ** 2 + RYIJ ** 2 + RZIJ ** 2
-              VIJSQ = VXIJ ** 2 + VYIJ ** 2 + VZIJ ** 2
-              DISCR = BIJ ** 2 - VIJSQ * ( RIJSQ - SIGSQ )
-
-              IF ( DISCR .GT. 0.0 ) THEN
-
-                 TIJ = ( - BIJ - SQRT ( DISCR ) ) / VIJSQ
-
-                 IF ( TIJ .LT. COLTIM(I) ) THEN
-
-                    COLTIM(I) = TIJ
-                    PARTNR(I) = J
-
-                 ENDIF
-
-              ENDIF
-
-           ENDIF
-
-100     CONTINUE
-
-        RETURN
-        END
-
-
-
-
-        SUBROUTINE BUMP ( SIGMA, I, J, W )
-
-        COMMON / BLOCK1 / RX, RY, RZ, VX, VY, VZ
-
-C    *******************************************************************
-C    ** COMPUTES COLLISION DYNAMICS FOR PARTICLES I AND J.            **
-C    **                                                               **
-C    ** IT IS ASSUMED THAT I AND J ARE IN CONTACT.                    **
-C    ** THE ROUTINE ALSO COMPUTES COLLISIONAL VIRIAL W.               **
-C    *******************************************************************
-
-        INTEGER     N
-        PARAMETER ( N = 108 )
-
-        INTEGER     I, J
-        REAL        SIGMA, W
-        REAL        RX(N), RY(N), RZ(N), VX(N), VY(N), VZ(N)
-
-        REAL        RXIJ, RYIJ, RZIJ, FACTOR
-        REAL        DELVX, DELVY, DELVZ, SIGSQ
-
-C    *******************************************************************
-
-        SIGSQ = SIGMA ** 2
-        RXIJ = RX(I) - RX(J)
-        RYIJ = RY(I) - RY(J)
-        RZIJ = RZ(I) - RZ(J)
-        RXIJ = RXIJ - ANINT ( RXIJ )
-        RYIJ = RYIJ - ANINT ( RYIJ )
-        RZIJ = RZIJ - ANINT ( RZIJ )
-
-        FACTOR = ( RXIJ * ( VX(I) - VX(J) ) +
-     :             RYIJ * ( VY(I) - VY(J) ) +
-     :             RZIJ * ( VZ(I) - VZ(J) ) ) / SIGSQ
-        DELVX = - FACTOR * RXIJ
-        DELVY = - FACTOR * RYIJ
-        DELVZ = - FACTOR * RZIJ
-
-        VX(I) = VX(I) + DELVX
-        VX(J) = VX(J) - DELVX
-        VY(I) = VY(I) + DELVY
-        VY(J) = VY(J) - DELVY
-        VZ(I) = VZ(I) + DELVZ
-        VZ(J) = VZ(J) - DELVZ
-
-        W = DELVX * RXIJ + DELVY * RYIJ + DELVZ * RZIJ
-
-        RETURN
-        END
-
-
-
-        SUBROUTINE READCN ( CNFILE )
-
-        COMMON / BLOCK1 / RX, RY, RZ, VX, VY, VZ
-
-C    *******************************************************************
-C    ** READS CONFIGURATION FROM CHANNEL 10                           **
-C    *******************************************************************
-
-        INTEGER     N
-        PARAMETER ( N = 108 )
-
-        INTEGER     CNUNIT
-        PARAMETER ( CNUNIT = 10 )
-
-        INTEGER     NN
-        CHARACTER   CNFILE*(*)
-        REAL        RX(N), RY(N), RZ(N), VX(N), VY(N), VZ(N)
-
-C    *******************************************************************
-
-        OPEN ( UNIT = CNUNIT, FILE = CNFILE,
-     :         STATUS = 'OLD', FORM = 'UNFORMATTED' )
-
-        READ ( CNUNIT ) NN
-        IF ( NN .NE. N ) STOP 'N ERROR IN READCN'
-        READ ( CNUNIT ) RX, RY, RZ
-        READ ( CNUNIT ) VX, VY, VZ
-
-        CLOSE ( UNIT = CNUNIT )
-
-        RETURN
-        END
-
-
-
-        SUBROUTINE WRITCN ( CNFILE )
-
-        COMMON / BLOCK1 / RX, RY, RZ, VX, VY, VZ
-
-C    *******************************************************************
-C    ** WRITES CONFIGURATION TO CHANNEL 10                            **
-C    *******************************************************************
-
-        INTEGER     N
-        PARAMETER ( N = 108 )
-
-        INTEGER     CNUNIT
-        PARAMETER ( CNUNIT = 10 )
-
-        CHARACTER   CNFILE*(*)
-        REAL        RX(N), RY(N), RZ(N), VX(N), VY(N), VZ(N)
-
-C    *******************************************************************
-
-        OPEN ( UNIT = CNUNIT, FILE = CNFILE,
-     :         STATUS = 'UNKNOWN', FORM = 'UNFORMATTED' )
-
-        WRITE ( CNUNIT ) N
-        WRITE ( CNUNIT ) RX, RY, RZ
-        WRITE ( CNUNIT ) VX, VY, VZ
-
-        CLOSE ( UNIT = CNUNIT )
-
-        RETURN
-        END
-
-
+END PROGRAM md_hard
 
