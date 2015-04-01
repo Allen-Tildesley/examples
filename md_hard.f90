@@ -1,4 +1,4 @@
-! md_hard.f90
+! md_hard.f90 (also uses md_hard_module.f90 and io_module.f90)
 ! Molecular dynamics of hard spheres
 PROGRAM md_hard
   USE md_hard_module
@@ -26,7 +26,7 @@ PROGRAM md_hard
   INTEGER   ::  i, j, k, ncoll, coll
   REAL      ::  tij, t, rate, kinetic_energy
   real, dimension(3) :: total_momentum
-  REAL      ::  virial, pvnkt1, acvirial, temperature, tbc, sigma_sq
+  REAL      ::  virial, pvnkt1, virial_avg, temperature, tbc, sigma_sq
 
   NAMELIST /run_parameters/ ncoll
 
@@ -75,7 +75,7 @@ PROGRAM md_hard
      CALL update ( i, i+1, n, sigma_sq ) ! initial search for collision partners >i
   END DO
 
-  acvirial = 0.0 ! zero virial accumulator
+  virial_avg = 0.0 ! zero virial accumulator
 
   WRITE(*,'(''Start of dynamics'')')
 
@@ -94,7 +94,7 @@ PROGRAM md_hard
 
      CALL collide ( i, j, sigma_sq, virial ) ! compute collision dynamics
 
-     acvirial = acvirial + virial
+     virial_avg = virial_avg + virial
 
      DO k = 1, n
         IF ( ( k == i ) .OR. ( partner(k) == i ) .OR. ( k == j ) .OR. ( partner(k) == j ) ) THEN
@@ -116,7 +116,7 @@ PROGRAM md_hard
 
   kinetic_energy = 0.5 * SUM ( v**2 ) ! in box units
   temperature = 2.0 * kinetic_energy / REAL ( 3*(n-1) ) ! in box units
-  pvnkt1 = acvirial / REAL ( n ) / 3.0 / t / temperature ! dimensionless
+  pvnkt1 = virial_avg / REAL ( n ) / 3.0 / t / temperature ! dimensionless
   t = t * SQRT ( temperature ) / sigma ! in sigma units
   rate = REAL ( ncoll ) / t ! in sigma units
   tbc  = REAL ( n ) / rate / 2.0 ! in sigma units
