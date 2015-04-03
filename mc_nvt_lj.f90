@@ -90,7 +90,7 @@ PROGRAM mc_nvt_lj
 
   CALL run_begin ( ['Move ratio','Pressure  ','Potential '] ) ! must all be character*10 constants
 
-  DO blk = 1, nblock
+  DO blk = 1, nblock ! Begin loop over blocks
 
      CALL blk_begin
 

@@ -18,15 +18,24 @@ PROGRAM md_hard
   ! most calculations, and all results 
   ! are given in units sigma = 1, mass = 1
 
-  REAL                        :: sigma   ! atomic diameter (in units where box=1)
-  REAL                        :: box     ! box length (in units where sigma=1)
-  REAL                        :: density ! reduced density n*sigma**3/box**3
-  CHARACTER(len=7), PARAMETER :: prefix = 'md_hard'
-  CHARACTER(len=7), PARAMETER :: cnfinp = '.cnfinp', cnfout = '.cnfout'
+  ! Most important variables
+  REAL :: sigma       ! atomic diameter (in units where box=1)
+  REAL :: box         ! box length (in units where sigma=1)
+  REAL :: density     ! reduced density n*sigma**3/box**3
+  REAL :: vir         ! total collisional virial
+  real :: kin         ! kinetic energy
+  real :: temperature ! temperature
+  real :: t           ! time
 
-  INTEGER            :: i, j, k, ncoll, coll, nblock
-  REAL               :: tij, t, rate, kin
-  REAL               :: virial, pvnkt1, virial_avg, temperature, tbc, sigma_sq
+  CHARACTER(len=11), PARAMETER :: cnf_prefix = 'md_hard.cnf'
+  CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
+  CHARACTER(len=3)             :: sav_tag = 'sav' ! may be overwritten with block number
+
+  REAL :: coll_rate, pressure ! quantities to be averaged
+  
+  INTEGER            :: i, j, k, ncoll, coll, blk, nblock
+  REAL               :: tij
+  REAL               :: vir_sum, sigma_sq
   REAL, DIMENSION(3) :: total_momentum
 
   NAMELIST /run_parameters/ nblock, ncoll
@@ -39,10 +48,10 @@ PROGRAM md_hard
   nblock = 10
   ncoll  = 10000
   READ(*,nml=run_parameters)
-  WRITE(*,'(''Number of blocks'',              t40,i15)'  ) nblock
-  WRITE(*,'(''Number of collisions per block'',t40,i15)'  ) ncoll
+  WRITE(*,'(''Number of blocks'',              t40,i15)') nblock
+  WRITE(*,'(''Number of collisions per block'',t40,i15)') ncoll
 
-  CALL read_cnf_atoms ( prefix//cnfinp, n, box )
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box )
   WRITE(*,'(''Number of particles'', t40,i15  )') n
   WRITE(*,'(''Box (in sigma units)'',t40,f15.5)') box
   sigma = 1.0
@@ -51,7 +60,7 @@ PROGRAM md_hard
 
   ALLOCATE ( r(3,n), v(3,n), coltime(n), partner(n) )
 
-  CALL read_cnf_atoms ( prefix//cnfinp, n, box, r, v )
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v )
   total_momentum = SUM(v,dim=2)
   total_momentum = total_momentum / REAL(n)
   WRITE(*,'(''Net momentum'',t40,3f15.5)') total_momentum
@@ -79,63 +88,60 @@ PROGRAM md_hard
      CALL update ( i, gt, sigma_sq ) ! initial search for collision partners >i
   END DO
 
-  virial_avg = 0.0 ! zero virial accumulator
+  CALL run_begin ( ['Coll Rate ','Pressure  '] ) ! must all be character*10 constants
 
-  WRITE(*,'(''Start of dynamics'')')
+  DO blk = 1, nblock ! Begin loop over blocks
 
-  t = 0.0
+     CALL blk_begin
+     vir_sum = 0.0
+     t = 0.0
 
-  DO coll = 1, ncoll ! Start of main loop
+     DO coll = 1, ncoll ! Begin loop over collisions
 
-     i   = MINLOC ( coltime, dim=1 ) ! locate minimum collision time
-     j   = partner(i)                ! collision partner
-     tij = coltime(i)                ! time to collision
+        i   = MINLOC ( coltime, dim=1 ) ! locate minimum collision time
+        j   = partner(i)                ! collision partner
+        tij = coltime(i)                ! time to collision
 
-     t          = t          + tij           ! advance time by tij
-     coltime(:) = coltime(:) - tij           ! reduce times to next collision by tij
-     r(:,:)     = r(:,:)     + tij * v(:,:)  ! advance all particles by tij
-     r(:,:)     = r(:,:) - ANINT ( r(:,:) )  ! apply periodic boundaries
+        t          = t          + tij           ! advance time by tij
+        coltime(:) = coltime(:) - tij           ! reduce times to next collision by tij
+        r(:,:)     = r(:,:)     + tij * v(:,:)  ! advance all particles by tij
+        r(:,:)     = r(:,:) - ANINT ( r(:,:) )  ! apply periodic boundaries
 
-     CALL collide ( i, j, sigma_sq, virial ) ! compute collision dynamics
+        CALL collide ( i, j, sigma_sq, vir ) ! compute collision dynamics
 
-     virial_avg = virial_avg + virial
+        vir_sum = vir_sum + vir
 
-     DO k = 1, n
-        IF ( ( k == i ) .OR. ( partner(k) == i ) .OR. ( k == j ) .OR. ( partner(k) == j ) ) THEN
-           CALL update ( k, gt, sigma_sq ) ! search for partners >k
-        ENDIF
-     END DO
+        DO k = 1, n
+           IF ( ( k == i ) .OR. ( partner(k) == i ) .OR. ( k == j ) .OR. ( partner(k) == j ) ) THEN
+              CALL update ( k, gt, sigma_sq ) ! search for partners >k
+           ENDIF
+        END DO
 
-     CALL update ( i, lt, sigma_sq ) ! search for partners <i
-     CALL update ( j, lt, sigma_sq ) ! search for partners <j
+        CALL update ( i, lt, sigma_sq ) ! search for partners <i
+        CALL update ( j, lt, sigma_sq ) ! search for partners <j
 
-  END DO ! End of main loop
+     END DO ! End loop over collisions
 
-  WRITE(*,'(''End of dynamics'')')
-  WRITE(*,'(''Final colliding pair '',2i5)') i, j
+      ! Collisional time averages in sigma units
+     coll_rate = REAL ( ncoll ) / t
+     pressure  = density*temperature + vir_sum / t / box**3
+     CALL stp_end ( [coll_rate, pressure] )
+     CALL blk_end ( blk )
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk ! number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v*box ) ! save configuration
 
-  IF ( overlap ( sigma_sq ) ) THEN
-     WRITE(*,'(''Particle overlap in final configuration'')')
-  ENDIF
+  END DO ! End loop over blocks
 
-  kin = 0.5 * SUM ( v**2 ) ! in box units
-  temperature = 2.0 * kin / REAL ( 3*(n-1) ) ! in box units
-  pvnkt1 = virial_avg / REAL ( n ) / 3.0 / t / temperature ! dimensionless
-  t = t * SQRT ( temperature ) / sigma ! in sigma units
-  rate = REAL ( ncoll ) / t ! in sigma units
-  tbc  = REAL ( n ) / rate / 2.0 ! in sigma units
-  temperature = temperature * box**2 ! in sigma units
+  CALL run_end
 
-  WRITE(*,'(''Final temperature (sigma units)'',t40,f15.5)') temperature
-  WRITE(*,'(''PV/NkT - 1 is'',t40,f15.8)') pvnkt1
-  WRITE(*,'(''Final time (sigma units)'',t40,f15.8)') t
-  WRITE(*,'(''Collision rate (sigma units)'',t40,f15.8)') rate
-  WRITE(*,'(''Mean collision time (sigma units)'',t40,f15.8)') tbc
+  WRITE(*,'(''Final colliding pair'',t40,2i5)') i, j
 
-! Convert from box units
+  IF ( overlap ( sigma_sq ) ) STOP 'Particle overlap in final configuration'
+
+  ! Convert from box units
   r(:,:) = r(:,:) * box
   v(:,:) = v(:,:) * box
-  CALL write_cnf_atoms ( prefix//cnfout, n, box, r, v )
+  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r, v )
 
   DEALLOCATE ( r, v, coltime, partner )
 

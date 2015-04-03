@@ -102,9 +102,9 @@ CONTAINS
   END FUNCTION overlap
 
   SUBROUTINE collide ( i, j, sigma_sq, virial ) ! collision dynamics
-    INTEGER, INTENT(in) :: i, j
-    REAL, INTENT(in)                  :: sigma_sq
-    REAL,               INTENT(out)   :: virial
+    INTEGER, INTENT(in)  :: i, j
+    REAL,    INTENT(in)  :: sigma_sq
+    REAL,    INTENT(out) :: virial
 
     ! it is assumed that i and j are in contact
     ! the routine also computes the collisional virial
@@ -121,7 +121,7 @@ CONTAINS
 
     v(:,i) = v(:,i) + vij
     v(:,j) = v(:,j) - vij
-    virial = dot_PRODUCT ( vij, rij )
+    virial = dot_PRODUCT ( vij, rij ) / 3.0
   END SUBROUTINE collide
 
 END MODULE md_hard_module
