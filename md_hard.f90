@@ -2,7 +2,7 @@
 ! Molecular dynamics of hard spheres
 PROGRAM md_hard
   USE md_hard_module
-  use io_module
+  USE io_module
   IMPLICIT NONE
 
   ! Takes in a hard-sphere configuration (positions and velocities)
@@ -21,12 +21,12 @@ PROGRAM md_hard
   REAL                        :: box     ! box length (in units where sigma=1)
   REAL                        :: density ! reduced density n*sigma**3/box**3
   CHARACTER(len=7), PARAMETER :: prefix = 'md_hard'
-  character(len=7), parameter :: cnfinp = '.cnfinp', cnfout = '.cnfout'
+  CHARACTER(len=7), PARAMETER :: cnfinp = '.cnfinp', cnfout = '.cnfout'
 
-  INTEGER   ::  i, j, k, ncoll, coll
-  REAL      ::  tij, t, rate, kinetic_energy
-  real, dimension(3) :: total_momentum
-  REAL      ::  virial, pvnkt1, virial_avg, temperature, tbc, sigma_sq
+  INTEGER            :: i, j, k, ncoll, coll
+  REAL               :: tij, t, rate, kinetic_energy
+  REAL               :: virial, pvnkt1, virial_avg, temperature, tbc, sigma_sq
+  REAL, DIMENSION(3) :: total_momentum
 
   NAMELIST /run_parameters/ ncoll
 
@@ -37,21 +37,21 @@ PROGRAM md_hard
   READ(*,nml=run_parameters)
   WRITE(*,'(''Collisions required'',t40,i15)'  ) ncoll
 
-  call read_cnf_atoms ( prefix//cnfinp, n, box )
+  CALL read_cnf_atoms ( prefix//cnfinp, n, box )
   WRITE(*,'(''Number of particles'',t40,i15)') n
   WRITE(*,'(''Box (in sigma units)'',t40,f15.5)') box
   sigma = 1.0
   WRITE(*,'(''Sigma (in sigma units)'',t40,f15.5)') sigma
-  density = real (n) * ( sigma / box ) ** 3
+  density = REAL (n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
 
   ALLOCATE ( r(3,n), v(3,n), coltime(n), partner(n) )
 
-  call read_cnf_atoms ( prefix//cnfinp, n, box, r, v )
-  total_momentum = sum(v,dim=2)
-  total_momentum = total_momentum / real(n)
-  write(*,'(''Net momentum'',t40,3f15.5)') total_momentum
-  v = v - spread(total_momentum,dim=1,ncopies=3)
+  CALL read_cnf_atoms ( prefix//cnfinp, n, box, r, v )
+  total_momentum = SUM(v,dim=2)
+  total_momentum = total_momentum / REAL(n)
+  WRITE(*,'(''Net momentum'',t40,3f15.5)') total_momentum
+  v = v - SPREAD(total_momentum,dim=1,ncopies=3)
   kinetic_energy = 0.5 * SUM ( v**2 )
   temperature = 2.0 * kinetic_energy / REAL ( 3*(n-1) )
   WRITE(*,'(''Initial temperature (sigma units)'',t40,f15.5)') temperature
@@ -131,7 +131,7 @@ PROGRAM md_hard
 ! Convert from box units
   r(:,:) = r(:,:) * box
   v(:,:) = v(:,:) * box
-  call write_cnf_atoms ( prefix//cnfout, n, box, r, v )
+  CALL write_cnf_atoms ( prefix//cnfout, n, box, r, v )
 
   DEALLOCATE ( r, v, coltime, partner )
 

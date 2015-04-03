@@ -1,3 +1,5 @@
+! md_hard_module.f90 (used by md_hard.f90)
+! Molecular dynamics of hard spheres
 MODULE md_hard_module
 
   IMPLICIT NONE
