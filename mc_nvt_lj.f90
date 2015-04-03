@@ -2,7 +2,7 @@
 ! Monte Carlo simulation, constant-NVT ensemble, Lennard-Jones atoms
 PROGRAM mc_nvt_lj
   USE utility_module,   ONLY : read_cnf_atoms, write_cnf_atoms, run_begin, run_end, blk_begin, blk_end, stp_end
-  USE mc_nvt_lj_module, ONLY : energy_i, energy, pot_lrc, vir_lrc
+  USE mc_nvt_lj_module, ONLY : energy_1, energy, pot_lrc, vir_lrc, n, r, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -104,11 +104,11 @@ PROGRAM mc_nvt_lj
            zeta(1:3) = 2.0*zeta(1:3) - 1.0 ! first three now in range (-1,+1)
 
            ri(:) = r(:,i)
-           CALL  energy_i ( ri, i, j_ne_i, sigma, r_cut, pot_old, vir_old, overlap )
+           CALL  energy_1 ( ri, i, ne, sigma, r_cut, pot_old, vir_old, overlap )
            IF ( overlap ) STOP 'Overlap in current configuration'
            ri(:) = ri(:) + zeta(1:3) * dr_max ! trial move to new position
            ri(:) = ri(:) - ANINT ( ri(:) )    ! periodic boundary correction
-           CALL  energy_i ( ri, i, j_ne_i, sigma, r_cut, pot_new, vir_new, overlap )
+           CALL  energy_1 ( ri, i, ne, sigma, r_cut, pot_new, vir_new, overlap )
 
            IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
 

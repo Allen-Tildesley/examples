@@ -2,13 +2,13 @@ MODULE mc_nvt_lj_module
 
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: n, r, j_lt_i, j_ne_i, j_gt_i
-  PUBLIC :: energy_i, energy, pot_lrc, vir_lrc
+  PUBLIC :: n, r, lt, ne, gt
+  PUBLIC :: energy_1, energy, pot_lrc, vir_lrc
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions
 
-  INTEGER, PARAMETER :: j_lt_i = -1, j_ne_i = 0, j_gt_i = 1 ! j-range options
+  INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
 
 CONTAINS
 
@@ -31,7 +31,7 @@ CONTAINS
 
     DO i = 1, n - 1
 
-       CALL energy_i ( r(:,i), i, j_gt_i, sigma, r_cut, pot_i, vir_i, overlap )
+       CALL energy_1 ( r(:,i), i, gt, sigma, r_cut, pot_i, vir_i, overlap )
 
        IF ( overlap ) RETURN
        pot = pot + pot_i
@@ -40,7 +40,7 @@ CONTAINS
 
   END SUBROUTINE energy
 
-  SUBROUTINE energy_i ( ri, i, j_range, sigma, r_cut, pot, vir, overlap )
+  SUBROUTINE energy_1 ( ri, i, j_range, sigma, r_cut, pot, vir, overlap )
 
     REAL, DIMENSION(3), INTENT(in)  :: ri
     INTEGER,            INTENT(in)  :: i, j_range
@@ -68,13 +68,13 @@ CONTAINS
     overlap = .FALSE.
 
     SELECT CASE ( j_range )
-    CASE ( j_lt_i )
+    CASE ( lt ) ! j < i
        j1 = 1
        j2 = i-1
-    CASE ( j_gt_i )
+    CASE ( gt ) ! j > i
        j1 = i+1
        j2 = n
-    CASE ( j_ne_i )
+    CASE ( ne ) ! j /= i
        j1 = 1
        j2 = n
     END SELECT
@@ -106,7 +106,7 @@ CONTAINS
     pot = 4.0 * pot        ! LJ units (sigma = 1)
     vir = 48.0 * vir / 3.0 ! LJ units (sigma = 1)
 
-  END SUBROUTINE energy_i
+  END SUBROUTINE energy_1
 
   FUNCTION pot_lrc ( sigma, r_cut, density ) ! Long-range correction to potential per atom
     REAL             :: pot_lrc              ! Function result in LJ (sigma=1) units

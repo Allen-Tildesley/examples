@@ -4,7 +4,7 @@ MODULE md_hard_module
 
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: n, r, v, coltime, partner
+  PUBLIC :: n, r, v, coltime, partner, lt, ne, gt
   PUBLIC :: update, overlap, collide
 
   INTEGER                              :: n       ! number of atoms
@@ -12,19 +12,35 @@ MODULE md_hard_module
   REAL,    DIMENSION(:),   ALLOCATABLE :: coltime ! time to next collision (n)
   INTEGER, DIMENSION(:),   ALLOCATABLE :: partner ! collision partner (n)
 
+  INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
+
 CONTAINS
 
-  SUBROUTINE update ( i, j1, j2, sigma_sq ) ! updates collision details for atom i
-    INTEGER, INTENT(in) :: i, j1, j2
+  SUBROUTINE update ( i, j_range, sigma_sq ) ! updates collision details for atom i
+    INTEGER, INTENT(in) :: i, j_range
     REAL,    INTENT(in) :: sigma_sq
 
-    INTEGER            :: j
+    INTEGER            :: j, j1, j2
     REAL, DIMENSION(3) :: rij, vij
     REAL               :: rijsq, vijsq, bij, tij, discr
+
+    SELECT CASE ( j_range )
+    CASE ( lt ) ! j < i
+       j1 = 1
+       j2 = i-1
+    CASE ( gt ) ! j > i
+       j1 = i+1
+       j2 = n
+    CASE ( ne ) ! j /= i
+       j1 = 1
+       j2 = n
+    END SELECT
 
     coltime(i) = HUGE(1.0)
 
     DO j = j1, j2
+
+       IF ( i == j ) CYCLE
 
        rij(:) = r(:,i) - r(:,j)
        rij(:) = rij(:) - ANINT ( rij(:) )

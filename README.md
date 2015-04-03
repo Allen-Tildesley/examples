@@ -7,6 +7,9 @@ The intention is to clarify points made in the text,
 rather than to provide a piece of code
 suitable for direct use in a research application.
 
+## Warning
+These programs are currently in development. They are not yet ready.
+
 ## Disclaimer
 We ascribe no commercial value to the programs themselves.
 Although a few complete programs are provided,
@@ -19,5 +22,5 @@ You should always check out a routine for your particular application.
 
 ## Language
 The programs contain some explanatory comments, and
-are written, in the main, in Fortran 2003.
+are written, in the main, in Fortran 2003/2008.
 Fortran provides a standard way of inter-operating with C.
