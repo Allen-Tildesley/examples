@@ -1,6 +1,6 @@
 # SCons build file for the various programs
 # Run this typing 'scons'
-# 'Clean' the program by 'scons -c' (i.e., remove object, module and executable)
+# Clean the program by 'scons -c' (i.e., remove object, module and executable)
 
 import os, sys
 
@@ -19,6 +19,7 @@ env_mpi.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFIX='
 
 variants={}
 variants['build_mc_nvt_lj']    = (['mc_nvt_lj.f90','mc_nvt_lj_module.f90','utility_module.f90'],env_normal)
+variants['build_mc_npt_lj']    = (['mc_npt_lj.f90','mc_npt_lj_module.f90','utility_module.f90'],env_normal)
 variants['build_md_hard']      = (['md_hard.f90','md_hard_module.f90','utility_module.f90'],env_normal)
 
 # Build each variant in appropriate variant directory

@@ -123,9 +123,9 @@ PROGRAM md_hard
      END DO ! End loop over collisions
 
       ! Collisional time averages in sigma units
-     coll_rate = REAL ( ncoll ) / t
-     pressure  = density*temperature + vir_sum / t / box**3
-     CALL stp_end ( [coll_rate, pressure] )
+     coll_rate = 2.0*REAL (ncoll) / t / real(n)             ! collision rate per particle
+     pressure  = density*temperature + vir_sum / t / box**3 ! ideal + collisional
+     CALL stp_end ( [coll_rate, pressure] ) ! single 'step' average equivalent to time average
      CALL blk_end ( blk )
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk ! number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v*box ) ! save configuration

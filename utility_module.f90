@@ -102,7 +102,7 @@ CONTAINS
     blk_averages = blk_averages / blk_norm     ! Normalize block averages
     run_averages = run_averages + blk_averages ! Increment run averages
     errors       = errors + blk_averages**2    ! Increment error accumulators
-    run_norm     = run_norm + 1                ! Increment run normalizer
+    run_norm     = run_norm + 1.0              ! Increment run normalizer
 
     IF ( first_call ) THEN  ! Write headings
        WRITE(*,'(*(a15))') REPEAT ( '=', 15*(nvariables+1) ) 
