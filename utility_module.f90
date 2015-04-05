@@ -150,4 +150,20 @@ CONTAINS
 
   END SUBROUTINE run_end
 
+  FUNCTION random_integer ( k1, k2 ) RESULT ( k ) ! returns random integer in range [k1,k2] inclusive
+    INTEGER             :: k
+    INTEGER, INTENT(in) :: k1, k2
+
+    INTEGER :: k_lo, k_hi
+    REAL    :: zeta
+
+    CALL random_NUMBER ( zeta )
+    k_lo = MIN(k1,k2)
+    k_hi = MAX(k1,k2)
+    k =  k_lo + FLOOR((k_hi-k_lo+1)*zeta)
+    IF ( k < k_lo ) k = k_lo ! guard against small danger of roundoff
+    IF ( k > k_hi ) k = k_hi ! guard against small danger of roundoff
+
+  END FUNCTION random_integer
+
 END MODULE utility_module

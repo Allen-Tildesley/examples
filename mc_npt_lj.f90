@@ -3,7 +3,7 @@
 PROGRAM mc_npt_lj
   USE utility_module,   ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                       run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_npt_lj_module, ONLY : energy_1, energy, pot_lrc, vir_lrc, n, r, ne
+  USE mc_npt_lj_module, ONLY : energy_1, energy, energy_lrc, n, r, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -40,11 +40,11 @@ PROGRAM mc_npt_lj
   LOGICAL            :: overlap
   INTEGER            :: blk, stp, i, nstep, nblock, moves
   REAL               :: box_scale, sigma_scale, box_new, sigma_new, density_new, delta
-  REAL, DIMENSION(2) :: pot_old, pot_new, vir_old, vir_new
+  REAL, DIMENSION(2) :: pot_old, pot_new, pot_lrc, vir_old, vir_new, vir_lrc
   REAL, DIMENSION(3) :: ri   ! position of atom i
   REAL, DIMENSION(3) :: zeta ! random numbers
 
-  CHARACTER(len=13), PARAMETER :: cnf_prefix = 'md_npt_lj.cnf'
+  CHARACTER(len=13), PARAMETER :: cnf_prefix = 'mc_npt_lj.cnf'
   CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)             :: sav_tag = 'sav' ! may be overwritten with block number
 
@@ -77,8 +77,6 @@ PROGRAM mc_npt_lj
   sigma = 1.0
   density = REAL(n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
-  WRITE(*,'(''Potential LRC (sigma units)'',t40,2f15.5)') pot_lrc ( sigma, r_cut, density )
-  WRITE(*,'(''Virial LRC (sigma units)'',   t40,2f15.5)') vir_lrc ( sigma, r_cut, density )
 
   ALLOCATE ( r(3,n) )
 
@@ -95,8 +93,11 @@ PROGRAM mc_npt_lj
 
   CALL energy ( sigma, r_cut, pot, vir, overlap )
   IF ( overlap ) STOP 'Overlap in initial configuration'
-  potential    = SUM ( pot ) / REAL ( n ) + SUM ( pot_lrc ( sigma, r_cut, density ) )
-  pressure = density * temperature + SUM ( vir ) / box**3 + SUM ( vir_lrc ( sigma, r_cut, density ) ) * density
+  CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+  pot = pot + pot_lrc
+  vir = vir + vir_lrc
+  potential = SUM ( pot ) / REAL ( n )
+  pressure  = density * temperature + SUM ( vir ) / box**3
   WRITE(*,'(''Initial potential energy (sigma units)'',t40,f15.5)') potential
   WRITE(*,'(''Initial pressure (sigma units)'',        t40,f15.5)') pressure
 
@@ -140,18 +141,17 @@ PROGRAM mc_npt_lj
         move_ratio = REAL(moves) / REAL(n)
 
         box_move_ratio = 0.0
-        pot_old = pot + REAL(n)*pot_lrc ( sigma, r_cut, density ) ! include LRC
-        CALL RANDOM_NUMBER ( zeta(1) )       ! uniform random number in range (0,1)
-        zeta(1)     = 2.0*zeta(1) - 1.0      ! now in range (-1,+1)
-        box_scale   = EXP ( zeta(1)*db_max ) ! sampling log(box) and log(vol) uniformly
-        sigma_scale = 1.0 / box_scale        ! sigma scaling in box=1 units
-        box_new     = box * box_scale        ! new box
-        sigma_new   = sigma * sigma_scale    ! new sigma (in box units)
-        density_new = REAL(n)*sigma_new**3   ! reduced density
-        pot_new(1)  = pot_old(1) * sigma_scale**12 ! scaled potential including LRC
-        pot_new(2)  = pot_old(2) * sigma_scale**6  ! scaled potential including LRC
-        delta       =  ( SUM(pot_new-pot_old) + pressure_inp * ( box_new ** 3 - box**3 )  ) / temperature &
-             &        + REAL ( n+1 ) * LOG ( density_new / density ) ! factor (n+1) consistent with box scaling
+        CALL RANDOM_NUMBER ( zeta(1) )         ! uniform random number in range (0,1)
+        zeta(1)     = 2.0*zeta(1) - 1.0        ! now in range (-1,+1)
+        box_scale   = EXP ( zeta(1)*db_max )   ! sampling log(box) and log(vol) uniformly
+        sigma_scale = 1.0 / box_scale          ! sigma scaling in box=1 units
+        box_new     = box * box_scale          ! new box
+        sigma_new   = sigma * sigma_scale      ! new sigma (in box units)
+        density_new = REAL(n) * sigma_new**3   ! reduced density
+        pot_new(1)  = pot(1) * sigma_scale**12 ! scaled potential
+        pot_new(2)  = pot(2) * sigma_scale**6  ! scaled potential
+        delta       =  ( SUM(pot_new-pot) + pressure_inp * ( box_new**3 - box**3 )  ) / temperature &
+             &        + REAL(n+1) * LOG(density_new/density) ! factor (n+1) consistent with box scaling
 
         IF ( metropolis ( delta ) ) THEN ! accept because Metropolis test
            pot(1)  = pot(1) * sigma_scale**12 ! update LJ12 part of potential (without LRC)
@@ -165,8 +165,8 @@ PROGRAM mc_npt_lj
         END IF ! reject Metropolis test
 
         ! Calculate all variables for this step
-        potential = SUM ( pot ) / REAL(n) + SUM ( pot_lrc ( sigma, r_cut, density ) )
-        pressure  = density * temperature + SUM ( vir ) / box**3 + SUM ( vir_lrc ( sigma, r_cut, density ) ) * density
+        potential = SUM ( pot ) / REAL(n)
+        pressure  = density * temperature + SUM ( vir ) / box**3
         CALL blk_add ( [move_ratio,box_move_ratio,density,potential,pressure] )
 
      END DO ! End loop over steps
@@ -179,16 +179,19 @@ PROGRAM mc_npt_lj
 
   CALL run_end
 
-  potential = SUM ( pot ) / REAL ( n ) + SUM ( pot_lrc ( sigma, r_cut, density ) )
-  pressure  = density * temperature + SUM ( vir ) / box**3 + SUM ( vir_lrc ( sigma, r_cut, density ) ) * density
+  potential = SUM ( pot ) / REAL ( n )
+  pressure  = density * temperature + SUM ( vir ) / box**3
   WRITE(*,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
   WRITE(*,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
   WRITE(*,'(''Final density (sigma units)'',         t40,f15.5)') density
 
   CALL energy ( sigma, r_cut, pot, vir, overlap )
   IF ( overlap ) STOP 'Overlap in final configuration'
-  potential = SUM ( pot ) / REAL ( n ) + SUM ( pot_lrc ( sigma, r_cut, density ) )
-  pressure  = density * temperature + SUM ( vir ) / box**3 + SUM ( vir_lrc ( sigma, r_cut, density ) ) * density
+  CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+  pot = pot + pot_lrc
+  vir = vir + vir_lrc
+  potential = SUM ( pot ) / REAL ( n )
+  pressure  = density * temperature + SUM ( vir ) / box**3
   WRITE(*,'(''Final check'')')
   WRITE(*,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
   WRITE(*,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure

@@ -5,7 +5,7 @@ MODULE mc_npt_lj_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, lt, ne, gt
-  PUBLIC :: energy_1, energy, pot_lrc, vir_lrc
+  PUBLIC :: energy_1, energy, energy_lrc
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions
@@ -111,30 +111,21 @@ CONTAINS
 
   END SUBROUTINE energy_1
 
-  FUNCTION pot_lrc ( sigma, r_cut, density ) ! Long-range correction to potential per atom
-    REAL, dimension(2) :: pot_lrc            ! Function result in LJ (sigma=1) units
-    REAL, INTENT(in)   :: sigma, r_cut, density
+  SUBROUTINE energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc ) ! Long-range corrections
+    INTEGER,            intent(in)  :: n                ! number of atoms
+    REAL,               INTENT(in)  :: sigma, r_cut     ! LJ potential parameters
+    REAL, DIMENSION(2), INTENT(out) :: pot_lrc, vir_lrc ! Results in LJ (sigma=1) units
 
-    REAL            :: sr3
+    REAL            :: sr3, density
     REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
 
-    sr3     = ( sigma / r_cut ) ** 3
-    pot_lrc(1) =  (8.0/9.0) * pi * density * sr3**3
-    pot_lrc(2) = -(8.0/3.0) * pi * density * sr3
+    sr3        = ( sigma / r_cut ) ** 3
+    density    =  REAL(n)*sigma**3
+    pot_lrc(1) =  REAL(n)*(8.0/9.0)  * pi * density * sr3**3
+    pot_lrc(2) = -REAL(n)*(8.0/3.0)  * pi * density * sr3
+    vir_lrc(1) =  REAL(n)*(32.0/9.0) * pi * density * sr3**3
+    vir_lrc(2) = -REAL(n)*(32.0/6.0) * pi * density * sr3
 
-  END FUNCTION pot_lrc
-
-  FUNCTION vir_lrc ( sigma, r_cut, density ) ! Long-range correction to virial per atom
-    REAL, dimension(2) :: vir_lrc            ! Function result in LJ (sigma=1) units
-    REAL, INTENT(in)   :: sigma, r_cut, density
-
-    REAL            :: sr3
-    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
-
-    sr3     = ( sigma / r_cut ) ** 3
-    vir_lrc(1) =  (32.0/9.0) * pi * density * sr3**3
-    vir_lrc(2) = -(32.0/6.0) * pi * density * sr3
-
-  END FUNCTION vir_lrc
+  END SUBROUTINE energy_lrc
 
 END MODULE mc_npt_lj_module

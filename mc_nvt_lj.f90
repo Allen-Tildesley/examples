@@ -3,7 +3,7 @@
 PROGRAM mc_nvt_lj
   USE utility_module,   ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                       run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_nvt_lj_module, ONLY : energy_1, energy, pot_lrc, vir_lrc, n, r, ne
+  USE mc_nvt_lj_module, ONLY : energy_1, energy, energy_lrc, n, r, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -31,11 +31,11 @@ PROGRAM mc_nvt_lj
 
   LOGICAL            :: overlap
   INTEGER            :: blk, stp, i, nstep, nblock, moves
-  REAL               :: pot_old, pot_new, vir_old, vir_new, delta
+  REAL               :: pot_old, pot_new, pot_lrc, vir_old, vir_new, vir_lrc, delta
   REAL, DIMENSION(3) :: ri   ! position of atom i
   REAL, DIMENSION(3) :: zeta ! random numbers
 
-  CHARACTER(len=13), PARAMETER :: cnf_prefix = 'md_nvt_lj.cnf'
+  CHARACTER(len=13), PARAMETER :: cnf_prefix = 'mc_nvt_lj.cnf'
   CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)             :: sav_tag = 'sav' ! may be overwritten with block number
 
@@ -64,8 +64,6 @@ PROGRAM mc_nvt_lj
   sigma = 1.0
   density = REAL(n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
-  WRITE(*,'(''Potential LRC (sigma units)'',t40,f15.5)') pot_lrc ( sigma, r_cut, density )
-  WRITE(*,'(''Virial LRC (sigma units)'',   t40,f15.5)') vir_lrc ( sigma, r_cut, density )
 
   ALLOCATE ( r(3,n) )
 
@@ -83,8 +81,11 @@ PROGRAM mc_nvt_lj
 
   CALL energy ( sigma, r_cut, pot, vir, overlap )
   IF ( overlap ) STOP 'Overlap in initial configuration'
-  potential = pot / REAL ( n ) + pot_lrc ( sigma, r_cut, density )
-  pressure  = density * temperature + vir / box**3 + vir_lrc ( sigma, r_cut, density ) * density
+  CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+  pot = pot + pot_lrc
+  vir = vir + vir_lrc
+  potential = pot / REAL ( n )
+  pressure  = density * temperature + vir / box**3
   WRITE(*,'(''Initial potential energy (sigma units)'',t40,f15.5)') potential
   WRITE(*,'(''Initial pressure (sigma units)'',        t40,f15.5)') pressure
 
@@ -124,8 +125,8 @@ PROGRAM mc_nvt_lj
 
         ! Calculate all variables for this step
         move_ratio = REAL(moves) / REAL(n)
-        potential  = pot / REAL(n) + pot_lrc ( sigma, r_cut, density )
-        pressure   = density * temperature + vir / box**3 + vir_lrc ( sigma, r_cut, density ) * density
+        potential  = pot / REAL(n)
+        pressure   = density * temperature + vir / box**3
         CALL blk_add ( [move_ratio,potential,pressure] )
 
      END DO ! End loop over steps
@@ -138,15 +139,18 @@ PROGRAM mc_nvt_lj
 
   CALL run_end
 
-  potential = pot / REAL ( n ) + pot_lrc ( sigma, r_cut, density )
-  pressure  = density * temperature + vir / box**3 + vir_lrc ( sigma, r_cut, density ) * density
+  potential = pot / REAL ( n )
+  pressure  = density * temperature + vir / box**3
   WRITE(*,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
   WRITE(*,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
 
   CALL energy ( sigma, r_cut, pot, vir, overlap )
   IF ( overlap ) STOP 'Overlap in final configuration'
-  potential = pot / REAL ( n ) + pot_lrc ( sigma, r_cut, density )
-  pressure  = density * temperature + vir / box**3 + vir_lrc ( sigma, r_cut, density ) * density
+  CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+  pot = pot + pot_lrc
+  vir = vir + vir_lrc
+  potential = pot / REAL ( n )
+  pressure  = density * temperature + vir / box**3
   WRITE(*,'(''Final check'')')
   WRITE(*,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
   WRITE(*,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
