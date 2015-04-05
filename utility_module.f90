@@ -1,8 +1,8 @@
 MODULE utility_module
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: read_cnf_atoms, write_cnf_atoms
-  PUBLIC :: run_begin, run_end, blk_begin, blk_end, stp_end
+  PUBLIC :: metropolis, read_cnf_atoms, write_cnf_atoms
+  PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add
 
   INTEGER,                                      SAVE :: nvariables
   CHARACTER(len=10), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
@@ -11,6 +11,24 @@ MODULE utility_module
 
 CONTAINS
 
+  FUNCTION metropolis ( delta ) ! Conduct Metropolis test, with safeguards
+    LOGICAL          :: metropolis
+    REAL, INTENT(in) :: delta
+
+    REAL            :: zeta
+    REAL, PARAMETER :: exponent_guard = 75.0
+
+    IF ( delta > exponent_guard ) THEN ! too high, reject without evaluating
+       metropolis = .FALSE.
+    ELSE IF ( delta < 0.0 ) THEN ! downhill, accept without evaluating
+       metropolis = .TRUE.
+    ELSE
+       CALL random_NUMBER ( zeta )     ! Uniform random number in range (0,1)
+       metropolis = EXP(-delta) > zeta ! Metropolis test
+    END IF
+    
+  END FUNCTION metropolis
+  
   SUBROUTINE read_cnf_atoms ( filename, n, box, r, v ) ! Read in atomic configuration
     CHARACTER(len=*),               INTENT(in)    :: filename
     INTEGER,                        INTENT(inout) :: n
@@ -86,13 +104,13 @@ CONTAINS
     blk_averages = 0.0
   END SUBROUTINE blk_begin
 
-  SUBROUTINE stp_end ( variables )
+  SUBROUTINE blk_add ( variables )
     REAL, DIMENSION(:), INTENT(in) :: variables
 
     IF ( SIZE(variables) /= nvariables ) STOP 'mismatched variable arrays in stp_end'
     blk_averages = blk_averages + variables ! Increment block averages
     blk_norm     = blk_norm + 1.0           ! Increment block normalizer
-  END SUBROUTINE stp_end
+  END SUBROUTINE blk_add
 
   SUBROUTINE blk_end ( blk )
     INTEGER, INTENT(in) :: blk

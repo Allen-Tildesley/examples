@@ -1,3 +1,5 @@
+! mc_nvt_lj_module.f90 (used by mc_nvt_lj.f90)
+! Monte Carlo simulation, constant-NVT ensemble, Lennard-Jones atoms
 MODULE mc_nvt_lj_module
 
   IMPLICIT NONE

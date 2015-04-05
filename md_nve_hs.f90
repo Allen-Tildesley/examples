@@ -1,8 +1,9 @@
-! md_hard.f90 (also uses md_hard_module.f90 and io_module.f90)
+! md_nve_hs.f90 (also uses md_nve_hs_module.f90 and utility_module.f90)
 ! Molecular dynamics of hard spheres
-PROGRAM md_hard
-  USE utility_module
-  USE md_hard_module
+PROGRAM md_nve_hs
+  USE utility_module, ONLY : read_cnf_atoms, write_cnf_atoms, &
+       &                     run_begin, run_end, blk_begin, blk_end, blk_add
+  USE md_nve_hs_module, ONLY : update, overlap, collide, n, r, v, coltime, partner, lt, gt
   IMPLICIT NONE
 
   ! Takes in a hard-sphere configuration (positions and velocities)
@@ -125,7 +126,7 @@ PROGRAM md_hard
       ! Collisional time averages in sigma units
      coll_rate = 2.0*REAL (ncoll) / t / real(n)             ! collision rate per particle
      pressure  = density*temperature + vir_sum / t / box**3 ! ideal + collisional
-     CALL stp_end ( [coll_rate, pressure] ) ! single 'step' average equivalent to time average
+     CALL blk_add ( [coll_rate, pressure] ) ! time averages
      CALL blk_end ( blk )
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk ! number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v*box ) ! save configuration
@@ -145,5 +146,5 @@ PROGRAM md_hard
 
   DEALLOCATE ( r, v, coltime, partner )
 
-END PROGRAM md_hard
+END PROGRAM md_nve_hs
 

@@ -1,6 +1,6 @@
-! md_hard_module.f90 (used by md_hard.f90)
+! md_nve_hs_module.f90 (used by md_nve_hs.f90)
 ! Molecular dynamics of hard spheres
-MODULE md_hard_module
+MODULE md_nve_hs_module
 
   IMPLICIT NONE
   PRIVATE
@@ -124,4 +124,4 @@ CONTAINS
     virial = dot_PRODUCT ( vij, rij ) / 3.0
   END SUBROUTINE collide
 
-END MODULE md_hard_module
+END MODULE md_nve_hs_module
