@@ -1,9 +1,9 @@
-! mc_nvt_lj.f90 (also uses mc_nvt_lj_module.f90 and utility_module.f90)
+! mc_nvt_lj.f90 (also uses mc_lj_module.f90 and utility_module.f90)
 ! Monte Carlo simulation, constant-NVT ensemble, Lennard-Jones atoms
 PROGRAM mc_nvt_lj
-  USE utility_module,   ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
-       &                       run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_nvt_lj_module, ONLY : energy_1, energy, energy_lrc, n, r, ne
+  USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
+       &                     run_begin, run_end, blk_begin, blk_end, blk_add
+  USE mc_lj_module,   ONLY : energy_1, energy, energy_lrc, n, r, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -79,7 +79,7 @@ PROGRAM mc_nvt_lj
   WRITE(*,'(''r_cut (in box units)'',t40,f15.5)') r_cut
   IF ( r_cut > 0.5 ) STOP 'r_cut too large '
 
-  CALL energy ( sigma, r_cut, pot, vir, overlap )
+  CALL energy ( sigma, r_cut, overlap, pot, vir )
   IF ( overlap ) STOP 'Overlap in initial configuration'
   CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
@@ -105,11 +105,11 @@ PROGRAM mc_nvt_lj
            zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
            ri(:) = r(:,i)
-           CALL  energy_1 ( ri, i, ne, sigma, r_cut, pot_old, vir_old, overlap )
+           CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot_old, vir_old )
            IF ( overlap ) STOP 'Overlap in current configuration'
            ri(:) = ri(:) + zeta * dr_max   ! trial move to new position
            ri(:) = ri(:) - ANINT ( ri(:) ) ! periodic boundary correction
-           CALL  energy_1 ( ri, i, ne, sigma, r_cut, pot_new, vir_new, overlap )
+           CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot_new, vir_new )
 
            IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
               delta = ( pot_new - pot_old ) / temperature
@@ -144,7 +144,7 @@ PROGRAM mc_nvt_lj
   WRITE(*,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
   WRITE(*,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
 
-  CALL energy ( sigma, r_cut, pot, vir, overlap )
+  CALL energy ( sigma, r_cut, overlap, pot, vir )
   IF ( overlap ) STOP 'Overlap in final configuration'
   CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc

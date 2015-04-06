@@ -3,6 +3,7 @@ MODULE utility_module
   PRIVATE
   PUBLIC :: metropolis, read_cnf_atoms, write_cnf_atoms
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add
+  PUBLIC :: random_integer
 
   INTEGER,                                      SAVE :: nvariables
   CHARACTER(len=10), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
