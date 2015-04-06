@@ -1,5 +1,5 @@
-! mc_npt_lj.f90 (also uses mc_lj_module.f90 and utility_module.f90)
-! Monte Carlo simulation, constant-NPT ensemble, Lennard-Jones atoms
+! mc_npt_lj.f90 (uses mc_lj_module.f90, utility_module.f90)
+! Monte Carlo, NPT ensemble, Lennard-Jones atoms
 PROGRAM mc_npt_lj
   USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add
