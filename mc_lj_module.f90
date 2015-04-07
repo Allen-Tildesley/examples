@@ -1,5 +1,5 @@
-! mc_npt_lj_module.f90 (used by mc_npt_lj.f90)
-! Monte Carlo simulation, constant-NPT ensemble, Lennard-Jones atoms
+! mc_lj_module.f90 (used by mc_nvt_lj.f90, mc_npt_lj.f90, mc_zvt_lj.f90)
+! Monte Carlo simulation, Lennard-Jones atoms
 MODULE mc_lj_module
 
   IMPLICIT NONE
