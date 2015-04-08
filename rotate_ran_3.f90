@@ -19,7 +19,7 @@ SUBROUTINE rotate_ran_3 ( dot_min, e )
   DO
 
      DO
-        CALL random_NUMBER ( zeta ) ! Two uniform random numbers between 0 and 1
+        CALL RANDOM_NUMBER ( zeta ) ! Two uniform random numbers between 0 and 1
         zeta = 2.0 * zeta - 1.0     ! now each between -1 and 1
         zeta_sq = SUM ( zeta**2 )   ! squared magnitude
         IF ( zeta_sq < 1.0 ) EXIT   ! now inside unit disk
@@ -27,7 +27,7 @@ SUBROUTINE rotate_ran_3 ( dot_min, e )
 
      f = 2.0 * SQRT ( 1.0 - zeta_sq )
      e = [ zeta(1) * f, zeta(2) * f, 1.0 - 2.0 * zeta_sq ] ! on surface of unit sphere
-     IF ( dot_min + dot_PRODUCT ( e, e0 ) > 1.0 ) EXIT     ! close enough to e0
+     IF ( dot_min + DOT_PRODUCT ( e, e0 ) > 1.0 ) EXIT     ! close enough to e0
 
   END DO
 

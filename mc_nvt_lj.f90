@@ -45,6 +45,8 @@ PROGRAM mc_nvt_lj
   WRITE(*,'(''Monte Carlo, constant-NVT, Lennard-Jones'')')
   WRITE(*,'(''Results in units epsilon = sigma = 1'')')
 
+  CALL RANDOM_SEED () ! Initialize random number generator
+
   ! Set sensible defaults for testing
   nblock      = 10
   nstep       = 1000

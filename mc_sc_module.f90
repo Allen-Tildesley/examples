@@ -81,9 +81,9 @@ CONTAINS
        rij_sq = SUM ( rij**2 )
        IF ( rij_sq > range_sq ) CYCLE
 
-       rei = dot_PRODUCT ( rij, ei     )
-       rej = dot_PRODUCT ( rij, e(:,j) )
-       eij = dot_PRODUCT ( ei,  e(:,j) )
+       rei = DOT_PRODUCT ( rij, ei     )
+       rej = DOT_PRODUCT ( rij, e(:,j) )
+       eij = DOT_PRODUCT ( ei,  e(:,j) )
 
        rij_sq = sc_dist_sq ( rij_sq, rei, rej, eij, length )
        IF ( rij_sq < sigma_sq ) THEN
@@ -156,9 +156,9 @@ CONTAINS
        rij_sq = SUM ( rij**2 )
        IF ( rij_sq > range_sq ) CYCLE
 
-       rei = dot_PRODUCT ( rij, ei     )
-       rej = dot_PRODUCT ( rij, e(:,j) )
-       eij = dot_PRODUCT ( ei,  e(:,j) )
+       rei = DOT_PRODUCT ( rij, ei     )
+       rej = DOT_PRODUCT ( rij, e(:,j) )
+       eij = DOT_PRODUCT ( ei,  e(:,j) )
 
        rij_sq = sc_dist_sq ( rij_sq, rei, rej, eij, length )
 

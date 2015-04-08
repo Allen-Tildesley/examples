@@ -24,7 +24,7 @@ CONTAINS
     ELSE IF ( delta < 0.0 ) THEN ! downhill, accept without evaluating
        metropolis = .TRUE.
     ELSE
-       CALL random_NUMBER ( zeta )     ! Uniform random number in range (0,1)
+       CALL RANDOM_NUMBER ( zeta )     ! Uniform random number in range (0,1)
        metropolis = EXP(-delta) > zeta ! Metropolis test
     END IF
 
@@ -266,7 +266,7 @@ CONTAINS
     INTEGER :: k_lo, k_hi
     REAL    :: zeta
 
-    CALL random_NUMBER ( zeta )
+    CALL RANDOM_NUMBER ( zeta )
     k_lo = MIN(k1,k2)
     k_hi = MAX(k1,k2)
     k =  k_lo + FLOOR((k_hi-k_lo+1)*zeta)

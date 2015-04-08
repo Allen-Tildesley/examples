@@ -49,6 +49,8 @@ PROGRAM mc_zvt_lj
   WRITE(*,'(''Monte Carlo, constant-zVT, Lennard-Jones'')')
   WRITE(*,'(''Results in units epsilon = sigma = 1'')')
 
+  CALL RANDOM_SEED () ! Initialize random number generator
+
   ! Set sensible defaults for testing
   nblock      = 10
   nstep       = 1000
@@ -115,7 +117,7 @@ PROGRAM mc_zvt_lj
 
         DO try = 1, ntry ! Begin loop over tries of different kinds
 
-           CALL random_NUMBER ( zeta(1) ) ! uniform random numbers in RANGE (0,1)
+           CALL RANDOM_NUMBER ( zeta(1) ) ! uniform random numbers in RANGE (0,1)
 
            IF ( zeta(1) < prob_move ) THEN ! try particle move
 
@@ -146,7 +148,7 @@ PROGRAM mc_zvt_lj
 
               IF ( n+1 > SIZE(r,dim=2) ) CALL resize
 
-              CALL random_NUMBER ( ri ) ! three uniform random numbers in range (0,1)
+              CALL RANDOM_NUMBER ( ri ) ! three uniform random numbers in range (0,1)
               ri = ri - 0.5             ! now in range (-0.5,+0.5)
               CALL energy_1 ( ri, n+1, ne, sigma, r_cut, overlap, del_pot, del_vir )
               CALL energy_lrc ( n+1, sigma, r_cut, pot_lrc, vir_lrc ) ! LRC for n+1 atoms

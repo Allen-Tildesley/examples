@@ -45,7 +45,7 @@ CONTAINS
        rij(:) = r(:,i) - r(:,j)
        rij(:) = rij(:) - ANINT ( rij(:) )
        vij(:) = v(:,i) - v(:,j)
-       bij  = dot_PRODUCT ( rij, vij )
+       bij  = DOT_PRODUCT ( rij, vij )
 
        IF ( bij < 0.0 ) THEN
 
@@ -116,12 +116,12 @@ CONTAINS
     rij(:) = rij(:) - ANINT ( rij(:) )
     vij(:) = v(:,i) - v(:,j)
 
-    factor = dot_PRODUCT ( rij, vij ) / sigma_sq
+    factor = DOT_PRODUCT ( rij, vij ) / sigma_sq
     vij = - factor * rij
 
     v(:,i) = v(:,i) + vij
     v(:,j) = v(:,j) - vij
-    virial = dot_PRODUCT ( vij, rij ) / 3.0
+    virial = DOT_PRODUCT ( vij, rij ) / 3.0
   END SUBROUTINE collide
 
 END MODULE md_nve_hs_module

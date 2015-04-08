@@ -39,6 +39,8 @@ PROGRAM mc_nvt_hs
   WRITE(*,'(''Monte Carlo, constant-NVT, hard spheres'')')
   WRITE(*,'(''Results in units sigma = 1'')')
 
+  CALL RANDOM_SEED () ! Initialize random number generator
+
   ! Set sensible defaults for testing
   nblock  = 10
   nstep   = 1000
