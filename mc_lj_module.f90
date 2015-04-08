@@ -81,7 +81,7 @@ CONTAINS
     REAL, DIMENSION(3) :: rij
     REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
+    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy_1'
 
     r_cut_sq = r_cut**2
     sigma_sq = sigma**2

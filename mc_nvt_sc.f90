@@ -3,7 +3,7 @@
 PROGRAM mc_nvt_sc
   USE utility_module, ONLY : read_cnf_molecules, write_cnf_molecules, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add, &
-       &                     rotate_ran
+       &                     random_rotate, orientational_order
   USE mc_sc_module,   ONLY : overlap_1, overlap, n_overlap, n, r, e, ne
   IMPLICIT NONE
 
@@ -23,6 +23,7 @@ PROGRAM mc_nvt_sc
   REAL :: box         ! box length (in units where sigma=1)
   REAL :: density     ! reduced density n*sigma**3/box**3
   REAL :: pressure    ! measured pressure in units kT/sigma**3
+  real :: order       ! orientational order parameter
   REAL :: dr_max      ! maximum MC displacement
   REAL :: de_max      ! maximum MC rotation
   REAL :: epsilon     ! pressure scaling parameter
@@ -94,9 +95,9 @@ PROGRAM mc_nvt_sc
            CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
            zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
-           ri(:) = r(:,i) + zeta * dr_max        ! trial move to new position
-           ri(:) = ri(:) - ANINT ( ri(:) )       ! periodic boundary correction
-           ei(:) = rotate_ran ( de_max, e(:,i) ) ! trial move to new orientation
+           ri(:) = r(:,i) + zeta * dr_max           ! trial move to new position
+           ri(:) = ri(:) - ANINT ( ri(:) )          ! periodic boundary correction
+           ei(:) = random_rotate ( de_max, e(:,i) ) ! trial move to new orientation
 
            IF ( .NOT. overlap_1 ( ri, ei, i, ne, sigma, length ) ) THEN ! accept
               r(:,i) = ri(:)     ! update position
@@ -110,22 +111,23 @@ PROGRAM mc_nvt_sc
         move_ratio = REAL(moves) / REAL(n)
         pressure = REAL ( n_overlap ( (1.0+epsilon)*sigma, (1.0+epsilon)*length ) ) / (3.0*epsilon) ! virial part
         pressure = density + pressure * sigma**3 ! convert to sigma units and add ideal gas part
-        CALL blk_add ( [move_ratio,pressure,?????] )
+        order    = orientational_order ( e )
+        CALL blk_add ( [move_ratio,pressure,order] )
 
      END DO ! End loop over steps
 
      CALL blk_end ( blk )
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk            ! number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box ) ! save configuration
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk                   ! number configuration by block
+     CALL write_cnf_molecules ( cnf_prefix//sav_tag, n, box, r*box, e ) ! save configuration
 
   END DO ! End loop over blocks
 
   CALL run_end
 
-  IF ( overlap ( sigma ) ) STOP 'Overlap in final configuration'
+  IF ( overlap ( sigma, length ) ) STOP 'Overlap in final configuration'
 
-  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
+  CALL write_cnf_molecules ( cnf_prefix//out_tag, n, box, r*box, e )
 
-  DEALLOCATE ( r )
+  DEALLOCATE ( r, e )
 
 END PROGRAM mc_nvt_sc

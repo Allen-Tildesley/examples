@@ -23,6 +23,7 @@ variants['build_mc_npt_lj']    = (['mc_npt_lj.f90','mc_lj_module.f90','utility_m
 variants['build_mc_zvt_lj']    = (['mc_zvt_lj.f90','mc_lj_module.f90','utility_module.f90'],env_normal)
 variants['build_md_nve_hs']    = (['md_nve_hs.f90','md_nve_hs_module.f90','utility_module.f90'],env_normal)
 variants['build_mc_nvt_hs']    = (['mc_nvt_hs.f90','mc_hs_module.f90','utility_module.f90'],env_normal)
+variants['build_mc_nvt_sc']    = (['mc_nvt_sc.f90','mc_sc_module.f90','utility_module.f90'],env_normal)
 
 # Build each variant in appropriate variant directory
 for variant_dir,(sources,env) in variants.iteritems():

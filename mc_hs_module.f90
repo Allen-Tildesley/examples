@@ -20,7 +20,7 @@ CONTAINS
 
     INTEGER :: i
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
+    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in overlap'
 
     overlap  = .FALSE.
 
@@ -44,10 +44,10 @@ CONTAINS
     ! It is assumed that r, sigma are in units where box = 1
 
     INTEGER            :: j, j1, j2
-    REAL               :: sigma_sq
+    REAL               :: sigma_sq, rij_sq
     REAL, DIMENSION(3) :: rij
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
+    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in overlap_1'
 
     sigma_sq = sigma**2
 
@@ -71,8 +71,9 @@ CONTAINS
 
        rij(:) = ri(:) - r(:,j)
        rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units
+       rij_sq = SUM ( rij**2 )
 
-       IF ( SUM ( rij**2 ) < sigma_sq ) THEN
+       IF ( rij_sq < sigma_sq ) THEN
           overlap = .TRUE.
           EXIT ! jump out of loop
        END IF
@@ -87,7 +88,7 @@ CONTAINS
 
     INTEGER :: i
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
+    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in n_overlap'
 
     n_overlap  = 0
 
@@ -108,10 +109,10 @@ CONTAINS
     ! It is assumed that r, sigma are in units where box = 1
 
     INTEGER            :: j, j1, j2
-    REAL               :: sigma_sq
+    REAL               :: sigma_sq, rij_sq
     REAL, DIMENSION(3) :: rij
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
+    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in n_overlap_1'
 
     sigma_sq = sigma**2
 
@@ -135,8 +136,9 @@ CONTAINS
 
        rij(:) = ri(:) - r(:,j)
        rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units
+       rij_sq = SUM ( rij**2 )
 
-       IF ( SUM ( rij**2 ) < sigma_sq ) n_overlap = n_overlap + 1
+       IF ( rij_sq < sigma_sq ) n_overlap = n_overlap + 1
 
     END DO
 
