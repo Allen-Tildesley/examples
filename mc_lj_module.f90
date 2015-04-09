@@ -112,7 +112,7 @@ CONTAINS
 
        IF ( rij_sq < r_cut_sq ) THEN
 
-          sr2 = sigma_sq / rij_sq ! now in LJ units
+          sr2 = sigma_sq / rij_sq ! now dimensionless
 
           IF ( sr2 > sr2_overlap ) THEN
              overlap = .TRUE.

@@ -1,5 +1,5 @@
-! md_nve_hs.f90 (also uses md_nve_hs_module.f90 and utility_module.f90)
-! Molecular dynamics of hard spheres
+! md_nve_hs.f90 (uses md_nve_hs_module.f90, utility_module.f90)
+! Molecular dynamics, NVE ensemble, hard spheres
 PROGRAM md_nve_hs
   USE utility_module, ONLY : read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add
