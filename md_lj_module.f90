@@ -59,11 +59,11 @@ CONTAINS
              f(:,j) = f(:,j) - fij
              n_cut  = n_cut + 1
 
-          ENDIF
+          END IF
 
        END DO ! End inner loop over atoms
 
-    end do ! End outer loop over atoms
+    END DO ! End outer loop over atoms
 
     ! calculate shifted potential
     sr2    = sigma_sq / r_cut_sq
