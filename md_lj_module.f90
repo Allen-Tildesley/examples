@@ -74,10 +74,10 @@ CONTAINS
 
     ! multiply results by numerical factors
 
-    f = f * 24.0
-    pot  = pot  * 4.0
+    f      = f      * 24.0
+    pot    = pot    * 4.0
     pot_sh = pot_sh * 4.0
-    vir  = vir * 24.0 / 3.0
+    vir    = vir    * 24.0 / 3.0
 
   END SUBROUTINE force
 
