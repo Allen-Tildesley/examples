@@ -1,9 +1,10 @@
 ! md_nve_hs.f90 (uses md_nve_hs_module.f90, utility_module.f90)
 ! Molecular dynamics, NVE ensemble, hard spheres
 PROGRAM md_nve_hs
-  USE utility_module, ONLY : read_cnf_atoms, write_cnf_atoms, &
-       &                     run_begin, run_end, blk_begin, blk_end, blk_add
-  USE md_nve_hs_module, ONLY : update, overlap, collide, n, r, v, coltime, partner, lt, gt
+  USE utility_module,   ONLY : read_cnf_atoms, write_cnf_atoms, &
+       &                       run_begin, run_end, blk_begin, blk_end, blk_add
+  USE md_nve_hs_module, ONLY : initialize, finalize, update, overlap, collide, &
+       &                       n, r, v, coltime, partner, lt, gt
   IMPLICIT NONE
 
   ! Takes in a hard-sphere configuration (positions and velocities)
@@ -24,9 +25,9 @@ PROGRAM md_nve_hs
   REAL :: box         ! box length (in units where sigma=1)
   REAL :: density     ! reduced density n*sigma**3/box**3
   REAL :: vir         ! total collisional virial
-  real :: kin         ! kinetic energy
-  real :: temperature ! temperature
-  real :: t           ! time
+  REAL :: kin         ! kinetic energy
+  REAL :: temperature ! temperature
+  REAL :: t           ! time
 
   CHARACTER(len=11), PARAMETER :: cnf_prefix = 'md_hard.cnf'
   CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -59,7 +60,7 @@ PROGRAM md_nve_hs
   density = REAL (n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
 
-  ALLOCATE ( r(3,n), v(3,n), coltime(n), partner(n) )
+  CALL initialize
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v )
   total_momentum = SUM(v,dim=2)
@@ -124,7 +125,7 @@ PROGRAM md_nve_hs
      END DO ! End loop over collisions
 
       ! Collisional time averages in sigma units
-     coll_rate = 2.0*REAL (ncoll) / t / real(n)             ! collision rate per particle
+     coll_rate = 2.0*REAL (ncoll) / t / REAL(n)             ! collision rate per particle
      pressure  = density*temperature + vir_sum / t / box**3 ! ideal + collisional
      CALL blk_add ( [coll_rate, pressure] ) ! time averages
      CALL blk_end ( blk )
@@ -144,7 +145,7 @@ PROGRAM md_nve_hs
   v(:,:) = v(:,:) * box
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r, v )
 
-  DEALLOCATE ( r, v, coltime, partner )
+  CALL finalize
 
 END PROGRAM md_nve_hs
 

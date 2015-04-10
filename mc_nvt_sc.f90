@@ -4,7 +4,7 @@ PROGRAM mc_nvt_sc
   USE utility_module, ONLY : read_cnf_molecules, write_cnf_molecules, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add, &
        &                     random_rotate, orientational_order
-  USE mc_sc_module,   ONLY : overlap_1, overlap, n_overlap, n, r, e, ne
+  USE mc_sc_module,   ONLY : initialize, finalize, overlap_1, overlap, n_overlap, n, r, e, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of linear molecules (positions and orientations)
@@ -23,7 +23,7 @@ PROGRAM mc_nvt_sc
   REAL :: box         ! box length (in units where sigma=1)
   REAL :: density     ! reduced density n*sigma**3/box**3
   REAL :: pressure    ! measured pressure in units kT/sigma**3
-  real :: order       ! orientational order parameter
+  REAL :: order       ! orientational order parameter
   REAL :: dr_max      ! maximum MC displacement
   REAL :: de_max      ! maximum MC rotation
   REAL :: epsilon     ! pressure scaling parameter
@@ -66,7 +66,7 @@ PROGRAM mc_nvt_sc
   density = REAL(n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
 
-  ALLOCATE ( r(3,n), e(3,n) )
+  CALL initialize
 
   CALL read_cnf_molecules ( cnf_prefix//inp_tag, n, box, r, e )
 
@@ -130,6 +130,6 @@ PROGRAM mc_nvt_sc
 
   CALL write_cnf_molecules ( cnf_prefix//out_tag, n, box, r*box, e )
 
-  DEALLOCATE ( r, e )
+  CALL finalize
 
 END PROGRAM mc_nvt_sc

@@ -5,7 +5,7 @@ MODULE mc_lj_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, lt, ne, gt
-  PUBLIC :: energy_1, energy, energy_lrc
+  PUBLIC :: initialize, finalize, energy_1, energy, energy_lrc
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
@@ -13,6 +13,14 @@ MODULE mc_lj_module
   INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
 
 CONTAINS
+
+  SUBROUTINE initialize
+    ALLOCATE ( r(3,n) )
+  END SUBROUTINE initialize
+
+  SUBROUTINE finalize
+    DEALLOCATE ( r )
+  END SUBROUTINE finalize
 
   SUBROUTINE energy ( sigma, r_cut, overlap, pot, vir, pot2, vir2 )
     REAL,                         INTENT(in)  :: sigma, r_cut ! potential parameters

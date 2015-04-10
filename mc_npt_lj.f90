@@ -3,7 +3,7 @@
 PROGRAM mc_npt_lj
   USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_lj_module,   ONLY : energy_1, energy, energy_lrc, n, r, ne
+  USE mc_lj_module,   ONLY : initialize, finalize, energy_1, energy, energy_lrc, n, r, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -55,7 +55,7 @@ PROGRAM mc_npt_lj
   WRITE(*,'(''Results in units epsilon = sigma = 1'')')
 
   CALL RANDOM_SEED () ! Initialize random number generator
-  
+
   ! Set sensible defaults for testing
   nblock       = 10
   nstep        = 1000
@@ -80,7 +80,7 @@ PROGRAM mc_npt_lj
   density = REAL(n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
 
-  ALLOCATE ( r(3,n) )
+  CALL initialize ! Allocate r
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r )
 
@@ -98,8 +98,8 @@ PROGRAM mc_npt_lj
   CALL energy_lrc ( n, sigma, r_cut, pot2=pot_lrc, vir2=vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
-  potential = sum ( pot ) / REAL ( n )
-  pressure  = density * temperature + sum ( vir ) / box**3
+  potential = SUM ( pot ) / REAL ( n )
+  pressure  = density * temperature + SUM ( vir ) / box**3
   WRITE(*,'(''Initial potential energy (sigma units)'',t40,f15.5)') potential
   WRITE(*,'(''Initial pressure (sigma units)'',        t40,f15.5)') pressure
 
@@ -128,7 +128,7 @@ PROGRAM mc_npt_lj
 
            IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
 
-              delta = sum ( pot_new - pot_old ) / temperature
+              delta = SUM ( pot_new - pot_old ) / temperature
 
               IF (  metropolis ( delta )  ) THEN ! accept Metropolis test
                  pot = pot + pot_new - pot_old   ! update potential energy
@@ -201,7 +201,7 @@ PROGRAM mc_npt_lj
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
 
-  DEALLOCATE ( r )
+  CALL finalize
 
 END PROGRAM mc_npt_lj
 

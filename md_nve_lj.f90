@@ -3,7 +3,7 @@
 PROGRAM md_nve_lj
   USE utility_module, ONLY : read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add
-  USE md_lj_module,   ONLY : force, r, v, f, n, energy_lrc
+  USE md_lj_module,   ONLY : initialize, finalize, force, r, v, f, n, energy_lrc
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions, velocities)
@@ -62,7 +62,7 @@ PROGRAM md_nve_lj
   density = REAL(n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
 
-  ALLOCATE ( r(3,n), v(3,n), f(3,n) )
+  CALL initialize
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v )
 
@@ -143,7 +143,7 @@ PROGRAM md_nve_lj
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
 
-  DEALLOCATE ( r, v, f )
+  CALL finalize
 
 END PROGRAM md_nve_lj
 

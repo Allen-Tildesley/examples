@@ -5,7 +5,7 @@ MODULE md_lj_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, v, f
-  PUBLIC :: force, energy_lrc
+  PUBLIC :: initialize, finalize, force, energy_lrc
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
@@ -13,7 +13,15 @@ MODULE md_lj_module
   REAL,    DIMENSION(:,:), ALLOCATABLE :: f ! forces (3,:)
 
 CONTAINS
-  
+
+  subroutine initialize
+    ALLOCATE ( r(3,n), v(3,n), f(3,n) )
+  end subroutine initialize
+
+  subroutine finalize
+    DEALLOCATE ( r, v, f )
+  end subroutine finalize
+
   SUBROUTINE force ( sigma, r_cut, pot, pot_sh, vir )
     REAL, INTENT(in)  :: sigma, r_cut ! potential parameters
     REAL, INTENT(out) :: pot          ! total potential energy

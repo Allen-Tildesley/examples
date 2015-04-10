@@ -3,7 +3,7 @@
 PROGRAM mc_nvt_hs
   USE utility_module, ONLY : read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_hs_module,   ONLY : overlap_1, overlap, n_overlap, n, r, ne
+  USE mc_hs_module,   ONLY : initialize, finalize, overlap_1, overlap, n_overlap, n, r, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -59,8 +59,8 @@ PROGRAM mc_nvt_hs
   density = REAL(n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
 
-  ALLOCATE ( r(3,n) )
-
+  call initialize ! Allocates r
+  
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r )
 
   ! Convert to box units
@@ -118,6 +118,6 @@ PROGRAM mc_nvt_hs
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
 
-  DEALLOCATE ( r )
+  call finalize ! Deallocates r
 
 END PROGRAM mc_nvt_hs

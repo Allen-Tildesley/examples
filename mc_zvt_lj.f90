@@ -3,7 +3,7 @@
 PROGRAM mc_zvt_lj
   USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add, random_integer
-  USE mc_lj_module,   ONLY : energy_1, energy, energy_lrc, n, r, ne
+  USE mc_lj_module,   ONLY : initialize, finalize, energy_1, energy, energy_lrc, n, r, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -77,9 +77,11 @@ PROGRAM mc_zvt_lj
   density = REAL(n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
 
-  ALLOCATE ( r(3,n*2) ) ! allocate plenty of spare space
+  CALL initialize ! Allocate r
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r )
+
+  CALL resize ! Double the size of r
 
   ! Convert to box units
   r(:,1:n) = r(:,1:n) / box
@@ -236,7 +238,7 @@ PROGRAM mc_zvt_lj
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
 
-  DEALLOCATE ( r )
+  CALL finalize
 
 CONTAINS
 

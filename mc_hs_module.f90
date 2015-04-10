@@ -5,7 +5,7 @@ MODULE mc_hs_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, lt, ne, gt
-  PUBLIC :: overlap_1, overlap, n_overlap_1, n_overlap
+  PUBLIC :: overlap_1, overlap, n_overlap_1, n_overlap, initialize, finalize
 
   INTEGER                             :: n ! number of atoms
   REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
@@ -13,6 +13,14 @@ MODULE mc_hs_module
   INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
 
 CONTAINS
+
+  SUBROUTINE initialize
+    ALLOCATE ( r(3,n) )
+  END SUBROUTINE initialize
+
+  SUBROUTINE finalize
+    DEALLOCATE ( r )
+  END SUBROUTINE finalize
 
   FUNCTION overlap ( sigma )
     LOGICAL             :: overlap ! shows if an overlap was detected

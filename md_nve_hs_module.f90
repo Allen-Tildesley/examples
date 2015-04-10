@@ -5,7 +5,7 @@ MODULE md_nve_hs_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, v, coltime, partner, lt, ne, gt
-  PUBLIC :: update, overlap, collide
+  PUBLIC :: initialize, finalize, update, overlap, collide
 
   INTEGER                              :: n       ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r, v    ! positions, velocities (3,n)
@@ -16,6 +16,14 @@ MODULE md_nve_hs_module
 
 CONTAINS
 
+  subroutine initialize
+    ALLOCATE ( r(3,n), v(3,n), coltime(n), partner(n) )
+  end subroutine initialize
+
+  subroutine finalize
+    DEALLOCATE ( r, v, coltime, partner )
+  end subroutine finalize
+  
   SUBROUTINE update ( i, j_range, sigma_sq ) ! updates collision details for atom i
     INTEGER, INTENT(in) :: i, j_range
     REAL,    INTENT(in) :: sigma_sq
