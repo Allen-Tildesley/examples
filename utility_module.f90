@@ -1,9 +1,13 @@
 MODULE utility_module
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: metropolis, read_cnf_atoms, write_cnf_atoms, read_cnf_molecules, write_cnf_molecules
+  PUBLIC :: metropolis
+  PUBLIC :: read_cnf_atoms, write_cnf_atoms, read_cnf_molecules, write_cnf_molecules
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add
-  PUBLIC :: random_integer, orientational_order, random_rotate
+  PUBLIC :: random_integer
+  PUBLIC :: random_orientation_vector, random_orientation_vector_alt1, random_orientation_vector_alt2
+  PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
+  PUBLIC :: orientational_order
 
   INTEGER,                                      SAVE :: nvariables
   CHARACTER(len=10), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
@@ -275,13 +279,192 @@ CONTAINS
 
   END FUNCTION random_integer
 
+  SUBROUTINE random_orientation_vector ( e )
+    REAL, DIMENSION(3), INTENT(out) :: e ! Uniformly sampled orientation
+
+    ! Firstly, the vector is chosen uniformly within the unit cube
+    ! Vectors lying outside the unit sphere are rejected
+    ! Having found a vector within the unit sphere, it is normalized
+    ! Essentially the same routine will work in 2d, or for quaternions in 4d
+
+    REAL :: e_sq
+
+    DO
+       CALL random_NUMBER ( e ) ! Random numbers uniformly sampled in range (0,1)
+       e    = 2.0 * e - 1.0     ! Now in range (-1,+1)
+       e_sq = SUM ( e**2 )
+       IF ( e_sq <= 1.0 ) EXIT
+    END DO
+
+    e = e / SQRT ( e_sq )
+
+  END SUBROUTINE random_orientation_vector
+
+  SUBROUTINE random_orientation_vector_alt1 ( e )
+    REAL, DIMENSION(3), INTENT(out) :: e ! Uniformly sampled orientation vector
+
+    ! First alternative routine for choosing a random orientation in 3D
+
+    REAL               :: c, s, phi
+    REAL, PARAMETER    :: pi = 4.0*ATAN(1.0)
+    REAL, DIMENSION(2) :: zeta ! random numbers
+
+    CALL RANDOM_NUMBER ( zeta )        ! Two uniformly sampled random numbers in range (0,1)
+    c   = 2.0*zeta(1) - 1.0            ! Random cosine uniformly sampled in range (-1,+1)
+    s   = SQRT(1.0-c**2)               ! Sine
+    phi = zeta(2) * 2.0*pi             ! Random angle uniform sampled in range (0,2*pi)
+    e  = [ s*COS(phi), s*SIN(phi), c ] ! Random unit vector
+
+  END SUBROUTINE random_orientation_vector_alt1
+
+  SUBROUTINE random_orientation_vector_alt2 ( e )
+    REAL, DIMENSION(3), INTENT(out) :: e ! Uniformly sampled orientation vector
+
+    ! Second alternative routine for choosing a random orientation in 3D
+
+    REAL, DIMENSION(2) :: zeta
+    REAL               :: zeta_sq, f
+
+    DO
+       CALL RANDOM_NUMBER ( zeta ) ! Two uniform random numbers between 0 and 1
+       zeta = 2.0 * zeta - 1.0     ! now each between -1 and 1
+       zeta_sq = SUM ( zeta**2 )   ! squared magnitude
+       IF ( zeta_sq < 1.0 ) EXIT   ! now inside unit disk
+    END DO
+
+    f = 2.0 * SQRT ( 1.0 - zeta_sq )
+    e = [ zeta(1) * f, zeta(2) * f, 1.0 - 2.0 * zeta_sq ] ! on surface of unit sphere
+
+  END SUBROUTINE random_orientation_vector_alt2
+
+  FUNCTION random_rotate_vector ( delta_max, e_old ) RESULT ( e )
+    REAL, DIMENSION(3)             :: e         ! orientation vector result
+    REAL, INTENT(in)               :: delta_max ! maximum magnitude of rotation
+    REAL, DIMENSION(3), INTENT(in) :: e_old     ! original orientation
+
+    ! Function to generate random orientation for linear molecule in 3D
+    ! by rotation through a small angle from a given orientation
+    ! Provided delta_max is << 1, it is approximately the maximum rotation angle (in radians)
+    ! The magnitude of the rotation is not uniformly sampled, but this should not matter
+
+    REAL, DIMENSION(3) :: de   ! random vector
+    REAL               :: e_sq
+
+    CALL random_orientation_vector ( de ) ! Random unit vector
+    de  = delta_max * de                  ! Random small vector
+
+    e    = e_old + de     ! Choose new orientation by adding random small vector
+    e_sq = SUM ( e**2 )
+    e    = e / SQRT(e_sq) ! Normalize
+
+  END FUNCTION random_rotate_vector
+
+  FUNCTION random_rotate_vector_alt1 ( delta_max, e_old ) RESULT ( e )
+    REAL, DIMENSION(3)             :: e         ! orientation vector result
+    REAL, INTENT(in)               :: delta_max ! maximum angle of rotation
+    REAL, DIMENSION(3), INTENT(in) :: e_old     ! original orientation
+
+    ! First alternative function to generate random orientation for linear molecule in 3D
+    ! by rotation through a small angle from a given orientation
+    ! delta_max is the maximum rotation angle (in radians)
+    ! The magnitude of the rotation is uniformly sampled
+
+    REAL, DIMENSION(3) :: e_perp
+    REAL               :: e_sq, delta, zeta, factor
+    REAL, PARAMETER    :: tol = 1.e-6
+
+    DO
+       CALL random_orientation_vector ( e_perp )                     ! Random unit vector
+       factor = dot_PRODUCT ( e_perp, e_old ) / SUM ( e_old**2 ) ! Projection along e_old
+       e_perp = e_perp - factor * e_old                          ! Make e_perp perpendicular to e_old
+       e_sq   = SUM ( e_perp**2 )
+       IF ( e_sq > tol ) EXIT ! Start again if e_perp is too small
+    END DO
+    e_perp = e_perp / SQRT ( e_sq ) ! Random unit direction perpendicular to e_old
+
+    CALL random_NUMBER ( zeta ) ! Random number uniformly sampled in range (0,1)
+    zeta  = 2.0 * zeta - 1.0    ! Now in range (-1,+1)
+    delta = zeta * delta_max    ! Random rotation angle
+
+    e    = e_old * COS ( delta ) + e_perp * SIN ( delta )
+    e_sq = SUM ( e**2 )
+    e    = e / SQRT(e_sq) ! Normalize
+
+  END FUNCTION random_rotate_vector_alt1
+
+  FUNCTION random_rotate_vector_alt2 ( delta_max, e_old ) RESULT ( e )
+    REAL, DIMENSION(3)             :: e         ! orientation vector result
+    REAL, INTENT(in)               :: delta_max ! maximum magnitude of rotation
+    REAL, DIMENSION(3), INTENT(in) :: e_old     ! original orientation
+
+    ! Second alternative function to generate random orientation in 3D without any angular bias
+    ! by rotation through a small angle from a given orientation
+    ! delta_max is the maximum rotation angle (in radians)
+    ! The magnitude of the rotation is uniformly sampled
+    ! The rotation axis is a Cartesian axis selected at random
+    ! Ref: Barker and Watts, Chem Phys Lett 3, 144 (1969)
+
+    INTEGER :: axis        ! axis of rotation
+    REAL    :: delta, c, s ! rotation angle
+    REAL    :: zeta        ! random number
+
+    axis  = random_integer (1,3)             ! random axis choice 1 = x, 2 = y, 3 = z
+    CALL RANDOM_NUMBER ( zeta )              ! uniform random number between 0 and 1
+    delta = ( 2.0 * zeta - 1.0 ) * delta_max ! uniform random angle
+    c     = COS ( delta )
+    s     = SIN ( delta )
+
+    SELECT CASE ( axis )
+
+    CASE ( 1 ) ! rotate about x
+       e(2) = c * e_old(2) + s * e_old(3)
+       e(3) = c * e_old(3) - s * e_old(2)
+
+    CASE ( 2 ) ! rotate about y
+       e(3) = c * e_old(3) + s * e_old(1)
+       e(1) = c * e_old(1) - s * e_old(3)
+
+    CASE default ! rotate about z
+       e(1) = c * e_old(1) + s * e_old(2)
+       e(2) = c * e_old(2) - s * e_old(1)
+
+    END SELECT
+
+  END FUNCTION random_rotate_vector_alt2
+
+  FUNCTION random_rotate_vector_alt3 ( delta_max, e_old ) RESULT ( e )
+    REAL, DIMENSION(3)             :: e         ! orientation vector result
+    REAL, INTENT(in)               :: delta_max ! maximum magnitude of rotation
+    REAL, DIMENSION(3), INTENT(in) :: e_old     ! original orientation
+
+    ! Ref: Marsaglia, Ann Maths Stat 43, 645 (1972)
+    ! Uses a rejection technique to create a trial orientation
+    ! subject to the constraint that the cosine of the angle
+    ! turned through is greater than cos(delta_max)
+
+    REAL :: cos_min
+
+    cos_min = COS ( delta_max )
+
+    DO
+       CALL random_orientation_vector_alt2 ( e )
+       IF ( DOT_PRODUCT ( e, e_old ) > cos_min ) EXIT ! close enough
+    END DO
+
+  END FUNCTION random_rotate_vector_alt3
+
   FUNCTION orientational_order ( e ) RESULT ( order )
     REAL                             :: order
-    REAL, DIMENSION(:,:), INTENT(in) :: e
+    REAL, DIMENSION(:,:), INTENT(in) :: e     ! set of molecular orientation vectors (3,n)
+
+    ! Calculate the nematic order parameter <P2(cos(theta))>
+    ! Where theta is the angle between a molecular axis and the director
+    ! This is obtained by finding the largest eigenvalue of
+    ! the 3x3 second-rank traceless order tensor
 
     INTEGER              :: i, n
-    REAL, DIMENSION(3,3) :: q
-    REAL                 :: h, g, psi
+    REAL, DIMENSION(3,3) :: q         ! order tensor
+    REAL                 :: h, g, psi ! used in eigenvalue calculation
     REAL, PARAMETER      :: pi = 4.0*ATAN(1.0)
 
     IF ( SIZE(e,dim=1) /= 3 ) STOP 'Array error in orientational_order'
@@ -313,28 +496,5 @@ CONTAINS
     order = MAXVAL ( [ h*COS(psi/3.0), h*COS((psi+2.0*pi)/3.0), h*COS((psi+4.0*pi)/3.0) ] ) 
 
   END FUNCTION orientational_order
-
-  FUNCTION random_rotate ( de_max, e_old ) RESULT ( e )
-    REAL, DIMENSION(3)             :: e      ! orientation vector result
-    REAL, INTENT(in)               :: de_max ! maximum magnitude of rotation
-    REAL, DIMENSION(3), INTENT(in) :: e_old  ! original orientation
-
-    REAL, DIMENSION(2) :: zeta ! random numbers
-    REAL, DIMENSION(3) :: de   ! random vector
-    REAL               :: c, s, phi, norm
-    REAL, PARAMETER    :: pi = 4.0*ATAN(1.0)
-
-    CALL RANDOM_NUMBER ( zeta )          ! Two uniformly sampled random numbers in range (0,1)
-    c   = 2.0*zeta(1) - 1.0             ! Random cosine uniformly sampled in range (-1,+1)
-    s   = SQRT(1.0-c**2)                ! Sine
-    phi = zeta(2) * 2.0*pi              ! Random angle uniform sampled in range (0,2*pi)
-    de  = [ s*COS(phi), s*SIN(phi), c ] ! Random unit vector
-    de  = de_max * de                   ! Random vector
-
-    e    = e_old + de      ! Choose new orientation by adding random small vector
-    norm = SQRT(SUM(e**2)) ! Normalizing factor
-    e    = e / norm        ! Normalize
-
-  END FUNCTION random_rotate
 
 END MODULE utility_module

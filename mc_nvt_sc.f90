@@ -3,7 +3,7 @@
 PROGRAM mc_nvt_sc
   USE utility_module, ONLY : read_cnf_molecules, write_cnf_molecules, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add, &
-       &                     random_rotate, orientational_order
+       &                     random_rotate_vector, orientational_order
   USE mc_sc_module,   ONLY : initialize, finalize, overlap_1, overlap, n_overlap, n, r, e, ne
   IMPLICIT NONE
 
@@ -97,9 +97,9 @@ PROGRAM mc_nvt_sc
            CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
            zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
-           ri(:) = r(:,i) + zeta * dr_max           ! trial move to new position
-           ri(:) = ri(:) - ANINT ( ri(:) )          ! periodic boundary correction
-           ei(:) = random_rotate ( de_max, e(:,i) ) ! trial move to new orientation
+           ri(:) = r(:,i) + zeta * dr_max                  ! trial move to new position
+           ri(:) = ri(:) - ANINT ( ri(:) )                 ! periodic boundary correction
+           ei(:) = random_rotate_vector ( de_max, e(:,i) ) ! trial move to new orientation
 
            IF ( .NOT. overlap_1 ( ri, ei, i, ne, sigma, length ) ) THEN ! accept
               r(:,i) = ri(:)     ! update position
