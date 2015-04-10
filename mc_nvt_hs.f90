@@ -59,7 +59,7 @@ PROGRAM mc_nvt_hs
   density = REAL(n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
 
-  call initialize ! Allocates r
+  CALL initialize ! Allocates r
   
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r )
 
@@ -73,7 +73,7 @@ PROGRAM mc_nvt_hs
 
   IF ( overlap ( sigma ) ) STOP 'Overlap in initial configuration'
 
-  CALL run_begin ( ['Move ratio','Pressure  '] ) ! must all be character*10 constants
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -118,6 +118,6 @@ PROGRAM mc_nvt_hs
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
 
-  call finalize ! Deallocates r
+  CALL finalize ! Deallocates r
 
 END PROGRAM mc_nvt_hs

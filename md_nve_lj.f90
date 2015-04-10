@@ -91,7 +91,7 @@ PROGRAM md_nve_lj
   WRITE(*,'(''Initial temperature (sigma units)'',   t40,f15.5)') temperature
   WRITE(*,'(''Initial pressure (sigma units)'',      t40,f15.5)') pressure
 
-  CALL run_begin ( ['Energy    ','Shifted   ','Temp      ','Pressure  '] ) ! must all be character*10 constants
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temperature', 'Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 

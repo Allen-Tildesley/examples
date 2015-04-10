@@ -82,7 +82,7 @@ PROGRAM mc_nvt_sc
 
   IF ( overlap ( sigma, length ) ) STOP 'Overlap in initial configuration'
 
-  CALL run_begin ( ['Move ratio','Pressure  ','P2 Order  '] ) ! must all be character*10 constants
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Pressure', 'P2 Order' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 

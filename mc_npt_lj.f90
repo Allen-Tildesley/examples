@@ -103,8 +103,8 @@ PROGRAM mc_npt_lj
   WRITE(*,'(''Initial potential energy (sigma units)'',t40,f15.5)') potential
   WRITE(*,'(''Initial pressure (sigma units)'',        t40,f15.5)') pressure
 
-  CALL run_begin ( ['Move ratio','Box ratio ','Density   ', &
-       &            'Potential ','Pressure  '] ) ! all character*10 constants
+  CALL run_begin ( [ CHARACTER(len=15) :: &
+       &            'Move ratio', 'Box ratio', 'Density', 'Potential', 'Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 

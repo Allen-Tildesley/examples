@@ -10,7 +10,7 @@ MODULE utility_module
   PUBLIC :: orientational_order
 
   INTEGER,                                      SAVE :: nvariables
-  CHARACTER(len=10), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
+  CHARACTER(len=15), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
   REAL,              DIMENSION(:), ALLOCATABLE, SAVE :: blk_averages, run_averages, errors
   REAL,                                         SAVE :: run_norm, blk_norm
 
@@ -197,7 +197,7 @@ CONTAINS
   END SUBROUTINE write_cnf_molecules
 
   SUBROUTINE run_begin ( names )
-    CHARACTER(len=10), DIMENSION(:), INTENT(in) :: names
+    CHARACTER(len=15), DIMENSION(:), INTENT(in) :: names
 
     nvariables = SIZE ( names )
     ALLOCATE ( variable_names(nvariables) )
@@ -236,14 +236,14 @@ CONTAINS
     run_norm     = run_norm + 1.0              ! Increment run normalizer
 
     IF ( first_call ) THEN  ! Write headings
-       WRITE(*,'(*(a15))') REPEAT ( '=', 15*(nvariables+1) ) 
-       WRITE(*,'(*(5x,a10))') 'Block     ', variable_names
-       WRITE(*,'(*(a15))') REPEAT ( '=', 15*(nvariables+1) )
+       WRITE(*,'(*(a16))') REPEAT ( '=', 16*(nvariables+1) ) 
+       WRITE(*,'(*(1x,a15))') 'Block', variable_names
+       WRITE(*,'(*(a16))') REPEAT ( '=', 16*(nvariables+1) )
        first_call = .FALSE.
     END IF
 
     ! Write out block averages
-    WRITE(*,'(5x,i10,*(5x,f10.4))') blk, blk_averages
+    WRITE(*,'(1x,i15,*(1x,f15.5))') blk, blk_averages
 
   END SUBROUTINE blk_end
 
@@ -256,10 +256,12 @@ CONTAINS
        errors = SQRT ( errors / run_norm ) ! Normalize and get estimated errors
     END WHERE
 
-    WRITE(*,'(*(a15))') REPEAT('-',15*(nvariables+1))
-    WRITE(*,'(a15,*(5x,f10.4))') 'Run averages', run_averages
-    WRITE(*,'(a15,*(5x,f10.4))') 'Run errors', errors
-    WRITE(*,'(*(a15))') REPEAT('=',15*(nvariables+1))
+    WRITE(*,'(*(a16))') REPEAT('-',16*(nvariables+1))
+    WRITE(*,'(1x,a15,*(1x,f15.5))') 'Run averages', run_averages
+    WRITE(*,'(1x,a15,*(1x,f15.5))') 'Run errors', errors
+    WRITE(*,'(*(a16))') REPEAT('=',16*(nvariables+1))
+
+    DEALLOCATE ( variable_names, blk_averages, run_averages, errors )
 
   END SUBROUTINE run_end
 

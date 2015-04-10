@@ -5,7 +5,7 @@ MODULE mc_lj_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, lt, ne, gt
-  PUBLIC :: initialize, finalize, energy_1, energy, energy_lrc
+  PUBLIC :: initialize, finalize, resize, energy_1, energy, energy_lrc
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
@@ -21,6 +21,24 @@ CONTAINS
   SUBROUTINE finalize
     DEALLOCATE ( r )
   END SUBROUTINE finalize
+
+  SUBROUTINE resize ! reallocates r array, twice as large
+
+    ! This is employed by mc_zvt_lj, grand canonical ensemble
+    
+    REAL, DIMENSION(:,:), ALLOCATABLE :: tmp
+    INTEGER                           :: n_old, n_new
+
+    n_old = SIZE(r,dim=2)
+    n_new = 2*n_old
+    WRITE(*,'(a,i5,a,i5)') 'Warning: reallocating r array, from old size = ', n_old, ' to ', n_new
+
+    ALLOCATE ( tmp(3,n_new) ) ! new size for r
+    tmp(:,1:n_old) = r(:,:)   ! copy elements across
+
+    CALL move_ALLOC ( tmp, r )
+
+  END SUBROUTINE resize
 
   SUBROUTINE energy ( sigma, r_cut, overlap, pot, vir, pot2, vir2 )
     REAL,                         INTENT(in)  :: sigma, r_cut ! potential parameters

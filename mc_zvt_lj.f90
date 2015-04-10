@@ -3,7 +3,7 @@
 PROGRAM mc_zvt_lj
   USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add, random_integer
-  USE mc_lj_module,   ONLY : initialize, finalize, energy_1, energy, energy_lrc, n, r, ne
+  USE mc_lj_module,   ONLY : initialize, finalize, resize, energy_1, energy, energy_lrc, n, r, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -103,8 +103,9 @@ PROGRAM mc_zvt_lj
   WRITE(*,'(''Initial potential energy (sigma units)'',t40,f15.5)') potential
   WRITE(*,'(''Initial pressure (sigma units)'',        t40,f15.5)') pressure
 
-  CALL run_begin ( ['Move ratio','+1 ratio  ','-1 ratio  ', &
-       &            'Potential ','Pressure  ','Density   '] ) ! must all be character*10 constants
+  CALL run_begin ( [ CHARACTER(len=15) :: &
+       &            'Move ratio', 'Create ratio', 'Destroy ratio', &
+       &            'Potential', 'Pressure', 'Density' ] )
 
   ntry = n ! each step consists of ntry tries (during which n might vary)
 
@@ -175,7 +176,7 @@ PROGRAM mc_zvt_lj
               tries(-1) = tries(-1) + 1
               i = random_integer ( 1, n )
 
-              CALL  energy_1 ( r(:,i), i, ne, sigma, r_cut, overlap, del_pot, del_vir )
+              CALL energy_1 ( r(:,i), i, ne, sigma, r_cut, overlap, del_pot, del_vir )
               CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc ) ! LRC for n atoms
               del_pot = del_pot + pot_lrc
               del_vir = del_vir + vir_lrc
@@ -239,27 +240,6 @@ PROGRAM mc_zvt_lj
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
 
   CALL finalize
-
-CONTAINS
-
-  SUBROUTINE resize ! reallocates r array, twice as large
-    USE mc_lj_module, ONLY : r
-    IMPLICIT NONE
-    REAL, DIMENSION(:,:), ALLOCATABLE :: tmp
-    INTEGER                           :: n_old, n_new
-
-    n_old = SIZE(r,dim=2)
-    n_new = 2*n_old
-    WRITE(*,'(a,i5)',advance='no') 'Warning: reallocating r array, from old size = ', n_old
-    ALLOCATE ( tmp ( 3, n_new ) ) ! temporary array, new size
-    tmp(:,1:n_old) = r            ! copy all elements of r
-    DEALLOCATE ( r )              ! deallocate r
-    ALLOCATE ( r(3,n_new) )       ! reallocate r
-    r(:,1:n_old) = tmp(:,1:n_old) ! copy elements back
-    DEALLOCATE ( tmp )            ! cleanup
-    WRITE(*,'(a,i5)') ' to new size = ', n_new
-
-  END SUBROUTINE resize
 
 END PROGRAM mc_zvt_lj
 

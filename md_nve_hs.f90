@@ -90,7 +90,7 @@ PROGRAM md_nve_hs
      CALL update ( i, gt, sigma_sq ) ! initial search for collision partners >i
   END DO
 
-  CALL run_begin ( ['Coll Rate ','Pressure  '] ) ! must all be character*10 constants
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Collision Rate', 'Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
