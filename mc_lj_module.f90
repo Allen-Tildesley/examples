@@ -6,6 +6,7 @@ MODULE mc_lj_module
   PRIVATE
   PUBLIC :: n, r, lt, ne, gt
   PUBLIC :: initialize, finalize, resize, energy_1, energy, energy_lrc
+  PUBLIC :: move, create, destroy
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)

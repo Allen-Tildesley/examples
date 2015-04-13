@@ -3,7 +3,8 @@
 PROGRAM mc_zvt_lj
   USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add, random_integer
-  USE mc_lj_module,   ONLY : initialize, finalize, resize, energy_1, energy, energy_lrc, move, &
+  USE mc_lj_module,   ONLY : initialize, finalize, resize, energy_1, energy, energy_lrc, &
+       &                     move, create, destroy, &
        &                     n, r, ne
   IMPLICIT NONE
 
