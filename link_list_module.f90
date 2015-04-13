@@ -59,9 +59,8 @@ CONTAINS
 
     ! Allocate to cells
     DO i = 1, n 
-       c(:,i)  = c_index ( r(:,i) )         ! Index function
-       list(i) = head(c(1,i),c(2,i),c(3,i)) ! store old head
-       head(c(1,i),c(2,i),c(3,i)) = i       ! replace with current atom index
+       c(:,i)  = c_index ( r(:,i) )    ! Index function
+       CALL add_particle ( i, c(:,i) )
     END DO
 
   END SUBROUTINE make_list
@@ -81,18 +80,38 @@ CONTAINS
     INTEGER,               INTENT(in) :: i
     REAL,    DIMENSION(3), INTENT(in) :: ri
 
-    INTEGER               :: this, next
     INTEGER, DIMENSION(3) :: ci
 
     ci(:) = c_index ( ri(:) ) ! Index function
 
     IF ( ALL ( ci(:) == c(:,i) ) ) RETURN ! no need to do anything
 
-    ! Find i and remove it from c(:,i)
-    this = head(c(1,i),c(2,i),c(3,i))
+    CALL remove_particle ( i, c(:,i) ) ! Remove from old cell
+    c(:,i)  = ci(:)                    ! Update cell array
+    CALL add_particle    ( i, c(:,i) ) ! Add to new cell
+
+  END SUBROUTINE update_list
+
+  SUBROUTINE add_particle ( i, ci )         ! Add particle i to cell ci
+    INTEGER,               INTENT(in) :: i  ! index of particle to be added
+    INTEGER, DIMENSION(3), INTENT(in) :: ci ! cell to which it is to be added
+
+    list(i) = head(ci(1),ci(2),ci(3))
+    head(ci(1),ci(2),ci(3)) = i 
+
+  END SUBROUTINE add_particle
+
+  SUBROUTINE remove_particle ( i, ci )      ! Remove particle i from cell ci
+    INTEGER,               INTENT(in) :: i  ! index of particle to be removed
+    INTEGER, DIMENSION(3), INTENT(in) :: ci ! cell from which it is to be removed
+
+    INTEGER :: this, next
+
+    this = head(ci(1),ci(2),ci(3))
+
     IF ( this == i ) THEN ! i is the head atom in that cell
 
-       head(c(1,i),c(2,i),c(3,i)) = list(i) ! simply point head at next atom
+       head(ci(1),ci(2),ci(3)) = list(i) ! simply point head at next atom
 
     ELSE
 
@@ -113,13 +132,8 @@ CONTAINS
        END DO
 
     END IF
-    
-    ! Add i to the new cell
-    c(:,i)  = ci(:)
-    list(i) = head(c(1,i),c(2,i),c(3,i))
-    head(c(1,i),c(2,i),c(3,i)) = i 
 
-  END SUBROUTINE update_list
+  END SUBROUTINE remove_particle
 
   SUBROUTINE check_list ( n, r ) ! Routine to check consistency of cell lists
     INTEGER,                 INTENT(in) :: n

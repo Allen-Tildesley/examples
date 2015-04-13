@@ -1,6 +1,5 @@
-! md_lj_vl_module.f90 (used by md_nve_lj.f90)
-! Molecular dynamics simulation, Lennard-Jones atoms, Verlet neighbour list
-! This is a drop-in replacement for md_lj_module in md_lj_module.f90
+! md_lj_vl_module.f90 (uses verlet_list_module.f90)
+! Verlet neighbour list (used by md_nve_lj.f90)
 MODULE md_lj_module
 
   IMPLICIT NONE

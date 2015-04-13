@@ -3,7 +3,8 @@
 PROGRAM mc_npt_lj
   USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_lj_module,   ONLY : initialize, finalize, energy_1, energy, energy_lrc, n, r, ne
+  USE mc_lj_module,   ONLY : initialize, finalize, energy_1, energy, energy_lrc, move, &
+       &                     n, r, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -133,8 +134,8 @@ PROGRAM mc_npt_lj
               IF (  metropolis ( delta )  ) THEN ! accept Metropolis test
                  pot = pot + pot_new - pot_old   ! update potential energy
                  vir = vir + vir_new - vir_old   ! update virial
-                 r(:,i) = ri(:)                  ! update position
-                 moves  = moves + 1              ! increment move counter
+                 call move ( i, ri )             ! update position
+                 moves = moves + 1               ! increment move counter
               END IF ! reject Metropolis test
 
            END IF ! reject overlapping configuration

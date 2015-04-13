@@ -192,4 +192,28 @@ CONTAINS
 
   END SUBROUTINE energy_lrc
 
+  SUBROUTINE move ( i, ri )
+    INTEGER,               INTENT(in) :: i
+    REAL,    DIMENSION(3), INTENT(in) :: ri
+
+    r(:,i) = ri
+    
+  END SUBROUTINE move
+
+  SUBROUTINE create ( ri )
+    REAL,    DIMENSION(3), INTENT(in) :: ri
+
+    n        = n+1 ! increase number of atoms
+    r(:,n)   = ri  ! add new atom at the end
+    
+  END SUBROUTINE create
+
+  SUBROUTINE destroy ( i )
+    INTEGER, INTENT(in) :: i
+
+    r(:,i)    = r(:,n) ! replace atom i with atom n
+    n         = n - 1  ! reduce number of atoms
+
+  END SUBROUTINE destroy
+  
 END MODULE mc_lj_module

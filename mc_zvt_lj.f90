@@ -3,7 +3,8 @@
 PROGRAM mc_zvt_lj
   USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add, random_integer
-  USE mc_lj_module,   ONLY : initialize, finalize, resize, energy_1, energy, energy_lrc, n, r, ne
+  USE mc_lj_module,   ONLY : initialize, finalize, resize, energy_1, energy, energy_lrc, move, &
+       &                     n, r, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -141,7 +142,7 @@ PROGRAM mc_zvt_lj
                  IF ( metropolis ( delta ) ) THEN    ! accept Metropolis test
                     pot    = pot + pot_new - pot_old ! update potential energy
                     vir    = vir + vir_new - vir_old ! update virial
-                    r(:,i) = ri(:)                   ! update position
+                    CALL move ( i, ri )              ! update position
                     moves(0)  = moves(0) + 1         ! increment move counter
                  END IF ! reject Metropolis test
               END IF ! reject overlapping configuration
@@ -164,11 +165,10 @@ PROGRAM mc_zvt_lj
               IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
                  delta = del_pot / temperature - LOG ( activity / REAL ( n+1 ) )
                  IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
-                    n        = n+1           ! increase number of atoms
-                    r(:,n)   = ri            ! add new atom coordinates
-                    pot      = pot + del_pot ! update total potential energy
-                    vir      = vir + del_vir ! update total virial
-                    moves(1) = moves(1) + 1  ! increment creation move counter
+                    call create ( ri )            ! create new particle
+                    pot      = pot + del_pot      ! update total potential energy
+                    vir      = vir + del_vir      ! update total virial
+                    moves(1) = moves(1) + 1       ! increment creation move counter
                  END IF ! reject Metropolis test
               END IF ! reject overlapping configuration
 
@@ -189,8 +189,7 @@ PROGRAM mc_zvt_lj
               IF ( overlap ) STOP 'Overlap found on particle removal'
               delta = del_pot/temperature - LOG ( REAL ( n ) / activity )
               IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
-                 r(:,i)    = r(:,n)            ! replace atom i with atom n
-                 n         = n - 1             ! reduce number of atoms
+                 call destroy ( i )            ! destroy chosen particle
                  pot       = pot + del_pot     ! update total potential energy
                  vir       = vir + del_vir     ! update total virial
                  moves(-1) = moves(-1) + 1     ! increment destruction move counter
