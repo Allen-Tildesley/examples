@@ -15,7 +15,8 @@ MODULE mc_lj_module
 
 CONTAINS
 
-  SUBROUTINE initialize
+  SUBROUTINE initialize ( r_cut )
+    REAL, INTENT(in) :: r_cut ! not used in initialization for this version
     ALLOCATE ( r(3,n) )
   END SUBROUTINE initialize
 

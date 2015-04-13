@@ -81,18 +81,20 @@ PROGRAM mc_npt_lj
   density = REAL(n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
 
-  CALL initialize ! Allocate r
+  ! Convert run and potential parameters to box units
+  sigma  = 1.0 / box
+  r_cut  = r_cut / box
+  dr_max = dr_max / box
+  WRITE(*,'(''sigma (in box units)'',t40,f15.5)') sigma
+  IF ( r_cut > 0.5 ) STOP 'r_cut too large '
+
+  CALL initialize ( r_cut ) ! Allocate r
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r )
 
   ! Convert to box units
   r(:,:) = r(:,:) / box
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
-  sigma  = 1.0 / box
-  r_cut  = r_cut / box
-  dr_max = dr_max / box
-  WRITE(*,'(''sigma (in box units)'',t40,f15.5)') sigma
-  IF ( r_cut > 0.5 ) STOP 'r_cut too large '
 
   CALL energy ( sigma, r_cut, overlap, pot2=pot, vir2=vir )
   IF ( overlap ) STOP 'Overlap in initial configuration'
