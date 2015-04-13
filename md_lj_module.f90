@@ -14,11 +14,9 @@ MODULE md_lj_module
 
 CONTAINS
 
-  SUBROUTINE initialize ( r_cut, r_list )
-    REAL, INTENT(in) :: r_cut, r_list
+  SUBROUTINE initialize ( r_cut )
+    REAL, INTENT(in) :: r_cut ! not used in initialization for this version
     ALLOCATE ( r(3,n), v(3,n), f(3,n) )
-    WRITE(*,'(''No lists are used in this program'')')
-    WRITE(*,'(''The following value is ignored: r_list ='',t40,f15.5)') r_list
   END SUBROUTINE initialize
 
   SUBROUTINE finalize

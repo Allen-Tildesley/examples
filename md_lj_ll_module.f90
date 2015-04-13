@@ -14,12 +14,12 @@ MODULE md_lj_module
 
 CONTAINS
 
-  SUBROUTINE initialize ( r_cut, r_list )
+  SUBROUTINE initialize ( r_cut )
     USE link_list_module, ONLY : initialize_list
-    REAL, INTENT(in) :: r_cut, r_list
+    REAL, INTENT(in) :: r_cut
 
     ALLOCATE ( r(3,n), v(3,n), f(3,n) )
-    CALL initialize_list ( n, r_cut, r_list )
+    CALL initialize_list ( n, r_cut )
 
   END SUBROUTINE initialize
 

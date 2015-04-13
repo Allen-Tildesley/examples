@@ -22,7 +22,6 @@ PROGRAM md_nve_lj
   REAL :: density     ! reduced density n*sigma**3/box**3
   REAL :: dt          ! time step
   REAL :: r_cut       ! potential cutoff distance
-  REAL :: r_list      ! list range parameter (if applicable)
   REAL :: pot         ! total potential energy
   REAL :: pot_sh      ! total shifted potential energy
   REAL :: kin         ! total kinetic energy
@@ -39,26 +38,22 @@ PROGRAM md_nve_lj
   CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)             :: sav_tag = 'sav' ! may be overwritten with block number
 
-  NAMELIST /run_parameters/ nblock, nstep, r_cut, r_list, dt
+  NAMELIST /run_parameters/ nblock, nstep, r_cut, dt
 
   WRITE(*,'(''md_nve_lj'')')
   WRITE(*,'(''Molecular dynamics, constant-NVE, Lennard-Jones'')')
   WRITE(*,'(''Results in units epsilon = sigma = 1'')')
 
   ! Set sensible default run parameters for testing
-  ! The user must set r_list > r_cut if Verlet lists are used
-  ! Otherwise its value is not critical
   nblock      = 10
   nstep       = 1000
   r_cut       = 2.5
-  r_list      = 3.0
   dt          = 0.005
 
   READ(*,nml=run_parameters)
   WRITE(*,'(''Number of blocks'',         t40,i15)'  ) nblock
   WRITE(*,'(''Number of steps per block'',t40,i15)'  ) nstep
   WRITE(*,'(''Potential cutoff distance'',t40,f15.5)') r_cut
-  WRITE(*,'(''List range parameter'',     t40,f15.5)') r_list
   WRITE(*,'(''Time step'',                t40,f15.5)') dt
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box )
@@ -71,15 +66,13 @@ PROGRAM md_nve_lj
   ! Convert run and potential parameters to box units
   sigma  = sigma / box
   r_cut  = r_cut / box
-  r_list = r_list / box
   dt     = dt / box
   WRITE(*,'(''sigma  (in box units)'',t40,f15.5)') sigma
   WRITE(*,'(''r_cut  (in box units)'',t40,f15.5)') r_cut
-  WRITE(*,'(''r_list (in box units)'',t40,f15.5)') r_list
   WRITE(*,'(''dt     (in box units)'',t40,f15.5)') dt
   IF ( r_cut > 0.5  ) STOP 'r_cut too large '
 
-  CALL initialize ( r_cut, r_list )
+  CALL initialize ( r_cut )
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v )
 

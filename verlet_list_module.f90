@@ -7,8 +7,8 @@ MODULE verlet_list_module
   PUBLIC :: point, list
 
   INTEGER                              :: nl     ! size of list
-  real                                 :: r_list ! list range parameter
-  real                                 :: r_skin ! list skin parameter
+  REAL                                 :: r_list ! list range parameter
+  REAL                                 :: r_skin ! list skin parameter
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r_save ! saved positions for list (3,n)
   REAL,    DIMENSION(:,:), ALLOCATABLE :: dr     ! displacements (3,n)
   INTEGER, DIMENSION(:),   ALLOCATABLE :: point  ! index to neighbour list (n)
@@ -16,16 +16,25 @@ MODULE verlet_list_module
 
 CONTAINS
 
-  SUBROUTINE initialize_list ( n, r_cut, r_list_inp )
+  SUBROUTINE initialize_list ( n, r_cut )
     INTEGER, INTENT(in) :: n
-    REAL,    INTENT(in) :: r_cut, r_list_inp
+    REAL,    INTENT(in) :: r_cut
 
-    REAL, PARAMETER :: pi = 4.0*atan(1.0)
+    REAL :: r_list_factor
 
-    r_list = r_list_inp ! store in module variable
-    IF ( r_list < r_cut ) STOP 'r_list < r_cut'
+    REAL, PARAMETER :: pi = 4.0*ATAN(1.0)
+    NAMELIST /list_parameters/ r_list_factor
+
+    ! Sensible default for r_list_factor
+    r_list_factor = 1.2
+    READ(*,nml=list_parameters)
+    WRITE(*,'(''Verlet list factor = '',t40,f15.5)') r_list_factor
+    IF ( r_list_factor <= 1.0 ) STOP 'r_list_factor must be > 1'
+    r_list = r_cut * r_list_factor
     IF ( r_list > 0.5   ) STOP 'r_list too large'
     r_skin = r_list - r_cut
+    WRITE(*,'(''Verlet list range (box units) = '',t40,f15.5)') r_list
+    WRITE(*,'(''Verlet list skin  (box units) = '',t40,f15.5)') r_skin
 
     ! Estimate list size based on density + 10 per cent
     nl = CEILING ( 1.1*(4.0*pi/6.0)*(r_list**3)*REAL(n**2) )
@@ -49,13 +58,13 @@ CONTAINS
     tmp(1:nl) = list(:)      ! copy elements across
 
     CALL move_ALLOC ( tmp, list )
-    nl = size(list)
+    nl = SIZE(list)
     WRITE(*,'(''New Verlet list size = '',t40,i15)') nl
 
   END SUBROUTINE resize_list
 
   SUBROUTINE make_list ( n, r )
-    INTEGER,                 intent(in) :: n
+    INTEGER,                 INTENT(in) :: n
     REAL,    DIMENSION(3,n), INTENT(in) :: r
 
     INTEGER            :: i, j, k
@@ -64,11 +73,11 @@ CONTAINS
 
     LOGICAL, SAVE :: first_call = .TRUE.
 
-    IF ( .not. first_call ) THEN
+    IF ( .NOT. first_call ) THEN
        dr = r - r_save                         ! displacement since last list update
        dr = dr - ANINT ( dr )                  ! periodic boundaries in box=1
        dr_sq_max = MAXVAL ( SUM(dr**2,dim=1) ) ! squared maximum displacement
-       IF ( 4.0*dr_sq_max < r_skin ** 2 )  return ! no need to make list
+       IF ( 4.0*dr_sq_max < r_skin ** 2 )  RETURN ! no need to make list
     END IF
 
     first_call = .FALSE.

@@ -29,13 +29,12 @@ MODULE link_list_module
 
 CONTAINS
 
-  SUBROUTINE initialize_list ( n, r_cut, r_list )
+  SUBROUTINE initialize_list ( n, r_cut )
     INTEGER, INTENT(in) :: n
-    REAL,    INTENT(in) :: r_cut, r_list ! We assume that r_cut (in box=1 units) never changes
+    REAL,    INTENT(in) :: r_cut ! We assume that r_cut (in box=1 units) never changes
 
     WRITE(*,'(''Link list initialization'')')
     WRITE(*,'(''Link cells based on r_cut ='',t40,f15.5)') r_cut
-    WRITE(*,'(''Ignoring value of r_list ='', t40,f15.5)') r_list
     nc = FLOOR ( 1.0 / r_cut ) ! number of cells
     IF ( nc < 3 ) STOP 'System is too small to use link cells'
 
