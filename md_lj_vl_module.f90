@@ -13,42 +13,26 @@ MODULE md_lj_module
   REAL,    DIMENSION(:,:), ALLOCATABLE :: v ! velocities (3,:)
   REAL,    DIMENSION(:,:), ALLOCATABLE :: f ! forces (3,:)
 
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: r_save ! saved positions for list (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: dr     ! displacements (3,n)
-  INTEGER, DIMENSION(:),   ALLOCATABLE :: point  ! index to neighbour list (n)
-  INTEGER, DIMENSION(:),   ALLOCATABLE :: list   ! Verlet neighbour list
-
 CONTAINS
 
-  SUBROUTINE initialize
+  SUBROUTINE initialize ( r_cut, r_list )
+    USE verlet_list_module, only : initialize_list
+    REAL, INTENT(in) :: r_cut, r_list
+
     ALLOCATE ( r(3,n), v(3,n), f(3,n) )
 
-    ! Size allocated to list is just a guess
-    ALLOCATE ( point(n), list(25*n) )
+    CALL initialize_list ( n, r_cut, r_list )
   END SUBROUTINE initialize
 
   SUBROUTINE finalize
+    USE verlet_list_module, only : finalize_list
     DEALLOCATE ( r, v, f )
-    DEALLOCATE ( point, list )
+    call finalize_list
   END SUBROUTINE finalize
-
-  SUBROUTINE resize ! reallocates list array, somewhat larger
-    
-    INTEGER, DIMENSION(:), ALLOCATABLE :: tmp
-    INTEGER                            :: n_old, n_new
-
-    n_old = SIZE(list)
-    n_new = CEILING( 1.25 * REAL(n_old) )
-    WRITE(*,'(a,i5,a,i5)') 'Warning: reallocating list array, from old size = ', n_old, ' to ', n_new
-
-    ALLOCATE ( tmp(n_new) ) ! new size for list
-    tmp(1:n_old) = list(:)  ! copy elements across
-
-    CALL move_ALLOC ( tmp, list )
-
-  END SUBROUTINE resize
   
   SUBROUTINE force ( sigma, r_cut, pot, pot_sh, vir )
+    USE verlet_list_module, ONLY : point, list, make_list
+
     REAL, INTENT(in)  :: sigma, r_cut ! potential parameters
     REAL, INTENT(out) :: pot          ! total potential energy
     REAL, INTENT(out) :: pot_sh       ! potential shifted to zero at cutoff
@@ -60,32 +44,14 @@ CONTAINS
     ! Forces are calculated in units where box = 1 and epsilon = 1
 
     INTEGER            :: i, j, k, n_cut
-    REAL               :: r_skin, r_list, dr_sq_max
     REAL               :: r_cut_sq, sigma_sq, rij_sq, sr2, sr6, sr12, potij, virij
     REAL, DIMENSION(3) :: rij, fij
-
-    LOGICAL, SAVE :: first_call = .TRUE.
-
-    r_skin = sigma * 1.5 ! somewhat arbitrary
-    r_list = r_cut + r_skin
 
     r_cut_sq  = r_cut ** 2
     sigma_sq  = sigma ** 2
 
-    IF ( first_call ) THEN
-       CALL make_list ( r_list )
-       r_save     = r
-       first_call = .FALSE.
-    ELSE
-       dr = r - r_save                         ! displacement since last list update
-       dr = dr - ANINT ( dr )                  ! periodic boundaries in box=1
-       dr_sq_max = MAXVAL ( SUM(dr**2,dim=1) ) ! squared maximum displacement
-       IF ( 4.0*dr_sq_max > r_skin ** 2 ) THEN
-          CALL make_list ( r_list )
-          r_save = r
-       END IF
-    END IF
-
+    CALL make_list ( n, r )
+    
     f     = 0.0
     pot   = 0.0
     vir   = 0.0
@@ -136,42 +102,6 @@ CONTAINS
     vir    = vir    * 24.0 / 3.0
 
   END SUBROUTINE force
-
-  SUBROUTINE make_list ( r_list )
-    REAL, INTENT(in) :: r_list
-
-    INTEGER            :: i, j, k
-    REAL               :: r_list_sq, rij_sq
-    REAL, DIMENSION(3) :: rij
-
-    k = 0
-    r_list_sq = r_list ** 2
-
-    DO i = 1, n - 1 ! Begin outer loop over atoms
-
-       point(i) = k + 1
-
-       DO j = i + 1, n ! Begin inner loop over partner atoms
-
-          rij(:)  = r(:,i) - r(:,j)
-          rij(:)  = rij(:) - ANINT ( rij(:) )
-          rij_sq = SUM ( rij**2 )
-
-          IF ( rij_sq < r_list_sq ) THEN
-
-             k = k + 1
-             IF ( k > SIZE(list) ) CALL resize
-             list(k) = j
-
-          END IF
-
-       END DO ! End inner loop over partner atoms
-
-    END DO ! End outer loop over atoms
-
-    point(n) = k + 1
-
-  END SUBROUTINE make_list
 
   SUBROUTINE energy_lrc ( n, sigma, r_cut, pot, vir )
     INTEGER, INTENT(in)  :: n            ! number of atoms

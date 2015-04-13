@@ -1,4 +1,4 @@
-! md_lj_module.f90 (used by md_nve_lj.f90)
+! md_lj_ll_module.f90
 ! Molecular dynamics simulation, Lennard-Jones atoms
 MODULE md_lj_module
 
@@ -15,17 +15,23 @@ MODULE md_lj_module
 CONTAINS
 
   SUBROUTINE initialize ( r_cut, r_list )
+    USE link_list_module, ONLY : initialize_list
     REAL, INTENT(in) :: r_cut, r_list
+
     ALLOCATE ( r(3,n), v(3,n), f(3,n) )
-    WRITE(*,'(''No lists are used in this program'')')
-    WRITE(*,'(''The following value is ignored: r_list ='',t40,f15.5)') r_list
+    CALL initialize_list ( n, r_cut, r_list )
+
   END SUBROUTINE initialize
 
   SUBROUTINE finalize
+    USE link_list_module, ONLY : finalize_list
     DEALLOCATE ( r, v, f )
+    CALL finalize_list
   END SUBROUTINE finalize
 
   SUBROUTINE force ( sigma, r_cut, pot, pot_sh, vir )
+    USE link_list_module, ONLY : make_list, nc, head, list, dc, nk
+
     REAL, INTENT(in)  :: sigma, r_cut ! potential parameters
     REAL, INTENT(out) :: pot          ! total potential energy
     REAL, INTENT(out) :: pot_sh       ! potential shifted to zero at cutoff
@@ -35,46 +41,79 @@ CONTAINS
     ! It is assumed that potential parameters and positions are in units where box = 1
     ! The Lennard-Jones energy parameter is taken to be epsilon = 1
     ! Forces are calculated in units where box = 1 and epsilon = 1
+    ! Uses link lists
 
-    INTEGER            :: i, j, n_cut
-    REAL               :: r_cut_sq, sigma_sq, rij_sq, sr2, sr6, sr12, potij, virij
-    REAL, DIMENSION(3) :: rij, fij
+    INTEGER               :: i, j, k, n_cut, ci1, ci2, ci3
+    INTEGER, DIMENSION(3) :: ci, cj
+    REAL                  :: r_cut_sq, sigma_sq, rij_sq, sr2, sr6, sr12, potij, virij
+    REAL,    DIMENSION(3) :: rij, fij
 
     r_cut_sq = r_cut ** 2
-    sigma_sq  = sigma ** 2
+    sigma_sq = sigma ** 2
 
     f     = 0.0
     pot   = 0.0
     vir   = 0.0
     n_cut = 0
 
-    DO i = 1, n - 1 ! Begin outer loop over atoms
+    CALL make_list ( n, r )
 
-       DO j = i + 1, n ! Begin inner loop over atoms
+    ! Triple loop over cells
+    DO ci1 = 0, nc-1
+       DO ci2 = 0, nc-1
+          DO ci3 = 0, nc-1
+             ci = [ ci1, ci2, ci3 ]
+             i = head(ci1,ci2,ci3)
 
-          rij(:) = r(:,i) - r(:,j)           ! separation vector
-          rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundary conditions in box=1 units
-          rij_sq = SUM ( rij**2 )            ! squared separation
+             DO ! Begin loop over i atoms in list
+                IF ( i == 0 ) EXIT ! end of link list
 
-          IF ( rij_sq < r_cut_sq ) THEN
+                DO k = 0, nk ! Begin loop over neighbouring cells
 
-             sr2    = sigma_sq / rij_sq
-             sr6    = sr2 ** 3
-             sr12   = sr6 ** 2
-             potij  = sr12 - sr6
-             virij  = potij + sr12
-             pot    = pot + potij
-             vir    = vir + virij
-             fij    = rij * virij / rij_sq
-             f(:,i) = f(:,i) + fij
-             f(:,j) = f(:,j) - fij
-             n_cut  = n_cut + 1
+                   IF ( k == 0 ) THEN
+                      j = list(i)
+                   ELSE
+                      cj(:) = MODULO ( ci(:) + dc(:,k), nc )
+                      j = head(cj(1),cj(2),cj(3))
+                   END IF
 
-          END IF
+                   DO ! Begin loop over j atoms in list
+                      IF ( j == 0 ) EXIT ! end of link list
+                      IF ( j == i ) STOP 'This can never happen'
 
-       END DO ! End inner loop over atoms
+                      rij(:) = r(:,i) - r(:,j)           ! separation vector
+                      rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundary conditions in box=1 units
+                      rij_sq = SUM ( rij**2 )            ! squared separation
 
-    END DO ! End outer loop over atoms
+                      IF ( rij_sq < r_cut_sq ) THEN ! check within cutoff
+
+                         sr2    = sigma_sq / rij_sq
+                         sr6    = sr2 ** 3
+                         sr12   = sr6 ** 2
+                         potij  = sr12 - sr6
+                         virij  = potij + sr12
+                         pot    = pot + potij
+                         vir    = vir + virij
+                         fij    = rij * virij / rij_sq
+                         f(:,i) = f(:,i) + fij
+                         f(:,j) = f(:,j) - fij
+                         n_cut  = n_cut + 1
+
+                      END IF ! end check within cutoff
+
+                      j = list(j) ! Next atom in j cell
+
+                   END DO ! End loop over j atoms in list
+
+                END DO ! End loop over neighbouring cells
+
+                i = list(i)
+             END DO ! End loop over i atoms in list
+
+          END DO
+       END DO
+    END DO
+    ! End triple loop over cells
 
     ! calculate shifted potential
     sr2    = sigma_sq / r_cut_sq
@@ -118,3 +157,4 @@ CONTAINS
   END SUBROUTINE energy_lrc
 
 END MODULE md_lj_module
+
