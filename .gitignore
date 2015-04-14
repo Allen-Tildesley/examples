@@ -2,3 +2,4 @@
 *.o
 *.mod
 a.out
+build_*
