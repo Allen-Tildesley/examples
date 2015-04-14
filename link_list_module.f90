@@ -3,7 +3,8 @@
 MODULE link_list_module
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: initialize_list, finalize_list, make_list, update_list, check_list, get_neighbours
+  PUBLIC :: initialize_list, finalize_list, make_list, check_list, get_neighbours
+  PUBLIC :: move_in_list, create_in_list, destroy_in_list, c_index
   PUBLIC :: nj, j_list, nc, head, list, c, dc, nk
 
   ! Set up vectors to each cell in neighbourhood of 3x3x3 cells in cubic lattice
@@ -60,7 +61,7 @@ CONTAINS
     ! Allocate to cells
     DO i = 1, n 
        c(:,i)  = c_index ( r(:,i) )    ! Index function
-       CALL add_particle ( i, c(:,i) )
+       CALL create_in_list ( i, c(:,i) )
     END DO
 
   END SUBROUTINE make_list
@@ -76,34 +77,30 @@ CONTAINS
 
   END FUNCTION c_index
   
-  SUBROUTINE update_list ( i, ri ) ! Routine to update list structures when particle i has been moved
+  SUBROUTINE move_in_list ( i, ci ) ! Move i from current cell to ci
     INTEGER,               INTENT(in) :: i
-    REAL,    DIMENSION(3), INTENT(in) :: ri
-
-    INTEGER, DIMENSION(3) :: ci
-
-    ci(:) = c_index ( ri(:) ) ! Index function
+    integer, DIMENSION(3), INTENT(in) :: ci
 
     IF ( ALL ( ci(:) == c(:,i) ) ) RETURN ! no need to do anything
 
-    CALL remove_particle ( i, c(:,i) ) ! Remove from old cell
-    c(:,i)  = ci(:)                    ! Update cell array
-    CALL add_particle    ( i, c(:,i) ) ! Add to new cell
+    CALL destroy_in_list ( i, c(:,i) ) ! Remove from old cell
+    CALL create_in_list  ( i, ci(:)  ) ! Add to new cell
 
-  END SUBROUTINE update_list
+  END SUBROUTINE move_in_list
 
-  SUBROUTINE add_particle ( i, ci )         ! Add particle i to cell ci
-    INTEGER,               INTENT(in) :: i  ! index of particle to be added
-    INTEGER, DIMENSION(3), INTENT(in) :: ci ! cell to which it is to be added
+  SUBROUTINE create_in_list ( i, ci ) ! Create i in cell ci
+    INTEGER,               INTENT(in) :: i
+    INTEGER, DIMENSION(3), INTENT(in) :: ci
 
-    list(i) = head(ci(1),ci(2),ci(3))
+    list(i)                 = head(ci(1),ci(2),ci(3))
     head(ci(1),ci(2),ci(3)) = i 
+    c(:,i)                  = ci(:)
 
-  END SUBROUTINE add_particle
+  END SUBROUTINE create_in_list
 
-  SUBROUTINE remove_particle ( i, ci )      ! Remove particle i from cell ci
-    INTEGER,               INTENT(in) :: i  ! index of particle to be removed
-    INTEGER, DIMENSION(3), INTENT(in) :: ci ! cell from which it is to be removed
+  SUBROUTINE destroy_in_list ( i, ci )      ! Destroy i in cell ci
+    INTEGER,               INTENT(in) :: i
+    INTEGER, DIMENSION(3), INTENT(in) :: ci
 
     INTEGER :: this, next
 
@@ -133,7 +130,7 @@ CONTAINS
 
     END IF
 
-  END SUBROUTINE remove_particle
+  END SUBROUTINE destroy_in_list
 
   SUBROUTINE check_list ( n, r ) ! Routine to check consistency of cell lists
     INTEGER,                 INTENT(in) :: n
