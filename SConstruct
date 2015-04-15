@@ -18,6 +18,7 @@ env_normal.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFI
 env_mpi.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
 
 variants={}
+variants['build_initialize']   = (['initialize.f90','initialize_module.f90','utility_module.f90'],env_normal)
 variants['build_mc_nvt_lj']    = (['mc_nvt_lj.f90','mc_lj_module.f90','utility_module.f90'],env_normal)
 variants['build_mc_npt_lj']    = (['mc_npt_lj.f90','mc_lj_module.f90','utility_module.f90'],env_normal)
 variants['build_mc_zvt_lj']    = (['mc_zvt_lj.f90','mc_lj_module.f90','utility_module.f90'],env_normal)

@@ -5,7 +5,8 @@ MODULE utility_module
   PUBLIC :: read_cnf_atoms, write_cnf_atoms, read_cnf_molecules, write_cnf_molecules
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add
   PUBLIC :: random_integer, random_normal
-  PUBLIC :: random_orientation_vector, random_orientation_vector_alt1, random_orientation_vector_alt2
+  PUBLIC :: random_orientation_vector, random_perpendicular_vector
+  PUBLIC :: random_orientation_vector_alt1, random_orientation_vector_alt2
   PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
   PUBLIC :: orientational_order
 
@@ -389,7 +390,7 @@ CONTAINS
     REAL, DIMENSION(3)             :: e         ! result is an orientation vector
     REAL, DIMENSION(3), INTENT(in) :: e_old     ! perpendicular to this vector 
 
-    REAL            :: factor
+    REAL            :: factor, e_sq
     REAL, PARAMETER :: tol = 1.e-6
 
     DO

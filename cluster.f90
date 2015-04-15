@@ -1,93 +1,68 @@
 ! cluster.f90
-SUBROUTINE cluster ( RCL, IT, NIT )
-! Placeholder for f90 subroutine
+program cluster
+! placeholder for f90 subroutine
 
-********************************************************************************
-** FICHE F.34.  AN EFFICIENT CLUSTERING ROUTINE                               **
-** This FORTRAN code is intended to illustrate points made in the text.       **
-** To our knowledge it works correctly.  However it is the responsibility of  **
-** the user to test it, if it is to be used in a research application.        **
-********************************************************************************
+  use utility_module, only : read_cnf_atoms
+  implicit none
 
+  ! Program to identify atom clusters in a configuration
+  ! Defines a cluster by a critical separation
+  ! Produces a linked list of clusters
+  ! Works in units where box = 1 
+! Reference:
+! Stoddard J Comp Phys, 27, 291, 1977.
 
+  integer n
+  real, dimension(:,:), allocatable :: r ! positions (3,n)
+  integer, dimension(:), allocatable :: l
 
+  
+  REAL     ::   rcl
+        INTEGER     it, nit
 
-        COMMON / BLOCK1 / RX, RY, RZ
+        REAL        rclsq, rxjk, ryjk, rzjk
+        REAL        rjksq, rxj, ryj, rzj
+        INTEGER     i, j, k, lk, lit
 
-C    *******************************************************************
-C    ** ROUTINE TO IDENTIFY ATOM CLUSTERS IN A CONFIGURATION.         **
-C    **                                                               **
-C    ** THIS ROUTINE SORTS N ATOMS INTO CLUSTERS DEFINED BY A         **
-C    ** CRITICAL CLUSTER RADIUS, AND COUNTS THE NUMBER OF ATOMS IN    **
-C    ** THE CLUSTER CONTAINING THE ATOM 'IT'.  THE ATOMS ARE IN A     **
-C    ** BOX OF UNIT LENGTH CENTRED AT THE ORIGIN                      **
-C    **                                                               **
-C    ** REFERENCE:                                                    **
-C    **                                                               **
-C    ** STODDARD J COMP PHYS, 27, 291, 1977.                          **
-C    **                                                               **
-C    ** PRINCIPAL VARIABLES:                                          **
-C    **                                                               **
-C    ** INTEGER N                   NUMBER OF ATOMS                   **
-C    ** INTEGER IT                  AN ATOM IN A PARTICULAR CLUSTER   **
-C    ** INTEGER L(N)                A LINKED-LIST                     **
-C    ** INTEGER NIT                 NUMBER OF ATOMS IN THAT CLUSTER   **
-C    ** REAL    RX(N),RY(N),RZ(N)   POSITIONS                         **
-C    ** REAL    RCL                 CRITICAL CLUSTER DISTANCE         **
-C    *******************************************************************
+        rclsq = rcl * rcl
 
-        INTEGER     N
-        PARAMETER ( N = 108 )
+! set up the sorting array **
 
-        REAL        RX(N), RY(N), RZ(N)
-        REAL        RCL
-        INTEGER     IT, NIT
+        DO 10 i = 1, n
 
-        REAL        RCLSQ, RXJK, RYJK, RZJK
-        REAL        RJKSQ, RXJ, RYJ, RZJ
-        INTEGER     I, J, K, LK, LIT, L(N)
-
-C       ****************************************************************
-
-        RCLSQ = RCL * RCL
-
-C    ** SET UP THE SORTING ARRAY **
-
-        DO 10 I = 1, N
-
-           L(I) = I
+           l(i) = i
 
 10      CONTINUE
 
-C    ** SORT THE CLUSTERS **
+! sort the clusters **
 
-        DO 50 I = 1, N - 1
+        DO 50 i = 1, n - 1
 
-           IF ( I .EQ. L(I) ) THEN
+           IF ( i .EQ. l(i) ) THEN
 
-              J   = I
-              RXJ = RX(J)
-              RYJ = RY(J)
-              RZJ = RZ(J)
+              j   = i
+              rxj = rx(j)
+              ryj = ry(j)
+              rzj = rz(j)
 
-              DO 20 K = I + 1, N
+              DO 20 k = i + 1, n
 
-                 LK = L(K)
+                 lk = l(k)
 
-                 IF ( LK .EQ. K ) THEN
+                 IF ( lk .EQ. k ) THEN
 
-                    RXJK  = RXJ - RX(K)
-                    RYJK  = RYJ - RY(K)
-                    RZJK  = RZJ - RZ(K)
-                    RXJK  = RXJK - ANINT ( RXJK )
-                    RYJK  = RYJK - ANINT ( RYJK )
-                    RZJK  = RZJK - ANINT ( RZJK )
-                    RJKSQ = RXJK * RXJK + RYJK * RYJK + RZJK * RZJK
+                    rxjk  = rxj - rx(k)
+                    ryjk  = ryj - ry(k)
+                    rzjk  = rzj - rz(k)
+                    rxjk  = rxjk - ANINT ( rxjk )
+                    ryjk  = ryjk - ANINT ( ryjk )
+                    rzjk  = rzjk - ANINT ( rzjk )
+                    rjksq = rxjk * rxjk + ryjk * ryjk + rzjk * rzjk
 
-                    IF ( RJKSQ .LE. RCLSQ ) THEN
+                    IF ( rjksq .LE. rclsq ) THEN
 
-                       L(K) = L(J)
-                       L(J) = LK
+                       l(k) = l(j)
+                       l(j) = lk
 
                     ENDIF
 
@@ -95,31 +70,31 @@ C    ** SORT THE CLUSTERS **
 
 20            CONTINUE
 
-              J   = L(J)
-              RXJ = RX(J)
-              RYJ = RY(J)
-              RZJ = RZ(J)
+              j   = l(j)
+              rxj = rx(j)
+              ryj = ry(j)
+              rzj = rz(j)
 
-30            IF ( J .NE. I ) THEN
+30            IF ( j .NE. i ) THEN
 
-                 DO 40 K = I + 1, N
+                 DO 40 k = i + 1, n
 
-                    LK = L(K)
+                    lk = l(k)
 
-                    IF ( LK .EQ. K ) THEN
+                    IF ( lk .EQ. k ) THEN
 
-                       RXJK  = RXJ - RX(K)
-                       RYJK  = RYJ - RY(K)
-                       RZJK  = RZJ - RZ(K)
-                       RXJK  = RXJK - ANINT ( RXJK )
-                       RYJK  = RYJK - ANINT ( RYJK )
-                       RZJK  = RZJK - ANINT ( RZJK )
-                       RJKSQ = RXJK * RXJK + RYJK * RYJK + RZJK * RZJK
+                       rxjk  = rxj - rx(k)
+                       ryjk  = ryj - ry(k)
+                       rzjk  = rzj - rz(k)
+                       rxjk  = rxjk - ANINT ( rxjk )
+                       ryjk  = ryjk - ANINT ( ryjk )
+                       rzjk  = rzjk - ANINT ( rzjk )
+                       rjksq = rxjk * rxjk + ryjk * ryjk + rzjk * rzjk
 
-                       IF ( RJKSQ .LE. RCLSQ ) THEN
+                       IF ( rjksq .LE. rclsq ) THEN
 
-                          L(K) = L(J)
-                          L(J) = LK
+                          l(k) = l(j)
+                          l(j) = lk
 
                        ENDIF
 
@@ -127,12 +102,12 @@ C    ** SORT THE CLUSTERS **
 
 40               CONTINUE
 
-                 J   = L(J)
-                 RXJ = RX(J)
-                 RYJ = RY(J)
-                 RZJ = RZ(J)
+                 j   = l(j)
+                 rxj = rx(j)
+                 ryj = ry(j)
+                 rzj = rz(j)
 
-                 GO TO 30
+                 go to 30
 
               ENDIF
 
@@ -140,17 +115,17 @@ C    ** SORT THE CLUSTERS **
 
 50      CONTINUE
 
-C   **  COUNT THE NUMBER IN A CLUSTER CONTAINING ATOM IT **
+c   **  count the number in a cluster containing atom it **
 
-        NIT = 1
-        LIT = L(IT)
+        nit = 1
+        lit = l(it)
 
-60      IF ( LIT .NE. IT ) THEN
+60      IF ( lit .NE. it ) THEN
 
-           NIT = NIT + 1
-           LIT = L(LIT)
+           nit = nit + 1
+           lit = l(lit)
 
-           GO TO 60
+           go to 60
 
         ENDIF
 
