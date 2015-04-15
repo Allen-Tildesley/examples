@@ -4,7 +4,7 @@ MODULE utility_module
   PUBLIC :: metropolis
   PUBLIC :: read_cnf_atoms, write_cnf_atoms, read_cnf_molecules, write_cnf_molecules
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add
-  PUBLIC :: random_integer
+  PUBLIC :: random_integer, random_normal
   PUBLIC :: random_orientation_vector, random_orientation_vector_alt1, random_orientation_vector_alt2
   PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
   PUBLIC :: orientational_order
@@ -265,9 +265,9 @@ CONTAINS
 
   END SUBROUTINE run_end
 
-  FUNCTION random_integer ( k1, k2 ) RESULT ( k ) ! returns random integer in range [k1,k2] inclusive
-    INTEGER             :: k
-    INTEGER, INTENT(in) :: k1, k2
+  FUNCTION random_integer ( k1, k2 ) RESULT ( k )
+    INTEGER             :: k      ! returns uniformly distributed random integer
+    INTEGER, INTENT(in) :: k1, k2 ! in range [k1,k2] inclusive
 
     INTEGER :: k_lo, k_hi
     REAL    :: zeta
@@ -280,6 +280,30 @@ CONTAINS
     IF ( k > k_hi ) k = k_hi ! guard against small danger of roundoff
 
   END FUNCTION random_integer
+
+  FUNCTION random_normal ( mean, std ) RESULT ( r )
+    REAL             :: r         ! returns normal random number
+    REAL, INTENT(in) :: mean, std ! with required mean and standard deviation
+
+    ! Box-Muller transform produces numbers in pairs, we save one for next time
+    
+    REAL, DIMENSION(2)      :: zeta
+    REAL,              SAVE :: r_save
+    LOGICAL,           SAVE :: saved = .FALSE.
+    REAL,         PARAMETER :: pi = 4.0*ATAN(1.0)
+
+    IF ( saved ) THEN
+       r = r_save
+       r = mean + std * r
+       saved = .FALSE.
+    ELSE
+       CALL RANDOM_NUMBER (zeta)
+       r      = SQRT(-2*LOG(zeta(1)))*COS(2*pi*zeta(2))
+       r_save = SQRT(-2*LOG(zeta(1)))*SIN(2*pi*zeta(2))
+       r      = mean + std * r
+       saved = .TRUE.
+    END IF
+  END FUNCTION random_normal
 
   SUBROUTINE random_orientation_vector ( e )
     REAL, DIMENSION(3), INTENT(out) :: e ! Uniformly sampled orientation
@@ -361,6 +385,23 @@ CONTAINS
 
   END FUNCTION random_rotate_vector
 
+  FUNCTION random_perpendicular_vector ( e_old ) RESULT ( e )
+    REAL, DIMENSION(3)             :: e         ! result is an orientation vector
+    REAL, DIMENSION(3), INTENT(in) :: e_old     ! perpendicular to this vector 
+
+    REAL            :: factor
+    REAL, PARAMETER :: tol = 1.e-6
+
+    DO
+       CALL random_orientation_vector ( e )                 ! Random unit vector
+       factor = dot_PRODUCT ( e, e_old ) / SUM ( e_old**2 ) ! Projection along e_old
+       e      = e - factor * e_old                          ! Make e perpendicular to e_old
+       e_sq   = SUM ( e**2 )
+       IF ( e_sq > tol ) EXIT ! Start again if e is too small
+    END DO
+    e = e / SQRT ( e_sq ) ! Random unit direction perpendicular to e_old
+  END FUNCTION random_perpendicular_vector
+
   FUNCTION random_rotate_vector_alt1 ( delta_max, e_old ) RESULT ( e )
     REAL, DIMENSION(3)             :: e         ! orientation vector result
     REAL, INTENT(in)               :: delta_max ! maximum angle of rotation
@@ -372,17 +413,9 @@ CONTAINS
     ! The magnitude of the rotation is uniformly sampled
 
     REAL, DIMENSION(3) :: e_perp
-    REAL               :: e_sq, delta, zeta, factor
-    REAL, PARAMETER    :: tol = 1.e-6
+    REAL               :: e_sq, delta, zeta
 
-    DO
-       CALL random_orientation_vector ( e_perp )                     ! Random unit vector
-       factor = dot_PRODUCT ( e_perp, e_old ) / SUM ( e_old**2 ) ! Projection along e_old
-       e_perp = e_perp - factor * e_old                          ! Make e_perp perpendicular to e_old
-       e_sq   = SUM ( e_perp**2 )
-       IF ( e_sq > tol ) EXIT ! Start again if e_perp is too small
-    END DO
-    e_perp = e_perp / SQRT ( e_sq ) ! Random unit direction perpendicular to e_old
+    e_perp = random_perpendicular_vector ( e_old ) ! Choose unit vector perpendicular to e_old
 
     CALL random_NUMBER ( zeta ) ! Random number uniformly sampled in range (0,1)
     zeta  = 2.0 * zeta - 1.0    ! Now in range (-1,+1)
