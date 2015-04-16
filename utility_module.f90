@@ -8,7 +8,7 @@ MODULE utility_module
   PUBLIC :: random_orientation_vector, random_perpendicular_vector
   PUBLIC :: random_orientation_vector_alt1, random_orientation_vector_alt2
   PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
-  PUBLIC :: orientational_order
+  PUBLIC :: orientational_order, translational_order
 
   INTEGER,                                      SAVE :: nvariables
   CHARACTER(len=15), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
@@ -488,6 +488,38 @@ CONTAINS
     END DO
 
   END FUNCTION random_rotate_vector_alt3
+
+  FUNCTION translational_order ( r, k ) RESULT ( order )
+    REAL                                :: order
+    REAL,    DIMENSION(:,:), INTENT(in) :: r     ! set of molecular position vectors (3,n)
+    INTEGER, DIMENSION(3),   INTENT(in) :: k     ! Lattice reciprocal vector (integer)
+
+    ! Calculate the "melting factor" based on a single k-vector
+    ! characterizing the lattice and commensurate with periodic box
+    ! It is assumed that both r and k are in box=1 units
+    ! k = (l,m,n) where l,m,n are integers
+    ! order = 1 when all atoms are on their lattice positions
+    ! order = 1/sqrt(n), approximately, for disordered positions
+
+    INTEGER         :: i, n
+    REAL            :: kr
+    COMPLEX         :: rho ! Fourier component of single-particle density
+    REAL, PARAMETER :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
+
+    IF ( SIZE(r,dim=1) /= 3 ) STOP 'Array error in translational_order'
+    n = SIZE(r,dim=2)
+
+    rho = ( 0.0, 0.0 )
+
+    DO i = 1, n
+       kr  = twopi*dot_PRODUCT ( REAL(k), r(:,i) )
+       rho = rho + CMPLX ( COS(kr), SIN(kr) )
+    END DO
+
+    rho = rho / REAL(n)
+    order = REAL ( CONJG(rho)*rho )
+
+  END FUNCTION translational_order
 
   FUNCTION orientational_order ( e ) RESULT ( order )
     REAL                             :: order
