@@ -1,136 +1,112 @@
 ! cluster.f90
-program cluster
-! placeholder for f90 subroutine
+PROGRAM cluster
+  ! placeholder for f90 subroutine
 
-  use utility_module, only : read_cnf_atoms
-  implicit none
+  USE utility_module, ONLY : read_cnf_atoms
+  IMPLICIT NONE
 
   ! Program to identify atom clusters in a configuration
   ! Defines a cluster by a critical separation
   ! Produces a linked list of clusters
   ! Works in units where box = 1 
-! Reference:
-! Stoddard J Comp Phys, 27, 291, 1977.
+  ! Reference:
+  ! Stoddard J Comp Phys, 27, 291, 1977.
 
-  integer n
-  real, dimension(:,:), allocatable :: r ! positions (3,n)
-  integer, dimension(:), allocatable :: l
+  INTEGER n
+  REAL, DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
+  INTEGER, DIMENSION(:), ALLOCATABLE :: list
 
-  
+
   REAL     ::   rcl
-        INTEGER     it, nit
+  INTEGER  ::   it, count
 
-        REAL        rclsq, rxjk, ryjk, rzjk
-        REAL        rjksq, rxj, ryj, rzj
-        INTEGER     i, j, k, lk, lit
+  REAL      ::  rcl_sq, rjk_sq, 
+  REAL, DIMENSION(3) :: rjk
+  INTEGER  ::   i, j, k
 
-        rclsq = rcl * rcl
+  NAMELIST /cluster_parameters/ rcl
 
-! set up the sorting array **
+  READ(*,cluster_parameters)
 
-        DO 10 i = 1, n
+  rcl_sq = rcl * rcl
 
-           l(i) = i
+  CALL read_cnf_atoms ( 'cluster.cnf', n, box )
+  WRITE(*,'(''Number of particles'', t40,i15)'  ) n
+  WRITE(*,'(''Box (in sigma units)'',t40,f15.5)') box
+  ALLOCATE ( r(3,n), list(n) )
+  CALL read_cnf_atoms ( 'cluster.cnf', n, box, r )
+  r(:,:) = r(:,:) / box ! Convert to box units
+  r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-10      CONTINUE
+  list(:) = [ (i,i=1,n) ] ! set up the sorting array
 
-! sort the clusters **
+  DO i = 1, n - 1 ! Begin outer loop
 
-        DO 50 i = 1, n - 1
+     IF ( i == list(i) ) THEN
 
-           IF ( i .EQ. l(i) ) THEN
+        DO j = i + 1, n ! Begin first inner loop
 
-              j   = i
-              rxj = rx(j)
-              ryj = ry(j)
-              rzj = rz(j)
+           IF ( list(j) == j ) THEN
+              IF ( in_range ( r(:,i), r(:,j), rcl_sq ) ) THEN
+                 list(j) = list(i)
+                 list(i) = j
+              END IF
+           END IF
 
-              DO 20 k = i + 1, n
+        END DO ! End first inner loop
 
-                 lk = l(k)
+        j = list(i)
 
-                 IF ( lk .EQ. k ) THEN
+        DO
+           IF ( j == i ) EXIT
 
-                    rxjk  = rxj - rx(k)
-                    ryjk  = ryj - ry(k)
-                    rzjk  = rzj - rz(k)
-                    rxjk  = rxjk - ANINT ( rxjk )
-                    ryjk  = ryjk - ANINT ( ryjk )
-                    rzjk  = rzjk - ANINT ( rzjk )
-                    rjksq = rxjk * rxjk + ryjk * ryjk + rzjk * rzjk
+           DO k = i + 1, n ! Begin second inner loop
 
-                    IF ( rjksq .LE. rclsq ) THEN
+              IF ( list(k) == k ) THEN
+                 IF ( in_range ( r(:,j), r(:,k), rcl_sq ) ) THEN
+                    list(k) = list(j)
+                    list(j) = k
+                 END IF
+              END IF
 
-                       l(k) = l(j)
-                       l(j) = lk
+           END DO ! End second inner loop
 
-                    ENDIF
+           j = list(j)
 
-                 ENDIF
+        END DO
 
-20            CONTINUE
+     END IF
 
-              j   = l(j)
-              rxj = rx(j)
-              ryj = ry(j)
-              rzj = rz(j)
+  END DO ! End outer loop
 
-30            IF ( j .NE. i ) THEN
+  count = 1
+  j = list(it)
 
-                 DO 40 k = i + 1, n
+  DO 
+     IF ( j == it ) EXIT
+     count = count + 1
+     j = list(j)
+  END DO
 
-                    lk = l(k)
+CONTAINS
 
-                    IF ( lk .EQ. k ) THEN
+  FUNCTION in_range ( rj, rk, rcl_sq )
+    LOGICAL                        :: in_range
+    REAL, DIMENSION(3), INTENT(in) :: rj, rk
+    REAL,               INTENT(in) :: rcl_sq
 
-                       rxjk  = rxj - rx(k)
-                       ryjk  = ryj - ry(k)
-                       rzjk  = rzj - rz(k)
-                       rxjk  = rxjk - ANINT ( rxjk )
-                       ryjk  = ryjk - ANINT ( ryjk )
-                       rzjk  = rzjk - ANINT ( rzjk )
-                       rjksq = rxjk * rxjk + ryjk * ryjk + rzjk * rzjk
+    REAL, DIMENSION(3) :: rjk
+    REAL               :: rjk_sq
 
-                       IF ( rjksq .LE. rclsq ) THEN
+    rjk(:) = rj(:) - rk(:)
+    rjk(:) = rjk(:) - ANINT ( rjk(:) )
+    rjk_sq = SUM ( rjk**2 )
 
-                          l(k) = l(j)
-                          l(j) = lk
+    in_range = ( rjk_sq <= rcl_sq )
 
-                       ENDIF
+  END FUNCTION in_range
 
-                    ENDIF
-
-40               CONTINUE
-
-                 j   = l(j)
-                 rxj = rx(j)
-                 ryj = ry(j)
-                 rzj = rz(j)
-
-                 go to 30
-
-              ENDIF
-
-           ENDIF
-
-50      CONTINUE
-
-c   **  count the number in a cluster containing atom it **
-
-        nit = 1
-        lit = l(it)
-
-60      IF ( lit .NE. it ) THEN
-
-           nit = nit + 1
-           lit = l(lit)
-
-           go to 60
-
-        ENDIF
-
-        RETURN
-        END
+END PROGRAM cluster
 
 
 
