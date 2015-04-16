@@ -1,104 +1,109 @@
 ! cluster.f90
 PROGRAM cluster
-  ! placeholder for f90 subroutine
+  ! Identify atom clusters in a configuration
 
   USE utility_module, ONLY : read_cnf_atoms
   IMPLICIT NONE
 
-  ! Program to identify atom clusters in a configuration
   ! Defines a cluster by a critical separation
-  ! Produces a linked list of clusters
+  ! Produces a set of circular linked lists of clusters
   ! Works in units where box = 1 
   ! Reference:
-  ! Stoddard J Comp Phys, 27, 291, 1977.
+  ! Stoddard J Comp Phys, 27, 291, 1977
+  ! This simple algorithm does not scale well to large n
 
   INTEGER n
-  REAL, DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
-  INTEGER, DIMENSION(:), ALLOCATABLE :: list
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
+  INTEGER, DIMENSION(:),   ALLOCATABLE :: list ! (n)
+  INTEGER, DIMENSION(:),   ALLOCATABLE :: done ! (n)
 
-
-  REAL     ::   rcl
-  INTEGER  ::   it, count
-
-  REAL      ::  rcl_sq, rjk_sq, 
-  REAL, DIMENSION(3) :: rjk
+  REAL     ::   rcl, rcl_sq, box
+  INTEGER  ::   count, cluster_id
   INTEGER  ::   i, j, k
 
   NAMELIST /cluster_parameters/ rcl
 
   READ(*,cluster_parameters)
+  WRITE(*,'(''Cluster critical separation'',f15.5)') rcl
 
   rcl_sq = rcl * rcl
 
-  CALL read_cnf_atoms ( 'cluster.cnf', n, box )
+  CALL read_cnf_atoms ( 'cluster.cnfinp', n, box )
   WRITE(*,'(''Number of particles'', t40,i15)'  ) n
   WRITE(*,'(''Box (in sigma units)'',t40,f15.5)') box
-  ALLOCATE ( r(3,n), list(n) )
+
+  ALLOCATE ( r(3,n), list(n), done(n) )
+
   CALL read_cnf_atoms ( 'cluster.cnf', n, box, r )
   r(:,:) = r(:,:) / box ! Convert to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  list(:) = [ (i,i=1,n) ] ! set up the sorting array
+  list(:) = [ (i,i=1,n) ] ! set up the list
 
   DO i = 1, n - 1 ! Begin outer loop
 
      IF ( i == list(i) ) THEN
 
-        DO j = i + 1, n ! Begin first inner loop
+        j = i
 
-           IF ( list(j) == j ) THEN
-              IF ( in_range ( r(:,i), r(:,j), rcl_sq ) ) THEN
-                 list(j) = list(i)
-                 list(i) = j
-              END IF
-           END IF
+        DO ! Begin inner loop
 
-        END DO ! End first inner loop
-
-        j = list(i)
-
-        DO
-           IF ( j == i ) EXIT
-
-           DO k = i + 1, n ! Begin second inner loop
+           DO k = i + 1, n ! Begin innermost loop
 
               IF ( list(k) == k ) THEN
-                 IF ( in_range ( r(:,j), r(:,k), rcl_sq ) ) THEN
-                    list(k) = list(j)
-                    list(j) = k
-                 END IF
+                 IF ( in_range ( j, k ) ) list([k,j]) = list([j,k])
               END IF
 
-           END DO ! End second inner loop
+           END DO ! End innermost loop
 
            j = list(j)
+           IF ( j == i ) EXIT
 
-        END DO
+        END DO ! End inner loop
 
      END IF
 
   END DO ! End outer loop
 
-  count = 1
-  j = list(it)
+  ! for diagnostic purposes, print out the cluster membership
+  ! no particular sorting (e.g. by size)
+  
+  done = 0 ! zero array
+  cluster_id = 0
 
-  DO 
-     IF ( j == it ) EXIT
-     count = count + 1
-     j = list(j)
-  END DO
+  DO ! Begin loop over remaining clusters
+     IF ( ALL ( done > 0 ) ) EXIT
+     i = MINLOC ( done, dim = 1 ) ! find first zero
+     cluster_id = cluster_id + 1
+     WRITE(*,'(''Cluster '',i5,'' members are:'')') cluster_id
+     j = i
+     done(j) = cluster_id
+     count = 1
+     WRITE(*,'(i5)',advance='no') j
+     
+     DO ! Begin loop to find other members of cluster
+        j = list(j)
+        IF ( j == i ) EXIT ! link list has returned to start
+        done(j) = cluster_id
+        count = count + 1
+        WRITE(*,'(i5)',advance='no') j
+     END DO ! End loop to find other members of cluster
+
+     WRITE(*,'(/,''Cluster '',i5,'' contains '',i10,'' members'')') cluster_id, count
+  END DO ! End loop over remaining clusters
+
+  DEALLOCATE ( r, list, done )
 
 CONTAINS
 
-  FUNCTION in_range ( rj, rk, rcl_sq )
-    LOGICAL                        :: in_range
-    REAL, DIMENSION(3), INTENT(in) :: rj, rk
-    REAL,               INTENT(in) :: rcl_sq
+  FUNCTION in_range ( j, k )
+    LOGICAL             :: in_range
+    integer, INTENT(in) :: j, k
 
     REAL, DIMENSION(3) :: rjk
     REAL               :: rjk_sq
 
-    rjk(:) = rj(:) - rk(:)
+    rjk(:) = r(:,j) - r(:,k)
     rjk(:) = rjk(:) - ANINT ( rjk(:) )
     rjk_sq = SUM ( rjk**2 )
 
