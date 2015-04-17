@@ -8,7 +8,7 @@ MODULE utility_module
   PUBLIC :: random_orientation_vector, random_perpendicular_vector
   PUBLIC :: random_orientation_vector_alt1, random_orientation_vector_alt2
   PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
-  PUBLIC :: orientational_order, translational_order
+  PUBLIC :: orientational_order, translational_order, nematic_order
 
   INTEGER,                                      SAVE :: nvariables
   CHARACTER(len=15), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
@@ -490,29 +490,41 @@ CONTAINS
   END FUNCTION random_rotate_vector_alt3
 
   FUNCTION translational_order ( r, k ) RESULT ( order )
-    REAL                                :: order
-    REAL,    DIMENSION(:,:), INTENT(in) :: r     ! set of molecular position vectors (3,n)
-    INTEGER, DIMENSION(3),   INTENT(in) :: k     ! Lattice reciprocal vector (integer)
+    REAL                                          :: order ! result order parameter
+    REAL,    DIMENSION(:,:), INTENT(in)           :: r     ! set of molecular position vectors (3,n)
+    INTEGER, DIMENSION(3),   INTENT(in), OPTIONAL :: k     ! Lattice reciprocal vector (integer)
 
-    ! Calculate the "melting factor" based on a single k-vector
-    ! characterizing the lattice and commensurate with periodic box
+    ! Calculate the "melting factor" for translational order 
+    ! based on a single k-vector characterizing the original lattice
+    ! and commensurate with the periodic box
     ! It is assumed that both r and k are in box=1 units
     ! k = (l,m,n) where l,m,n are integers
+    ! If optional argument k is omitted, we default to a choice
+    ! based on the fcc lattice, if this makes sense
     ! order = 1 when all atoms are on their lattice positions
     ! order = 1/sqrt(n), approximately, for disordered positions
 
-    INTEGER         :: i, n
-    REAL            :: kr
-    COMPLEX         :: rho ! Fourier component of single-particle density
-    REAL, PARAMETER :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
+    INTEGER            :: i, n, nc
+    REAL, DIMENSION(3) :: k_real
+    REAL               :: kr
+    COMPLEX            :: rho ! Fourier component of single-particle density
+    REAL, PARAMETER    :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
 
     IF ( SIZE(r,dim=1) /= 3 ) STOP 'Array error in translational_order'
     n = SIZE(r,dim=2)
 
+    IF ( PRESENT ( k ) ) THEN
+       k_real = twopi * REAL ( k )
+    ELSE                                          ! Make arbitrary choice assuming fcc
+       nc = NINT ( ( REAL(n)/4.0 ) ** (1.0/3.0) ) ! number of fcc unit cells
+       IF ( 4*nc**3 /= n ) STOP 'n not sensible in translational_order'
+       k_real = twopi * REAL( [-nc,nc,-nc] )      ! arbitrary fcc reciprocal vector
+    END IF
+    
     rho = ( 0.0, 0.0 )
 
     DO i = 1, n
-       kr  = twopi*dot_PRODUCT ( REAL(k), r(:,i) )
+       kr  = dot_PRODUCT ( k_real, r(:,i) )
        rho = rho + CMPLX ( COS(kr), SIN(kr) )
     END DO
 
@@ -522,11 +534,46 @@ CONTAINS
   END FUNCTION translational_order
 
   FUNCTION orientational_order ( e ) RESULT ( order )
+    REAL                             :: order ! result order parameter
+    REAL, DIMENSION(:,:), INTENT(in) :: e     ! set of molecular orientation vectors (3,n)
+
+    ! Calculates an orientational order parameter to monitor "melting"
+    ! The parameter depends completely on knowing the orientations of the molecules
+    ! in the original crystal lattice, and here we assume a specific alpha-fcc crystal
+    ! of the same kind as was set up in initialize.f90 and initialize_module.f90
+    ! Four molecules per unit cell, each pointing along a body-diagonal
+    ! Order parameter can be a low-ranking (e.g. 1st or 2nd) Legendre polynomial
+
+    INTEGER :: n, nc, i, i0
+    REAL    :: c
+    
+    REAL, PARAMETER :: rroot3 = 1.0 / SQRT ( 3.0 )
+
+    REAL, DIMENSION(3,4), PARAMETER :: e0 = RESHAPE (  rroot3*[ &
+         &  1.0,  1.0,  1.0,    1.0, -1.0, -1.0,  &
+         & -1.0,  1.0, -1.0,   -1.0, -1.0,  1.0 ],[3,4] ) ! orientations in unit cell
+
+    IF ( SIZE(e,dim=1) /= 3 ) STOP 'Array error in orientational_order'
+    n = SIZE(e,dim=2)
+    nc = NINT ( ( REAL(n)/4.0 ) ** (1.0/3.0) )
+    IF ( 4*nc**3 /= n ) STOP 'n not sensible in orientational_order'
+    order = 0.0
+    DO i = 1, n
+       i0 = MODULO ( i, 4 ) + 1             ! select appropriate original orientation
+       c = dot_PRODUCT ( e(:,i), e0(:,i0) ) ! cosine of angle
+       order = order + 1.5*c**2 - 0.5       ! Second Legendre polynomial
+    END DO
+    order = order / REAL ( n )
+
+  END FUNCTION orientational_order
+  
+  FUNCTION nematic_order ( e ) RESULT ( order )
     REAL                             :: order
     REAL, DIMENSION(:,:), INTENT(in) :: e     ! set of molecular orientation vectors (3,n)
 
     ! Calculate the nematic order parameter <P2(cos(theta))>
-    ! Where theta is the angle between a molecular axis and the director
+    ! where theta is the angle between a molecular axis and the director
+    ! which is the direction that maximises the order parameter
     ! This is obtained by finding the largest eigenvalue of
     ! the 3x3 second-rank traceless order tensor
 
@@ -535,7 +582,7 @@ CONTAINS
     REAL                 :: h, g, psi ! used in eigenvalue calculation
     REAL, PARAMETER      :: pi = 4.0*ATAN(1.0)
 
-    IF ( SIZE(e,dim=1) /= 3 ) STOP 'Array error in orientational_order'
+    IF ( SIZE(e,dim=1) /= 3 ) STOP 'Array error in nematic_order'
     n = SIZE(e,dim=2)
 
     ! Order tensor: outer product of each orientation vector, summed over molecules
@@ -563,6 +610,6 @@ CONTAINS
     ! Select largest root
     order = MAXVAL ( [ h*COS(psi/3.0), h*COS((psi+2.0*pi)/3.0), h*COS((psi+4.0*pi)/3.0) ] ) 
 
-  END FUNCTION orientational_order
+  END FUNCTION nematic_order
 
 END MODULE utility_module
