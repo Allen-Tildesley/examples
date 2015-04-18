@@ -30,7 +30,7 @@ CONTAINS
   END SUBROUTINE finalize
 
   SUBROUTINE force ( sigma, r_cut, pot, pot_sh, vir )
-    USE link_list_module, ONLY : make_list, nc, head, list, dc, nk
+    USE link_list_module, ONLY : make_list, nc, head, list
 
     REAL, INTENT(in)  :: sigma, r_cut ! potential parameters
     REAL, INTENT(out) :: pot          ! total potential energy
@@ -43,7 +43,7 @@ CONTAINS
     ! Forces are calculated in units where box = 1 and epsilon = 1
     ! Uses link lists
 
-    INTEGER               :: i, j, k, n_cut, ci1, ci2, ci3
+    INTEGER               :: i, j, n_cut, ci1, ci2, ci3, d1, d2, d3
     INTEGER, DIMENSION(3) :: ci, cj
     REAL                  :: r_cut_sq, sigma_sq, rij_sq, sr2, sr6, sr12, potij, virij
     REAL,    DIMENSION(3) :: rij, fij
@@ -62,53 +62,59 @@ CONTAINS
     DO ci1 = 0, nc-1
        DO ci2 = 0, nc-1
           DO ci3 = 0, nc-1
-             ci = [ ci1, ci2, ci3 ]
+             ci(:) = [ ci1, ci2, ci3 ]
              i = head(ci1,ci2,ci3)
 
              DO ! Begin loop over i atoms in list
                 IF ( i == 0 ) EXIT ! end of link list
 
-                DO k = 0, nk ! Begin loop over neighbouring cells
+                ! Triple loop over neighbouring cells
+                DO d1 = -1, 1
+                   DO d2 = -1, 1
+                      DO d3 = -1, 1
 
-                   IF ( k == 0 ) THEN
-                      j = list(i)
-                   ELSE
-                      cj(:) = MODULO ( ci(:) + dc(:,k), nc )
-                      j = head(cj(1),cj(2),cj(3))
-                   END IF
+                         IF ( ALL ( [d1,d2,d3] == [0,0,0] ) ) THEN
+                            j = list(i) ! Look downlist from i in current cell
+                         ELSE
+                            cj(:) = ci(:) + [d1,d2,d3]      ! Neighbour cell index
+                            cj(:) = MODULO ( cj(:), nc )    ! Periodic boundary correction
+                            j     = head(cj(1),cj(2),cj(3)) ! Look at all atoms in neighbour cell
+                         END IF
 
-                   DO ! Begin loop over j atoms in list
-                      IF ( j == 0 ) EXIT ! end of link list
-                      IF ( j == i ) STOP 'This can never happen'
+                         DO ! Begin loop over j atoms in list
+                            IF ( j == 0 ) EXIT ! end of link list
+                            IF ( j == i ) STOP 'Index error in force' ! This should never happen
 
-                      rij(:) = r(:,i) - r(:,j)           ! separation vector
-                      rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundary conditions in box=1 units
-                      rij_sq = SUM ( rij**2 )            ! squared separation
+                            rij(:) = r(:,i) - r(:,j)           ! separation vector
+                            rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundary conditions in box=1 units
+                            rij_sq = SUM ( rij**2 )            ! squared separation
 
-                      IF ( rij_sq < r_cut_sq ) THEN ! check within cutoff
+                            IF ( rij_sq < r_cut_sq ) THEN ! check within cutoff
 
-                         sr2    = sigma_sq / rij_sq
-                         sr6    = sr2 ** 3
-                         sr12   = sr6 ** 2
-                         potij  = sr12 - sr6
-                         virij  = potij + sr12
-                         pot    = pot + potij
-                         vir    = vir + virij
-                         fij    = rij * virij / rij_sq
-                         f(:,i) = f(:,i) + fij
-                         f(:,j) = f(:,j) - fij
-                         n_cut  = n_cut + 1
+                               sr2    = sigma_sq / rij_sq
+                               sr6    = sr2 ** 3
+                               sr12   = sr6 ** 2
+                               potij  = sr12 - sr6
+                               virij  = potij + sr12
+                               pot    = pot + potij
+                               vir    = vir + virij
+                               fij    = rij * virij / rij_sq
+                               f(:,i) = f(:,i) + fij
+                               f(:,j) = f(:,j) - fij
+                               n_cut  = n_cut + 1
 
-                      END IF ! end check within cutoff
+                            END IF ! end check within cutoff
 
-                      j = list(j) ! Next atom in j cell
+                            j = list(j) ! Next atom in j cell
+                         END DO         ! End loop over j atoms in list
 
-                   END DO ! End loop over j atoms in list
+                      END DO
+                   END DO
+                END DO
+                ! End triple loop over neighbouring cells
 
-                END DO ! End loop over neighbouring cells
-
-                i = list(i)
-             END DO ! End loop over i atoms in list
+                i = list(i) ! Next atom in i cell
+             END DO         ! End loop over i atoms in list
 
           END DO
        END DO

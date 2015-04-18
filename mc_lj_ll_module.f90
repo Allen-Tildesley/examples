@@ -11,6 +11,7 @@ MODULE mc_lj_module
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
+  INTEGER, DIMENSION(:),   ALLOCATABLE :: j_list ! list of j-neighbours
 
   INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
 
@@ -19,13 +20,13 @@ CONTAINS
   SUBROUTINE initialize ( r_cut )
     USE link_list_module, ONLY : initialize_list
     REAL, INTENT(in) :: r_cut ! not used in initialization for this version
-    ALLOCATE ( r(3,n) )
+    ALLOCATE ( r(3,n), j_list(n) )
     CALL initialize_list ( n, r_cut )
   END SUBROUTINE initialize
 
   SUBROUTINE finalize
     USE link_list_module, ONLY : finalize_list
-    DEALLOCATE ( r )
+    DEALLOCATE ( r, j_list )
     CALL finalize_list
   END SUBROUTINE finalize
 
@@ -97,7 +98,6 @@ CONTAINS
   END SUBROUTINE energy
 
   SUBROUTINE energy_1 ( ri, i, j_range, sigma, r_cut, overlap, pot, vir, pot2, vir2 )
-    USE link_list_module, ONLY : get_neighbours, j_list, nj
 
     REAL, DIMENSION(3),           INTENT(in)  :: ri           ! coordinates of atom of interest
     INTEGER,                      INTENT(in)  :: i, j_range   ! index, and partner index range
@@ -115,7 +115,7 @@ CONTAINS
     ! It is assumed that r, sigma and r_cut are in units where box = 1
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
-    INTEGER            :: j, jj
+    INTEGER            :: j, jj, nj
     REAL               :: r_cut_sq, sigma_sq
     REAL               :: sr2, sr6, rij_sq
     REAL, DIMENSION(2) :: pot2_sum, vir2_sum
@@ -131,7 +131,7 @@ CONTAINS
     vir2_sum = 0.0
     overlap = .FALSE.
 
-    CALL get_neighbours ( i, j_range )
+    CALL get_neighbours ( i, j_range, nj )
 
     DO jj = 1, nj
        j = j_list(jj)
@@ -167,6 +167,71 @@ CONTAINS
     IF ( PRESENT ( vir2 ) ) vir2 = vir2_sum        ! separate parts
 
   END SUBROUTINE energy_1
+
+  SUBROUTINE get_neighbours ( i, op, nj )
+    USE link_list_module, ONLY : nc, list, head, c
+
+    ! Arguments
+    INTEGER, intent(in)  :: i  ! particle whose neighbours are required
+    INTEGER, intent(in)  :: op ! ne or gt, determining the range of neighbours
+    INTEGER, INTENT(out) :: nj ! number of j-partners
+
+    ! Set up vectors to each cell in neighbourhood of 3x3x3 cells in cubic lattice
+  INTEGER, PARAMETER :: nk = 13 
+  INTEGER, DIMENSION(3,-nk:nk), PARAMETER :: d = RESHAPE( [ &
+       &   -1,-1,-1,    0,-1,-1,    1,-1,-1, &
+       &   -1, 1,-1,    0, 1,-1,    1, 1,-1, &
+       &   -1, 0,-1,    1, 0,-1,    0, 0,-1, &
+       &    0,-1, 0,    1,-1, 0,   -1,-1, 0, &
+       &   -1, 0, 0,    0, 0, 0,    1, 0, 0, &
+       &    1, 1, 0,   -1, 1, 0,    0, 1, 0, &
+       &    0, 0, 1,   -1, 0, 1,    1, 0, 1, &
+       &   -1,-1, 1,    0,-1, 1,    1,-1, 1, &
+       &   -1, 1, 1,    0, 1, 1,    1, 1, 1    ], [ 3, 2*nk+1 ] )
+
+    ! Local variables
+    INTEGER :: k1, k2, k, j
+    INTEGER, DIMENSION(3) :: cj
+
+    SELECT CASE ( op )
+    CASE ( ne ) ! check every atom other than i in all cells
+       k1 = -nk
+       k2 =  nk
+    CASE ( gt ) ! check half neighbour cells and j downlist from i in current cell
+       k1 = 0
+       k2 = nk
+    CASE default
+       STOP 'This should never happen'
+    END SELECT
+
+    nj = 0 ! Will store number of neighbours found
+
+    DO k = k1, k2 ! Begin loop over neighbouring cells
+
+       cj(:) = c(:,i) + d(:,k)      ! Neighbour cell index
+       cj(:) = MODULO ( cj(:), nc ) ! Periodic boundary correction
+
+       IF ( k == 0 .AND. op == gt ) THEN
+          j = list(i) ! check down-list from i in i-cell
+       ELSE
+          j = head(cj(1),cj(2),cj(3)) ! check entire j-cell
+       END IF
+
+       DO ! Begin loop over j atoms in list
+
+          IF ( j == 0 ) EXIT
+          
+          IF ( j /= i ) THEN
+             nj         = nj + 1 ! increment count of j atoms
+             j_list(nj) = j      ! store new j atom
+          END IF
+          j = list(j) ! Next atom in j cell
+
+       ENDDO ! End loop over j atoms in list
+
+    ENDDO ! End loop over neighbouring cells 
+
+  END SUBROUTINE get_neighbours
 
   SUBROUTINE energy_lrc ( n, sigma, r_cut, pot, vir, pot2, vir2 )
     INTEGER,                      INTENT(in)  :: n            ! number of atoms

@@ -3,30 +3,14 @@
 MODULE link_list_module
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: initialize_list, finalize_list, make_list, check_list, get_neighbours
+  PUBLIC :: initialize_list, finalize_list, make_list, check_list
   PUBLIC :: move_in_list, create_in_list, destroy_in_list, c_index
-  PUBLIC :: nj, j_list, nc, head, list, c, dc, nk
+  PUBLIC :: nc, head, list, c
 
-  ! Set up vectors to each cell in neighbourhood of 3x3x3 cells in cubic lattice
-  INTEGER, PARAMETER :: nk = 13 
-  INTEGER, DIMENSION(3,-nk:nk), PARAMETER :: dc = RESHAPE( [ &
-       &   -1,-1,-1,    0,-1,-1,    1,-1,-1, &
-       &   -1, 1,-1,    0, 1,-1,    1, 1,-1, &
-       &   -1, 0,-1,    1, 0,-1,    0, 0,-1, &
-       &    0,-1, 0,    1,-1, 0,   -1,-1, 0, &
-       &   -1, 0, 0,    0, 0, 0,    1, 0, 0, &
-       &    1, 1, 0,   -1, 1, 0,    0, 1, 0, &
-       &    0, 0, 1,   -1, 0, 1,    1, 0, 1, &
-       &   -1,-1, 1,    0,-1, 1,    1,-1, 1, &
-       &   -1, 1, 1,    0, 1, 1,    1, 1, 1    ], [ 3, 2*nk+1 ] )
   INTEGER,                                PROTECTED :: nc     ! dimensions of head array, assume cubic box
   INTEGER, DIMENSION(:,:,:), ALLOCATABLE, PROTECTED :: head   ! head(0:nc-1,0:nc-1,0:nc-1), assume cubic box
   INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED :: list   ! list(n)
   INTEGER, DIMENSION(:,:),   ALLOCATABLE, PROTECTED :: c      ! c(3,n) 3D cell index of each atom
-  INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED :: j_list ! j_list(n) list of j-partners
-  INTEGER,                                PROTECTED :: nj     ! number of j-partners
-
-  INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
 
 CONTAINS
 
@@ -39,13 +23,13 @@ CONTAINS
     nc = FLOOR ( 1.0 / r_cut ) ! number of cells
     IF ( nc < 3 ) STOP 'System is too small to use link cells'
 
-    ALLOCATE ( list(n), j_list(n), c(3,n) )
+    ALLOCATE ( list(n), c(3,n) )
     ALLOCATE ( head(0:nc-1,0:nc-1,0:nc-1) )
 
   END SUBROUTINE initialize_list
 
   SUBROUTINE finalize_list
-    DEALLOCATE ( list, j_list, c )
+    DEALLOCATE ( list, c )
     DEALLOCATE ( head )
   END SUBROUTINE finalize_list
 
@@ -161,54 +145,5 @@ CONTAINS
     END DO
 
   END SUBROUTINE check_list
-
-  SUBROUTINE get_neighbours ( i, op )
-
-    ! Arguments
-    INTEGER, intent(in) :: i  ! particle whose neighbours are required
-    INTEGER, intent(in) :: op ! ne or gt, determining the range of neighbours
-
-    ! Local variables
-    INTEGER :: k1, k2, k, j
-    INTEGER, DIMENSION(3) :: cj
-
-    SELECT CASE ( op )
-    CASE ( ne ) ! check every other atom in all cells
-       k1 = -nk
-       k2 =  nk
-    CASE ( gt ) ! check half neighbour cells and j downlist from i in current cell
-       k1 = 0
-       k2 = nk
-    CASE default
-       STOP 'This should never happen'
-    END SELECT
-
-    nj = 0 ! Will store number of neighbours found
-
-    DO k = k1, k2 ! Begin loop over neighbouring cells
-
-       cj(:) = MODULO ( c(:,i) + dc(:,k), nc )
-
-       IF ( k == 0 .AND. op == gt ) THEN
-          j = list(i) ! check down-list from i in i-cell
-       ELSE
-          j = head(cj(1),cj(2),cj(3)) ! check entire j-cell
-       END IF
-
-       DO ! Begin loop over j atoms in list
-
-          IF ( j == 0 ) EXIT
-          
-          IF ( j /= i ) THEN
-             nj         = nj + 1 ! increment count of j atoms
-             j_list(nj) = j      ! store new j atom
-          END IF
-          j = list(j) ! Next atom in j cell
-
-       ENDDO ! End loop over j atoms in list
-
-    ENDDO ! End loop over neighbouring cells 
-
-  END SUBROUTINE get_neighbours
 
 END MODULE link_list_module
