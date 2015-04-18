@@ -54,16 +54,20 @@ CONTAINS
     INTEGER, DIMENSION(3)             :: ci ! 3D cell index in range 0..nc-1
     REAL,    DIMENSION(3), INTENT(in) :: ri ! position in box = 1 units
 
-    ci(:) = FLOOR ( ( 0.5 + ( ri(:) - ANINT(ri(:)) ) ) * REAL(nc) ) ! The index formula
+    ! We do not want to do any periodic imaging here, so as to cope with 
+    ! Lees-Edwards boundaries as well as normal ones
+    IF ( ANY ( ABS(ri) > 0.5 ) ) STOP 'atom not in main box in c_index'
+    ci(:) = FLOOR ( ( ri(:) + 0.5 ) * REAL(nc) ) ! The index formula
 
-    WHERE ( ci(:) < 0    ) ci(:) = 0    ! guard against small chance of roundoff error
-    WHERE ( ci(:) > nc-1 ) ci(:) = nc-1 ! guard against small chance of roundoff error
+    ! Guard against small chance of roundoff error
+    WHERE ( ci(:) < 0    ) ci(:) = 0
+    WHERE ( ci(:) > nc-1 ) ci(:) = nc-1
 
   END FUNCTION c_index
   
   SUBROUTINE move_in_list ( i, ci ) ! Move i from current cell to ci
     INTEGER,               INTENT(in) :: i
-    integer, DIMENSION(3), INTENT(in) :: ci
+    INTEGER, DIMENSION(3), INTENT(in) :: ci
 
     IF ( ALL ( ci(:) == c(:,i) ) ) RETURN ! no need to do anything
 

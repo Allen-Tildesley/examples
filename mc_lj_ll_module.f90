@@ -71,6 +71,7 @@ CONTAINS
 
     IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
     IF ( first_call ) THEN
+       r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
        CALL make_list ( n, r )
        first_call = .false.
     END IF

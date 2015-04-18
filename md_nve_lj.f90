@@ -103,10 +103,12 @@ PROGRAM md_nve_lj
      DO stp = 1, nstep ! Begin loop over steps
 
         ! Velocity Verlet algorithm
-        r = r + 0.5 * dt * v
-        CALL force ( sigma, r_cut, pot, pot_sh, vir )
-        v = v + dt * f
-        r = r + 0.5 * dt * v
+        r(:,:) = r(:,:) + 0.5 * dt * v(:,:)           ! Kick half-step
+        r(:,:) = r(:,:) - anint ( r(:,:) )            ! Periodic boundaries
+        CALL force ( sigma, r_cut, pot, pot_sh, vir ) ! Force evaluation
+        v(:,:) = v(:,:) + dt * f(:,:)                 ! Drift step
+        r(:,:) = r(:,:) + 0.5 * dt * v(:,:)           ! Kick half-step
+        r(:,:) = r(:,:) - anint ( r(:,:) )            ! Periodic boundaries
 
         CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
         pot         = pot + pot_lrc
