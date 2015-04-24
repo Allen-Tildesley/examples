@@ -1,5 +1,5 @@
-! md_lj_module.f90 (used by md_nve_lj.f90)
-! Molecular dynamics simulation, Lennard-Jones atoms
+! md_lj_module.f90
+! Force routine for MD simulation, Lennard-Jones atoms
 MODULE md_lj_module
 
   IMPLICIT NONE

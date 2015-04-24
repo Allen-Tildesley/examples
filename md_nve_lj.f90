@@ -1,4 +1,4 @@
-! md_nve_lj.f90 (uses md_lj_module.f90, utility_module.f90)
+! md_nve_lj.f90
 ! Molecular dynamics, NVE ensemble, Lennard-Jones atoms
 PROGRAM md_nve_lj
   USE utility_module, ONLY : read_cnf_atoms, write_cnf_atoms, &

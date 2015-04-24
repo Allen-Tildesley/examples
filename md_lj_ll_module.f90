@@ -1,5 +1,5 @@
-! md_lj_ll_module.f90 (uses link_list_module.f90)
-! Link-list algorithm (used by md_nve_lj.f90)
+! md_lj_ll_module.f90
+! Force routine for MD simulation, LJ atoms, using link-lists
 MODULE md_lj_module
 
   IMPLICIT NONE

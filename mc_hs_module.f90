@@ -1,5 +1,5 @@
-! mc_hs_module.f90 (used by mc_nvt_hs.f90)
-! Monte Carlo simulation, hard spheres
+! mc_hs_module.f90
+! Overlap routines for MC simulation, hard spheres
 MODULE mc_hs_module
 
   IMPLICIT NONE

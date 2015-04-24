@@ -1,3 +1,5 @@
+! utility_module.f90
+! routines for I/O, random numbers, averages, order parameters
 MODULE utility_module
   IMPLICIT NONE
   PRIVATE

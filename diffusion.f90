@@ -1,6 +1,6 @@
 ! diffusion.f90
+! Calculates vacf and msd
 PROGRAM diffusion
-  ! Calculates velocity correlation functions
   USE iso_fortran_env, ONLY : iostat_end
   IMPLICIT NONE
 

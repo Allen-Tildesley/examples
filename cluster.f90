@@ -1,6 +1,6 @@
 ! cluster.f90
+! Identify atom clusters in a configuration
 PROGRAM cluster
-  ! Identify atom clusters in a configuration
 
   USE utility_module, ONLY : read_cnf_atoms
   IMPLICIT NONE

@@ -1,5 +1,5 @@
-! mc_sc_module.f90 (used by mc_nvt_sc.f90)
-! Monte Carlo simulation, hard spherocylinders
+! mc_sc_module.f90
+! Overlap routines for MC simulation, hard spherocylinders
 MODULE mc_sc_module
 
   IMPLICIT NONE

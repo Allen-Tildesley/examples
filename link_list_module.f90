@@ -1,5 +1,5 @@
-! link_list_module.f90 (used by md_lj_ll_module.f90)
-! Monte Carlo or molecular dynamics simulation
+! link_list_module.f90
+! Link list handling routines for MC or MD simulation
 MODULE link_list_module
   IMPLICIT NONE
   PRIVATE

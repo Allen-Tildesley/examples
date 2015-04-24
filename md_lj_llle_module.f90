@@ -1,5 +1,5 @@
-! md_lj_llle_module.f90 (uses link_list_module.f90)
-! Link-list algorithm for Lees-Edwards boundaries
+! md_lj_llle_module.f90
+! Force routine for MD, LJ, Lees-Edwards, using link-lists
 MODULE md_lj_le_module
 
   IMPLICIT NONE

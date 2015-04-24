@@ -1,4 +1,4 @@
-! mc_zvt_lj.f90 (uses mc_lj_module.f90, utility_module.f90)
+! mc_zvt_lj.f90
 ! Monte Carlo, zVT (grand) ensemble, Lennard-Jones atoms
 PROGRAM mc_zvt_lj
   USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &

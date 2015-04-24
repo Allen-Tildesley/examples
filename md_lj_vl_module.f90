@@ -1,5 +1,5 @@
-! md_lj_vl_module.f90 (uses verlet_list_module.f90)
-! Verlet neighbour list (used by md_nve_lj.f90)
+! md_lj_vl_module.f90
+! Force routine for MD, LJ atoms, using Verlet neighbour list
 MODULE md_lj_module
 
   IMPLICIT NONE

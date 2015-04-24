@@ -1,4 +1,4 @@
-! mc_nvt_sc.f90 (uses mc_sc_module.f90, utility_module.f90)
+! mc_nvt_sc.f90
 ! Monte Carlo, NVT ensemble, hard spherocylinders
 PROGRAM mc_nvt_sc
   USE utility_module, ONLY : read_cnf_molecules, write_cnf_molecules, &

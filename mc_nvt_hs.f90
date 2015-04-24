@@ -1,5 +1,5 @@
-! mc_nvt_hs.f90 (uses mc_hs_module.f90, utility_module.f90)
-! Monte Carlo, NVT ensemble, hard spheres
+! mc_nvt_hs.f90
+! Monte Carlo simulation, NVT ensemble, hard spheres
 PROGRAM mc_nvt_hs
   USE utility_module, ONLY : read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add

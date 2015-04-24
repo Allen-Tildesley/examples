@@ -1,5 +1,5 @@
-! verlet_list_module.f90 (used by md_lj_vl_module.f90)
-! Molecular dynamics simulation
+! verlet_list_module.f90
+! Verlet list handling routines for MD simulation
 MODULE verlet_list_module
   IMPLICIT NONE
   PRIVATE

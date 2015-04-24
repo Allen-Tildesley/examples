@@ -1,5 +1,5 @@
 ! md_lj_le_module.f90
-! Force routine for Lees-Edwards boundaries
+! Force routine for MD, LJ atoms, Lees-Edwards boundaries
 MODULE md_lj_le_module
 
   IMPLICIT NONE

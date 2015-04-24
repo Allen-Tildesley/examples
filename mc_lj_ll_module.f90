@@ -1,6 +1,5 @@
-! mc_lj_ll_module.f90 (uses link_list_module.f90)
-! Link-list algorithm (used by mc_nvt_lj.f90 etc)
-! Monte Carlo simulation, Lennard-Jones atoms
+! mc_lj_ll_module.f90
+! Energy and move routines for MC, LJ potential, link-lists
 MODULE mc_lj_module
 
   IMPLICIT NONE

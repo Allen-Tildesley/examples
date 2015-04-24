@@ -1,7 +1,7 @@
-  ! initialize.f90 (uses initialize_module.f90, utility_module.f90)
-  ! Sets up initial configuration for MD or MC
+! initialize.f90
+! Sets up initial configuration for MD or MC
 PROGRAM initialize
-  USE utility_module, ONLY : write_cnf_atoms, write_cnf_molecules
+  USE utility_module,    ONLY : write_cnf_atoms, write_cnf_molecules
   USE initialize_module, ONLY : initialize_positions, initialize_orientations, &
        &                        initialize_velocities, initialize_angular_velocities, &
        &                        n, r, e, v, w

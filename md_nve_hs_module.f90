@@ -1,5 +1,5 @@
-! md_nve_hs_module.f90 (used by md_nve_hs.f90)
-! Molecular dynamics of hard spheres
+! md_nve_hs_module.f90
+! Collisions and overlap for MD of hard spheres
 MODULE md_nve_hs_module
 
   IMPLICIT NONE

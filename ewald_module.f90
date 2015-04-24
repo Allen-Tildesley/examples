@@ -1,6 +1,6 @@
-! ewald.f90
-MODULE ewald
-  ! r-space and k-space parts of Ewald sum for ions
+! ewald_module.f90
+! r-space and k-space parts of Ewald sum for ions
+MODULE ewald_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: pot_r_ewald, pot_k_ewald
@@ -11,17 +11,18 @@ MODULE ewald
   ! Heyes, J. Chem. Phys. 74, 1924, 1981.
   ! see also Fincham, mdions, CCP5 program library.
 
-  ! the self term is subtracted from the k-space contribution
-  ! the surface term for simulations in vacuum is not included
-  ! a cubic box and unit box length are assumed throughout
+  ! The self term is subtracted from the k-space contribution
+  ! The surface term for simulations in vacuum is not included
+  ! A cubic box and unit box length are assumed throughout
+  ! No special lists are used
 
 CONTAINS
 
-  FUNCTION pot_r_ewald ( n, r, z, kappa ) RESULT ( pot ) ! r-space part of potential energy
+  FUNCTION pot_r_ewald ( n, r, q, kappa ) RESULT ( pot ) ! r-space part of potential energy
     REAL                              :: pot   ! Result
     INTEGER,              INTENT(in)  :: n     ! Number of atoms
     REAL, DIMENSION(3,n), INTENT(in)  :: r     ! positions
-    REAL, DIMENSION(n),   INTENT(in)  :: z     ! charges
+    REAL, DIMENSION(n),   INTENT(in)  :: q     ! charges
     REAL,                 INTENT(in)  :: kappa ! Ewald width parameter
 
     INTEGER            :: i, j
@@ -37,7 +38,7 @@ CONTAINS
           rij(:) = rij(:) - ANINT ( rij(:) )
 
           rij_mag = SQRT ( SUM ( rij**2 ) )
-          vij     = z(i) * z(j) * ERFC ( kappa * rij_mag ) / rij_mag
+          vij     = q(i) * q(j) * ERFC ( kappa * rij_mag ) / rij_mag
           pot     = pot + vij
 
        END DO ! End inner loop
@@ -45,12 +46,12 @@ CONTAINS
 
   END FUNCTION pot_r_ewald
 
-  FUNCTION pot_k_ewald ( nk, n, r, z, kappa ) RESULT ( pot ) ! k-space part of potential energy
+  FUNCTION pot_k_ewald ( nk, n, r, q, kappa ) RESULT ( pot ) ! k-space part of potential energy
     REAL                              :: pot   ! Result
     INTEGER,              INTENT(in)  :: nk    ! Determines number of wave-vectors
     INTEGER,              INTENT(in)  :: n     ! Number of atoms
     REAL, DIMENSION(3,n), INTENT(in)  :: r     ! positions
-    REAL, DIMENSION(n),   INTENT(in)  :: z     ! charges
+    REAL, DIMENSION(n),   INTENT(in)  :: q     ! charges
     REAL,                 INTENT(in)  :: kappa ! Ewald width parameter
 
     ! Consider k-vectors within a sphere bounded by the cube (-nk,+nk) in each component
@@ -93,6 +94,7 @@ CONTAINS
 
     END IF ! End of precalculation of expressions at the start
 
+    ! Double-check value on later calls
     IF ( k_sq_max /= nk**2 ) STOP 'nk error in pot_k_ewald'
 
     ! construct EXP(ik.r) for all ions and k-vectors **
@@ -134,7 +136,7 @@ CONTAINS
              k_sq = kx**2 + ky**2 + kz**2
 
              IF ( ( k_sq <= k_sq_max ) .AND. ( k_sq /= 0 ) ) THEN
-                term = SUM ( z(:) * eikx(:,kx) * eiky(:,ky) * eikz(:,kz) )
+                term = SUM ( q(:) * eikx(:,kx) * eiky(:,ky) * eikz(:,kz) )
                 pot = pot + factor * kfac(k_sq) * REAL ( CONJG ( term ) * term )
              END IF
 
@@ -143,7 +145,8 @@ CONTAINS
     END DO ! End outer loop over non-negative kx
 
     ! subtract self part of k-space sum
-    pot = pot - kappa * SUM ( z(:)**2 ) / SQRT(pi)
+    pot = pot - kappa * SUM ( q(:)**2 ) / SQRT(pi)
 
   END FUNCTION pot_k_ewald
-END MODULE ewald
+
+END MODULE ewald_module

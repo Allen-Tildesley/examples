@@ -1,5 +1,5 @@
-! md_nvt_lj_le.f90 (uses md_lj_le_module.f90, utility_module.f90)
-! Molecular dynamics, NVT ensemble, Lees-Edwards boundaries, Lennard-Jones atoms
+! md_nvt_lj_le.f90
+! MD, NVT ensemble, LJ atoms, Lees-Edwards boundaries
 PROGRAM md_nve_lj_le
   USE utility_module,  ONLY : read_cnf_atoms, write_cnf_atoms, &
        &                      run_begin, run_end, blk_begin, blk_end, blk_add

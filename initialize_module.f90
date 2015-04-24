@@ -1,4 +1,4 @@
-! initialize_module.f90 (used by initialize.f90)
+! initialize_module.f90
 ! Routines to initialize configurations and velocities
 MODULE initialize_module
   IMPLICIT NONE
