@@ -23,7 +23,7 @@ PROGRAM diffusion
   INTEGER :: trj_unit, iostat
   LOGICAL :: full
   INTEGER :: k, mk, nk
-  real    :: box
+  REAL    :: box
 
   NAMELIST /diffusion_parameters/ nt, origin_interval
 
@@ -75,10 +75,12 @@ PROGRAM diffusion
      END IF
 
      DO k = 1, nk
-        dt       = t - t0(k)
-        msd(dt)  = msd(dt)  + SUM ( ( r(:,:) - r0(:,:,k) ) ** 2 ) ! increment msd
-        vacf(dt) = vacf(dt) + SUM (   v(:,:) * v0(:,:,k)        ) ! increment correlation function
-        norm(dt) = norm(dt) + 1.0                                 ! increment normalizing factor
+        dt = t - t0(k)
+        IF ( dt >= 0 .AND. dt <= nt ) THEN
+           msd(dt)  = msd(dt)  + SUM ( ( r(:,:) - r0(:,:,k) ) ** 2 ) ! increment msd
+           vacf(dt) = vacf(dt) + SUM (   v(:,:) * v0(:,:,k)        ) ! increment correlation function
+           norm(dt) = norm(dt) + 1.0                                 ! increment normalizing factor
+        END IF
      END DO
 
      r1 = r     ! ready for next step
