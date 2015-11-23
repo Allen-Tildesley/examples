@@ -10,6 +10,7 @@ MODULE utility_module
   PUBLIC :: random_orientation_vector, random_perpendicular_vector
   PUBLIC :: random_orientation_vector_alt1, random_orientation_vector_alt2
   PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
+  PUBLIC :: rotate_vector, cross_product, init_random_seed
   PUBLIC :: orientational_order, translational_order, nematic_order
 
   INTEGER,                                      SAVE :: nvariables
@@ -289,7 +290,7 @@ CONTAINS
     REAL, INTENT(in) :: mean, std ! with required mean and standard deviation
 
     ! Box-Muller transform produces numbers in pairs, we save one for next time
-    
+
     REAL, DIMENSION(2)      :: zeta
     REAL,              SAVE :: r_save
     LOGICAL,           SAVE :: saved = .FALSE.
@@ -442,33 +443,36 @@ CONTAINS
     ! The rotation axis is a Cartesian axis selected at random
     ! Ref: Barker and Watts, Chem Phys Lett 3, 144 (1969)
 
-    INTEGER :: axis        ! axis of rotation
-    REAL    :: delta, c, s ! rotation angle
-    REAL    :: zeta        ! random number
+    INTEGER            :: k
+    REAL, DIMENSION(3) :: axis  ! axis of rotation
+    REAL               :: delta ! rotation angle
+    REAL               :: zeta  ! random number
 
-    axis  = random_integer (1,3)             ! random axis choice 1 = x, 2 = y, 3 = z
+    k       = random_integer (1,3)! random axis choice 1 = x, 2 = y, 3 = z
+    axis    = 0.0
+    axis(k) = 1.0
+
     CALL RANDOM_NUMBER ( zeta )              ! uniform random number between 0 and 1
     delta = ( 2.0 * zeta - 1.0 ) * delta_max ! uniform random angle
-    c     = COS ( delta )
-    s     = SIN ( delta )
 
-    SELECT CASE ( axis )
-
-    CASE ( 1 ) ! rotate about x
-       e(2) = c * e_old(2) + s * e_old(3)
-       e(3) = c * e_old(3) - s * e_old(2)
-
-    CASE ( 2 ) ! rotate about y
-       e(3) = c * e_old(3) + s * e_old(1)
-       e(1) = c * e_old(1) - s * e_old(3)
-
-    CASE default ! rotate about z
-       e(1) = c * e_old(1) + s * e_old(2)
-       e(2) = c * e_old(2) - s * e_old(1)
-
-    END SELECT
+    e = rotate_vector ( delta, axis, e_old )
 
   END FUNCTION random_rotate_vector_alt2
+
+  FUNCTION rotate_vector ( delta, axis, e_old ) RESULT ( e )
+    REAL, DIMENSION(3)             :: e           ! orientation vector result
+    REAL, INTENT(in)               :: delta       ! rotation angle
+    REAL, DIMENSION(3), INTENT(in) :: axis, e_old ! rotation axis and original orientation
+
+    REAL :: dot, c, s
+
+    c   = COS ( delta )
+    s   = SIN ( delta )
+    dot = DOT_PRODUCT ( axis, e_old )
+
+    e = c * e_old + (1.0-c)*dot*axis + s * cross_product ( axis, e_old )
+
+  END FUNCTION rotate_vector
 
   FUNCTION random_rotate_vector_alt3 ( delta_max, e_old ) RESULT ( e )
     REAL, DIMENSION(3)             :: e         ! orientation vector result
@@ -490,6 +494,15 @@ CONTAINS
     END DO
 
   END FUNCTION random_rotate_vector_alt3
+
+  FUNCTION cross_product ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL, DIMENSION(3)             :: c    ! result cross product
+    REAL, DIMENSION(3), INTENT(in) :: a, b ! arguments
+    c(1) = a(2)*b(3) - a(3)*b(2)
+    c(2) = a(3)*b(1) - a(1)*b(3)
+    c(3) = a(1)*b(2) - a(2)*b(1)
+  END FUNCTION cross_product
 
   FUNCTION translational_order ( r, k ) RESULT ( order )
     REAL                                          :: order ! result order parameter
@@ -522,7 +535,7 @@ CONTAINS
        IF ( 4*nc**3 /= n ) STOP 'n not sensible in translational_order'
        k_real = twopi * REAL( [-nc,nc,-nc] )      ! arbitrary fcc reciprocal vector
     END IF
-    
+
     rho = ( 0.0, 0.0 )
 
     DO i = 1, n
@@ -548,7 +561,7 @@ CONTAINS
 
     INTEGER :: n, nc, i, i0
     REAL    :: c
-    
+
     REAL, PARAMETER :: rroot3 = 1.0 / SQRT ( 3.0 )
 
     REAL, DIMENSION(3,4), PARAMETER :: e0 = RESHAPE (  rroot3*[ &
@@ -568,7 +581,7 @@ CONTAINS
     order = order / REAL ( n )
 
   END FUNCTION orientational_order
-  
+
   FUNCTION nematic_order ( e ) RESULT ( order )
     REAL                             :: order
     REAL, DIMENSION(:,:), INTENT(in) :: e     ! set of molecular orientation vectors (3,n)
@@ -613,5 +626,67 @@ CONTAINS
     order = MAXVAL ( [ h*COS(psi/3.0), h*COS((psi+2.0*pi)/3.0), h*COS((psi+4.0*pi)/3.0) ] ) 
 
   END FUNCTION nematic_order
+
+  ! This routine, and the next one, are taken from the online GNU documentation
+  ! https://gcc.gnu.org/onlinedocs/gfortran/RANDOM_005fSEED.html
+  ! and is specific to the gfortran compiler
+  ! At the time of writing, calling RANDOM_SEED() initializes the random number generator
+  ! with the same random seed to a default state, which may result in the same sequence
+  ! being generated every time. The routines below are intended to generate different
+  ! sequences on different calls.
+  ! YOU SHOULD INVESTIGATE THE BEHAVIOUR FOR YOUR OWN COMPILER AND MACHINE IMPLEMENTATION 
+  SUBROUTINE init_random_seed()
+    USE iso_fortran_env, ONLY: int64
+    IMPLICIT NONE
+    INTEGER, ALLOCATABLE :: seed(:)
+    INTEGER :: i, n, un, istat, dt(8), pid
+    INTEGER(int64) :: t
+
+    CALL RANDOM_SEED(size = n)
+    ALLOCATE(seed(n))
+    ! First try if the OS provides a random number generator
+    OPEN(newunit=un, file="/dev/urandom", access="stream", &
+         form="unformatted", action="read", status="old", iostat=istat)
+    IF (istat == 0) THEN
+       READ(un) seed
+       CLOSE(un)
+    ELSE
+       ! Fallback to XOR:ing the current time and pid. The PID is
+       ! useful in case one launches multiple instances of the same
+       ! program in parallel.
+       CALL SYSTEM_CLOCK(t)
+       IF (t == 0) THEN
+          CALL DATE_AND_TIME(values=dt)
+          t = (dt(1) - 1970) * 365_int64 * 24 * 60 * 60 * 1000 &
+               + dt(2) * 31_int64 * 24 * 60 * 60 * 1000 &
+               + dt(3) * 24_int64 * 60 * 60 * 1000 &
+               + dt(5) * 60 * 60 * 1000 &
+               + dt(6) * 60 * 1000 + dt(7) * 1000 &
+               + dt(8)
+       END IF
+       pid = getpid()
+       t = IEOR(t, INT(pid, KIND(t)))
+       DO i = 1, n
+          seed(i) = lcg(t)
+       END DO
+    END IF
+    CALL RANDOM_SEED(put=seed)
+  END SUBROUTINE init_random_seed
+
+  ! This simple PRNG might not be good enough for real work, but is
+  ! sufficient for seeding a better PRNG.
+  FUNCTION lcg(s)
+    USE iso_fortran_env, ONLY: int64
+    IMPLICIT NONE
+    INTEGER :: lcg
+    INTEGER(int64) :: s
+    IF (s == 0) THEN
+       s = 104729
+    ELSE
+       s = MOD(s, 4294967296_int64)
+    END IF
+    s = MOD(s * 279470273_int64, 4294967291_int64)
+    lcg = INT(MOD(s, INT(HUGE(0), int64)), KIND(0))
+  END FUNCTION lcg
 
 END MODULE utility_module
