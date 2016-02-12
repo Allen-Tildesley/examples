@@ -11,7 +11,7 @@ env_mpi=Environment(ENV=os.environ,F90='mpif90',F90LINKER='mpif90')
 #Tool('gfortran')(env_normal)
 #Tool('mpif90')(env_mpi)
 #MY_F90FLAGS='-O2 -finline-functions -funswitch-loops -fwhole-file'
-MY_F90FLAGS='-fdefault-real-8 -std=f2008 -Wall'
+MY_F90FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2008 -Wall'
 MY_LINKFLAGS=''
 
 env_normal.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')

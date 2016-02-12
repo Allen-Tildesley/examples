@@ -320,7 +320,7 @@ CONTAINS
     REAL :: e_sq
 
     DO
-       CALL random_NUMBER ( e ) ! Random numbers uniformly sampled in range (0,1)
+       CALL RANDOM_NUMBER ( e ) ! Random numbers uniformly sampled in range (0,1)
        e    = 2.0 * e - 1.0     ! Now in range (-1,+1)
        e_sq = SUM ( e**2 )
        IF ( e_sq <= 1.0 ) EXIT
@@ -421,7 +421,7 @@ CONTAINS
 
     e_perp = random_perpendicular_vector ( e_old ) ! Choose unit vector perpendicular to e_old
 
-    CALL random_NUMBER ( zeta ) ! Random number uniformly sampled in range (0,1)
+    CALL RANDOM_NUMBER ( zeta ) ! Random number uniformly sampled in range (0,1)
     zeta  = 2.0 * zeta - 1.0    ! Now in range (-1,+1)
     delta = zeta * delta_max    ! Random rotation angle
 
