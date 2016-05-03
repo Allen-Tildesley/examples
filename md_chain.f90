@@ -1,5 +1,5 @@
 ! md_chain.f90
-! Molecular dynamics, NVE ensemble, repulsive Lennard-Jones chain
+! Molecular dynamics, NVE ensemble, WCA Lennard-Jones chain
 PROGRAM md_chain
   USE utility_module,  ONLY : read_cnf_atoms, write_cnf_atoms, time_stamp, lowercase, &
        &                      run_begin, run_end, blk_begin, blk_end, blk_add
