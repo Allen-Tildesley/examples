@@ -5,16 +5,16 @@ PROGRAM meshup3d
   ! This program assigns a set of charges to a cubic mesh using the
   ! triangular shape cloud distribution described by Hockney and Eastwood (1988)
   ! The charges are positioned in a box of unit length.
-  ! The charge mesh is indexed from 0 to ncell-1 in each coordinate direction
+  ! The charge mesh is indexed from 0 to sc-1 in each coordinate direction
 
   IMPLICIT NONE
 
-  INTEGER                             :: n     ! number of charges
-  INTEGER                             :: ncell ! dimension of mesh
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: rho   ! (0:ncell-1,0:ncell-1,0:ncell-1) mesh cell charge density
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: r     ! (3,n) charge positions in range (0,1)
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: dr    ! (3,n) charge positions relative to mesh point
-  REAL, ALLOCATABLE, DIMENSION(:)     :: q     ! (n) charges
+  INTEGER                             :: n   ! number of charges
+  INTEGER                             :: sc  ! dimension of mesh
+  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: rho ! (0:sc-1,0:sc-1,0:sc-1) mesh cell charge density
+  REAL, ALLOCATABLE, DIMENSION(:,:)   :: r   ! (3,n) charge positions in range (0,1)
+  REAL, ALLOCATABLE, DIMENSION(:,:)   :: dr  ! (3,n) charge positions relative to mesh point
+  REAL, ALLOCATABLE, DIMENSION(:)     :: q   ! (n) charges
 
   REAL,    DIMENSION(3,-1:1) :: v  ! weights in each coordinate direction
   INTEGER, DIMENSION(3)      :: nr ! mesh point index
@@ -23,11 +23,11 @@ PROGRAM meshup3d
   REAL    :: h, q1, q2, q3
 
   ! Example values for illustration
-  n     = 4                   ! number of charges
-  ncell = 10                  ! dimension of mesh
-  h     = 1.0 / REAL( ncell ) ! mesh spacing
+  n  = 4                ! number of charges
+  sc = 10               ! dimension of mesh
+  h  = 1.0 / REAL( sc ) ! mesh spacing
 
-  ALLOCATE ( rho(0:ncell-1,0:ncell-1,0:ncell-1) ) ! C-style indexing is convenient here
+  ALLOCATE ( rho(0:sc-1,0:sc-1,0:sc-1) ) ! C-style indexing is convenient here
   ALLOCATE ( r(3,n), dr(3,n), q(n) )
 
   WRITE(*,'(a)') '3-D mesh assignment for unit boxlength, coordinates in range (0,1)'
@@ -45,8 +45,8 @@ PROGRAM meshup3d
 
   DO i = 1, n ! Loop over charges
 
-     nr(:)   = NINT ( r(:,i) * ncell )    ! nearest mesh point indices
-     nr(:)   = MODULO ( nr, ncell)        ! with periodic boundaries
+     nr(:)   = NINT ( r(:,i) * sc )       ! nearest mesh point indices
+     nr(:)   = MODULO ( nr, sc)           ! with periodic boundaries
      dr(:,i) = r(:,i) - REAL( nr(:) ) * h ! vector to charge from mesh cell centre
      dr(:,i) = dr(:,i) - ANINT( dr(:,i) ) ! periodic boundaries
      dr(:,i) = dr(:,i) / h                ! normalise by mesh cell size
@@ -57,16 +57,16 @@ PROGRAM meshup3d
      v(:,+1) = 0.5 * ( 0.5 + dr(:,i) ) ** 2
 
      DO i1 = -1, 1 ! Loop over x-neighbours
-        q1 = q(i) * v(1,i1)               ! charge times x-weight
-        n1 = MODULO ( nr(1) + i1, ncell ) ! neighbour index with periodic boundaries
+        q1 = q(i) * v(1,i1)            ! charge times x-weight
+        n1 = MODULO ( nr(1) + i1, sc ) ! neighbour index with periodic boundaries
 
         DO i2 = -1, 1 ! Loop over y-neighbours
-           q2 = q1 * v(2,i2)                 ! charge times xy-weight
-           n2 = MODULO ( nr(2) + i2, ncell ) ! neighbour index with periodic boundaries
+           q2 = q1 * v(2,i2)              ! charge times xy-weight
+           n2 = MODULO ( nr(2) + i2, sc ) ! neighbour index with periodic boundaries
 
            DO i3 = -1, 1 ! Loop over z-neighbours
               q3 = q2 * v(3,i3)                  ! charge times xyz-weight
-              n3 = MODULO ( nr(3) + i3, ncell )  ! neighbour index with periodic boundaries
+              n3 = MODULO ( nr(3) + i3, sc )     ! neighbour index with periodic boundaries
               rho(n1,n2,n3) = rho(n1,n2,n3) + q3 ! mesh cell share of charge
            END DO ! End loop over z-neighbours
 
@@ -79,9 +79,9 @@ PROGRAM meshup3d
   rho = rho / (h**3) ! Convert charges to charge densities
 
   ! Output mesh charge density
-  DO n3 = 0, ncell-1
+  DO n3 = 0, sc-1
      WRITE(*,'(a,i5)') 'z-layer ', n3
-     DO n2 = 0, ncell-1
+     DO n2 = 0, sc-1
         WRITE(*,'(*(f10.4))') rho(:,n2,n3)
      END DO
   END DO

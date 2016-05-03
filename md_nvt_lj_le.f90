@@ -128,7 +128,7 @@ PROGRAM md_nve_lj_le
         ! Operator A for half a step
         d_strain = 0.5 * dt * strain_rate
         r(1,:)   = r(1,:) + d_strain * r(2,:)  ! Extra strain term
-        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:)  ! Kick half-step
+        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:)  ! Drift half-step
         strain   = strain + d_strain           ! Advance boundaries
 
         r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain   ! Extra correction
@@ -162,7 +162,7 @@ PROGRAM md_nve_lj_le
         ! Operator A for half a step
         d_strain = 0.5 * dt * strain_rate
         r(1,:)   = r(1,:) + d_strain * r(2,:)  ! Extra strain term
-        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:)  ! Kick half-step
+        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:)  ! Drift half-step
         strain   = strain + d_strain           ! Advance boundaries
 
         r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain   ! Extra correction

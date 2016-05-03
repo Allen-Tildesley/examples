@@ -57,7 +57,7 @@ CONTAINS
     ALLOCATE ( tmp(nl_new) ) ! new size for list
     tmp(1:nl) = list(:)      ! copy elements across
 
-    CALL move_ALLOC ( tmp, list )
+    CALL MOVE_ALLOC ( tmp, list )
     nl = SIZE(list)
     WRITE(*,'(''New Verlet list size = '',t40,i15)') nl
 

@@ -30,7 +30,7 @@ CONTAINS
   END SUBROUTINE finalize
 
   SUBROUTINE force ( sigma, r_cut, pot, pot_sh, vir )
-    USE link_list_module, ONLY : make_list, nc, head, list
+    USE link_list_module, ONLY : make_list, sc, head, list
 
     REAL, INTENT(in)  :: sigma, r_cut ! potential parameters
     REAL, INTENT(out) :: pot          ! total potential energy
@@ -70,9 +70,9 @@ CONTAINS
     CALL make_list ( n, r )
 
     ! Triple loop over cells
-    DO ci1 = 0, nc-1
-       DO ci2 = 0, nc-1
-          DO ci3 = 0, nc-1
+    DO ci1 = 0, sc-1
+       DO ci2 = 0, sc-1
+          DO ci3 = 0, sc-1
              ci(:) = [ ci1, ci2, ci3 ]
              i = head(ci1,ci2,ci3)
 
@@ -86,7 +86,7 @@ CONTAINS
                       j = list(i) ! Look downlist from i in current cell
                    ELSE
                       cj(:) = ci(:) + d(:,k)          ! Neighbour cell index
-                      cj(:) = MODULO ( cj(:), nc )    ! Periodic boundary correction
+                      cj(:) = MODULO ( cj(:), sc )    ! Periodic boundary correction
                       j     = head(cj(1),cj(2),cj(3)) ! Look at all atoms in neighbour cell
                    END IF
 

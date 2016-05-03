@@ -5,10 +5,10 @@ MODULE link_list_module
   PRIVATE
   PUBLIC :: initialize_list, finalize_list, make_list, check_list
   PUBLIC :: move_in_list, create_in_list, destroy_in_list, c_index
-  PUBLIC :: nc, head, list, c
+  PUBLIC :: sc, head, list, c
 
-  INTEGER,                                PROTECTED :: nc     ! dimensions of head array, assume cubic box
-  INTEGER, DIMENSION(:,:,:), ALLOCATABLE, PROTECTED :: head   ! head(0:nc-1,0:nc-1,0:nc-1), assume cubic box
+  INTEGER,                                PROTECTED :: sc     ! dimensions of head array, assume cubic box
+  INTEGER, DIMENSION(:,:,:), ALLOCATABLE, PROTECTED :: head   ! head(0:sc-1,0:sc-1,0:sc-1), assume cubic box
   INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED :: list   ! list(n)
   INTEGER, DIMENSION(:,:),   ALLOCATABLE, PROTECTED :: c      ! c(3,n) 3D cell index of each atom
 
@@ -20,11 +20,11 @@ CONTAINS
 
     WRITE(*,'(''Link list initialization'')')
     WRITE(*,'(''Link cells based on r_cut ='',t40,f15.5)') r_cut
-    nc = FLOOR ( 1.0 / r_cut ) ! number of cells
-    IF ( nc < 3 ) STOP 'System is too small to use link cells'
+    sc = FLOOR ( 1.0 / r_cut ) ! number of cells
+    IF ( sc < 3 ) STOP 'System is too small to use link cells'
 
     ALLOCATE ( list(n), c(3,n) )
-    ALLOCATE ( head(0:nc-1,0:nc-1,0:nc-1) )
+    ALLOCATE ( head(0:sc-1,0:sc-1,0:sc-1) )
 
   END SUBROUTINE initialize_list
 
@@ -51,17 +51,17 @@ CONTAINS
   END SUBROUTINE make_list
 
   FUNCTION c_index ( ri ) RESULT ( ci )
-    INTEGER, DIMENSION(3)             :: ci ! 3D cell index in range 0..nc-1
+    INTEGER, DIMENSION(3)             :: ci ! 3D cell index in range 0..sc-1
     REAL,    DIMENSION(3), INTENT(in) :: ri ! position in box = 1 units
 
     ! We do not want to do any periodic imaging here, so as to cope with 
     ! Lees-Edwards boundaries as well as normal ones
     IF ( ANY ( ABS(ri) > 0.5 ) ) STOP 'atom not in main box in c_index'
-    ci(:) = FLOOR ( ( ri(:) + 0.5 ) * REAL(nc) ) ! The index formula
+    ci(:) = FLOOR ( ( ri(:) + 0.5 ) * REAL(sc) ) ! The index formula
 
     ! Guard against small chance of roundoff error
     WHERE ( ci(:) < 0    ) ci(:) = 0
-    WHERE ( ci(:) > nc-1 ) ci(:) = nc-1
+    WHERE ( ci(:) > sc-1 ) ci(:) = sc-1
 
   END FUNCTION c_index
   
@@ -134,9 +134,9 @@ CONTAINS
     END DO
 
     ! Next check that atoms in cells really are in those cells
-    DO ci1 = 0, nc-1
-       DO ci2 = 0, nc-1
-          DO ci3 = 0, nc-1
+    DO ci1 = 0, sc-1
+       DO ci2 = 0, sc-1
+          DO ci3 = 0, sc-1
              ci = [ ci1, ci2, ci3 ]
              i = head(ci1,ci2,ci3)
              DO

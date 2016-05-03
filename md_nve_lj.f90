@@ -1,14 +1,14 @@
 ! md_nve_lj.f90
 ! Molecular dynamics, NVE ensemble, Lennard-Jones atoms
 PROGRAM md_nve_lj
-  USE utility_module, ONLY : read_cnf_atoms, write_cnf_atoms, &
+  USE utility_module, ONLY : read_cnf_atoms, write_cnf_atoms, time_stamp, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_lj_module,   ONLY : initialize, finalize, force, r, v, f, n, energy_lrc
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions, velocities)
   ! Cubic periodic boundary conditions
-  ! Conducts molecular dynamics
+  ! Conducts molecular dynamics using velocity Verlet algorithm
   ! Uses no special neighbour lists
 
   ! Box is taken to be of unit length during the dynamics
@@ -43,6 +43,7 @@ PROGRAM md_nve_lj
   WRITE(*,'(''md_nve_lj'')')
   WRITE(*,'(''Molecular dynamics, constant-NVE, Lennard-Jones'')')
   WRITE(*,'(''Results in units epsilon = sigma = 1'')')
+  CALL time_stamp
 
   ! Set sensible default run parameters for testing
   nblock      = 10
@@ -103,12 +104,11 @@ PROGRAM md_nve_lj
      DO stp = 1, nstep ! Begin loop over steps
 
         ! Velocity Verlet algorithm
-        r(:,:) = r(:,:) + 0.5 * dt * v(:,:)           ! Kick half-step
+        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)           ! Kick half-step
+        r(:,:) = r(:,:) + dt * v(:,:)                 ! Drift step
         r(:,:) = r(:,:) - anint ( r(:,:) )            ! Periodic boundaries
         CALL force ( sigma, r_cut, pot, pot_sh, vir ) ! Force evaluation
-        v(:,:) = v(:,:) + dt * f(:,:)                 ! Drift step
-        r(:,:) = r(:,:) + 0.5 * dt * v(:,:)           ! Kick half-step
-        r(:,:) = r(:,:) - anint ( r(:,:) )            ! Periodic boundaries
+        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)           ! Kick half-step
 
         CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
         pot         = pot + pot_lrc
@@ -145,6 +145,7 @@ PROGRAM md_nve_lj
   WRITE(*,'(''Final shifted energy (sigma units)'',t40,f15.5)') energy_sh
   WRITE(*,'(''Final temperature (sigma units)'',   t40,f15.5)') temperature
   WRITE(*,'(''Final pressure (sigma units)'',      t40,f15.5)') pressure
+  CALL time_stamp
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
 

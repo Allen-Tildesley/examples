@@ -30,7 +30,7 @@ CONTAINS
   END SUBROUTINE finalize
 
   SUBROUTINE force ( sigma, r_cut, strain, pot, pot_sh, vir )
-    USE link_list_module, ONLY : make_list, nc, head, list
+    USE link_list_module, ONLY : make_list, sc, head, list
 
     REAL, INTENT(in)  :: sigma, r_cut ! potential parameters
     REAL, intent(in)  :: strain       ! shear strain
@@ -80,17 +80,17 @@ CONTAINS
     r(:,:) = r(:,:) - ANINT ( r(:,:) )          ! Standard correction
     CALL make_list ( n, r )
 
-    shift  = floor ( strain * REAL ( nc ) ) ! strain measured in cell lengths
+    shift  = floor ( strain * REAL ( sc ) ) ! strain measured in cell lengths
 
     ! Triple loop over cells
-    DO ci1 = 0, nc-1
-       DO ci2 = 0, nc-1
-          DO ci3 = 0, nc-1
+    DO ci1 = 0, sc-1
+       DO ci2 = 0, sc-1
+          DO ci3 = 0, sc-1
              ci(:) = [ ci1, ci2, ci3 ]
              i = head(ci1,ci2,ci3)
 
              ! Set up correct neighbour cell indices
-             IF ( ci2 == nc-1 ) THEN                       ! top layer
+             IF ( ci2 == sc-1 ) THEN                       ! top layer
                 dd(:,0:4)        = d(:,0:4)                ! five cells do not need adjustment
                 dd(:,5:nk_extra) = d(:,5:nk_extra) - shift ! remaining cells need adjustment
                 k_max = nk_extra                           ! extra cells need to be checked
@@ -109,7 +109,7 @@ CONTAINS
                       j = list(i) ! Look downlist from i in current cell
                    ELSE
                       cj(:) = ci(:) + dd(:,k)         ! Neighbour cell index
-                      cj(:) = MODULO ( cj(:), nc )    ! Periodic boundary correction
+                      cj(:) = MODULO ( cj(:), sc )    ! Periodic boundary correction
                       j     = head(cj(1),cj(2),cj(3)) ! Look at all atoms in neighbour cell
                    END IF
 

@@ -10,8 +10,9 @@ MODULE utility_module
   PUBLIC :: random_orientation_vector, random_perpendicular_vector
   PUBLIC :: random_orientation_vector_alt1, random_orientation_vector_alt2
   PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
-  PUBLIC :: rotate_vector, cross_product, init_random_seed
+  PUBLIC :: rotate_vector, cross_product, init_random_seed, time_stamp
   PUBLIC :: orientational_order, translational_order, nematic_order
+  PUBLIC :: lowercase
 
   INTEGER,                                      SAVE :: nvariables
   CHARACTER(len=15), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
@@ -46,6 +47,7 @@ CONTAINS
 
     INTEGER :: cnf_unit, ioerr, i
 
+!    WRITE(*,'(a,t40,a)') 'read_cnf_atoms', filename
     OPEN(newunit=cnf_unit,file=filename,status='old',action='read',iostat=ioerr)
     IF ( ioerr /= 0 ) STOP 'Error opening file in read_cnf_atoms'
     READ(cnf_unit,*) n
@@ -86,6 +88,7 @@ CONTAINS
 
     INTEGER :: cnf_unit, ioerr, i
 
+!    WRITE(*,'(a,t40,a)') 'write_cnf_atoms', filename
     OPEN(newunit=cnf_unit,file=filename,status='replace',iostat=ioerr)
     IF ( ioerr /= 0 ) STOP 'Error opening file in write_cnf_atoms'
     WRITE(cnf_unit,'(i15)'  ) n
@@ -123,6 +126,7 @@ CONTAINS
 
     INTEGER :: cnf_unit, ioerr, i
 
+!    WRITE(*,'(a,t40,a)') 'read_cnf_molecules', filename
     OPEN(newunit=cnf_unit,file=filename,status='old',action='read',iostat=ioerr)
     IF ( ioerr /= 0 ) STOP 'Error opening file in read_cnf_molecules'
     READ(cnf_unit,*) n
@@ -169,6 +173,7 @@ CONTAINS
 
     INTEGER :: cnf_unit, ioerr, i
 
+!    WRITE(*,'(a,t40,a)') 'write_cnf_molecules', filename
     OPEN(newunit=cnf_unit,file=filename,status='replace',iostat=ioerr)
     IF ( ioerr /= 0 ) STOP 'Error opening file in write_cnf_molecules'
     WRITE(cnf_unit,'(i15)'  ) n
@@ -241,7 +246,7 @@ CONTAINS
 
     IF ( first_call ) THEN  ! Write headings
        WRITE(*,'(*(a16))') REPEAT ( '=', 16*(nvariables+1) ) 
-       WRITE(*,'(*(1x,a15))') 'Block', variable_names
+       WRITE(*,'(*(1x,a15))') 'Block', ADJUSTR ( variable_names )
        WRITE(*,'(*(a16))') REPEAT ( '=', 16*(nvariables+1) )
        first_call = .FALSE.
     END IF
@@ -688,5 +693,37 @@ CONTAINS
     s = MOD(s * 279470273_int64, 4294967291_int64)
     lcg = INT(MOD(s, INT(HUGE(0), int64)), KIND(0))
   END FUNCTION lcg
+
+  SUBROUTINE time_stamp
+    IMPLICIT NONE
+    CHARACTER(len=8)  :: date
+    CHARACTER(len=10) :: time
+    REAL              :: cpu
+
+    CALL DATE_AND_TIME ( date, time )
+    CALL CPU_TIME ( cpu )
+    WRITE(*,'(a,t45,a4,a1,a2,a1,a2)'    ) 'Date: ', date(1:4), '/', date(5:6), '/', date(7:8)
+    WRITE(*,'(a,t47,a2,a1,a2,a1,a2)'    ) 'Time: ', time(1:2), ':', time(3:4), ':', time(5:6)
+    WRITE(*,'(a,t40,f15.5)') 'CPU time: ', cpu
+    
+  END SUBROUTINE time_stamp
+
+  FUNCTION lowercase ( oldstring ) RESULT ( newstring )
+    IMPLICIT NONE
+    CHARACTER(len=*),             INTENT(in)    :: oldstring 
+    CHARACTER(len=LEN(oldstring))               :: newstring 
+
+    INTEGER :: i, k 
+
+    DO i = 1, LEN(oldstring) 
+       k = IACHAR(oldstring(i:i)) 
+       IF ( k >= IACHAR('A') .AND. k <= IACHAR('Z') ) THEN 
+          k = k + IACHAR('a') - IACHAR('A') 
+          newstring(i:i) = ACHAR(k)
+       ELSE
+          newstring(i:i) = oldstring(i:i)
+       END IF
+    END DO
+  END FUNCTION lowercase
 
 END MODULE utility_module

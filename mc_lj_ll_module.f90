@@ -169,7 +169,7 @@ CONTAINS
   END SUBROUTINE energy_1
 
   SUBROUTINE get_neighbours ( i, op, nj )
-    USE link_list_module, ONLY : nc, list, head, c
+    USE link_list_module, ONLY : sc, list, head, c
 
     ! Arguments
     INTEGER, intent(in)  :: i  ! particle whose neighbours are required
@@ -209,7 +209,7 @@ CONTAINS
     DO k = k1, k2 ! Begin loop over neighbouring cells
 
        cj(:) = c(:,i) + d(:,k)      ! Neighbour cell index
-       cj(:) = MODULO ( cj(:), nc ) ! Periodic boundary correction
+       cj(:) = MODULO ( cj(:), sc ) ! Periodic boundary correction
 
        IF ( k == 0 .AND. op == gt ) THEN
           j = list(i) ! check down-list from i in i-cell
