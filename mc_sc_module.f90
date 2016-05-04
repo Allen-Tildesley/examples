@@ -5,7 +5,7 @@ MODULE mc_sc_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, e, lt, ne, gt
-  PUBLIC :: initialize, finalize, overlap_1, overlap, n_overlap_1, n_overlap
+  PUBLIC :: allocate_arrays, deallocate_arrays, overlap_1, overlap, n_overlap_1, n_overlap
 
   INTEGER                             :: n ! number of atoms
   REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
@@ -15,13 +15,13 @@ MODULE mc_sc_module
 
 CONTAINS
 
-  subroutine initialize
+  subroutine allocate_arrays
     ALLOCATE ( r(3,n), e(3,n) )
-  end subroutine initialize
+  end subroutine allocate_arrays
 
-  subroutine finalize
+  subroutine deallocate_arrays
     DEALLOCATE ( r, e )
-  end subroutine finalize
+  end subroutine deallocate_arrays
   
   FUNCTION overlap ( sigma, length )
     LOGICAL             :: overlap ! shows if an overlap was detected

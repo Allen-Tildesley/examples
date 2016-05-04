@@ -4,12 +4,13 @@ MODULE utility_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: metropolis
-  PUBLIC :: read_cnf_atoms, write_cnf_atoms, read_cnf_molecules, write_cnf_molecules
+  PUBLIC :: read_cnf_atoms, write_cnf_atoms, read_cnf_mols, write_cnf_mols
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add
   PUBLIC :: random_integer, random_normal
   PUBLIC :: random_orientation_vector, random_perpendicular_vector
   PUBLIC :: random_orientation_vector_alt1, random_orientation_vector_alt2
   PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
+  public :: random_quaternion
   PUBLIC :: rotate_vector, cross_product, init_random_seed, time_stamp
   PUBLIC :: orientational_order, translational_order, nematic_order
   PUBLIC :: lowercase
@@ -118,7 +119,7 @@ CONTAINS
 
   END SUBROUTINE write_cnf_atoms
 
-  SUBROUTINE read_cnf_molecules ( filename, n, box, r, e, v, w ) ! Read in molecular configuration
+  SUBROUTINE read_cnf_mols ( filename, n, box, r, e, v, w ) ! Read in molecular configuration
     CHARACTER(len=*),               INTENT(in)    :: filename
     INTEGER,                        INTENT(inout) :: n
     REAL,                           INTENT(out)   :: box
@@ -126,23 +127,23 @@ CONTAINS
 
     INTEGER :: cnf_unit, ioerr, i
 
-!    WRITE(*,'(a,t40,a)') 'read_cnf_molecules', filename
+!    WRITE(*,'(a,t40,a)') 'read_cnf_mols', filename
     OPEN(newunit=cnf_unit,file=filename,status='old',action='read',iostat=ioerr)
-    IF ( ioerr /= 0 ) STOP 'Error opening file in read_cnf_molecules'
+    IF ( ioerr /= 0 ) STOP 'Error opening file in read_cnf_mols'
     READ(cnf_unit,*) n
     READ(cnf_unit,*) box
 
     IF ( PRESENT ( r ) ) THEN
 
-       IF ( .NOT. PRESENT ( e )    ) STOP 'Argument e missing in read_cnf_molecules'
-       IF ( n /= SIZE ( r, dim=2 ) ) STOP 'r size wrong in read_cnf_molecules'
-       IF ( n /= SIZE ( e, dim=2 ) ) STOP 'e size wrong in read_cnf_molecules'
+       IF ( .NOT. PRESENT ( e )    ) STOP 'Argument e missing in read_cnf_mols'
+       IF ( n /= SIZE ( r, dim=2 ) ) STOP 'r size wrong in read_cnf_mols'
+       IF ( n /= SIZE ( e, dim=2 ) ) STOP 'e size wrong in read_cnf_mols'
 
        IF ( PRESENT ( v ) ) THEN
 
-          IF ( .NOT. PRESENT ( w )    ) STOP 'Argument w missing in read_cnf_molecules'
-          IF ( n /= SIZE ( v, dim=2 ) ) STOP 'v size wrong in read_cnf_molecules'
-          IF ( n /= SIZE ( w, dim=2 ) ) STOP 'w size wrong in read_cnf_molecules'
+          IF ( .NOT. PRESENT ( w )    ) STOP 'Argument w missing in read_cnf_mols'
+          IF ( n /= SIZE ( v, dim=2 ) ) STOP 'v size wrong in read_cnf_mols'
+          IF ( n /= SIZE ( w, dim=2 ) ) STOP 'w size wrong in read_cnf_mols'
 
           ! Read positions, orientation vectors or quaternions, velocities, angular velocities
           DO i = 1, n
@@ -162,9 +163,9 @@ CONTAINS
 
     CLOSE(unit=cnf_unit)
 
-  END SUBROUTINE read_cnf_molecules
+  END SUBROUTINE read_cnf_mols
 
-  SUBROUTINE write_cnf_molecules ( filename, n, box, r, e, v, w )
+  SUBROUTINE write_cnf_mols ( filename, n, box, r, e, v, w )
     CHARACTER(len=*),               INTENT(in) :: filename
     INTEGER,                        INTENT(in) :: n
     REAL,                           INTENT(in) :: box
@@ -173,19 +174,19 @@ CONTAINS
 
     INTEGER :: cnf_unit, ioerr, i
 
-!    WRITE(*,'(a,t40,a)') 'write_cnf_molecules', filename
+!    WRITE(*,'(a,t40,a)') 'write_cnf_mols', filename
     OPEN(newunit=cnf_unit,file=filename,status='replace',iostat=ioerr)
-    IF ( ioerr /= 0 ) STOP 'Error opening file in write_cnf_molecules'
+    IF ( ioerr /= 0 ) STOP 'Error opening file in write_cnf_mols'
     WRITE(cnf_unit,'(i15)'  ) n
     WRITE(cnf_unit,'(f15.8)') box
 
-    IF ( n /= SIZE ( r, dim=2 ) ) STOP 'r size wrong in write_cnf_molecules'
-    IF ( n /= SIZE ( e, dim=2 ) ) STOP 'e size wrong in write_cnf_molecules'
+    IF ( n /= SIZE ( r, dim=2 ) ) STOP 'r size wrong in write_cnf_mols'
+    IF ( n /= SIZE ( e, dim=2 ) ) STOP 'e size wrong in write_cnf_mols'
 
     IF ( PRESENT ( v ) ) THEN
-       IF ( .NOT. PRESENT ( w )    ) STOP 'Argument w missing in write_cnf_molecules'
-       IF ( n /= SIZE ( v, dim=2 ) ) STOP 'v size wrong in write_cnf_molecules'
-       IF ( n /= SIZE ( w, dim=2 ) ) STOP 'w size wrong in write_cnf_molecules'
+       IF ( .NOT. PRESENT ( w )    ) STOP 'Argument w missing in write_cnf_mols'
+       IF ( n /= SIZE ( v, dim=2 ) ) STOP 'v size wrong in write_cnf_mols'
+       IF ( n /= SIZE ( w, dim=2 ) ) STOP 'w size wrong in write_cnf_mols'
 
        ! Write positions, orientation vectors or quaternions, velocities, angular velocities
        DO i = 1, n
@@ -203,7 +204,7 @@ CONTAINS
 
     CLOSE(unit=cnf_unit)
 
-  END SUBROUTINE write_cnf_molecules
+  END SUBROUTINE write_cnf_mols
 
   SUBROUTINE run_begin ( names )
     CHARACTER(len=15), DIMENSION(:), INTENT(in) :: names
@@ -499,6 +500,33 @@ CONTAINS
     END DO
 
   END FUNCTION random_rotate_vector_alt3
+
+  SUBROUTINE random_quaternion ( e )
+    REAL, DIMENSION(0:3), INTENT(out) :: e ! Uniformly sampled orientation quaternion
+
+    REAL, DIMENSION(2) :: zeta
+    REAL               :: s1, s2, f
+
+    DO
+       CALL RANDOM_NUMBER ( zeta ) ! Two uniform random numbers between 0 and 1
+       zeta = 2.0 * zeta - 1.0     ! now each between -1 and 1
+       s1 = SUM ( zeta**2 )        ! squared magnitude
+       IF ( s1 < 1.0 ) EXIT        ! now inside unit disk
+    END DO
+    e(0) = zeta(1)
+    e(1) = zeta(2)
+
+    DO
+       CALL RANDOM_NUMBER ( zeta ) ! Two uniform random numbers between 0 and 1
+       zeta = 2.0 * zeta - 1.0     ! now each between -1 and 1
+       s2 = SUM ( zeta**2 )        ! squared magnitude
+       IF ( s2 < 1.0 ) EXIT        ! now inside unit disk
+    END DO
+    f = SQRT ( (1.0 - s1 ) / s2 )
+    e(2) = zeta(1)*f
+    e(3) = zeta(2)*f
+
+  END SUBROUTINE random_quaternion
 
   FUNCTION cross_product ( a, b ) RESULT ( c )
     IMPLICIT NONE

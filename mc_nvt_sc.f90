@@ -1,10 +1,10 @@
 ! mc_nvt_sc.f90
 ! Monte Carlo, NVT ensemble, hard spherocylinders
 PROGRAM mc_nvt_sc
-  USE utility_module, ONLY : read_cnf_molecules, write_cnf_molecules, &
+  USE utility_module, ONLY : read_cnf_mols, write_cnf_mols, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add, &
        &                     random_rotate_vector, orientational_order
-  USE mc_sc_module,   ONLY : initialize, finalize, overlap_1, overlap, n_overlap, n, r, e, ne
+  USE mc_sc_module,   ONLY : allocate_arrays, deallocate_arrays, overlap_1, overlap, n_overlap, n, r, e, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of linear molecules (positions and orientations)
@@ -43,7 +43,7 @@ PROGRAM mc_nvt_sc
   WRITE(*,'(''Monte Carlo, constant-NVT, hard spherocylinders'')')
   WRITE(*,'(''Results in units sigma = 1'')')
 
-  CALL RANDOM_SEED () ! Initialize random number generator
+  CALL RANDOM_SEED () ! initialize random number generator
 
   ! Set sensible defaults for testing
   nblock  = 10
@@ -59,16 +59,16 @@ PROGRAM mc_nvt_sc
   WRITE(*,'(''Maximum displacement'',       t40,f15.5)') dr_max
   WRITE(*,'(''Pressure scaling parameter'', t40,f15.5)') epsilon
 
-  CALL read_cnf_molecules ( cnf_prefix//inp_tag, n, box )
+  CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box )
   WRITE(*,'(''Number of particles'', t40,i15)'  ) n
   WRITE(*,'(''Box (in sigma units)'',t40,f15.5)') box
   sigma = 1.0
   density = REAL(n) * ( sigma / box ) ** 3
   WRITE(*,'(''Reduced density'',t40,f15.5)') density
 
-  CALL initialize
+  CALL allocate_arrays
 
-  CALL read_cnf_molecules ( cnf_prefix//inp_tag, n, box, r, e )
+  CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box, r, e )
 
   ! Convert to box units
   r(:,:) = r(:,:) / box
@@ -120,7 +120,7 @@ PROGRAM mc_nvt_sc
 
      CALL blk_end ( blk )
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk                   ! number configuration by block
-     CALL write_cnf_molecules ( cnf_prefix//sav_tag, n, box, r*box, e ) ! save configuration
+     CALL write_cnf_mols ( cnf_prefix//sav_tag, n, box, r*box, e ) ! save configuration
 
   END DO ! End loop over blocks
 
@@ -128,8 +128,8 @@ PROGRAM mc_nvt_sc
 
   IF ( overlap ( sigma, length ) ) STOP 'Overlap in final configuration'
 
-  CALL write_cnf_molecules ( cnf_prefix//out_tag, n, box, r*box, e )
+  CALL write_cnf_mols ( cnf_prefix//out_tag, n, box, r*box, e )
 
-  CALL finalize
+  CALL deallocate_arrays
 
 END PROGRAM mc_nvt_sc

@@ -3,20 +3,37 @@
 MODULE initialize_module
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: initialize_positions, initialize_orientations, initialize_velocities, initialize_angular_velocities
+  PUBLIC :: allocate_arrays, deallocate_arrays
+  PUBLIC :: initialize_positions_lattice, initialize_orientations_lattice
+  PUBLIC :: initialize_positions_random, initialize_orientations_random
+  PUBLIC :: initialize_velocities, initialize_angular_velocities
   PUBLIC :: initialize_chain_lattice, initialize_chain_random, initialize_chain_velocities
   PUBLIC :: n, r, v, e, w
 
   INTEGER                           :: n
-  REAL, DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
-  REAL, DIMENSION(:,:), ALLOCATABLE :: v ! velocities (3,:)
-  REAL, DIMENSION(:,:), ALLOCATABLE :: e ! orientations (3,:)
-  REAL, DIMENSION(:,:), ALLOCATABLE :: w ! angular velocities (3,:)
+  REAL, DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
+  REAL, DIMENSION(:,:), ALLOCATABLE :: v ! velocities (3,n)
+  REAL, DIMENSION(:,:), ALLOCATABLE :: e ! orientations (3,n) or (0:3,n)
+  REAL, DIMENSION(:,:), ALLOCATABLE :: w ! angular velocities (3,n)
 
 CONTAINS
 
-  SUBROUTINE initialize_positions ( nc )
-    INTEGER, INTENT(in) :: nc ! number of unit cells in each coordinate direction
+  SUBROUTINE allocate_arrays ( quaternions )
+    LOGICAL, INTENT(in) :: quaternions
+    
+    ALLOCATE ( r(3,n), v(3,n), w(3,n) )
+    IF ( quaternions ) THEN
+       ALLOCATE ( e(0:3,n) )
+    ELSE
+       ALLOCATE ( e(3,n) )
+    END IF
+  END SUBROUTINE allocate_arrays
+
+  SUBROUTINE deallocate_arrays
+    DEALLOCATE ( r, v, w, e )
+  END SUBROUTINE deallocate_arrays
+  
+  SUBROUTINE initialize_positions_lattice
 
     ! Sets up the fcc lattice
     ! Four molecules per unit cell
@@ -26,13 +43,14 @@ CONTAINS
          & 0.25, 0.25, 0.25,  0.75, 0.75, 0.25,  &
          & 0.25, 0.75, 0.75,  0.75, 0.25, 0.75 ],[3,4] ) ! positions in unit cell
     REAL, DIMENSION(3) :: rcm ! centre of mass
-    INTEGER     ix, iy, iz, a, i
+    INTEGER            :: nc, ix, iy, iz, a, i
 
     WRITE(*,'(''Initializing positions on fcc lattice'')')
-    
-    IF ( n /= 4 * nc ** 3 ) STOP 'n, nc mismatch in init_positions'
 
-    ALLOCATE ( r(3,n) )
+    nc = NINT ( REAL(n/4) ** (1.0/3.0) )
+    IF ( n /= 4 * nc ** 3 ) STOP 'n, nc mismatch in initialize_positions_lattice'
+    IF ( .NOT. ALLOCATED ( r ) ) STOP 'Allocation error in initialize_positions_lattice'
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) STOP 'Array mismatch in initialize_positions_lattice'
 
     i = 0
 
@@ -52,12 +70,27 @@ CONTAINS
     ! End triple loop over unit cell indices
 
     r(:,:) = r(:,:)  / REAL ( nc ) ! Scale positions into unit cell
-    rcm = SUM ( r, dim=2 ) / real(n)
+    rcm = SUM ( r, dim=2 ) / REAL(n)
     r(:,:) = r(:,:) - SPREAD ( rcm(:), dim=2, ncopies=n ) ! shift centre of mass to the origin
-  END SUBROUTINE initialize_positions
+  END SUBROUTINE initialize_positions_lattice
+ 
+  SUBROUTINE initialize_positions_random
+    ! simulation box is a unit cube centred at the origin
 
-  SUBROUTINE initialize_orientations ( nc )
-    INTEGER, INTENT(in) :: nc ! number of unit cells in each coordinate direction
+    REAL, DIMENSION(3) :: rcm ! centre of mass
+
+    WRITE(*,'(''Initializing positions randomly'')')
+
+    IF ( .NOT. ALLOCATED ( r ) ) STOP 'Allocation error in initialize_positions_random'
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) STOP 'Array mismatch in initialize_positions_random'
+
+    CALL RANDOM_NUMBER ( r )
+    rcm = SUM ( r, dim=2 ) / REAL(n)
+    r(:,:) = r(:,:) - SPREAD ( rcm(:), dim=2, ncopies=n ) ! shift centre of mass to the origin
+    
+  END SUBROUTINE initialize_positions_random
+ 
+  SUBROUTINE initialize_orientations_lattice
 
     ! Sets up the alpha-fcc lattice for linear molecules
     ! Four molecules per unit cell
@@ -68,21 +101,57 @@ CONTAINS
          &  1.0,  1.0,  1.0,    1.0, -1.0, -1.0,  &
          & -1.0,  1.0, -1.0,   -1.0, -1.0,  1.0 ],[3,4] ) ! orientations in unit cell
 
-    INTEGER     k
+    INTEGER :: nc, k
 
     WRITE(*,'(''Initializing orientations on alpha-fcc lattice'')')
 
-    IF ( n /= 4 * nc ** 3 ) STOP 'n, nc mismatch in initialize_orientations'
+    nc = NINT ( REAL(n/4) ** (1.0/3.0) )
+    IF ( n /= 4 * nc ** 3 ) STOP 'n, nc mismatch in initialize_orientations_lattice'
+    IF ( .NOT. ALLOCATED ( e ) ) STOP 'Allocation error in initialize_orientations_lattice'
+    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) STOP 'Array mismatch in initialize_orientations_lattice'
+    IF ( UBOUND(e,dim=1) /= 3 ) STOP 'Array mismatch in initialize_orientations_lattice'
+    IF ( SIZE(e,dim=2) /= n   ) STOP 'Array mismatch in initialize_orientations_lattice'
 
-    ALLOCATE ( e(3,n) )
+    IF ( LBOUND(e,dim=1) == 0 ) THEN
+       DO k = 1, n
+          e(:,k) = [1.0,0.0,0.0,0.0]
+       END DO
+    ELSE
+       DO k = 0, n-4, 4 ! Loop over unit cells (4 molecules per unit cell)
+          e(:,k+1:k+4) = e0(:,1:4) ! copy unit cell orientations
+       END DO ! End loop over unit cells
+    END IF
 
-    ! Begin loop over unit cells (4 molecules per unit cell)
-    DO k = 0, n-4, 4
-       e(:,k+1:k+4) = e0(:,1:4) ! copy unit cell orientations
-    END DO
-    ! End loop over unit cells
+  END SUBROUTINE initialize_orientations_lattice
 
-  END SUBROUTINE initialize_orientations
+  SUBROUTINE initialize_orientations_random
+    USE utility_module, ONLY : random_quaternion, random_orientation_vector
+
+    ! Sets up random orientations for linear or nonlinear molecules
+
+    INTEGER :: i
+    REAL, DIMENSION(0:3) :: eq
+    REAL, DIMENSION(3)   :: ev
+
+    WRITE(*,'(''Initializing orientations randomly'')')
+    IF ( .NOT. ALLOCATED ( e ) ) STOP 'Allocation error in initialize_orientations_random'
+    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) STOP 'Array mismatch in initialize_orientations_random'
+    IF ( UBOUND(e,dim=1) /= 3 ) STOP 'Array mismatch in initialize_orientations_random'
+    IF ( SIZE(e,dim=2) /= n   ) STOP 'Array mismatch in initialize_orientations_random'
+
+    IF ( LBOUND(e,dim=1) == 0 ) THEN
+       DO i = 1, n
+          CALL random_quaternion ( eq )
+          e(:,i) = eq
+       END DO
+    ELSE
+       DO i = 1, n
+          CALL random_orientation_vector ( ev )
+          e(:,i) = ev
+       END DO
+    END IF
+
+  END SUBROUTINE initialize_orientations_random
 
   SUBROUTINE initialize_velocities ( temperature )
     USE utility_module, ONLY : random_normal
@@ -103,8 +172,8 @@ CONTAINS
     INTEGER            :: i, k
 
     WRITE(*,'(''Initializing velocities at temperature'',t40,f15.5)') temperature
-
-    ALLOCATE ( v(3,n) )
+    IF ( .NOT. ALLOCATED ( v ) ) STOP 'Allocation error in initialize_velocities'
+    IF ( ANY ( SHAPE(v) /= [3,n] ) ) STOP 'Array mismatch in initialize_velocities'
 
     v_rms = SQRT ( temperature )
 
@@ -124,7 +193,7 @@ CONTAINS
   END SUBROUTINE initialize_velocities
 
   SUBROUTINE initialize_angular_velocities ( temperature, inertia )
-    USE utility_module, ONLY : random_perpendicular_vector
+    USE utility_module, ONLY : random_perpendicular_vector, random_normal
     REAL, INTENT(in) :: temperature ! reduced temperature
     REAL, INTENT(in) :: inertia     ! reduced moment of inertia
 
@@ -135,24 +204,35 @@ CONTAINS
     ! is chosen from an exponential distribution
     ! there is no attempt to set the total angular momentum to zero
 
-    REAL     ::   w_sq, w_sq_mean, zeta
-    INTEGER   ::  i
+    REAL    ::  w_sq, w_sq_mean, w_std_dev,  zeta
+    INTEGER ::  i, k
 
     WRITE(*,'(''Initializing angular velocities at temperature'',t40,f15.5)') temperature
     WRITE(*,'(''Moment of inertia'',                             t40,f15.5)') inertia
 
-    ALLOCATE ( w(3,n) )
-    IF ( .NOT. ALLOCATED ( e ) ) STOP 'Allocation error in init_angular_velocities'
-    IF ( SIZE(e,dim=2) /= n ) STOP 'Array mismatch in init_angular_velocities'
+    IF ( .NOT. ALLOCATED ( w ) ) STOP 'Allocation error in initialize_angular_velocities'
+    IF ( ANY ( SHAPE(w) /= [3,n] ) ) STOP 'Array mismatch in initialize_angular_velocities'
+    IF ( .NOT. ALLOCATED ( e ) ) STOP 'Allocation error in initialize_angular_velocities'
+    IF ( SIZE(e,dim=2) /= n ) STOP 'Array mismatch in initialize_angular_velocities'
 
-    w_sq_mean = 2.0 * temperature / inertia
+    IF ( LBOUND(e,dim=1) == 0 ) THEN ! nonlinear molecule, treat as spherical top
+       w_std_dev = SQRT(temperature/inertia)
+       DO i = 1, n
+          DO k = 1, 3
+             w(k,i) = random_normal ( 0.0, w_std_dev )
+          END DO
+       END DO
 
-    DO i = 1, n ! Begin loop over molecules
-       w(:,i) = random_perpendicular_vector ( e(:,i) ) ! set direction of the angular velocity
-       CALL RANDOM_NUMBER ( zeta )
-       w_sq   = - w_sq_mean * LOG ( zeta ) ! squared magnitude of angular velocity
-       w(:,i) = w(:,i) * SQRT ( w_sq )
-    END DO
+    ELSE ! linear molecule
+       w_sq_mean = 2.0 * temperature / inertia
+       DO i = 1, n ! Begin loop over molecules
+          w(:,i) = random_perpendicular_vector ( e(:,i) ) ! set direction of the angular velocity
+          CALL RANDOM_NUMBER ( zeta )
+          w_sq   = - w_sq_mean * LOG ( zeta ) ! squared magnitude of angular velocity
+          w(:,i) = w(:,i) * SQRT ( w_sq )
+       END DO
+
+    END IF
 
   END SUBROUTINE initialize_angular_velocities
 
@@ -171,7 +251,7 @@ CONTAINS
     INTEGER, DIMENSION(4,2,2) :: atoms_mid, atoms_inp, atoms_out
     INTEGER, DIMENSION(4)     :: atoms
     REAL                      :: rsq
-    REAL,    dimension(3)     :: rcm ! centre of mass
+    REAL,    DIMENSION(3)     :: rcm ! centre of mass
     INTEGER                   :: nc, ix, iy, iz ! unit cell indices
     INTEGER                   :: a, i, j, x_direction, y_direction, plane_count
     INTEGER, DIMENSION(2)     :: istart, istop, istep
@@ -181,8 +261,8 @@ CONTAINS
 
     nc = NINT ( ( REAL(n)/4.0 )**(1.0/3.0) )
     IF ( n /= 4 * nc ** 3 ) STOP 'n, nc mismatch in initialize_chain_lattice'
-
-    ALLOCATE ( r(3,n) )
+    IF ( .NOT. ALLOCATED ( r ) ) STOP 'Allocation error in initialize_chain_lattice'
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) STOP 'Array mismatch in initialize_chain_lattice'
 
     ! define sequences of atoms through unit cells
     atoms_inp(:,1,1) = [1,4,2,3]
@@ -230,7 +310,7 @@ CONTAINS
     END DO
     ! End triple loop over unit cell indices
 
-    rcm = SUM ( r, dim=2 ) / real(n)
+    rcm = SUM ( r, dim=2 ) / REAL(n)
     r(:,:) = r(:,:) - SPREAD ( rcm, dim=2, ncopies = n )  ! shift centre of box to the origin
     r(:,:) = r(:,:) / SQRT(0.5)     ! scale to give unit bond length
 
@@ -257,12 +337,12 @@ CONTAINS
     REAL, DIMENSION(3) :: d, rcm
     INTEGER            :: i, j, iter
     REAL, PARAMETER    :: tol = 1.0e-9
-    INTEGER, parameter :: iter_max = 1000
+    INTEGER, PARAMETER :: iter_max = 1000
     LOGICAL            :: overlap
 
-    WRITE(*,'(''Initializing positions randomly'')')
-
-    ALLOCATE ( r(3,n) )
+    WRITE(*,'(''Initializing chain positions randomly'')')
+    IF ( .NOT. ALLOCATED ( r ) ) STOP 'Allocation error in initialize_chain_random'
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) STOP 'Array mismatch in initialize_chain_random'
 
     ! First atom at origin
     r(:,1) = [0.0,0.0,0.0]
@@ -329,9 +409,9 @@ CONTAINS
     REAL, DIMENSION(3) :: v_vec ! total momentum
     INTEGER            :: i, k
 
-    WRITE(*,'(''Initializing velocities at temperature'',t40,f15.5)') temperature
-
-    ALLOCATE ( v(3,n) )
+    WRITE(*,'(''Initializing chain velocities at temperature'',t40,f15.5)') temperature
+    IF ( .NOT. ALLOCATED ( v ) ) STOP 'Allocation error in initialize_chain_velocities'
+    IF ( ANY ( SHAPE(v) /= [3,n] ) ) STOP 'Array mismatch in initialize_chain_velocities'
 
     DO i = 1, n
        IF ( i == 1 ) THEN
