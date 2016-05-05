@@ -10,7 +10,7 @@ MODULE utility_module
   PUBLIC :: random_orientation_vector, random_perpendicular_vector
   PUBLIC :: random_orientation_vector_alt1, random_orientation_vector_alt2
   PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
-  public :: random_quaternion
+  PUBLIC :: random_quaternion, random_rotate_quaternion, q_to_a
   PUBLIC :: rotate_vector, cross_product, init_random_seed, time_stamp
   PUBLIC :: orientational_order, translational_order, nematic_order
   PUBLIC :: lowercase
@@ -275,6 +275,24 @@ CONTAINS
 
   END SUBROUTINE run_end
 
+  FUNCTION q_to_a ( q ) RESULT ( a ) ! converts quaternion to rotation matrix
+    IMPLICIT NONE
+
+    ! Arguments
+    REAL, DIMENSION(0:3), INTENT(in) :: q ! quaternion
+    REAL, DIMENSION(3,3)             :: a ! rotation matrix
+
+    ! The rows of the rotation matrix correspond to unit vectors of the molecule in the space-fixed frame
+    ! The third row  a(3,:) is [2*(q(1)*q(3)+q(0)*q(2)),2*(q(2)*q(3)-q(0)*q(1)),q(0)**2-q(1)**2-q(2)**2+q(3)**2]
+    ! which is "the" axis of the molecule, for uniaxial molecules
+    ! use a to convert space-fixed to body-fixed axes thus: db = matmul(a,ds)
+    ! use transpose of a to convert body-fixed to space-fixed axes thus: ds = matmul(db,a)
+
+       a(1,:) = [ q(0)**2+q(1)**2-q(2)**2-q(3)**2,   2*(q(1)*q(2)+q(0)*q(3)),       2*(q(1)*q(3)-q(0)*q(2))     ] ! 1st row
+       a(2,:) = [     2*(q(1)*q(2)-q(0)*q(3)),   q(0)**2-q(1)**2+q(2)**2-q(3)**2,   2*(q(2)*q(3)+q(0)*q(1))     ] ! 2nd row
+       a(3,:) = [     2*(q(1)*q(3)+q(0)*q(2)),       2*(q(2)*q(3)-q(0)*q(1)),   q(0)**2-q(1)**2-q(2)**2+q(3)**2 ] ! 3rd row
+     END FUNCTION q_to_a
+     
   FUNCTION random_integer ( k1, k2 ) RESULT ( k )
     INTEGER             :: k      ! returns uniformly distributed random integer
     INTEGER, INTENT(in) :: k1, k2 ! in range [k1,k2] inclusive
@@ -528,6 +546,35 @@ CONTAINS
 
   END SUBROUTINE random_quaternion
 
+  FUNCTION random_rotate_quaternion ( delta_max, q_old ) RESULT ( q )
+    REAL,                 INTENT(in) :: delta_max ! maximum rotation angle
+    REAL, DIMENSION(0:3), INTENT(in) :: q_old     ! old quaternion
+    REAL, DIMENSION(0:3)             :: q         ! result
+
+    REAL, DIMENSION(3)   :: axis        ! rotation axis
+    REAL                 :: delta, s, c ! rotation angle, sin, cos
+    REAL, dimension(0:3) :: q_rot       ! rotation quaternion
+
+    CALL random_orientation_vector ( axis )
+    CALL random_NUMBER ( delta )
+    delta = ( 2.0*delta - 1.0 ) * delta_max
+    s = SIN(0.5*delta)
+    c = COS(0.5*delta)
+    q_rot = [ c, s*axis(1), s*axis(2), s*axis(3) ]
+    q = quatmul ( q_rot, q_old )
+    
+  END FUNCTION random_rotate_quaternion
+
+  FUNCTION quatmul ( a, b ) RESULT ( c ) ! multiply two quaternions
+    REAL, DIMENSION(0:3), INTENT(in) :: a, b ! arguments
+    REAL, DIMENSION(0:3)             :: c    ! result
+
+    c(0) = a(0)*b(0) - a(1)*b(1) - a(2)*b(2) - a(3)*b(3)
+    c(1) = a(1)*b(0) + a(0)*b(1) - a(3)*b(2) + a(2)*b(3)
+    c(2) = a(2)*b(0) + a(3)*b(1) + a(0)*b(2) - a(1)*b(3)
+    c(3) = a(3)*b(0) - a(2)*b(1) + a(1)*b(2) + a(0)*b(3)
+    
+  END FUNCTION quatmul
   FUNCTION cross_product ( a, b ) RESULT ( c )
     IMPLICIT NONE
     REAL, DIMENSION(3)             :: c    ! result cross product
