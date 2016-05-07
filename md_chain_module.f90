@@ -4,14 +4,15 @@ MODULE md_chain_module
 
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: n, r, v, f
-  PUBLIC :: initialize, finalize, force
+  PUBLIC :: n, r, v, f, f_spring
+  PUBLIC :: allocate_arrays, deallocate_arrays, force, spring
   PUBLIC :: rattle_a, rattle_b, check_constraints, milcshake_a, milcshake_b 
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
   REAL,    DIMENSION(:,:), ALLOCATABLE :: v ! velocities (3,n)
   REAL,    DIMENSION(:,:), ALLOCATABLE :: f ! forces (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: f_spring                   ! spring forces (3,n)
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r_old, r_new               ! old, new positions (3,n)
   LOGICAL, DIMENSION(:),   ALLOCATABLE :: moving, moved              ! iterative flags (n)
   REAL,    DIMENSION(:,:), ALLOCATABLE :: rij, rij_old, rij_new, vij ! bond vectors (3,n-1)
@@ -20,25 +21,29 @@ MODULE md_chain_module
   REAL,    DIMENSION(:),   ALLOCATABLE :: dl, dl_tmp                 ! sub-diagonal part of constraint matrix (n-2)
   REAL,    DIMENSION(:),   ALLOCATABLE :: du, du_tmp                 ! super-diagonal part of constraint matrix (n-2)
 
+  ! all masses are unity
+  ! all bond lengths are the same
+  ! no periodic boundary conditions
+
 CONTAINS
 
-  SUBROUTINE initialize
-    ALLOCATE ( r(3,n), v(3,n), f(3,n), r_old(3,n), r_new(3,n) )
+  SUBROUTINE allocate_arrays
+    ALLOCATE ( r(3,n), v(3,n), f(3,n), f_spring(3,n), r_old(3,n), r_new(3,n) )
     ALLOCATE ( moving(n), moved(n) )
     ALLOCATE ( rij(3,n-1), rij_old(3,n-1), rij_new(3,n-1), vij(3,n-1) )
     ALLOCATE ( rijsq(n-1), lambda(n-1), rhs(n-1), rhsold(n-1) )
     ALLOCATE ( dd(n-1), dd_tmp(n-1) )
     ALLOCATE ( dl(n-2), dl_tmp(n-2), du(n-2), du_tmp(n-2) )
-  END SUBROUTINE initialize
+  END SUBROUTINE allocate_arrays
 
-  SUBROUTINE finalize
-    DEALLOCATE ( r, v, f, r_old, r_new )
+  SUBROUTINE deallocate_arrays
+    DEALLOCATE ( r, v, f, f_spring, r_old, r_new )
     DEALLOCATE ( moving, moved )
     DEALLOCATE ( rij, rij_old, rij_new, vij )
     DEALLOCATE ( rijsq, lambda, rhs, rhsold )
     DEALLOCATE ( dd, dd_tmp )
     DEALLOCATE ( dl, dl_tmp, du, du_tmp )
-  END SUBROUTINE finalize
+  END SUBROUTINE deallocate_arrays
 
   SUBROUTINE force ( pot )
     REAL, INTENT(out) :: pot          ! total potential energy
@@ -87,9 +92,37 @@ CONTAINS
 
   END SUBROUTINE force
 
-  ! all masses are unity
-  ! all bond lengths are the same
-  ! no periodic boundary conditions
+  SUBROUTINE spring ( k_spring, bond, pot_spring )
+    REAL, INTENT(in)  :: k_spring   ! spring force constant
+    REAL, INTENT(in)  :: bond       ! spring bond length
+    REAL, INTENT(out) :: pot_spring ! total spring potential energy
+
+    ! Calculates bond spring potential for atomic chain
+    ! NO periodic boundaries
+
+    INTEGER            :: i, j
+    REAL               :: rij_sq, rij_mag, potij
+    REAL, DIMENSION(3) :: rij, fij
+
+    f_spring   = 0.0
+    pot_spring = 0.0
+
+    DO i = 1, n - 1 ! Begin outer loop over bonds
+       j = i+1
+
+       rij(:) = r(:,i) - r(:,j)  ! separation vector
+       rij_sq = SUM ( rij**2 )   ! squared separation
+       rij_mag = sqrt ( rij_sq ) ! separation
+
+       potij         = 0.5*k_spring*(rij_mag-bond)**2 ! spring potential
+       pot_spring    = pot_spring + potij
+       fij           = rij * k_spring*(bond-rij_mag)/rij_mag
+       f_spring(:,i) = f_spring(:,i) + fij
+       f_spring(:,j) = f_spring(:,j) - fij
+
+    END DO ! End outer loop over bonds
+
+  END SUBROUTINE spring
 
   SUBROUTINE rattle_a ( dt, bond ) ! first part of velocity Verlet algorithm with constraints
     IMPLICIT NONE

@@ -3,7 +3,7 @@
 PROGRAM md_chain
   USE utility_module,  ONLY : read_cnf_atoms, write_cnf_atoms, time_stamp, lowercase, &
        &                      run_begin, run_end, blk_begin, blk_end, blk_add
-  USE md_chain_module, ONLY : initialize, finalize, check_constraints, force, &
+  USE md_chain_module, ONLY : allocate_arrays, deallocate_arrays, check_constraints, force, &
        &                      milcshake_a, milcshake_b, rattle_a, rattle_b, r, v, n
   IMPLICIT NONE
 
@@ -34,7 +34,7 @@ PROGRAM md_chain
   PROCEDURE(rattle_a), pointer :: move_a => null()
   PROCEDURE(rattle_b), pointer :: move_b => null()
 
-  NAMELIST /run_parameters/ nblock, nstep, dt, constraints
+  NAMELIST /params/ nblock, nstep, dt, constraints
 
   WRITE(*,'(''md_chain'')')
   WRITE(*,'(''Molecular dynamics, constant-NVE, repulsive Lennard-Jones chain'')')
@@ -47,7 +47,7 @@ PROGRAM md_chain
   dt          = 0.002
   constraints = 'rattle'
 
-  READ(*,nml=run_parameters)
+  READ(*,nml=params)
   WRITE(*,'(''Number of blocks'',         t40,i15)'  ) nblock
   WRITE(*,'(''Number of steps per block'',t40,i15)'  ) nstep
   WRITE(*,'(''Time step'',                t40,f15.5)') dt
@@ -68,7 +68,7 @@ PROGRAM md_chain
   WRITE(*,'(''Number of particles'', t40,i15)'          ) n
   WRITE(*,'(''Bond length (in sigma units)'',t40,f15.5)') bond
 
-  CALL initialize
+  CALL allocate_arrays
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r, v )
   CALL check_constraints ( bond )
@@ -121,7 +121,7 @@ PROGRAM md_chain
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r, v )
 
-  CALL finalize
+  CALL deallocate_arrays
 
 END PROGRAM md_chain
 

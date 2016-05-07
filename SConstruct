@@ -6,6 +6,7 @@ import os, sys
 
 env_normal=Environment(ENV=os.environ)
 env_lapack=Environment(ENV=os.environ)
+env_fftw=Environment(ENV=os.environ)
 env_mpi=Environment(ENV=os.environ,F90='mpif90',F90LINKER='mpif90')
 
 # Assume that gfortran will be used. 
@@ -13,11 +14,14 @@ env_mpi=Environment(ENV=os.environ,F90='mpif90',F90LINKER='mpif90')
 #Tool('mpif90')(env_mpi)
 #MY_F90FLAGS='-O2 -finline-functions -funswitch-loops -fwhole-file'
 MY_F90FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2008 -Wall'
+FFTW_F90FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2008 -Wall -I/opt/local/include'
 MY_LINKFLAGS=''
 LAPACK_LINKFLAGS='-L/opt/local/lib/lapack -llapack'
+FFTW_LINKFLAGS='-L/opt/local/lib -lfftw3'
 
 env_normal.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
 env_lapack.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=LAPACK_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
+env_fftw.Append(F90FLAGS=FFTW_F90FLAGS,LINKFLAGS=FFTW_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
 env_mpi.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
 
 variants={}
@@ -39,6 +43,7 @@ variants['build_mc_zvt_lj_ll']     = (['mc_zvt_lj.f90','mc_lj_ll_module.f90','li
 variants['build_cluster']          = (['cluster.f90','utility_module.f90'],env_normal)
 variants['build_diffusion']        = (['diffusion.f90'],env_normal)
 variants['build_mesh']             = (['mesh.f90'],env_normal)
+variants['build_fft3dwrap']        = (['fft3dwrap.f90'],env_fftw)
 variants['build_test_pot_at']      = (['test_pot_atom.f90','test_pot_at.f90','utility_module.f90'],env_normal)
 variants['build_test_pot_bend']    = (['test_pot_atom.f90','test_pot_bend.f90','utility_module.f90'],env_normal)
 variants['build_test_pot_twist']   = (['test_pot_atom.f90','test_pot_twist.f90','utility_module.f90'],env_normal)
@@ -47,6 +52,7 @@ variants['build_test_pot_dq']      = (['test_pot_linear.f90','test_pot_dq.f90','
 variants['build_test_pot_qq']      = (['test_pot_linear.f90','test_pot_qq.f90','utility_module.f90'],env_normal)
 variants['build_test_pot_gb']      = (['test_pot_linear.f90','test_pot_gb.f90','utility_module.f90'],env_normal)
 variants['build_md_chain']         = (['md_chain.f90','md_chain_module.f90','utility_module.f90'],env_lapack)
+variants['build_md_chain_mts']     = (['md_chain_mts.f90','md_chain_module.f90','utility_module.f90'],env_lapack)
 variants['build_mc_nvt_poly_lj']   = (['mc_nvt_poly_lj.f90','mc_poly_lj_module.f90','utility_module.f90'],env_normal)
 
 # Build each variant in appropriate variant directory
