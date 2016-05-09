@@ -53,6 +53,7 @@ variants['build_test_pot_qq']      = (['test_pot_linear.f90','test_pot_qq.f90','
 variants['build_test_pot_gb']      = (['test_pot_linear.f90','test_pot_gb.f90','utility_module.f90'],env_normal)
 variants['build_md_chain']         = (['md_chain.f90','md_chain_module.f90','utility_module.f90'],env_lapack)
 variants['build_md_chain_mts']     = (['md_chain_mts.f90','md_chain_module.f90','utility_module.f90'],env_lapack)
+variants['build_md_lj_mts']        = (['md_lj_mts.f90','md_lj_mts_module.f90','utility_module.f90'],env_normal)
 variants['build_mc_nvt_poly_lj']   = (['mc_nvt_poly_lj.f90','mc_poly_lj_module.f90','utility_module.f90'],env_normal)
 
 # Build each variant in appropriate variant directory
