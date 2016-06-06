@@ -11,7 +11,7 @@ PROGRAM qmc_walk_sho
   ! Finally compare the simulated ground state wave function for the exact result for this simple problem.
 
 
-  USE utility_module
+  USE utility_module, only: random_normal
 
   IMPLICIT NONE
 
@@ -23,11 +23,11 @@ PROGRAM qmc_walk_sho
   INTEGER                             :: bin(nb)
   REAL                                :: psi(nb)
 
-  INTEGER                             :: ntemp, nl, nk
-  INTEGER                             :: i, j, maxstep, step
-  INTEGER                             :: nc, nzero, nupper, nlive, ibin, nbin, bincount
+  INTEGER                             :: nk, rep1
+  INTEGER                             :: i, j, maxstep, step, count
+  INTEGER                             :: nc, nupper, nlive, ibin, nbin, bincount
   REAL                                :: lx, de, ds, diff, var, et, xi, resid, lx2, k
-  REAL                                :: random_normal, zeta, rep1, dx
+  REAL                                :: zeta, dx
   REAL                                :: sum, factor, const, pexact, xbin
 
 
@@ -37,7 +37,7 @@ PROGRAM qmc_walk_sho
 
   !set up parameters for the simulation
 
-  maxstep = 30000                 ! number of steps
+  maxstep = 40000                 ! number of steps
   lx      = 8.0                   ! length of the line, centred at x = 0.0
   diff    = 0.5                   ! diffusion coefficient in atomic units
   et      = 0.5                   ! initial estimate of ground state energy in atomic units for spring contant k=1
@@ -47,9 +47,10 @@ PROGRAM qmc_walk_sho
   lx2     = lx / 2.0              ! line goes from -lx2 to lx2
   nc      = nw                    ! current number of walkers
 
+  CALL RANDOM_SEED()
+
   ! set up an intial random distribution of walkers on a line
 
-  CALL RANDOM_SEED() ! Inialise random number generator
   DO i = 1, nc
 
      CALL RANDOM_NUMBER( zeta )
@@ -89,8 +90,8 @@ PROGRAM qmc_walk_sho
         IF( de  < 0.0) THEN                         ! k greater than 1
            k = exp( - de )
            nk = floor( k )
-           CALL RANDOM_NUMBER( zeta )
            resid = k - real( nk )
+           CALL RANDOM_NUMBER( zeta )
            IF ( resid >= zeta ) THEN
               replica(i) = nk + 1
            ELSE
@@ -109,37 +110,51 @@ PROGRAM qmc_walk_sho
 
      ENDDO
 
-     !sort the first nc members of the array replica in descending; organise the elements of array x in the same order
 
-     CALL bubble_sort( replica, x, nc )
+     ! move zeroes in replica to the of the live array
 
-     ! count the number of end zeros
+     count = 0
 
-     nzero  = 0
      DO i = 1, nc
 
-        IF( replica(i) == 0 ) THEN
-           nzero = nzero + 1
+        IF( replica(i) /= 0) THEN
+           count = count + 1
+           replica(count) = replica(i)
+           x(count) = x(i)
         ENDIF
 
      ENDDO
 
-     ! expand the x array with new replicas
+     nlive = count  !number of live elements in replica
 
-     nlive   = nc - nzero                    ! current number of live particles
-     nupper  = nlive                         ! upper limit of live array
+     DO WHILE (count < nc )
+
+        count           = count + 1
+        replica(count)  = 0
+        x(count)        = 0.0
+
+     ENDDO
+
+     ! expand the array x according to the replica number
+
+     nupper  = nlive
+
      DO i = 1, nlive
 
         IF( replica(i) > 1 ) THEN
            rep1 = replica(i) - 1
+
            DO j = 1, rep1
 
               x(nupper+j) = x(i)
 
            ENDDO
+
            nupper = nupper + rep1
         ENDIF
+
      ENDDO
+
      nc = nupper ! update number of walkers for next step
 
      ! Stop if nc is too large or too small
@@ -180,7 +195,7 @@ PROGRAM qmc_walk_sho
 
   ENDDO ! end over steps
 
-  ! normalize the wavefunction so that the integral over psi**2 = 1.0 
+  ! normalize the wavefunction so that the integral over psi**2 = 1.0
 
   sum = 0.0
 
@@ -197,6 +212,7 @@ PROGRAM qmc_walk_sho
   WRITE(*,'(/)')
   WRITE(*, '(''     x            psi(x)    psi_exact(x)'')')
   const = (1.0 / 3.14159) ** 0.25
+
   DO i = 1, nbin
 
      xbin    = -lx2 + real(i - 1) * dx + dx/2.0
@@ -206,44 +222,5 @@ PROGRAM qmc_walk_sho
 
   ENDDO
 
-CONTAINS
-
-  SUBROUTINE bubble_sort ( ix, fx, num )
-
-    ! sorts an array ix in descending order and moves the corresponding values of an associated array fx
-
-    IMPLICIT NONE
-    INTEGER, DIMENSION(:), INTENT(INOUT)           :: ix    ! list
-    REAL,    DIMENSION(:), INTENT(INOUT)           :: fx    ! variables associated with list
-    INTEGER    num                                          ! size of list
-    INTEGER    tempi, j, k
-    REAL       tempf
-    LOGICAL    sorted
-
-    sorted  = .FALSE.
-    k       = 0
-    DO WHILE (.NOT. sorted)
-
-       sorted  = .TRUE.
-       k       = k + 1
-
-       DO j = 1, num - k
-
-          IF( ix(j) < ix(j+1) ) THEN
-             tempi   = ix(j)
-             tempf   = fx(j)
-             ix(j)   = ix(j+1)
-             fx(j)   = fx(j+1)
-             ix(j+1) = tempi
-             fx(j+1) = tempf
-             sorted  = .FALSE.
-          ENDIF
-
-       ENDDO
-
-    ENDDO
-
-    RETURN
-  END SUBROUTINE bubble_sort
-
 END PROGRAM qmc_walk_sho
+
