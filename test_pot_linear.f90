@@ -1,5 +1,5 @@
 ! test_pot_linear.f90
-! Calculate and test potential, forces, torques for linear molecule
+! Test potential, forces, torques for linear molecule
 PROGRAM test_pot
   USE test_pot_module, ONLY : n, force
   USE utility_module,  ONLY : init_random_seed, rotate_vector, cross_product

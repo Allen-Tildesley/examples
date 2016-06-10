@@ -1,5 +1,5 @@
 ! test_pot_atom.f90
-! Calculate and test potential, forces, torques for atoms
+! Test potential, forces for atoms
 PROGRAM test_pot
   USE test_pot_module, ONLY : n, force
   USE utility_module,  ONLY : init_random_seed, cross_product

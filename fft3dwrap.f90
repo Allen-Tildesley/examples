@@ -1,5 +1,5 @@
 ! fft3dwrap.f90
-! 3Dfinite discrete Fourier transform applied to a Gaussian function
+! 3D fast Fourier transform applied to a Gaussian function
 PROGRAM fft3dwrap
   USE, INTRINSIC :: iso_c_binding
   IMPLICIT NONE

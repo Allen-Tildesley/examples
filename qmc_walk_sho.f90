@@ -2,103 +2,94 @@
 ! Quantum Monte Carlo, random walk, simple harmonic oscillator
 PROGRAM qmc_walk_sho
   !
-  ! Program to calculate the ground state wavefunction for a particle in a harmonic potential, V=(x^2)/2, by
-  ! solving the corresponding diffusion equation in imaginary time.
+  ! Program to calculate the ground state wavefunction for a particle in a harmonic potential, V=(x^2)/2,
+  ! by solving the corresponding diffusion equation in imaginary time.
   !
-  ! Run the simultion with et = 0.5, the exact groundstate energy for this potential.
+  ! Run the simulation with et = 0.5, the exact groundstate energy for this potential.
   ! Then try et = 0.6 and et = 0.4 observing the behaviour of the number of walkers in each case.
-  ! This type of simulation is very senstive to the intial guiess for et.
+  ! This type of simulation is very senstive to the intial guess for et.
   ! Finally compare the simulated ground state wave function for the exact result for this simple problem.
 
 
-  USE utility_module, only: random_normal
-
+  USE utility_module, ONLY: random_normal
   IMPLICIT NONE
 
-  INTEGER, PARAMETER                  :: nw = 100         ! initial number of walkers on the line
-  INTEGER, PARAMETER                  :: nw10 = 10*nw     ! maximum number of walkers allowed
-  INTEGER, PARAMETER                  :: nb = 300         ! Maximum number of bin entries for wavefunction
-  REAL                                :: x(nw10)
-  INTEGER                             :: replica(nw10)
-  INTEGER                             :: bin(nb)
-  REAL                                :: psi(nb)
+  REAL,    DIMENSION(:), ALLOCATABLE  :: x          ! position of each walker (n_max)
+  INTEGER, DIMENSION(:), ALLOCATABLE  :: replica    ! number of replicas to make (n_max)
+  INTEGER, DIMENSION(:), ALLOCATABLE  :: bin        ! histogram bins for wavefunction (nbin)
+  REAL,    DIMENSION(:), ALLOCATABLE  :: psi        ! wavefunction (nbin)
+  REAL, PARAMETER                     :: diff = 0.5 ! diffusion coefficient in atomic units
 
-  INTEGER                             :: nk, rep1
-  INTEGER                             :: i, j, maxstep, step, count
-  INTEGER                             :: nc, nupper, nlive, ibin, nbin, bincount
-  REAL                                :: lx, de, ds, diff, var, et, xi, resid, lx2, k
-  REAL                                :: zeta, dx
-  REAL                                :: sum, factor, const, pexact, xbin
+  REAL, PARAMETER :: pi = 4.0 * ATAN ( 1.0 ), const = (1.0 / pi) ** (1.0/4.0)
 
+  INTEGER         :: n, n_max, n_target, nbin, nk
+  INTEGER         :: i, j, maxstep, step, count
+  INTEGER         :: nlive, ibin, bincount
+  REAL            :: lx, de, ds, var, et, resid, lx2, k
+  REAL            :: zeta, dx
+  REAL            :: factor, pexact, xbin
 
-  WRITE(*,'(''quantum_mc_diffusion'')')
-  WRITE(*,'(''diffusion Monte Carlo simultion of a quantum oscillator'')')
+  NAMELIST /params/ maxstep, lx, et, ds, dx, n_max, n_target
+
+  WRITE(*,'(''qmc_walk_sho'')')
+  WRITE(*,'(''diffusion Monte Carlo simulation of a quantum oscillator'')')
   WRITE(*,'(''Results in atomic units'')')
 
   !set up parameters for the simulation
 
+  n_max = 1000 ! max number of walkers
+  n_target = 100 ! target number of walkers
   maxstep = 40000                 ! number of steps
   lx      = 8.0                   ! length of the line, centred at x = 0.0
-  diff    = 0.5                   ! diffusion coefficient in atomic units
   et      = 0.5                   ! initial estimate of ground state energy in atomic units for spring contant k=1
   ds      = 0.001                 ! timestep in imaginary time
   dx      = 0.2                   ! bin interval for calculating the wavefunction
-  var     = sqrt(2.0 * diff * ds) !the variance for gaussian random number
+  READ(*,nml=params)
+  var     = SQRT(2.0 * diff * ds) ! the variance for gaussian random number
   lx2     = lx / 2.0              ! line goes from -lx2 to lx2
-  nc      = nw                    ! current number of walkers
+  n = n_target
+  IF ( n > n_max ) STOP 'n exceeds n_max at start'
+  nbin     = NINT(lx /dx)
+
+  ALLOCATE ( x(n_max), replica(n_max) )
+  ALLOCATE ( psi(nbin), bin(nbin) )
 
   CALL RANDOM_SEED()
 
-  ! set up an intial random distribution of walkers on a line
-
-  DO i = 1, nc
-
-     CALL RANDOM_NUMBER( zeta )
-     x(i) = -lx2 + lx * zeta
-
-  ENDDO
+  ! set up an initial delta distribution of walkers at origin
+  x = 0.0
 
   ! set up the array for calculating the wave function
 
-  nbin        = nint(lx /dx)
   bincount    = 0
-
-  DO i = 1, nbin
-
-     bin(i) = 0
-
-  ENDDO
+  bin = 0
 
 
   ! loop over steps
 
-  step = 0
-  write(*,'(''    step   nwalkers        e0'')')
+  WRITE(*,'(''    step   nwalkers        e0'')')
 
-  DO WHILE (step < maxstep )
-
-     step = step + 1
+  DO step = 1, maxstep
 
      ! Calculate the replica number for each walker
 
-     DO i = 1, nc
+     DO i = 1, n
 
-        xi    = x(i) + random_normal( 0.0, var )    ! move walker forward by ds in imaginary time
-        x(i)  = xi                                  ! update the position array
-        de    = (0.5 * xi * xi - et) *  ds          ! calculate the scaled energy difference with the trial ground state
+        x(i) = x(i) + random_normal( 0.0, var ) ! move walker forward by ds in imaginary time
+        de   = (0.5 * x(i) * x(i) - et) *  ds   ! calculate the scaled energy difference with the trial ground state
 
-        IF( de  < 0.0) THEN                         ! k greater than 1
-           k = exp( - de )
-           nk = floor( k )
-           resid = k - real( nk )
+        IF ( de  < 0.0 ) THEN                         ! k greater than 1
+           k = EXP( -de )
+           nk = FLOOR( k )
+           resid = k - REAL( nk )
            CALL RANDOM_NUMBER( zeta )
            IF ( resid >= zeta ) THEN
-              replica(i) = nk + 1
+              replica(i) = MIN ( nk + 1, 3 ) ! following Kozstin et al (1996)
            ELSE
-              replica(i) = nk
+              replica(i) = MIN ( nk, 3 ) ! following Kozstin et al (1996)
            ENDIF
         ELSE                                    ! k less than 1
-           k = exp( - de )
+           k = EXP( -de )
            resid = 1.0 - k
            CALL RANDOM_NUMBER( zeta )
            IF( resid >= zeta ) THEN
@@ -110,117 +101,79 @@ PROGRAM qmc_walk_sho
 
      ENDDO
 
-
-     ! move zeroes in replica to the of the live array
-
-     count = 0
-
-     DO i = 1, nc
-
-        IF( replica(i) /= 0) THEN
-           count = count + 1
-           replica(count) = replica(i)
-           x(count) = x(i)
-        ENDIF
-
-     ENDDO
-
-     nlive = count  !number of live elements in replica
-
-     DO WHILE (count < nc )
-
-        count           = count + 1
-        replica(count)  = 0
-        x(count)        = 0.0
-
-     ENDDO
+     ! remove walkers with replica=0
+     nlive            = COUNT( replica(1:n) > 0 )
+     x(1:nlive)       = PACK ( x(1:n),       replica(1:n) > 0 )
+     replica(1:nlive) = PACK ( replica(1:n), replica(1:n) > 0 )
 
      ! expand the array x according to the replica number
 
-     nupper  = nlive
+     n  = nlive
 
      DO i = 1, nlive
 
-        IF( replica(i) > 1 ) THEN
-           rep1 = replica(i) - 1
+        IF ( replica(i) > 1 ) THEN ! only if more replicas are needed
+           DO j = 1, replica(i) - 1 
+              n = n + 1
+              IF ( n > n_max ) STOP 'n exceeds n_max in run'
+              x(n) = x(i)
+           END DO
+        END IF
 
-           DO j = 1, rep1
+     END DO
 
-              x(nupper+j) = x(i)
+     ! Stop if n is too large or too small
 
-           ENDDO
-
-           nupper = nupper + rep1
-        ENDIF
-
-     ENDDO
-
-     nc = nupper ! update number of walkers for next step
-
-     ! Stop if nc is too large or too small
-
-     IF( nc < 3 ) THEN
-        STOP 'nc is to small, increase the value of et'
-     ELSEIF(nc > (nw10-3) ) THEN
-        STOP 'nc is too large, decrease the value of et'
+     IF( n < 3 ) THEN
+        STOP 'n is too small, increase the value of et'
+     ELSEIF(n > (n_max-3) ) THEN
+        STOP 'n is too large, decrease the value of et'
      ENDIF
-
-     ! Reset replica number to one
-
-     DO i = 1, nc
-
-        replica(i) = 1
-
-     ENDDO
 
      ! Periodically write the current number of walkers
 
-     IF( MOD(STEP,50) == 0 ) THEN
-        write(*,'(i7,i9,f16.6)') step, nc, et
+     IF( MOD(step,50) == 0 ) THEN
+        WRITE(*,'(i7,i9,f16.6)') step, n, et
      ENDIF
 
      ! Periodically calculate the distribution of walkers on the line
 
-     IF( MOD(STEP, 5 ) == 0 ) THEN
+     IF( MOD(step, 5 ) == 0 ) THEN
 
-        DO i = 1, nc
+        DO i = 1, n
 
-           xi          = x(i)
-           ibin        = int( (xi+lx2)/dx ) + 1
-           bin(ibin)   = bin(ibin) +  1
-
+           ibin = INT( (x(i)+lx2)/dx ) + 1
+           IF ( ibin >= 0 .AND. ibin <= nbin ) THEN
+              bin(ibin) = bin(ibin) +  1
+           END IF
         ENDDO
-        bincount = bincount + nc
+        bincount = bincount + n
      ENDIF
 
+     ! reset trial energy
+     et = 0.5 * SUM ( x(1:n)**2)/REAL(n) + 0.001*(1.0-REAL(n)/REAL(n_target)) ! following Kozstin et al (1996)
+     
   ENDDO ! end over steps
 
   ! normalize the wavefunction so that the integral over psi**2 = 1.0
-
-  sum = 0.0
-
-  DO i = 1, nbin
-
-     psi(i)  =  bin(i) * lx  / REAL( bincount) / dx
-     sum = sum + psi(i) * psi(i)
-
-  ENDDO
-
-  factor = sqrt( sum * dx )
+  psi    =  bin * lx  / REAL( bincount) / dx
+  factor = SUM ( psi**2 )
+  factor = SQRT( factor * dx )
+  psi    = psi / factor
 
   ! print ground state wave function
   WRITE(*,'(/)')
   WRITE(*, '(''     x            psi(x)    psi_exact(x)'')')
-  const = (1.0 / 3.14159) ** 0.25
-
+  
   DO i = 1, nbin
 
-     xbin    = -lx2 + real(i - 1) * dx + dx/2.0
-     psi(i)  = psi(i) / factor
-     pexact  = const * exp(- 0.5 * xbin * xbin)
+     xbin    = -lx2 + ( REAL(i - 1) + 0.5 ) * dx
+     pexact  = const * EXP(- 0.5 * xbin * xbin)
      WRITE(*,'(3f12.6)') xbin, psi(i), pexact
 
-  ENDDO
+  END DO
+
+  DEALLOCATE ( x, replica, bin, psi )
 
 END PROGRAM qmc_walk_sho
 
