@@ -6,6 +6,8 @@ PROGRAM md_nve_lj_le
   USE md_lj_le_module, ONLY : initialize, finalize, force, r, v, f, n, energy_lrc
   IMPLICIT NONE
 
+  ! MPA TODO: double check this program!!!
+  
   ! Takes in a configuration of atoms (positions, velocities)
   ! Cubic periodic boundary conditions, with Lees-Edwards shear
   ! Conducts molecular dynamics, SLLOD algorithm, with isokinetic thermostat

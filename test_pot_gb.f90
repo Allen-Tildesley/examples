@@ -57,7 +57,7 @@ CONTAINS
     REAL               :: deps_dci, deps_dcj, deps_dcij
     REAL               :: dpot_dci, dpot_dcj, dpot_dcij, dpot_drij
     REAL               :: rho, rho6, rho12, rhoterm, drhoterm, cutterm, dcutterm
-    REAL,    PARAMETER :: rcut = 4.0   ! normally would use a larger value of rcut
+    REAL,    PARAMETER :: r_cut = 4.0   ! normally would use a larger value of r_cut
     REAL,    PARAMETER :: tol = 1.e-6
     INTEGER, PARAMETER :: i = 1, j = 2 ! notation to match appendix
 
@@ -108,8 +108,8 @@ CONTAINS
     drhoterm = -24.0 * (2.0 * rho12 - rho6) / rho ! needed for forces and torques
     pot      = epsilon*rhoterm
 
-    ! Potential at rcut
-    rho      = rcut - sigma + 1.0
+    ! Potential at r_cut
+    rho      = r_cut - sigma + 1.0
     rho6     = 1.0 / rho**6
     rho12    = rho6**2
     cutterm  = 4.0*(rho12 - rho6)                 ! needed for cutoff forces and torques
