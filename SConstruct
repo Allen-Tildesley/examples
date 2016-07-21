@@ -7,7 +7,7 @@ import os, sys
 env_normal=Environment(ENV=os.environ)
 env_lapack=Environment(ENV=os.environ)
 env_fftw=Environment(ENV=os.environ)
-env_mpi=Environment(ENV=os.environ,F90='mpif90',F90LINKER='mpif90')
+env_mpi=Environment(ENV=os.environ,F90='mpif90',LINK='mpif90')
 
 # Assume that gfortran will be used. 
 #Tool('gfortran')(env_normal)
@@ -57,6 +57,7 @@ variants['build_md_lj_mts']        = (['md_lj_mts.f90','md_lj_mts_module.f90','u
 variants['build_mc_nvt_poly_lj']   = (['mc_nvt_poly_lj.f90','mc_poly_lj_module.f90','utility_module.f90'],env_normal)
 variants['build_qmc_walk_sho']     = (['qmc_walk_sho.f90','utility_module.f90'],env_normal)
 variants['build_t_tensor']         = (['t_tensor.f90','utility_module.f90'],env_normal)
+variants['build_mc_nvt_lj_re']     = (['mc_nvt_lj_re.f90','mc_lj_module.f90','utility_module.f90'],env_mpi)
 
 # Build each variant in appropriate variant directory
 for variant_dir,(sources,env) in variants.iteritems():
