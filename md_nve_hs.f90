@@ -1,6 +1,7 @@
 ! md_nve_hs.f90
 ! Molecular dynamics, NVE ensemble, hard spheres
 PROGRAM md_nve_hs
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit
   USE utility_module,   ONLY : read_cnf_atoms, write_cnf_atoms, &
        &                       run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_nve_hs_module, ONLY : initialize, finalize, update, overlap, collide, &
@@ -128,13 +129,13 @@ PROGRAM md_nve_hs
      coll_rate = 2.0*REAL (ncoll) / t / REAL(n)             ! collision rate per particle
      pressure  = density*temperature + vir_sum / t / box**3 ! ideal + collisional
      CALL blk_add ( [coll_rate, pressure] ) ! time averages
-     CALL blk_end ( blk )
+     CALL blk_end ( blk, output_unit )
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk ! number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v*box ) ! save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end
+  CALL run_end ( output_unit )
 
   WRITE(*,'(''Final colliding pair'',t40,2i5)') i, j
 

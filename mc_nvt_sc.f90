@@ -1,6 +1,7 @@
 ! mc_nvt_sc.f90
 ! Monte Carlo, NVT ensemble, hard spherocylinders
 PROGRAM mc_nvt_sc
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit
   USE utility_module, ONLY : read_cnf_mols, write_cnf_mols, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add, &
        &                     random_rotate_vector, orientational_order
@@ -118,13 +119,13 @@ PROGRAM mc_nvt_sc
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk )
+     CALL blk_end ( blk, output_unit )
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk                   ! number configuration by block
      CALL write_cnf_mols ( cnf_prefix//sav_tag, n, box, r*box, e ) ! save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end
+  CALL run_end ( output_unit )
 
   IF ( overlap ( sigma, length ) ) STOP 'Overlap in final configuration'
 

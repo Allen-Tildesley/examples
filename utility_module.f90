@@ -1,20 +1,33 @@
 ! utility_module.f90
 ! routines for I/O, random numbers, averages, order parameters
 MODULE utility_module
+
+  ! We use the standard error_unit for error messages
+  ! but allow the output_unit to be passed in as an argument, when needed
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit, iostat_end, iostat_eor
+
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: metropolis
+
+  ! I/O routines, including some calculation of averages
   PUBLIC :: read_cnf_atoms, write_cnf_atoms, read_cnf_mols, write_cnf_mols
-  PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add
-  PUBLIC :: random_integer, random_normal
+  PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add, time_stamp
+
+  ! Random number routines
+  PUBLIC :: init_random_seed, random_integer, random_normal
   PUBLIC :: random_orientation_vector, random_perpendicular_vector
   PUBLIC :: random_orientation_vector_alt1, random_orientation_vector_alt2
   PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
-  PUBLIC :: random_quaternion, random_rotate_quaternion, q_to_a
-  PUBLIC :: rotate_vector, cross_product, init_random_seed, time_stamp
-  PUBLIC :: orientational_order, translational_order, nematic_order
-  PUBLIC :: lowercase
+  PUBLIC :: random_quaternion, random_rotate_quaternion
+  PUBLIC :: metropolis
 
+  ! Low-level mathematical routines and string operations
+  PUBLIC :: rotate_vector, cross_product, q_to_a, lowercase
+
+  ! Order parameter calculations
+  PUBLIC :: orientational_order, translational_order, nematic_order
+
+  ! These variables (run averages etc) are only accessed within this module
   INTEGER,                                      SAVE :: nvariables
   CHARACTER(len=15), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
   REAL,              DIMENSION(:), ALLOCATABLE, SAVE :: blk_averages, run_averages, errors
@@ -22,23 +35,22 @@ MODULE utility_module
 
 CONTAINS
 
-  FUNCTION metropolis ( delta ) ! Conduct Metropolis test, with safeguards
-    LOGICAL          :: metropolis
-    REAL, INTENT(in) :: delta
+  ! Routines associated with input/output and quantities to be averaged
 
-    REAL            :: zeta
-    REAL, PARAMETER :: exponent_guard = 75.0
+  SUBROUTINE time_stamp ( output_unit )
+    IMPLICIT NONE
+    INTEGER, INTENT(in) :: output_unit
+    CHARACTER(len=8)    :: date
+    CHARACTER(len=10)   :: time
+    REAL                :: cpu
 
-    IF ( delta > exponent_guard ) THEN ! too high, reject without evaluating
-       metropolis = .FALSE.
-    ELSE IF ( delta < 0.0 ) THEN ! downhill, accept without evaluating
-       metropolis = .TRUE.
-    ELSE
-       CALL RANDOM_NUMBER ( zeta )     ! Uniform random number in range (0,1)
-       metropolis = EXP(-delta) > zeta ! Metropolis test
-    END IF
+    CALL DATE_AND_TIME ( date, time )
+    CALL CPU_TIME ( cpu )
+    WRITE ( unit=output_unit, fmt='(a,t45,a4,a1,a2,a1,a2)' ) 'Date: ', date(1:4), '/', date(5:6), '/', date(7:8)
+    WRITE ( unit=output_unit, fmt='(a,t47,a2,a1,a2,a1,a2)' ) 'Time: ', time(1:2), ':', time(3:4), ':', time(5:6)
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'          ) 'CPU time: ', cpu
 
-  END FUNCTION metropolis
+  END SUBROUTINE time_stamp
 
   SUBROUTINE read_cnf_atoms ( filename, n, box, r, v ) ! Read in atomic configuration
     CHARACTER(len=*),               INTENT(in)    :: filename
@@ -48,39 +60,78 @@ CONTAINS
 
     INTEGER :: cnf_unit, ioerr, i
 
-!    WRITE(*,'(a,t40,a)') 'read_cnf_atoms', filename
-    OPEN(newunit=cnf_unit,file=filename,status='old',action='read',iostat=ioerr)
-    IF ( ioerr /= 0 ) STOP 'Error opening file in read_cnf_atoms'
-    READ(cnf_unit,*) n
-    READ(cnf_unit,*) box
+    ! Open given filename, will terminate on any errors
+
+    OPEN ( newunit=cnf_unit, file=filename, status='old', action='read', iostat=ioerr )
+    IF ( ioerr /= 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error opening ', filename, ioerr
+       STOP 'Error in read_cnf_atoms'
+    END IF
+    READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) n
+    IF ( ioerr /= 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading n from ', filename, ioerr
+       IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+       IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+       STOP 'Error in read_cnf_atoms'
+    END IF
+    READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) box
+    IF ( ioerr /= 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading box from ', filename, ioerr
+       IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+       IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+       STOP 'Error in read_cnf_atoms'
+    END IF
+
+    ! The first call of this routine is used just to get n and box
+    ! The second call attempts to read in the atomic positions and optionally velocities
+    ! Expected format is one line per atom containing either r(:,i), v(:,i) or just r(:,i)
 
     IF ( PRESENT ( r ) ) THEN
-       IF ( n /= SIZE ( r, dim=2 ) ) STOP 'r size wrong in read_cnf_atoms'
+       IF ( n /= SIZE ( r, dim=2 ) ) THEN
+          WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of r ', n, SIZE ( r, dim=2 )
+          STOP 'Error in read_cnf_atoms'
+       END IF
 
        IF ( PRESENT ( v ) ) THEN
-          IF ( n /= SIZE ( v, dim=2 ) ) STOP 'v size wrong in read_cnf_atoms'
+
+          IF ( n /= SIZE ( v, dim=2 ) ) THEN
+             WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of v ', n, SIZE ( v, dim=2 )
+             STOP 'Error in read_cnf_atoms'
+          END IF
 
           ! Read positions, velocities
           DO i = 1, n
-             READ(cnf_unit,*) r(:,i), v(:,i)
+             READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) r(:,i), v(:,i)
+             IF ( ioerr /= 0 ) THEN
+                WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading r, v from ', filename, ioerr
+                IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+                IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+                STOP 'Error in read_cnf_atoms'
+             END IF
           END DO
 
        ELSE
 
           ! Read positions
           DO i = 1, n
-             READ(cnf_unit,*) r(:,i)
+             READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) r(:,i)
+             IF ( ioerr /= 0 ) THEN
+                WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading r from ', filename, ioerr
+                IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+                IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+                STOP 'Error in read_cnf_atoms'
+             END IF
           END DO
 
        END IF
 
     END IF
 
-    CLOSE(unit=cnf_unit)
+    CLOSE ( unit=cnf_unit )
 
   END SUBROUTINE read_cnf_atoms
 
-  SUBROUTINE write_cnf_atoms ( filename, n, box, r, v )
+  SUBROUTINE write_cnf_atoms ( filename, n, box, r, v ) ! Write out atomic configuration
     CHARACTER(len=*),               INTENT(in) :: filename
     INTEGER,                        INTENT(in) :: n
     REAL,                           INTENT(in) :: box
@@ -89,33 +140,42 @@ CONTAINS
 
     INTEGER :: cnf_unit, ioerr, i
 
-!    WRITE(*,'(a,t40,a)') 'write_cnf_atoms', filename
-    OPEN(newunit=cnf_unit,file=filename,status='replace',iostat=ioerr)
-    IF ( ioerr /= 0 ) STOP 'Error opening file in write_cnf_atoms'
-    WRITE(cnf_unit,'(i15)'  ) n
-    WRITE(cnf_unit,'(f15.8)') box
+    ! Open given filename, replacing it if it already exists, will terminate on any errors
+    OPEN ( newunit=cnf_unit, file=filename, status='replace', iostat=ioerr )
+    IF ( ioerr /= 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error opening ', filename, ioerr
+       STOP 'Error in write_cnf_atoms'
+    END IF
+    WRITE ( unit=cnf_unit, fmt='(i15)'  ) n
+    WRITE ( unit=cnf_unit, fmt='(f15.8)') box
 
-    IF ( n /= SIZE ( r, dim=2 ) ) STOP 'r size wrong in write_cnf_atoms'
+    IF ( n /= SIZE ( r, dim=2 ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of r ', n, SIZE ( r, dim=2 )
+       STOP 'Error in write_cnf_atoms'
+    END IF
 
     IF ( PRESENT ( v ) ) THEN
 
-       IF ( n /= SIZE ( v, dim=2 ) ) STOP 'v size wrong in write_cnf_atoms'
+       IF ( n /= SIZE ( v, dim=2 ) ) THEN
+          WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of v ', n, SIZE ( v, dim=2 )
+          STOP 'Error in write_cnf_atoms'
+       END IF
 
        ! Write positions, velocities
        DO i = 1, n
-          WRITE(cnf_unit,'(*(f15.10))') r(:,i), v(:,i)
+          WRITE ( unit=cnf_unit, fmt='(*(f15.10))' ) r(:,i), v(:,i)
        END DO
 
     ELSE
 
        ! Write positions
        DO i = 1, n
-          WRITE(cnf_unit,'(*(f15.10))') r(:,i)
+          WRITE ( unit=cnf_unit, fmt='(*(f15.10))' ) r(:,i)
        END DO
 
     END IF
 
-    CLOSE(unit=cnf_unit)
+    CLOSE ( unit=cnf_unit )
 
   END SUBROUTINE write_cnf_atoms
 
@@ -127,45 +187,96 @@ CONTAINS
 
     INTEGER :: cnf_unit, ioerr, i
 
-!    WRITE(*,'(a,t40,a)') 'read_cnf_mols', filename
-    OPEN(newunit=cnf_unit,file=filename,status='old',action='read',iostat=ioerr)
-    IF ( ioerr /= 0 ) STOP 'Error opening file in read_cnf_mols'
-    READ(cnf_unit,*) n
-    READ(cnf_unit,*) box
+    ! Open given filename, will terminate on any errors
+
+    OPEN ( newunit=cnf_unit, file=filename, status='old', action='read', iostat=ioerr )
+    IF ( ioerr /= 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error opening ', filename, ioerr
+       STOP 'Error opening file in read_cnf_mols'
+    END IF
+    READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) n
+    IF ( ioerr /= 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading n from ', filename, ioerr
+       IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+       IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+       STOP 'Error in read_cnf_mols'
+    END IF
+    READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) box
+    IF ( ioerr /= 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading box from ', filename, ioerr
+       IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+       IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+       STOP 'Error in read_cnf_mols'
+    END IF
+
+    ! The first call of this routine is used just to get n and box
+    ! The second call attempts to read in the atomic positions, orientations and optionally velocities, angular velocities
+    ! Expected format is one line per atom containing either r(:,i), e(:,i), v(:,i), w(:,i)  or just r(:,i), e(:,i)
+    ! The first dimension of the e array can be 3 (vector) or 4 (quaternion)
 
     IF ( PRESENT ( r ) ) THEN
 
-       IF ( .NOT. PRESENT ( e )    ) STOP 'Argument e missing in read_cnf_mols'
-       IF ( n /= SIZE ( r, dim=2 ) ) STOP 'r size wrong in read_cnf_mols'
-       IF ( n /= SIZE ( e, dim=2 ) ) STOP 'e size wrong in read_cnf_mols'
+       IF ( .NOT. PRESENT ( e )    ) THEN
+          WRITE ( unit=error_unit, fmt='(a,a,i15)') 'r and e arguments must be present together'
+          STOP 'Error in read_cnf_mols'
+       END IF
+       IF ( n /= SIZE ( r, dim=2 ) ) THEN
+          WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of r ', n, SIZE ( r, dim=2 )
+          STOP 'Error in read_cnf_mols'
+       END IF
+       IF ( n /= SIZE ( e, dim=2 ) ) THEN
+          WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of e ', n, SIZE ( e, dim=2 )
+          STOP 'Error in read_cnf_mols'
+       END IF
 
        IF ( PRESENT ( v ) ) THEN
 
-          IF ( .NOT. PRESENT ( w )    ) STOP 'Argument w missing in read_cnf_mols'
-          IF ( n /= SIZE ( v, dim=2 ) ) STOP 'v size wrong in read_cnf_mols'
-          IF ( n /= SIZE ( w, dim=2 ) ) STOP 'w size wrong in read_cnf_mols'
+          IF ( .NOT. PRESENT ( w )    ) THEN
+             WRITE ( unit=error_unit, fmt='(a,a,i15)') 'v and w arguments must be present together'
+             STOP 'Error in read_cnf_mols'
+          END IF
+          IF ( n /= SIZE ( v, dim=2 ) ) THEN
+             WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of v ', n, SIZE ( v, dim=2 )
+             STOP 'Error in read_cnf_mols'
+          END IF
+          IF ( n /= SIZE ( w, dim=2 ) ) THEN
+             WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of w ', n, SIZE ( w, dim=2 )
+             STOP 'Error in read_cnf_mols'
+          END IF
 
           ! Read positions, orientation vectors or quaternions, velocities, angular velocities
           DO i = 1, n
-             READ(cnf_unit,*) r(:,i), e(:,i), v(:,i), w(:,i)
+             READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) r(:,i), e(:,i), v(:,i), w(:,i)
+             IF ( ioerr /= 0 ) THEN
+                WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading r, e, v, w from ', filename, ioerr
+                IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+                IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+                STOP 'Error in read_cnf_mols'
+             END IF
           END DO
 
        ELSE
 
           ! Read positions, orientation vectors or quaternions
           DO i = 1, n
-             READ(cnf_unit,*) r(:,i), e(:,i)
+             READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) r(:,i), e(:,i)
+             IF ( ioerr /= 0 ) THEN
+                WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading r, e from ', filename, ioerr
+                IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+                IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+                STOP 'Error in read_cnf_mols'
+             END IF
           END DO
 
        END IF
 
     END IF
 
-    CLOSE(unit=cnf_unit)
+    CLOSE ( unit=cnf_unit )
 
   END SUBROUTINE read_cnf_mols
 
-  SUBROUTINE write_cnf_mols ( filename, n, box, r, e, v, w )
+  SUBROUTINE write_cnf_mols ( filename, n, box, r, e, v, w ) ! Write out molecular configuration
     CHARACTER(len=*),               INTENT(in) :: filename
     INTEGER,                        INTENT(in) :: n
     REAL,                           INTENT(in) :: box
@@ -174,39 +285,57 @@ CONTAINS
 
     INTEGER :: cnf_unit, ioerr, i
 
-!    WRITE(*,'(a,t40,a)') 'write_cnf_mols', filename
-    OPEN(newunit=cnf_unit,file=filename,status='replace',iostat=ioerr)
-    IF ( ioerr /= 0 ) STOP 'Error opening file in write_cnf_mols'
+    ! Open given filename, replacing it if it already exists, will terminate on any errors
+    OPEN ( newunit=cnf_unit, file=filename, status='replace', iostat=ioerr )
+    IF ( ioerr /= 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error opening ', filename, ioerr
+       STOP 'Error in write_cnf_mols'
+    END IF
     WRITE(cnf_unit,'(i15)'  ) n
     WRITE(cnf_unit,'(f15.8)') box
 
-    IF ( n /= SIZE ( r, dim=2 ) ) STOP 'r size wrong in write_cnf_mols'
-    IF ( n /= SIZE ( e, dim=2 ) ) STOP 'e size wrong in write_cnf_mols'
+    IF ( n /= SIZE ( r, dim=2 ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of r ', n, SIZE ( r, dim=2 )
+       STOP 'Error in write_cnf_mols'
+    END IF
+    IF ( n /= SIZE ( e, dim=2 ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of e ', n, SIZE ( e, dim=2 )
+       STOP 'Error in write_cnf_mols'
+    END IF
 
     IF ( PRESENT ( v ) ) THEN
-       IF ( .NOT. PRESENT ( w )    ) STOP 'Argument w missing in write_cnf_mols'
-       IF ( n /= SIZE ( v, dim=2 ) ) STOP 'v size wrong in write_cnf_mols'
-       IF ( n /= SIZE ( w, dim=2 ) ) STOP 'w size wrong in write_cnf_mols'
+       IF ( .NOT. PRESENT ( w )    ) THEN
+          WRITE ( unit=error_unit, fmt='(a,a,i15)') 'v and w arguments must be present together'
+          STOP 'Error in write_cnf_mols'
+       END IF
+       IF ( n /= SIZE ( v, dim=2 ) ) THEN
+          WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of v ', n, SIZE ( v, dim=2 )
+          STOP 'Error in write_cnf_mols'
+       END IF
+       IF ( n /= SIZE ( w, dim=2 ) ) THEN
+          WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of w ', n, SIZE ( w, dim=2 )
+          STOP 'Error in write_cnf_mols'
+       END IF
 
        ! Write positions, orientation vectors or quaternions, velocities, angular velocities
        DO i = 1, n
-          WRITE(cnf_unit,'(*(f15.10))') r(:,i), e(:,i), v(:,i), w(:,i) ! positions and velocities
+          WRITE ( unit=cnf_unit, fmt='(*(f15.10))') r(:,i), e(:,i), v(:,i), w(:,i)
        END DO
 
     ELSE
 
        ! Write positions, orientation vectors or quaternions
        DO i = 1, n
-          WRITE(cnf_unit,'(*(f15.10))') r(:,i), e(:,i)
+          WRITE ( unit=cnf_unit, fmt='(*(f15.10))') r(:,i), e(:,i)
        END DO
 
     END IF
 
-    CLOSE(unit=cnf_unit)
+    CLOSE ( unit=cnf_unit )
 
   END SUBROUTINE write_cnf_mols
 
-  SUBROUTINE run_begin ( names )
+  SUBROUTINE run_begin ( names ) ! Set up averaging variables based on supplied names
     CHARACTER(len=15), DIMENSION(:), INTENT(in) :: names
 
     nvariables = SIZE ( names )
@@ -222,21 +351,25 @@ CONTAINS
 
   END SUBROUTINE run_begin
 
-  SUBROUTINE blk_begin
+  SUBROUTINE blk_begin ! Zero averaging variables at start of each block
     blk_norm     = 0.0
     blk_averages = 0.0
   END SUBROUTINE blk_begin
 
-  SUBROUTINE blk_add ( variables )
+  SUBROUTINE blk_add ( variables ) ! Increment block-average variables
     REAL, DIMENSION(:), INTENT(in) :: variables
 
-    IF ( SIZE(variables) /= nvariables ) STOP 'mismatched variable arrays in stp_end'
+    IF ( SIZE(variables) /= nvariables ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Mismatched variable arrays', nvariables, SIZE(variables)
+       STOP 'Error in blk_add'
+    END IF
+
     blk_averages = blk_averages + variables ! Increment block averages
     blk_norm     = blk_norm + 1.0           ! Increment block normalizer
   END SUBROUTINE blk_add
 
-  SUBROUTINE blk_end ( blk )
-    INTEGER, INTENT(in) :: blk
+  SUBROUTINE blk_end ( blk, output_unit ) ! Write out block averages
+    INTEGER, INTENT(in) :: blk, output_unit
 
     LOGICAL, SAVE :: first_call = .TRUE.
 
@@ -246,18 +379,19 @@ CONTAINS
     run_norm     = run_norm + 1.0              ! Increment run normalizer
 
     IF ( first_call ) THEN  ! Write headings
-       WRITE(*,'(*(a16))') REPEAT ( '=', 16*(nvariables+1) ) 
-       WRITE(*,'(*(1x,a15))') 'Block', ADJUSTR ( variable_names )
-       WRITE(*,'(*(a16))') REPEAT ( '=', 16*(nvariables+1) )
+       WRITE ( unit=output_unit, fmt='(*(a16))'   ) REPEAT ( '=', 16*(nvariables+1) ) 
+       WRITE ( unit=output_unit, fmt='(*(1x,a15))') 'Block', ADJUSTR ( variable_names )
+       WRITE ( unit=output_unit, fmt='(*(a16))'   ) REPEAT ( '=', 16*(nvariables+1) )
        first_call = .FALSE.
     END IF
 
     ! Write out block averages
-    WRITE(*,'(1x,i15,*(1x,f15.5))') blk, blk_averages
+    WRITE ( unit=output_unit, fmt='(1x,i15,*(1x,f15.5))') blk, blk_averages
 
   END SUBROUTINE blk_end
 
-  SUBROUTINE run_end
+  SUBROUTINE run_end ( output_unit ) ! Write out run averages
+    INTEGER, INTENT(in) :: output_unit
 
     run_averages = run_averages / run_norm  ! Normalize run averages
     errors       = errors / run_norm        ! Normalize error estimates
@@ -266,33 +400,79 @@ CONTAINS
        errors = SQRT ( errors / run_norm ) ! Normalize and get estimated errors
     END WHERE
 
-    WRITE(*,'(*(a16))') REPEAT('-',16*(nvariables+1))
-    WRITE(*,'(1x,a15,*(1x,f15.5))') 'Run averages', run_averages
-    WRITE(*,'(1x,a15,*(1x,f15.5))') 'Run errors', errors
-    WRITE(*,'(*(a16))') REPEAT('=',16*(nvariables+1))
+    WRITE ( unit=output_unit, fmt='(*(a16))'             ) REPEAT('-',16*(nvariables+1))
+    WRITE ( unit=output_unit, fmt='(1x,a15,*(1x,f15.5))' ) 'Run averages', run_averages
+    WRITE ( unit=output_unit, fmt='(1x,a15,*(1x,f15.5))' ) 'Run errors', errors
+    WRITE ( unit=output_unit, fmt='(*(a16))'             ) REPEAT('=',16*(nvariables+1))
 
     DEALLOCATE ( variable_names, blk_averages, run_averages, errors )
 
   END SUBROUTINE run_end
 
-  FUNCTION q_to_a ( q ) RESULT ( a ) ! converts quaternion to rotation matrix
+  ! Routines associated with random number generation
+  
+  ! This routine, and the next one, are taken from the online GNU documentation
+  ! https://gcc.gnu.org/onlinedocs/gfortran/RANDOM_005fSEED.html
+  ! and is specific to the gfortran compiler
+  ! At the time of writing, calling RANDOM_SEED() initializes the random number generator
+  ! with the same random seed to a default state, which may result in the same sequence
+  ! being generated every time. The routines below are intended to generate different
+  ! sequences on different calls.
+  ! YOU SHOULD INVESTIGATE THE BEHAVIOUR FOR YOUR OWN COMPILER AND MACHINE IMPLEMENTATION 
+  SUBROUTINE init_random_seed()
+    USE iso_fortran_env, ONLY: int64
     IMPLICIT NONE
+    INTEGER, ALLOCATABLE :: seed(:)
+    INTEGER :: i, n, un, istat, dt(8), pid
+    INTEGER(int64) :: t
 
-    ! Arguments
-    REAL, DIMENSION(0:3), INTENT(in) :: q ! quaternion
-    REAL, DIMENSION(3,3)             :: a ! rotation matrix
+    CALL RANDOM_SEED(size = n)
+    ALLOCATE(seed(n))
+    ! First try if the OS provides a random number generator
+    OPEN(newunit=un, file="/dev/urandom", access="stream", &
+         form="unformatted", action="read", status="old", iostat=istat)
+    IF (istat == 0) THEN
+       READ(un) seed
+       CLOSE(un)
+    ELSE
+       ! Fallback to XOR:ing the current time and pid. The PID is
+       ! useful in case one launches multiple instances of the same
+       ! program in parallel.
+       CALL SYSTEM_CLOCK(t)
+       IF (t == 0) THEN
+          CALL DATE_AND_TIME(values=dt)
+          t = (dt(1) - 1970) * 365_int64 * 24 * 60 * 60 * 1000 &
+               + dt(2) * 31_int64 * 24 * 60 * 60 * 1000 &
+               + dt(3) * 24_int64 * 60 * 60 * 1000 &
+               + dt(5) * 60 * 60 * 1000 &
+               + dt(6) * 60 * 1000 + dt(7) * 1000 &
+               + dt(8)
+       END IF
+       pid = getpid()
+       t = IEOR(t, INT(pid, KIND(t)))
+       DO i = 1, n
+          seed(i) = lcg(t)
+       END DO
+    END IF
+    CALL RANDOM_SEED(put=seed)
+  END SUBROUTINE init_random_seed
 
-    ! The rows of the rotation matrix correspond to unit vectors of the molecule in the space-fixed frame
-    ! The third row  a(3,:) is [2*(q(1)*q(3)+q(0)*q(2)),2*(q(2)*q(3)-q(0)*q(1)),q(0)**2-q(1)**2-q(2)**2+q(3)**2]
-    ! which is "the" axis of the molecule, for uniaxial molecules
-    ! use a to convert space-fixed to body-fixed axes thus: db = matmul(a,ds)
-    ! use transpose of a to convert body-fixed to space-fixed axes thus: ds = matmul(db,a)
+  ! This simple PRNG might not be good enough for real work, but is
+  ! sufficient for seeding a better PRNG.
+  FUNCTION lcg(s)
+    USE iso_fortran_env, ONLY: int64
+    IMPLICIT NONE
+    INTEGER :: lcg
+    INTEGER(int64) :: s
+    IF (s == 0) THEN
+       s = 104729
+    ELSE
+       s = MOD(s, 4294967296_int64)
+    END IF
+    s = MOD(s * 279470273_int64, 4294967291_int64)
+    lcg = INT(MOD(s, INT(HUGE(0), int64)), KIND(0))
+  END FUNCTION lcg
 
-       a(1,:) = [ q(0)**2+q(1)**2-q(2)**2-q(3)**2,   2*(q(1)*q(2)+q(0)*q(3)),       2*(q(1)*q(3)-q(0)*q(2))     ] ! 1st row
-       a(2,:) = [     2*(q(1)*q(2)-q(0)*q(3)),   q(0)**2-q(1)**2+q(2)**2-q(3)**2,   2*(q(2)*q(3)+q(0)*q(1))     ] ! 2nd row
-       a(3,:) = [     2*(q(1)*q(3)+q(0)*q(2)),       2*(q(2)*q(3)-q(0)*q(1)),   q(0)**2-q(1)**2-q(2)**2+q(3)**2 ] ! 3rd row
-     END FUNCTION q_to_a
-     
   FUNCTION random_integer ( k1, k2 ) RESULT ( k )
     INTEGER             :: k      ! returns uniformly distributed random integer
     INTEGER, INTENT(in) :: k1, k2 ! in range [k1,k2] inclusive
@@ -483,21 +663,6 @@ CONTAINS
 
   END FUNCTION random_rotate_vector_alt2
 
-  FUNCTION rotate_vector ( delta, axis, e_old ) RESULT ( e )
-    REAL, DIMENSION(3)             :: e           ! orientation vector result
-    REAL, INTENT(in)               :: delta       ! rotation angle
-    REAL, DIMENSION(3), INTENT(in) :: axis, e_old ! rotation axis and original orientation
-
-    REAL :: dot, c, s
-
-    c   = COS ( delta )
-    s   = SIN ( delta )
-    dot = DOT_PRODUCT ( axis, e_old )
-
-    e = c * e_old + (1.0-c)*dot*axis + s * cross_product ( axis, e_old )
-
-  END FUNCTION rotate_vector
-
   FUNCTION random_rotate_vector_alt3 ( delta_max, e_old ) RESULT ( e )
     REAL, DIMENSION(3)             :: e         ! orientation vector result
     REAL, INTENT(in)               :: delta_max ! maximum magnitude of rotation
@@ -553,7 +718,7 @@ CONTAINS
 
     REAL, DIMENSION(3)   :: axis        ! rotation axis
     REAL                 :: delta, s, c ! rotation angle, sin, cos
-    REAL, dimension(0:3) :: q_rot       ! rotation quaternion
+    REAL, DIMENSION(0:3) :: q_rot       ! rotation quaternion
 
     CALL random_orientation_vector ( axis )
     CALL random_NUMBER ( delta )
@@ -562,8 +727,43 @@ CONTAINS
     c = COS(0.5*delta)
     q_rot = [ c, s*axis(1), s*axis(2), s*axis(3) ]
     q = quatmul ( q_rot, q_old )
-    
+
   END FUNCTION random_rotate_quaternion
+
+  FUNCTION metropolis ( delta ) ! Conduct Metropolis test, with safeguards
+    LOGICAL          :: metropolis
+    REAL, INTENT(in) :: delta
+
+    REAL            :: zeta
+    REAL, PARAMETER :: exponent_guard = 75.0
+
+    IF ( delta > exponent_guard ) THEN ! too high, reject without evaluating
+       metropolis = .FALSE.
+    ELSE IF ( delta < 0.0 ) THEN ! downhill, accept without evaluating
+       metropolis = .TRUE.
+    ELSE
+       CALL RANDOM_NUMBER ( zeta )     ! Uniform random number in range (0,1)
+       metropolis = EXP(-delta) > zeta ! Metropolis test
+    END IF
+
+  END FUNCTION metropolis
+
+  ! Low level mathematical operations and string manipulation
+  
+  FUNCTION rotate_vector ( delta, axis, e_old ) RESULT ( e )
+    REAL, DIMENSION(3)             :: e           ! orientation vector result
+    REAL, INTENT(in)               :: delta       ! rotation angle
+    REAL, DIMENSION(3), INTENT(in) :: axis, e_old ! rotation axis and original orientation
+
+    REAL :: dot, c, s
+
+    c   = COS ( delta )
+    s   = SIN ( delta )
+    dot = DOT_PRODUCT ( axis, e_old )
+
+    e = c * e_old + (1.0-c)*dot*axis + s * cross_product ( axis, e_old )
+
+  END FUNCTION rotate_vector
 
   FUNCTION quatmul ( a, b ) RESULT ( c ) ! multiply two quaternions
     REAL, DIMENSION(0:3), INTENT(in) :: a, b ! arguments
@@ -573,8 +773,9 @@ CONTAINS
     c(1) = a(1)*b(0) + a(0)*b(1) - a(3)*b(2) + a(2)*b(3)
     c(2) = a(2)*b(0) + a(3)*b(1) + a(0)*b(2) - a(1)*b(3)
     c(3) = a(3)*b(0) - a(2)*b(1) + a(1)*b(2) + a(0)*b(3)
-    
+
   END FUNCTION quatmul
+
   FUNCTION cross_product ( a, b ) RESULT ( c )
     IMPLICIT NONE
     REAL, DIMENSION(3)             :: c    ! result cross product
@@ -584,6 +785,26 @@ CONTAINS
     c(3) = a(1)*b(2) - a(2)*b(1)
   END FUNCTION cross_product
 
+  FUNCTION lowercase ( oldstring ) RESULT ( newstring )
+    IMPLICIT NONE
+    CHARACTER(len=*),             INTENT(in)    :: oldstring 
+    CHARACTER(len=LEN(oldstring))               :: newstring 
+
+    INTEGER :: i, k 
+
+    DO i = 1, LEN(oldstring) 
+       k = IACHAR(oldstring(i:i)) 
+       IF ( k >= IACHAR('A') .AND. k <= IACHAR('Z') ) THEN 
+          k = k + IACHAR('a') - IACHAR('A') 
+          newstring(i:i) = ACHAR(k)
+       ELSE
+          newstring(i:i) = oldstring(i:i)
+       END IF
+    END DO
+  END FUNCTION lowercase
+
+  ! Order parameter routines
+  
   FUNCTION translational_order ( r, k ) RESULT ( order )
     REAL                                          :: order ! result order parameter
     REAL,    DIMENSION(:,:), INTENT(in)           :: r     ! set of molecular position vectors (3,n)
@@ -605,14 +826,20 @@ CONTAINS
     COMPLEX            :: rho ! Fourier component of single-particle density
     REAL, PARAMETER    :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
 
-    IF ( SIZE(r,dim=1) /= 3 ) STOP 'Array error in translational_order'
+    IF ( SIZE(r,dim=1) /= 3 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Error in r dimension ', SIZE(r,dim=1)
+       STOP 'Error in translational_order'
+    END IF
     n = SIZE(r,dim=2)
 
     IF ( PRESENT ( k ) ) THEN
        k_real = twopi * REAL ( k )
     ELSE                                          ! Make arbitrary choice assuming fcc
        nc = NINT ( ( REAL(n)/4.0 ) ** (1.0/3.0) ) ! number of fcc unit cells
-       IF ( 4*nc**3 /= n ) STOP 'n not sensible in translational_order'
+       IF ( 4*nc**3 /= n ) THEN
+          WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Error in value of n ', 4*nc**3, n
+          STOP 'Error in translational_order'
+       END IF
        k_real = twopi * REAL( [-nc,nc,-nc] )      ! arbitrary fcc reciprocal vector
     END IF
 
@@ -648,10 +875,16 @@ CONTAINS
          &  1.0,  1.0,  1.0,    1.0, -1.0, -1.0,  &
          & -1.0,  1.0, -1.0,   -1.0, -1.0,  1.0 ],[3,4] ) ! orientations in unit cell
 
-    IF ( SIZE(e,dim=1) /= 3 ) STOP 'Array error in orientational_order'
+    IF ( SIZE(e,dim=1) /= 3 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Error in e dimension ', SIZE(e,dim=1)
+       STOP 'Error in orientational_order'
+    END IF
     n = SIZE(e,dim=2)
     nc = NINT ( ( REAL(n)/4.0 ) ** (1.0/3.0) )
-    IF ( 4*nc**3 /= n ) STOP 'n not sensible in orientational_order'
+    IF ( 4*nc**3 /= n ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Error in value of n ', 4*nc**3, n
+       STOP 'Error in orientational_order'
+    END IF
     order = 0.0
     DO i = 1, n
        i0 = MODULO ( i, 4 ) + 1             ! select appropriate original orientation
@@ -677,7 +910,10 @@ CONTAINS
     REAL                 :: h, g, psi ! used in eigenvalue calculation
     REAL, PARAMETER      :: pi = 4.0*ATAN(1.0)
 
-    IF ( SIZE(e,dim=1) /= 3 ) STOP 'Array error in nematic_order'
+    IF ( SIZE(e,dim=1) /= 3 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Error in e dimension ', SIZE(e,dim=1)
+       STOP 'Error in nematic_order'
+    END IF
     n = SIZE(e,dim=2)
 
     ! Order tensor: outer product of each orientation vector, summed over molecules
@@ -707,98 +943,22 @@ CONTAINS
 
   END FUNCTION nematic_order
 
-  ! This routine, and the next one, are taken from the online GNU documentation
-  ! https://gcc.gnu.org/onlinedocs/gfortran/RANDOM_005fSEED.html
-  ! and is specific to the gfortran compiler
-  ! At the time of writing, calling RANDOM_SEED() initializes the random number generator
-  ! with the same random seed to a default state, which may result in the same sequence
-  ! being generated every time. The routines below are intended to generate different
-  ! sequences on different calls.
-  ! YOU SHOULD INVESTIGATE THE BEHAVIOUR FOR YOUR OWN COMPILER AND MACHINE IMPLEMENTATION 
-  SUBROUTINE init_random_seed()
-    USE iso_fortran_env, ONLY: int64
+  FUNCTION q_to_a ( q ) RESULT ( a ) ! converts quaternion to rotation matrix
     IMPLICIT NONE
-    INTEGER, ALLOCATABLE :: seed(:)
-    INTEGER :: i, n, un, istat, dt(8), pid
-    INTEGER(int64) :: t
 
-    CALL RANDOM_SEED(size = n)
-    ALLOCATE(seed(n))
-    ! First try if the OS provides a random number generator
-    OPEN(newunit=un, file="/dev/urandom", access="stream", &
-         form="unformatted", action="read", status="old", iostat=istat)
-    IF (istat == 0) THEN
-       READ(un) seed
-       CLOSE(un)
-    ELSE
-       ! Fallback to XOR:ing the current time and pid. The PID is
-       ! useful in case one launches multiple instances of the same
-       ! program in parallel.
-       CALL SYSTEM_CLOCK(t)
-       IF (t == 0) THEN
-          CALL DATE_AND_TIME(values=dt)
-          t = (dt(1) - 1970) * 365_int64 * 24 * 60 * 60 * 1000 &
-               + dt(2) * 31_int64 * 24 * 60 * 60 * 1000 &
-               + dt(3) * 24_int64 * 60 * 60 * 1000 &
-               + dt(5) * 60 * 60 * 1000 &
-               + dt(6) * 60 * 1000 + dt(7) * 1000 &
-               + dt(8)
-       END IF
-       pid = getpid()
-       t = IEOR(t, INT(pid, KIND(t)))
-       DO i = 1, n
-          seed(i) = lcg(t)
-       END DO
-    END IF
-    CALL RANDOM_SEED(put=seed)
-  END SUBROUTINE init_random_seed
+    ! Arguments
+    REAL, DIMENSION(0:3), INTENT(in) :: q ! quaternion
+    REAL, DIMENSION(3,3)             :: a ! rotation matrix
 
-  ! This simple PRNG might not be good enough for real work, but is
-  ! sufficient for seeding a better PRNG.
-  FUNCTION lcg(s)
-    USE iso_fortran_env, ONLY: int64
-    IMPLICIT NONE
-    INTEGER :: lcg
-    INTEGER(int64) :: s
-    IF (s == 0) THEN
-       s = 104729
-    ELSE
-       s = MOD(s, 4294967296_int64)
-    END IF
-    s = MOD(s * 279470273_int64, 4294967291_int64)
-    lcg = INT(MOD(s, INT(HUGE(0), int64)), KIND(0))
-  END FUNCTION lcg
+    ! The rows of the rotation matrix correspond to unit vectors of the molecule in the space-fixed frame
+    ! The third row  a(3,:) is [2*(q(1)*q(3)+q(0)*q(2)),2*(q(2)*q(3)-q(0)*q(1)),q(0)**2-q(1)**2-q(2)**2+q(3)**2]
+    ! which is "the" axis of the molecule, for uniaxial molecules
+    ! use a to convert space-fixed to body-fixed axes thus: db = matmul(a,ds)
+    ! use transpose of a to convert body-fixed to space-fixed axes thus: ds = matmul(db,a)
 
-  SUBROUTINE time_stamp
-    IMPLICIT NONE
-    CHARACTER(len=8)  :: date
-    CHARACTER(len=10) :: time
-    REAL              :: cpu
-
-    CALL DATE_AND_TIME ( date, time )
-    CALL CPU_TIME ( cpu )
-    WRITE(*,'(a,t45,a4,a1,a2,a1,a2)'    ) 'Date: ', date(1:4), '/', date(5:6), '/', date(7:8)
-    WRITE(*,'(a,t47,a2,a1,a2,a1,a2)'    ) 'Time: ', time(1:2), ':', time(3:4), ':', time(5:6)
-    WRITE(*,'(a,t40,f15.5)') 'CPU time: ', cpu
-    
-  END SUBROUTINE time_stamp
-
-  FUNCTION lowercase ( oldstring ) RESULT ( newstring )
-    IMPLICIT NONE
-    CHARACTER(len=*),             INTENT(in)    :: oldstring 
-    CHARACTER(len=LEN(oldstring))               :: newstring 
-
-    INTEGER :: i, k 
-
-    DO i = 1, LEN(oldstring) 
-       k = IACHAR(oldstring(i:i)) 
-       IF ( k >= IACHAR('A') .AND. k <= IACHAR('Z') ) THEN 
-          k = k + IACHAR('a') - IACHAR('A') 
-          newstring(i:i) = ACHAR(k)
-       ELSE
-          newstring(i:i) = oldstring(i:i)
-       END IF
-    END DO
-  END FUNCTION lowercase
+    a(1,:) = [ q(0)**2+q(1)**2-q(2)**2-q(3)**2,   2*(q(1)*q(2)+q(0)*q(3)),       2*(q(1)*q(3)-q(0)*q(2))     ] ! 1st row
+    a(2,:) = [     2*(q(1)*q(2)-q(0)*q(3)),   q(0)**2-q(1)**2+q(2)**2-q(3)**2,   2*(q(2)*q(3)+q(0)*q(1))     ] ! 2nd row
+    a(3,:) = [     2*(q(1)*q(3)+q(0)*q(2)),       2*(q(2)*q(3)-q(0)*q(1)),   q(0)**2-q(1)**2-q(2)**2+q(3)**2 ] ! 3rd row
+  END FUNCTION q_to_a
 
 END MODULE utility_module

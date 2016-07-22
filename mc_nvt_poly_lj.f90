@@ -1,6 +1,7 @@
 ! mc_nvt_poly_lj.f90
 ! Monte Carlo, NVT ensemble, polyatomic molecule, LJ atoms
 PROGRAM mc_nvt_poly_lj
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit
   USE utility_module,    ONLY : metropolis, read_cnf_mols, write_cnf_mols, random_rotate_quaternion, &
        &                        run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_poly_lj_module, ONLY : allocate_arrays, deallocate_arrays, energy_1, energy, q_to_d, &
@@ -166,13 +167,13 @@ PROGRAM mc_nvt_poly_lj
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk )
+     CALL blk_end ( blk, output_unit )
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk              ! number configuration by block
      CALL write_cnf_mols ( cnf_prefix//sav_tag, n, box, r*box, e ) ! save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end
+  CALL run_end ( output_unit )
 
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3

@@ -1,6 +1,7 @@
 ! md_nve_lj.f90
 ! Molecular dynamics, NVE ensemble, Lennard-Jones atoms
 PROGRAM md_nve_lj
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit
   USE utility_module, ONLY : read_cnf_atoms, write_cnf_atoms, time_stamp, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_lj_module,   ONLY : initialize, finalize, force, r, v, f, n, energy_lrc
@@ -43,7 +44,7 @@ PROGRAM md_nve_lj
   WRITE(*,'(''md_nve_lj'')')
   WRITE(*,'(''Molecular dynamics, constant-NVE, Lennard-Jones'')')
   WRITE(*,'(''Results in units epsilon = sigma = 1'')')
-  CALL time_stamp
+  CALL time_stamp ( output_unit )
 
   ! Set sensible default run parameters for testing
   nblock      = 10
@@ -124,13 +125,13 @@ PROGRAM md_nve_lj
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk )
+     CALL blk_end ( blk, output_unit )
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end
+  CALL run_end ( output_unit )
 
   CALL force ( sigma, r_cut, pot, pot_sh, vir )
   CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
@@ -145,7 +146,7 @@ PROGRAM md_nve_lj
   WRITE(*,'(''Final shifted energy (sigma units)'',t40,f15.5)') energy_sh
   WRITE(*,'(''Final temperature (sigma units)'',   t40,f15.5)') temperature
   WRITE(*,'(''Final pressure (sigma units)'',      t40,f15.5)') pressure
-  CALL time_stamp
+  CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
 

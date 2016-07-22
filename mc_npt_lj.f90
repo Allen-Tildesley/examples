@@ -1,6 +1,7 @@
 ! mc_npt_lj.f90
 ! Monte Carlo, NPT ensemble, Lennard-Jones atoms
 PROGRAM mc_npt_lj
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit
   USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_lj_module,   ONLY : initialize, finalize, energy_1, energy, energy_lrc, move, &
@@ -176,13 +177,13 @@ PROGRAM mc_npt_lj
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk )
+     CALL blk_end ( blk, output_unit )
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk            ! number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box ) ! save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end
+  CALL run_end ( output_unit )
 
   potential = SUM ( pot ) / REAL ( n )
   pressure  = density * temperature + SUM ( vir ) / box**3

@@ -1,6 +1,7 @@
 ! ewald_module.f90
 ! r-space and k-space parts of Ewald sum for ions
 MODULE ewald_module
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: pot_r_ewald, pot_k_ewald
@@ -88,14 +89,16 @@ CONTAINS
              END DO
           END DO
        END DO
-       WRITE(*,'(''Ewald sum setup complete'')')
 
        first_call = .FALSE.
 
     END IF ! End of precalculation of expressions at the start
 
     ! Double-check value on later calls
-    IF ( k_sq_max /= nk**2 ) STOP 'nk error in pot_k_ewald'
+    IF ( k_sq_max /= nk**2 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'nk error ', k_sq_max, nk**2
+       STOP 'Error in pot_k_ewald'
+    END IF
 
     ! construct EXP(ik.r) for all ions and k-vectors **
 

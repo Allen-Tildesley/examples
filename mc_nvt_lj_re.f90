@@ -1,6 +1,7 @@
 ! mc_nvt_lj_re.f90
 ! Monte Carlo, NVT ensemble, Lennard-Jones, replica exchange
 PROGRAM mc_nvt_lj_re
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit
   USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_lj_module,   ONLY : initialize, finalize, energy_1, energy, energy_lrc, move, &
@@ -42,7 +43,7 @@ PROGRAM mc_nvt_lj_re
   REAL, DIMENSION(3) :: ri   ! position of atom i
   REAL, DIMENSION(3) :: zeta ! random numbers
 
-  INTEGER :: log_unit ! log file unit number 
+  INTEGER :: output_unit ! log file unit number 
   CHARACTER(len=3),  PARAMETER :: run_prefix = 'mc_'
   CHARACTER(len=7),  PARAMETER :: cnfinp_tag = '.cnfinp', cnfout_tag = '.cnfout'
   CHARACTER(len=7)             :: cnfsav_tag = '.cnfsav' ! may be overwritten with block number
@@ -62,16 +63,16 @@ PROGRAM mc_nvt_lj_re
   CALL MPI_Comm_size(MPI_COMM_WORLD,p,error)
   WRITE(rank_tag,'(i3.3)') m
 
-  OPEN(newunit=log_unit, file = run_prefix // rank_tag // '.log' )
-  WRITE(log_unit,'(''mc_nvt_lj_re'')')
-  WRITE(log_unit,'(''Monte Carlo, constant-NVT, Lennard-Jones, replica exchange'')')
-  WRITE(log_unit,'(''Results in units epsilon = sigma = 1'')')
-  WRITE(log_unit,'(a,t40,i15)') 'This is processor rank', m
-  WRITE(log_unit,'(a,t40,i15)') 'Number of processors is', p
+  OPEN(newunit=output_unit, file = run_prefix // rank_tag // '.log' )
+  WRITE(output_unit,'(''mc_nvt_lj_re'')')
+  WRITE(output_unit,'(''Monte Carlo, constant-NVT, Lennard-Jones, replica exchange'')')
+  WRITE(output_unit,'(''Results in units epsilon = sigma = 1'')')
+  WRITE(output_unit,'(a,t40,i15)') 'This is processor rank', m
+  WRITE(output_unit,'(a,t40,i15)') 'Number of processors is', p
 
   CALL RANDOM_SEED () ! Initialize random number generator
   CALL random_NUMBER ( zeta )
-  WRITE(log_unit,'(a,t40,3f15.5)') 'First three random numbers', zeta
+  WRITE(output_unit,'(a,t40,3f15.5)') 'First three random numbers', zeta
 
   ALLOCATE ( every_temperature(0:p-1), every_dr_max(0:p-1) )
 
@@ -87,26 +88,26 @@ PROGRAM mc_nvt_lj_re
   dr_max = every_dr_max(m) ! max displacement for this process
   beta = 1.0 / temperature
 
-  WRITE(log_unit,'(''Number of blocks'',         t40,i15)'  ) nblock
-  WRITE(log_unit,'(''Number of steps per block'',t40,i15)'  ) nstep
-  WRITE(log_unit,'(''Replica exchange swap interval'',t40,i15)'  ) swap_interval
-  WRITE(log_unit,'(''Temperature'',              t40,f15.5)') temperature
-  WRITE(log_unit,'(''Potential cutoff distance'',t40,f15.5)') r_cut
-  WRITE(log_unit,'(''Maximum displacement'',     t40,f15.5)') dr_max
+  WRITE(output_unit,'(''Number of blocks'',         t40,i15)'  ) nblock
+  WRITE(output_unit,'(''Number of steps per block'',t40,i15)'  ) nstep
+  WRITE(output_unit,'(''Replica exchange swap interval'',t40,i15)'  ) swap_interval
+  WRITE(output_unit,'(''Temperature'',              t40,f15.5)') temperature
+  WRITE(output_unit,'(''Potential cutoff distance'',t40,f15.5)') r_cut
+  WRITE(output_unit,'(''Maximum displacement'',     t40,f15.5)') dr_max
 
   CALL read_cnf_atoms ( run_prefix//rank_tag//cnfinp_tag, n, box )
-  WRITE(log_unit,'(''Number of particles'', t40,i15)'  ) n
-  WRITE(log_unit,'(''Box (in sigma units)'',t40,f15.5)') box
+  WRITE(output_unit,'(''Number of particles'', t40,i15)'  ) n
+  WRITE(output_unit,'(''Box (in sigma units)'',t40,f15.5)') box
   sigma = 1.0
   density = REAL(n) * ( sigma / box ) ** 3
-  WRITE(log_unit,'(''Reduced density'',t40,f15.5)') density
+  WRITE(output_unit,'(''Reduced density'',t40,f15.5)') density
 
   ! Convert run and potential parameters to box units
   sigma  = sigma / box
   r_cut  = r_cut / box
   dr_max = dr_max / box
-  WRITE(log_unit,'(''sigma (in box units)'',t40,f15.5)') sigma
-  WRITE(log_unit,'(''r_cut (in box units)'',t40,f15.5)') r_cut
+  WRITE(output_unit,'(''sigma (in box units)'',t40,f15.5)') sigma
+  WRITE(output_unit,'(''r_cut (in box units)'',t40,f15.5)') r_cut
   IF ( r_cut > 0.5 ) STOP 'r_cut too large '
 
   CALL initialize ( r_cut ) ! Allocate r
@@ -124,8 +125,8 @@ PROGRAM mc_nvt_lj_re
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE(log_unit,'(''Initial potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(log_unit,'(''Initial pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE(output_unit,'(''Initial potential energy (sigma units)'',t40,f15.5)') potential
+  WRITE(output_unit,'(''Initial pressure (sigma units)'',        t40,f15.5)') pressure
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Swap ratio', 'Potential', 'Pressure' ] )
 
@@ -209,18 +210,18 @@ PROGRAM mc_nvt_lj_re
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk )
+     CALL blk_end ( blk, output_unit )
      IF ( nblock < 1000 ) WRITE(cnfsav_tag(5:7),'(i3.3)') blk            ! number configuration by block
      CALL write_cnf_atoms ( run_prefix//rank_tag//cnfsav_tag, n, box, r*box ) ! save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end
+  CALL run_end ( output_unit )
 
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE(log_unit,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(log_unit,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE(output_unit,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
+  WRITE(output_unit,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
 
   CALL energy ( sigma, r_cut, overlap, pot, vir )
   IF ( overlap ) STOP 'Overlap in final configuration'
@@ -229,15 +230,15 @@ PROGRAM mc_nvt_lj_re
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE(log_unit,'(''Final check'')')
-  WRITE(log_unit,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(log_unit,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE(output_unit,'(''Final check'')')
+  WRITE(output_unit,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
+  WRITE(output_unit,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
 
   CALL write_cnf_atoms ( run_prefix//rank_tag//cnfout_tag, n, box, r*box )
 
   CALL finalize
 
-  CLOSE ( log_unit )
+  CLOSE ( output_unit )
   CALL MPI_Finalize(error)
 
 END PROGRAM mc_nvt_lj_re

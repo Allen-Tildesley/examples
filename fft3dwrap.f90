@@ -1,6 +1,7 @@
 ! fft3dwrap.f90
 ! 3D fast Fourier transform applied to a Gaussian function
 PROGRAM fft3dwrap
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
   USE, INTRINSIC :: iso_c_binding
   IMPLICIT NONE
   INCLUDE 'fftw3.f03'
@@ -9,7 +10,6 @@ PROGRAM fft3dwrap
   ! The details of this library are available at http://www.fftw.org/
   ! We assume that compiler flags are set such that real and integer fortran variables
   ! have the appropriate precision to match their C counterparts
-
 
   INTEGER(C_INT), PARAMETER :: sc   = 128   ! the number of points in real space in each dimension
   INTEGER,        PARAMETER :: sc2  = sc/2  ! In this example sc is the same in each dimension
@@ -26,8 +26,7 @@ PROGRAM fft3dwrap
   delta      = lper / REAL (sc)     ! periodic repeat distance in x, y and z
   delta3     = delta ** 3           ! factor for forward transform
 
-
-  WRITE(*,*) 'Input Gaussian'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Initial Gaussian'
   DO i = 1, sc
 
      IF ( i  <= sc2 ) THEN
@@ -58,7 +57,7 @@ PROGRAM fft3dwrap
            !write some elements of data
            nup = FLOOR( SQRT (REAL( i*i +j*j + k*k ) ) )
            IF( nup <= 3 ) THEN
-              WRITE(*,'(3I4, 2F10.4)') i, j, k, fin(i,j,k)
+              WRITE ( unit=output_unit, fmt='(3i4,2f10.4)') i, j, k, fin(i,j,k)
            END IF
 
         END DO
@@ -74,7 +73,7 @@ PROGRAM fft3dwrap
 
   dk = (2.0 * pi) / delta / REAL(sc) ! interval in reciprocal space
 
-  WRITE (*, *) 'Reciprocal-space transform'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Reciprocal-space transform'
 
   DO i = 1, sc
 
@@ -109,12 +108,12 @@ PROGRAM fft3dwrap
 
            nup  = FLOOR( SQRT (REAL( i*i +j*j + k*k ) ) )
            IF ( nup <= 3 ) THEN
-              WRITE(*,'(3I4, 4F10.4)') i, j, k, kmag, delta3 * fout(i,j,k), ghat
+              WRITE ( unit=output_unit, fmt='(3i4,4f10.4)') i, j, k, kmag, delta3 * fout(i,j,k), ghat
            END IF
         END DO
      END DO
   END DO
-  WRITE(*,'(/)')
+  WRITE ( unit=output_unit, fmt='(/)')
 
   ! backward Fourier transform
 
@@ -125,13 +124,13 @@ PROGRAM fft3dwrap
   ! Write some elements of data in real space after the back transform including the normalising
   ! factor 1/n**3. These should be compared with the input data
 
-  WRITE(*,*) 'Back Transform to real space'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Back Transform to real space'
   DO i = 1, sc
      DO j = 1, sc
         DO k = 1, sc
            nup = FLOOR( SQRT (REAL( i*i +j*j + k*k ) ) )
            IF( nup <= 3) THEN
-              WRITE(*,'(3I4, 2F10.4)') i, j, k, fin(i,j,k)/REAL( sc*sc*sc  )
+              WRITE ( unit=output_unit, fmt='(3i4,2f10.4)') i, j, k, fin(i,j,k)/REAL( sc*sc*sc  )
            END IF
         END DO
      END DO

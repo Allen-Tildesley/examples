@@ -1,15 +1,23 @@
 ! diffusion.f90
 ! Calculates vacf and msd
 PROGRAM diffusion
-  USE iso_fortran_env, ONLY : iostat_end
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   IMPLICIT NONE
 
-  INTEGER :: n ! number of atoms
-  INTEGER :: nt ! number of timesteps to correlate
-  INTEGER :: n0 ! number of time origins to store
+  ! Reads a trajectory from an unformatted (binary) file inp.trj
+  ! The first record should contain n (number of atoms) and box (box length)
+  ! Each subsequent record contains positions r and velocities v at a single time
+  ! Cubic periodic boundary conditions are assumed
+  ! r and box are assumed to be in the same units (e.g. LJ sigma)
+  ! Basic parameters are read from standard input using a namelist
+  ! Results are written to standard output
+
+  INTEGER :: n               ! number of atoms
+  INTEGER :: nt              ! number of timesteps to correlate
+  INTEGER :: n0              ! number of time origins to store
   INTEGER :: origin_interval ! interval for time origins
-  INTEGER :: dt ! time difference
-  INTEGER :: t  ! time (equivalent to record number in file)
+  INTEGER :: dt              ! time difference
+  INTEGER :: t               ! time (equivalent to record number in file)
 
   REAL,    DIMENSION(:,:),   ALLOCATABLE :: r, r1 ! positions (3,n)
   REAL,    DIMENSION(:,:),   ALLOCATABLE :: v     ! velocities (3,n)
@@ -20,24 +28,43 @@ PROGRAM diffusion
   REAL,    DIMENSION(:),     ALLOCATABLE :: msd   ! mean-squared displacement (0:nt)
   REAL,    DIMENSION(:),     ALLOCATABLE :: norm  ! normalization factors (0:nt)
 
-  INTEGER :: trj_unit, iostat
-  LOGICAL :: full
-  INTEGER :: k, mk, nk
-  REAL    :: box
+  CHARACTER(len=7), PARAMETER :: filename = 'inp.trj'
+  INTEGER                     :: trj_unit, ioerr
+  LOGICAL                     :: full
+  INTEGER                     :: k, mk, nk
+  REAL                        :: box
 
-  NAMELIST /diffusion_parameters/ nt, origin_interval
+  NAMELIST /nml/ nt, origin_interval
 
-  ! Sample defaults
-  nt = 1000
+  ! Example default values
+  nt              = 1000
   origin_interval = 10 
-  READ(*,nml=diffusion_parameters)
+
+  ! Namelist from standard input
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist from standard input', ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in diffusion'
+  END IF
+
   n0 = nt / origin_interval + 1
 
-  OPEN(newunit=trj_unit,file='diffusion.trjinp',status='old', &
-       & form = 'unformatted', access = 'sequential',action='read',iostat=iostat)
-  IF ( iostat /= 0 ) STOP 'Error opening trajectory file'
+  OPEN ( newunit=trj_unit, file=filename,status='old', &
+       & form = 'unformatted', access = 'sequential', action='read', iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error opening ', filename, ioerr
+     STOP 'Error in diffusion'
+  END IF
 
-  READ(trj_unit) n, box
+  READ ( unit=trj_unit, iostat=ioerr ) n, box
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading n, box from ', filename, ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in diffusion'
+  END IF
 
   ALLOCATE ( r(3,n), r1(3,n), v(3,n), r0(3,n,n0), v0(3,n,n0), t0(n0) )
   ALLOCATE ( msd(0:nt), vacf(0:nt), norm(0:nt) )
@@ -51,9 +78,13 @@ PROGRAM diffusion
 
   DO ! Single sweep through data until end
 
-     READ ( trj_unit, iostat=iostat ) r, v
-     IF ( iostat == iostat_end ) EXIT
-     IF ( iostat /= 0          ) STOP 'Error reading trajectory file'
+     READ ( unit=trj_unit, iostat=ioerr ) r, v
+     IF ( ioerr == iostat_end ) EXIT ! end of file is expected at some point
+     IF ( ioerr /= 0          ) THEN
+        WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading n, box from ', filename, ioerr
+        IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+        STOP 'Error in diffusion'
+     END IF
 
      IF ( t > 0 ) CALL unfold ( r1, r )
 
@@ -94,7 +125,7 @@ PROGRAM diffusion
   vacf(:) = vacf(:) / norm(:) / REAL ( n ) ! normalise correlation function
 
   DO t = 0, nt
-     WRITE ( *, '(i10,2f15.8)') t, vacf(t), msd(t)
+     WRITE ( unit=output_unit, fmt='(i10,2f15.8)' ) t, vacf(t), msd(t)
   END DO
 
 CONTAINS
