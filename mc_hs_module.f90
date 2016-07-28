@@ -2,6 +2,7 @@
 ! Overlap routines for MC simulation, hard spheres
 MODULE mc_hs_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, lt, ne, gt
@@ -28,7 +29,10 @@ CONTAINS
 
     INTEGER :: i
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in overlap'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in overlap'
+    END IF
 
     overlap  = .FALSE.
 
@@ -55,7 +59,10 @@ CONTAINS
     REAL               :: sigma_sq, rij_sq
     REAL, DIMENSION(3) :: rij
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in overlap_1'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in overlap_1'
+    END IF
 
     sigma_sq = sigma**2
 
@@ -96,7 +103,10 @@ CONTAINS
 
     INTEGER :: i
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in n_overlap'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in n_overlap'
+    END IF
 
     n_overlap  = 0
 
@@ -120,7 +130,10 @@ CONTAINS
     REAL               :: sigma_sq, rij_sq
     REAL, DIMENSION(3) :: rij
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in n_overlap_1'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in n_overlap_1'
+    END IF
 
     sigma_sq = sigma**2
 

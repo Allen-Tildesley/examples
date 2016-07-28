@@ -1,8 +1,8 @@
 ! md_nve_hs.f90
 ! Molecular dynamics, NVE ensemble, hard spheres
 PROGRAM md_nve_hs
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit
-  USE utility_module,   ONLY : read_cnf_atoms, write_cnf_atoms, &
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+  USE utility_module,   ONLY : read_cnf_atoms, write_cnf_atoms, time_stamp, &
        &                       run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_nve_hs_module, ONLY : initialize, finalize, update, overlap, collide, &
        &                       n, r, v, coltime, partner, lt, gt
@@ -16,6 +16,10 @@ PROGRAM md_nve_hs
   ! Assumes that collisions can be predicted by looking at 
   ! nearest neighbour particles in periodic boundaries
   ! ... so is unsuitable for low densities
+
+  ! Reads several variables and options from standard input using a namelist nml
+  ! Leave namelist empty to accept supplied defaults
+
   ! Box is taken to be of unit length during the dynamics.
   ! However, input configuration, output configuration,
   ! most calculations, and all results 
@@ -30,47 +34,54 @@ PROGRAM md_nve_hs
   REAL :: temperature ! temperature
   REAL :: t           ! time
 
-  CHARACTER(len=11), PARAMETER :: cnf_prefix = 'md_hard.cnf'
-  CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
-  CHARACTER(len=3)             :: sav_tag = 'sav' ! may be overwritten with block number
+  CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
+  CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
+  CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
 
   REAL :: coll_rate, pressure ! quantities to be averaged
   
-  INTEGER            :: i, j, k, ncoll, coll, blk, nblock
+  INTEGER            :: i, j, k, ncoll, coll, blk, nblock, ioerr
   REAL               :: tij
   REAL               :: vir_sum, sigma_sq
   REAL, DIMENSION(3) :: total_momentum
 
-  NAMELIST /run_parameters/ nblock, ncoll
+  NAMELIST /nml/ nblock, ncoll
 
-  WRITE(*,'(''md_hard'')')
-  WRITE(*,'(''Molecular dynamics of hard spheres'')')
-  WRITE(*,'(''Results in units sigma = 1, mass = 1'')')
+  WRITE ( unit=output_unit, fmt='(a)' ) 'md_nve_hs'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE, hard spheres'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Results in units sigma = 1, mass = 1'
+  CALL time_stamp ( output_unit )
 
   ! Set sensible defaults for testing
   nblock = 10
   ncoll  = 10000
-  READ(*,nml=run_parameters)
-  WRITE(*,'(''Number of blocks'',              t40,i15)') nblock
-  WRITE(*,'(''Number of collisions per block'',t40,i15)') ncoll
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in md_nve_hs'
+  END IF
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Number of blocks',               nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Number of collisions per block', ncoll
 
-  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box )
-  WRITE(*,'(''Number of particles'', t40,i15  )') n
-  WRITE(*,'(''Box (in sigma units)'',t40,f15.5)') box
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
   sigma = 1.0
   density = REAL (n) * ( sigma / box ) ** 3
-  WRITE(*,'(''Reduced density'',t40,f15.5)') density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
   CALL initialize
 
-  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v )
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
   total_momentum = SUM(v,dim=2)
   total_momentum = total_momentum / REAL(n)
-  WRITE(*,'(''Net momentum'',t40,3f15.5)') total_momentum
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Net momentum/particle', total_momentum
   v   = v - SPREAD(total_momentum,dim=1,ncopies=3)
   kin = 0.5 * SUM ( v**2 )
   temperature = 2.0 * kin / REAL ( 3*(n-1) )
-  WRITE(*,'(''Temperature (sigma units)'',t40,f15.5)') temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature (sigma units)', temperature
 
   ! Convert to box units (time units are unaffected)
   r(:,:) = r(:,:) / box
@@ -78,10 +89,11 @@ PROGRAM md_nve_hs
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
   sigma = sigma / box
   sigma_sq = sigma ** 2
-  WRITE(*,'(''Sigma (in box units)'',t40,f15.5)'  ) sigma
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Sigma (in box units)', sigma
 
   IF ( overlap ( sigma_sq ) ) THEN
-     STOP 'particle overlap in initial configuration'
+     WRITE ( unit=error_unit, fmt='(a)' ) 'Particle overlap in initial configuration'
+     STOP 'Error in md_nve_hs'
   END IF
 
   coltime(:) = HUGE(1.0)
@@ -137,7 +149,7 @@ PROGRAM md_nve_hs
 
   CALL run_end ( output_unit )
 
-  WRITE(*,'(''Final colliding pair'',t40,2i5)') i, j
+  WRITE ( unit=output_unit, fmt='(a,t40,2i5)' ) 'Final colliding pair', i, j
 
   IF ( overlap ( sigma_sq ) ) STOP 'Particle overlap in final configuration'
 
@@ -145,6 +157,7 @@ PROGRAM md_nve_hs
   r(:,:) = r(:,:) * box
   v(:,:) = v(:,:) * box
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r, v )
+  CALL time_stamp ( output_unit )
 
   CALL finalize
 

@@ -1,8 +1,8 @@
 ! mc_nvt_sc.f90
 ! Monte Carlo, NVT ensemble, hard spherocylinders
 PROGRAM mc_nvt_sc
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit
-  USE utility_module, ONLY : read_cnf_mols, write_cnf_mols, &
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+  USE utility_module, ONLY : read_cnf_mols, write_cnf_mols, time_stamp, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add, &
        &                     random_rotate_vector, orientational_order
   USE mc_sc_module,   ONLY : allocate_arrays, deallocate_arrays, overlap_1, overlap, n_overlap, n, r, e, ne
@@ -12,6 +12,8 @@ PROGRAM mc_nvt_sc
   ! Cubic periodic boundary conditions
   ! Conducts Monte Carlo (the temperature is irrelevant)
   ! Uses no special neighbour lists
+  ! Reads several variables and options from standard input using a namelist nml
+  ! Leave namelist empty to accept supplied defaults
 
   ! Box is taken to be of unit length during the Monte Carlo
   ! However, input configuration, output configuration,
@@ -30,19 +32,20 @@ PROGRAM mc_nvt_sc
   REAL :: epsilon     ! pressure scaling parameter
   REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
 
-  INTEGER            :: blk, stp, i, nstep, nblock, moves
+  INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL, DIMENSION(3) :: ri, ei ! position and orientation of atom i
   REAL, DIMENSION(3) :: zeta   ! random numbers
 
-  CHARACTER(len=13), PARAMETER :: cnf_prefix = 'mc_nvt_sc.cnf'
-  CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
-  CHARACTER(len=3)             :: sav_tag = 'sav' ! may be overwritten with block number
+  CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
+  CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
+  CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
 
-  NAMELIST /run_parameters/ nblock, nstep, dr_max, de_max, length, epsilon
+  NAMELIST /nml/ nblock, nstep, dr_max, de_max, length, epsilon
 
-  WRITE(*,'(''mc_nvt_sc'')')
-  WRITE(*,'(''Monte Carlo, constant-NVT, hard spherocylinders'')')
-  WRITE(*,'(''Results in units sigma = 1'')')
+  WRITE( unit=output_unit, fmt='(a)' ) 'mc_nvt_sc'
+  WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT, hard spherocylinders'
+  WRITE( unit=output_unit, fmt='(a)' ) 'Results in units sigma = 1'
+  CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! initialize random number generator
 
@@ -53,23 +56,29 @@ PROGRAM mc_nvt_sc
   dr_max  = 0.15
   de_max  = 0.15
   epsilon = 0.005
-  READ(*,nml=run_parameters)
-  WRITE(*,'(''Number of blocks'',           t40,i15)'  ) nblock
-  WRITE(*,'(''Number of steps per block'',  t40,i15)'  ) nstep
-  WRITE(*,'(''Spherocylinder L/D ratio'',   t40,f15.5)') length
-  WRITE(*,'(''Maximum displacement'',       t40,f15.5)') dr_max
-  WRITE(*,'(''Pressure scaling parameter'', t40,f15.5)') epsilon
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in mc_nvt_sc'
+  END IF
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',           nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',  nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Spherocylinder L/D ratio',   length
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum displacement',       dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Pressure scaling parameter', epsilon
 
-  CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box )
-  WRITE(*,'(''Number of particles'', t40,i15)'  ) n
-  WRITE(*,'(''Box (in sigma units)'',t40,f15.5)') box
+  CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box ) ! first call just to get n and box
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
   sigma = 1.0
   density = REAL(n) * ( sigma / box ) ** 3
-  WRITE(*,'(''Reduced density'',t40,f15.5)') density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
   CALL allocate_arrays
 
-  CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box, r, e )
+  CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box, r, e ) ! second call to get r and e
 
   ! Convert to box units
   r(:,:) = r(:,:) / box
@@ -77,11 +86,14 @@ PROGRAM mc_nvt_sc
   sigma  = sigma / box
   length = length / box
   dr_max = dr_max / box
-  WRITE(*,'(''sigma (in box units)'', t40,f15.5)') sigma
-  WRITE(*,'(''length (in box units)'',t40,f15.5)') length
-  WRITE(*,'(''dr_max (in box units)'',t40,f15.5)') dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'sigma (in box units)',  sigma
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'length (in box units)', length
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'dr_max (in box units)', dr_max
 
-  IF ( overlap ( sigma, length ) ) STOP 'Overlap in initial configuration'
+  IF ( overlap ( sigma, length ) ) then
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
+     STOP 'Error in mc_nvt_sc'
+  END IF
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Pressure', 'P2 Order' ] )
 
@@ -120,16 +132,20 @@ PROGRAM mc_nvt_sc
      END DO ! End loop over steps
 
      CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk                   ! number configuration by block
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk              ! number configuration by block
      CALL write_cnf_mols ( cnf_prefix//sav_tag, n, box, r*box, e ) ! save configuration
 
   END DO ! End loop over blocks
 
   CALL run_end ( output_unit )
 
-  IF ( overlap ( sigma, length ) ) STOP 'Overlap in final configuration'
-
+  IF ( overlap ( sigma, length ) ) THEN ! should never happen
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
+     STOP 'Error in mc_nvt_sc'
+  END IF
+  
   CALL write_cnf_mols ( cnf_prefix//out_tag, n, box, r*box, e )
+  CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
 

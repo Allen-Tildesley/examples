@@ -7,51 +7,53 @@ PROGRAM t_tensor
   ! theta1xx = -0.5*thetam1, theta1yy = -0.5*thetam1, and theta1zz = thetam1 in the molecule-fixed system.
   ! The vector r12=r1-r2 points from 2 to 1.
 
-  USE utility_module, ONLY : random_orientation_vector
+  ! TODO MPA tidy up this program
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
+  USE               utility_module,  ONLY : random_orientation_vector
   IMPLICIT NONE
 
-  REAL, DIMENSION(3)                  :: r1, r2
-  REAL, DIMENSION(3)                  :: e1, e2, econ
-  REAL, DIMENSION(3)                  :: r12, r12u
-  REAL, DIMENSION(3,3)                :: tt2, theta1, theta2, emat
-  REAL, DIMENSION(3,3,3)              :: tt3
-  REAL                                :: mu1, mu2, thetam1, thetam2
-  REAL                                :: modr12, r12sq, r12cu, r12fo
-  REAL                                :: vddt, vdde, vdqt, vdqe, vqdt, vqde, c1, c2, c12
-  REAL                                :: f12tx, f12ty, f12tz, f12ex, f12ey, f12ez
+  REAL, DIMENSION(3)      :: r1, r2
+  REAL, DIMENSION(3)      :: e1, e2, econ
+  REAL, DIMENSION(3)      :: r12, r12u
+  REAL, DIMENSION(3,3)    :: tt2, theta1, theta2, emat
+  REAL, DIMENSION(3,3,3)  :: tt3
+  REAL                    :: mu1, mu2, thetam1, thetam2
+  REAL                    :: modr12, r12sq, r12cu, r12fo
+  REAL                    :: vddt, vdde, vdqt, vdqe, vqdt, vqde, c1, c2, c12
+  REAL                    :: f12tx, f12ty, f12tz, f12ex, f12ey, f12ez
 
-  WRITE(*,'(''T-tensor '',/)')
-  WRITE(*,'(''Calculation of electrostatic inteactions beteeen linear molecules'' )')
-  WRITE(*,'(''using T-tensors and Euler angles                                 ''/)')
+  WRITE ( unit=output_unit, fmt='(a)' ) 'T-tensor '
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Calculation of electrostatic interactions beteeen linear molecules' 
+  WRITE ( unit=output_unit, fmt='(a)' ) 'using T-tensors and Euler angles'
 
   ! Set up parameters for the pair interaction
 
-  mu1      = 1.0                                       ! dipole moment of molecule 1
-  mu2      = 1.0                                       ! dipole moment of molecule 2
-  thetam1  = 1.0                                       ! quadrupole moment of molecule 1
-  thetam2  = 1.0                                       ! quadrupole moment of molecule 2
-  r1       = (/ 2.0,  1.0,  1.0/)                      ! set position of molecule 1
-  r2       = (/ 0.0,  0.0,  0.0/)                      ! molecule is at the origin
-  e1       = (/ 0.0,  0.0,  1.0/)                      ! axial vector of molecule 1
-  e2       = (/ 0.0,  1.0,  0.0/)                      ! axial vector of molecule 2
+  mu1      = 1.0                 ! dipole moment of molecule 1
+  mu2      = 1.0                 ! dipole moment of molecule 2
+  thetam1  = 1.0                 ! quadrupole moment of molecule 1
+  thetam2  = 1.0                 ! quadrupole moment of molecule 2
+  r1       = [ 2.0,  1.0,  1.0 ] ! set position of molecule 1
+  r2       = [ 0.0,  0.0,  0.0 ] ! molecule is at the origin
+  e1       = [ 0.0,  0.0,  1.0 ] ! axial vector of molecule 1
+  e2       = [ 0.0,  1.0,  0.0 ] ! axial vector of molecule 2
 
-  r12         = r1 - r2
-  r12sq       = DOT_PRODUCT(r12, r12)
-  modr12      = SQRT(r12sq)
-  r12u        = r12 / modr12
-  r12cu       = r12sq * modr12
-  r12fo       = r12sq * r12sq
+  r12    = r1 - r2
+  r12sq  = DOT_PRODUCT(r12, r12)
+  modr12 = SQRT(r12sq)
+  r12u   = r12 / modr12
+  r12cu  = r12sq * modr12
+  r12fo  = r12sq * r12sq
 
   ! Choose orientations at random
 
   CALL random_orientation_vector ( e1 )
   CALL random_orientation_vector ( e2 )
 
-  WRITE(*,'(''Position of molecule    1'', 3f10.6)')    r1
-  WRITE(*,'(''Orientation of molecule 1'', 3f10.6)')    e1
-  WRITE(*,'(''Position of molecule    2'', 3f10.6)')    r2
-  WRITE(*,'(''Orientation of molecule 2'', 3f10.6, /)') e2
+  WRITE ( unit=output_unit, fmt='(a,3f10.6)' ) 'Position of molecule    1', r1
+  WRITE ( unit=output_unit, fmt='(a,3f10.6)' ) 'Orientation of molecule 1', e1
+  WRITE ( unit=output_unit, fmt='(a,3f10.6)' ) 'Position of molecule    2', r2
+  WRITE ( unit=output_unit, fmt='(a,3f10.6)' ) 'Orientation of molecule 2', e2
 
   ! calculate the elements of the quadrupole tensors in the space-fixed system
 
@@ -88,8 +90,8 @@ PROGRAM t_tensor
   c12     = DOT_PRODUCT(e1, e2)
   vdde    = mu1 * mu2 * ( c12 - 3.0 * c1 * c2 ) / r12cu
 
-  WRITE(*,'('' Dipole-dipole energy from T tensor     ='', f10.6)')    vddt
-  WRITE(*,'('' Dipole-dipole energy from Euler angles ='', f10.6, /)') vdde
+  WRITE ( unit=output_unit, fmt='(a,f10.6)' ) 'Dipole-dipole energy from T tensor     =', vddt
+  WRITE ( unit=output_unit, fmt='(a,f10.6)' ) 'Dipole-dipole energy from Euler angles =', vdde
 
   ! Calculate the third rank tensor T3
 
@@ -105,8 +107,8 @@ PROGRAM t_tensor
 
   vdqe =   1.5 * mu1 * thetam2 * ( c1 * (1.0 - 5.0 * c2 * c2) + 2.0 * c2 * c12 ) / r12fo
 
-  WRITE(*,'('' Dipole-quadrupole energy from T-tensors    ='', f10.6)')    vdqe
-  WRITE(*,'('' Dipole-quadrupole energy from Euler angles ='', f10.6, /)') vdqt
+  WRITE ( unit=output_unit, fmt='(a,f10.6)' ) 'Dipole-quadrupole energy from T-tensors    =', vdqe
+  WRITE ( unit=output_unit, fmt='(a,f10.6)' ) 'Dipole-quadrupole energy from Euler angles =', vdqt
 
   ! Calculate the quadrupole-dipole energy
 
@@ -117,8 +119,8 @@ PROGRAM t_tensor
   vqdt  =  (1.0/3.0) * thetam1 * mu2 * DOT_PRODUCT( econ, e2 )
   vqde  = - 1.5 * thetam1 * mu2 * ( c2 * (1.0 - 5.0 * c1 * c1 ) + 2.0 * c1 * c12 ) / r12fo
 
-  WRITE(*,'('' Quadrupole-dipole energy from T-tensors    ='', f10.6)')     vqde
-  WRITE(*,'('' Quadrupole-dipole energy from Euler angles ='', f10.6, /)')  vqdt
+  WRITE ( unit=output_unit, fmt='(a,f10.6)' ) 'Quadrupole-dipole energy from T-tensors    =', vqde
+  WRITE ( unit=output_unit, fmt='(a,f10.6)' ) 'Quadrupole-dipole energy from Euler angles =', vqdt
 
   ! Calculate of the dipole-dipole force
 
@@ -144,8 +146,8 @@ PROGRAM t_tensor
   f12ey = (3 * mu1 * mu2 / r12fo ) * ((c12 - 5.0 *c1 * c2) * r12u(2) + c2 * e1(2) + c1 * e2(2) )
   f12ez = (3 * mu1 * mu2 / r12fo ) * ((c12 - 5.0 *c1 * c2) * r12u(3) + c2 * e1(3) + c1 * e2(3) )
 
-  WRITE(*,'('' Dipole-dipole force from T-tensors    ='', 3f10.6)') f12tx, f12ty, f12tz
-  WRITE(*,'('' Dipole-dipole force from Euler angles ='', 3f10.6)') f12ex, f12ey, f12ez
+  WRITE ( unit=output_unit, fmt='(a,3f10.6)' ) 'Dipole-dipole force from T-tensors    =', f12tx, f12ty, f12tz
+  WRITE ( unit=output_unit, fmt='(a,3f10.6)' ) 'Dipole-dipole force from Euler angles =', f12ex, f12ey, f12ez
 
 
 CONTAINS
@@ -154,14 +156,12 @@ CONTAINS
 
     IMPLICIT NONE
 
-    REAL, DIMENSION(:)     , INTENT(IN)         :: r         ! unit vector from j to i
-    REAL                   , INTENT(IN)         :: r3        ! third power of the modulus of rij
-    REAL, DIMENSION(:,:)   , INTENT(OUT)        :: t2        ! second-rank interaction tensor
+    REAL, DIMENSION(:),   INTENT(in)  :: r  ! unit vector from j to i
+    REAL,                 INTENT(in)  :: r3 ! third power of the modulus of rij
+    REAL, DIMENSION(:,:), INTENT(out) :: t2 ! second-rank interaction tensor
 
-
-
-    REAL                                        :: txx, tyy, tzz
-    REAL                                        :: txy, txz, tyz
+    REAL :: txx, tyy, tzz
+    REAL :: txy, txz, tyz
 
     ! calculate the 6 independent second rank elements
 
@@ -192,13 +192,13 @@ CONTAINS
 
     IMPLICIT NONE
 
-    REAL, DIMENSION(:)     , INTENT(IN)         :: r         ! unit vector from 2 to 1
-    REAL                   , INTENT(IN)         :: r4        ! fourth power of the modulus of r12
-    REAL, DIMENSION(:,:,:) , INTENT(OUT)        :: t3        ! third-rank interaction tensor (note positive sign)
+    REAL, DIMENSION(:),     INTENT(in)  :: r  ! unit vector from 2 to 1
+    REAL,                   INTENT(in)  :: r4 ! fourth power of the modulus of r12
+    REAL, DIMENSION(:,:,:), INTENT(out) :: t3 ! third-rank interaction tensor (note positive sign)
 
 
-    REAL                                        :: txxx, tyyy, tzzz, txyz
-    REAL                                        :: txxz, txxy, txyy, txzz, tyyz, tyzz
+    REAL :: txxx, tyyy, tzzz, txyz
+    REAL :: txxz, txxy, txyy, txzz, tyyz, tyzz
 
     ! calculate the unique third rank elements
 
@@ -251,11 +251,12 @@ CONTAINS
 
     IMPLICIT NONE
 
-    REAL, DIMENSION(:,:,:) , INTENT(IN)         :: mat3       ! third-rank  tensor
-    REAL, DIMENSION(:,:)   , INTENT(IN)         :: mat2       ! second-rank tensor
-    REAL, DIMENSION(:)     , INTENT(OUT)        :: mat1       ! first-rank contraction
-    INTEGER                                     :: i, j, k
-    REAL                                        :: sum
+    REAL, DIMENSION(:,:,:), INTENT(in)  :: mat3       ! third-rank  tensor
+    REAL, DIMENSION(:,:),   INTENT(in)  :: mat2       ! second-rank tensor
+    REAL, DIMENSION(:),     INTENT(out) :: mat1       ! first-rank contraction
+
+    INTEGER :: i, j, k
+    REAL    :: sum
 
     ! loop over first component of mat1
 

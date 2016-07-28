@@ -9,7 +9,8 @@ PROGRAM diffusion
   ! Each subsequent record contains positions r and velocities v at a single time
   ! Cubic periodic boundary conditions are assumed
   ! r and box are assumed to be in the same units (e.g. LJ sigma)
-  ! Basic parameters are read from standard input using a namelist
+  ! Values of basic parameters nt, origin_interval are read from standard input using a namelist nml
+  ! Leave namelist empty to accept supplied defaults
   ! Results are written to standard output
 
   INTEGER :: n               ! number of atoms
@@ -43,7 +44,7 @@ PROGRAM diffusion
   ! Namelist from standard input
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist from standard input', ioerr
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
      IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in diffusion'

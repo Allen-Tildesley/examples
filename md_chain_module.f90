@@ -2,11 +2,12 @@
 ! Force & constraint routines for MD simulation, repulsive Lennard-Jones atom chain
 MODULE md_chain_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, v, f, f_spring
   PUBLIC :: allocate_arrays, deallocate_arrays, force, spring
-  PUBLIC :: rattle_a, rattle_b, check_constraints, milcshake_a, milcshake_b 
+  PUBLIC :: rattle_a, rattle_b, worst_bond, milcshake_a, milcshake_b 
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
@@ -85,10 +86,9 @@ CONTAINS
 
     END DO ! End outer loop over atoms
 
-    ! multiply results by numerical factors
-
-    f      = f      * 24.0
-    pot    = pot    * 4.0
+    ! Multiply results by numerical factors
+    f      = f   * 24.0
+    pot    = pot * 4.0
 
   END SUBROUTINE force
 
@@ -112,7 +112,7 @@ CONTAINS
 
        rij(:) = r(:,i) - r(:,j)  ! separation vector
        rij_sq = SUM ( rij**2 )   ! squared separation
-       rij_mag = sqrt ( rij_sq ) ! separation
+       rij_mag = SQRT ( rij_sq ) ! separation
 
        potij         = 0.5*k_spring*(rij_mag-bond)**2 ! spring potential
        pot_spring    = pot_spring + potij
@@ -163,7 +163,10 @@ CONTAINS
 
                 rij_old = r_old(:,i) - r_old(:,j)
                 dot = DOT_PRODUCT ( rij_old, rij )
-                IF ( dot < dot_tol * bond**2 ) STOP ' constraint failure in rattle_a'
+                IF ( dot < dot_tol * bond**2 ) THEN
+                   WRITE ( unit=error_unit, fmt='(a,3f15.5)' ) 'Constraint failure', dot, dot_tol, bond**2
+                   STOP 'Error in rattle_a'
+                END IF
 
                 ! in the following formulae, inverse masses are all unity
                 g      = diffsq / ( 4.0 * dot ) 
@@ -186,7 +189,10 @@ CONTAINS
        moved(:)  = moving(:)
        moving(:) = .FALSE.
        iter = iter + 1
-       IF ( iter > iter_max ) STOP 'too many iterations in rattle_a'
+       IF ( iter > iter_max ) THEN
+          WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Too many iterations', iter, iter_max
+          STOP 'Error in rattle_a'
+       END IF
 
     END DO ! end of iterative loop
 
@@ -249,7 +255,10 @@ CONTAINS
        moving(:) = .FALSE.
 
        iter = iter + 1
-       IF ( iter > iter_max ) STOP 'too many iterations in rattle_b'
+       IF ( iter > iter_max ) THEN
+          WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Too many iterations', iter, iter_max
+          STOP 'Error in rattle_b'
+       END IF
 
     END DO ! end iterative loop
 
@@ -257,23 +266,21 @@ CONTAINS
 
   END SUBROUTINE rattle_b
 
-  SUBROUTINE check_constraints ( bond )
+  FUNCTION worst_bond ( bond ) RESULT ( diff_max )
     REAL, INTENT(in) :: bond
+    REAL             :: diff_max
 
-    INTEGER :: i
-    REAL    :: diff, diff_max, diff_min
+    INTEGER            :: i
+    REAL               :: diff
     REAL, DIMENSION(3) :: rij
 
     diff_max = 0.0
-    diff_min = 0.0
     DO i = 1, n-1
        rij = r(:,i) - r(:,i+1)          ! current bond vector
        diff = SQRT( SUM(rij**2) ) -bond ! amount by which constraint is violated
        diff_max = MAX ( diff_max, diff )
-       diff_min = MIN ( diff_min, diff )
     END DO
-    WRITE(*,'(a,t40,2es15.5)') 'Bond length deviation range = ', diff_min, diff_max
-  END SUBROUTINE check_constraints
+  END FUNCTION worst_bond
 
   SUBROUTINE milcshake_a ( dt, bond )
     REAL, INTENT(in) :: dt, bond
@@ -293,15 +300,15 @@ CONTAINS
 
     ! Elements of tridiagonal matrix
     ! In this example, all masses are equal to unity
-    dd(1) = dot_PRODUCT ( rij_old(:,1), rij_new(:,1) ) / 0.5
-    du(1) = dot_PRODUCT ( rij_old(:,2), rij_new(:,1) )
+    dd(1) = DOT_PRODUCT ( rij_old(:,1), rij_new(:,1) ) / 0.5
+    du(1) = DOT_PRODUCT ( rij_old(:,2), rij_new(:,1) )
     DO i = 2, n-2
-       dl(i-1) = dot_PRODUCT ( rij_old(:,i-1), rij_new(:,i) )
-       dd(i)   = dot_PRODUCT ( rij_old(:,i),   rij_new(:,i) ) / 0.5
-       du(i)   = dot_PRODUCT ( rij_old(:,i+1), rij_new(:,i) )
+       dl(i-1) = DOT_PRODUCT ( rij_old(:,i-1), rij_new(:,i) )
+       dd(i)   = DOT_PRODUCT ( rij_old(:,i),   rij_new(:,i) ) / 0.5
+       du(i)   = DOT_PRODUCT ( rij_old(:,i+1), rij_new(:,i) )
     ENDDO
-    dl(n-2) = dot_PRODUCT ( rij_old(:,n-3), rij_new(:,n-2) ) 
-    dd(n-1) = dot_PRODUCT ( rij_old(:,n-1), rij_new(:,n-1) ) / 0.5
+    dl(n-2) = DOT_PRODUCT ( rij_old(:,n-3), rij_new(:,n-2) ) 
+    dd(n-1) = DOT_PRODUCT ( rij_old(:,n-1), rij_new(:,n-1) ) / 0.5
 
     dl(:) = -2.0*dl(:)
     dd(:) =  2.0*dd(:)  
@@ -345,7 +352,10 @@ CONTAINS
        done      = ( max_error <= tol )                                
 
        iter = iter + 1
-       IF ( iter > iter_max ) STOP 'too many iterations in milcshake_a'
+       IF ( iter > iter_max ) then
+          WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Too many iterations', iter, iter_max
+          STOP 'Error in milcshake_a'
+       END IF
 
     END DO
 
@@ -360,7 +370,7 @@ CONTAINS
 
   SUBROUTINE milcshake_b ( dt, bond, wc )
     REAL, INTENT(in)  :: dt, bond
-    REAL, intent(out) :: wc
+    REAL, INTENT(out) :: wc
 
     INTEGER :: i
     LOGICAL :: info
@@ -372,15 +382,15 @@ CONTAINS
     rij(:,1:n-1) = r(:,1:n-1) - r(:,2:n)
     rhs(:) = - SUM ( vij*rij, dim=1 )
 
-    dd(1) =  dot_PRODUCT ( rij(:,1), rij(:,1) ) / 0.5
-    du(1) = -dot_PRODUCT ( rij(:,2), rij(:,1) )
+    dd(1) =  DOT_PRODUCT ( rij(:,1), rij(:,1) ) / 0.5
+    du(1) = -DOT_PRODUCT ( rij(:,2), rij(:,1) )
     DO i = 2, n-2
-       dl(i-1) = -dot_PRODUCT ( rij(:,i-1), rij(:,i) )
-       dd(i)   =  dot_PRODUCT ( rij(:,i),   rij(:,i) ) / 0.5
-       du(i)   = -dot_PRODUCT ( rij(:,i+1), rij(:,i) )
+       dl(i-1) = -DOT_PRODUCT ( rij(:,i-1), rij(:,i) )
+       dd(i)   =  DOT_PRODUCT ( rij(:,i),   rij(:,i) ) / 0.5
+       du(i)   = -DOT_PRODUCT ( rij(:,i+1), rij(:,i) )
     ENDDO
-    dl(n-2) = -dot_PRODUCT ( rij(:,n-2), rij(:,n-1) )
-    dd(n-1) =  dot_PRODUCT ( rij(:,n-1), rij(:,n-1) ) / 0.5
+    dl(n-2) = -DOT_PRODUCT ( rij(:,n-2), rij(:,n-1) )
+    dd(n-1) =  DOT_PRODUCT ( rij(:,n-1), rij(:,n-1) ) / 0.5
 
     CALL dgtsv ( n-1, 1, dl, dd, du, rhs, n-1, info ) 
     lambda(:) = rhs(:)
@@ -395,5 +405,5 @@ CONTAINS
     wc = wc / (0.5*dt) / 3.0 ! scale factors for virial
 
   END SUBROUTINE milcshake_b
-  
+
 END MODULE md_chain_module

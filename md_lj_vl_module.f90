@@ -2,6 +2,7 @@
 ! Force routine for MD, LJ atoms, using Verlet neighbour list
 MODULE md_lj_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, v, f
@@ -19,7 +20,7 @@ CONTAINS
     REAL, INTENT(in) :: r_cut
 
     ALLOCATE ( r(3,n), v(3,n), f(3,n) )
-
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list based on r_cut =', r_cut
     CALL initialize_list ( n, r_cut )
   END SUBROUTINE initialize
 

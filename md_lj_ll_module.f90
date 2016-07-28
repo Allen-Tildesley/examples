@@ -2,6 +2,7 @@
 ! Force routine for MD simulation, LJ atoms, using link-lists
 MODULE md_lj_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, v, f
@@ -19,6 +20,7 @@ CONTAINS
     REAL, INTENT(in) :: r_cut
 
     ALLOCATE ( r(3,n), v(3,n), f(3,n) )
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Link cells based on r_cut =', r_cut
     CALL initialize_list ( n, r_cut )
 
   END SUBROUTINE initialize
@@ -92,7 +94,10 @@ CONTAINS
 
                    DO ! Begin loop over j atoms in list
                       IF ( j == 0 ) EXIT ! end of link list
-                      IF ( j == i ) STOP 'Index error in force' ! This should never happen
+                      IF ( j == i ) THEN ! This should never happen
+                         WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Index error', i, j
+                         STOP 'Error in force' 
+                      END IF
 
                       rij(:) = r(:,i) - r(:,j)           ! separation vector
                       rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundary conditions in box=1 units

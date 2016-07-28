@@ -7,6 +7,7 @@ PROGRAM meshup3d
   ! The charges are positioned in a box of unit length.
   ! The charge mesh is indexed from 0 to sc-1 in each coordinate direction
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
   IMPLICIT NONE
 
   INTEGER                             :: n   ! number of charges
@@ -30,7 +31,7 @@ PROGRAM meshup3d
   ALLOCATE ( rho(0:sc-1,0:sc-1,0:sc-1) ) ! C-style indexing is convenient here
   ALLOCATE ( r(3,n), dr(3,n), q(n) )
 
-  WRITE(*,'(a)') '3-D mesh assignment for unit boxlength, coordinates in range (0,1)'
+  WRITE ( unit=output_unit, fmt='(a)' ) '3-D mesh assignment for unit boxlength, coordinates in range (0,1)'
 
   ! For illustration we choose random charge positions with coordinates in range (0,1)
   ! In a real application, we would convert positions into this range
@@ -80,14 +81,14 @@ PROGRAM meshup3d
 
   ! Output mesh charge density
   DO n3 = 0, sc-1
-     WRITE(*,'(a,i5)') 'z-layer ', n3
+     WRITE( unit=output_unit, fmt='(a,i5)' ) 'z-layer ', n3
      DO n2 = 0, sc-1
-        WRITE(*,'(*(f10.4))') rho(:,n2,n3)
+        WRITE( unit=output_unit, fmt='(*(f10.4))') rho(:,n2,n3)
      END DO
   END DO
 
   ! Finally check integrated charge density
-  WRITE(*,'(a,2f10.6)') 'Total charge = ', SUM ( q ), SUM ( rho )*(h**3)
+  WRITE( unit=output_unit, fmt='(a,2f10.6)') 'Total charge = ', SUM ( q ), SUM ( rho )*(h**3)
 
   DEALLOCATE ( r, dr, q, rho )
   

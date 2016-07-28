@@ -1,8 +1,9 @@
 ! test_pot_atom.f90
 ! Test potential, forces for atoms
 PROGRAM test_pot
-  USE test_pot_module, ONLY : n, force
-  USE utility_module,  ONLY : init_random_seed, cross_product
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
+  USE               test_pot_module, ONLY : n, force
+  USE               utility_module,  ONLY : init_random_seed, cross_product
   IMPLICIT NONE
 
   LOGICAL              :: ok
@@ -14,9 +15,8 @@ PROGRAM test_pot
   CHARACTER(len=2), DIMENSION(3), PARAMETER :: cf = ['Fx','Fy','Fz']
 
   ! Any of the following parameters could be empirically adjusted
-  REAL, PARAMETER      :: delta = 0.00001, d_min = 0.3, d_max = 1.5, pot_max = 10.0
-  INTEGER, PARAMETER   :: ntry = 1000
-
+  REAL,    PARAMETER :: delta = 0.00001, d_min = 0.3, d_max = 1.5, pot_max = 10.0
+  INTEGER, PARAMETER :: ntry = 1000
 
   ! Initialize random number generator                          
   CALL init_random_seed()
@@ -31,10 +31,10 @@ PROGRAM test_pot
         EXIT
      END IF
   END DO
-  IF (.NOT.ok) WRITE(*,'(a)') 'Warning: atom placement failed'
+  IF (.NOT.ok) WRITE ( output_unit, fmt='(a)' ) 'Warning: atom placement failed'
 
   CALL force ( r, pot, f ) ! Calculation of potential, and analytical forces
-  WRITE(*,'(a,t25,f15.5)') 'Potential energy = ', pot
+  WRITE ( output_unit, fmt='(a,t25,f15.5)' ) 'Potential energy = ', pot
 
   ! Check momentum and angular momentum conservation
   ftot = SUM ( f, dim=2 )
@@ -42,10 +42,10 @@ PROGRAM test_pot
   DO i = 1, n
      ttot = ttot + cross_product ( r(:,i), f(:,i) )
   END DO
-  WRITE(*,'(a,t25,3es15.3)') 'Total force      = ', ftot
-  WRITE(*,'(a,t25,3es15.3)') 'Total torque     = ', ttot
+  WRITE ( output_unit, fmt='(a,t25,3es15.3)') 'Total force      = ', ftot
+  WRITE ( output_unit, fmt='(a,t25,3es15.3)') 'Total torque     = ', ttot
 
-  WRITE(*,'(2a10,3a15)') 'Atom', 'Component', 'Exact', 'Numerical', 'Difference'
+  WRITE ( output_unit, fmt='(2a10,3a15)') 'Atom', 'Component', 'Exact', 'Numerical', 'Difference'
 
   DO i = 1, n
 
@@ -59,7 +59,7 @@ PROGRAM test_pot
         CALL force ( r, potm )
         r(:,i)    = rsave ! Restore position
         fnum      = -(potp-potm)/(2.0*delta)
-        WRITE(*,'(i10,a10,2f15.5,es15.3)') i, cf(xyz), f(xyz,i), fnum, f(xyz,i)-fnum
+        WRITE ( output_unit, fmt='(i10,a10,2f15.5,es15.3)' ) i, cf(xyz), f(xyz,i), fnum, f(xyz,i)-fnum
      END DO ! End loop to calculate numerical forces
 
   END DO ! End loop over molecules
@@ -83,7 +83,7 @@ CONTAINS
 
     ! Choose r vector randomly in appropriate range
     DO i = 2, n
-       DO ! loop until successfully 
+       DO ! loop until successful
           CALL random_orientation_vector ( r(:,i) ) ! direction of r
           CALL RANDOM_NUMBER ( ran )
           d      = d_min + (d_max-d_min)*ran ! magnitude of r

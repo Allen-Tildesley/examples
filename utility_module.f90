@@ -429,8 +429,8 @@ CONTAINS
     CALL RANDOM_SEED(size = n)
     ALLOCATE(seed(n))
     ! First try if the OS provides a random number generator
-    OPEN(newunit=un, file="/dev/urandom", access="stream", &
-         form="unformatted", action="read", status="old", iostat=istat)
+    OPEN(newunit=un, file='/dev/urandom', access='stream', &
+         form='unformatted', action='read', status='old', iostat=istat)
     IF (istat == 0) THEN
        READ(un) seed
        CLOSE(un)

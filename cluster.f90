@@ -7,7 +7,8 @@ PROGRAM cluster
   IMPLICIT NONE
 
   ! Reads an atomic configuration with periodic boundary conditions from inp.cnf
-  ! Defines a cluster by a critical separation
+  ! Defines a cluster by a critical separation rcl
+  ! Value of rcl read from standard input using a namelist nml (leave namelist empty to accept supplied default)
   ! Produces a set of circular linked lists of clusters
   ! Input data in atomic (e.g. LJ sigma) units
   ! Program works in box = 1 units
@@ -31,7 +32,7 @@ PROGRAM cluster
   
   READ ( unit=input_unit, nml=nml, iostat=ioerr ) ! namelist input
   IF ( ioerr /= 0 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist from standard input', ioerr
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
      IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in cluster'

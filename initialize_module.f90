@@ -1,6 +1,7 @@
 ! initialize_module.f90
 ! Routines to initialize configurations and velocities
 MODULE initialize_module
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: allocate_arrays, deallocate_arrays
@@ -20,7 +21,7 @@ CONTAINS
 
   SUBROUTINE allocate_arrays ( quaternions )
     LOGICAL, INTENT(in) :: quaternions
-    
+
     ALLOCATE ( r(3,n), v(3,n), w(3,n) )
     IF ( quaternions ) THEN
        ALLOCATE ( e(0:3,n) )
@@ -32,7 +33,7 @@ CONTAINS
   SUBROUTINE deallocate_arrays
     DEALLOCATE ( r, v, w, e )
   END SUBROUTINE deallocate_arrays
-  
+
   SUBROUTINE initialize_positions_lattice
 
     ! Sets up the fcc lattice
@@ -45,12 +46,19 @@ CONTAINS
     REAL, DIMENSION(3) :: rcm ! centre of mass
     INTEGER            :: nc, ix, iy, iz, a, i
 
-    WRITE(*,'(''Initializing positions on fcc lattice'')')
-
     nc = NINT ( REAL(n/4) ** (1.0/3.0) )
-    IF ( n /= 4 * nc ** 3 ) STOP 'n, nc mismatch in initialize_positions_lattice'
-    IF ( .NOT. ALLOCATED ( r ) ) STOP 'Allocation error in initialize_positions_lattice'
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) STOP 'Array mismatch in initialize_positions_lattice'
+    IF ( n /= 4 * nc ** 3 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'n, nc mismatch ', n, 4 * nc ** 3
+       STOP 'Error in initialize_positions_lattice'
+    END IF
+    IF ( .NOT. ALLOCATED ( r ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
+       STOP 'Error in initialize_positions_lattice'
+    END IF
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of r', SHAPE(r), 3, n
+       STOP 'Error in initialize_positions_lattice'
+    END IF
 
     i = 0
 
@@ -79,10 +87,14 @@ CONTAINS
 
     REAL, DIMENSION(3) :: rcm ! centre of mass
 
-    WRITE(*,'(''Initializing positions randomly'')')
-
-    IF ( .NOT. ALLOCATED ( r ) ) STOP 'Allocation error in initialize_positions_random'
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) STOP 'Array mismatch in initialize_positions_random'
+    IF ( .NOT. ALLOCATED ( r ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
+       STOP 'Error in initialize_positions_random'
+    END IF
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of r', SHAPE(r), 3, n
+       STOP 'Error in initialize_positions_random'
+    END IF
 
     CALL RANDOM_NUMBER ( r )
     rcm = SUM ( r, dim=2 ) / REAL(n)
@@ -103,14 +115,27 @@ CONTAINS
 
     INTEGER :: nc, k
 
-    WRITE(*,'(''Initializing orientations on alpha-fcc lattice'')')
-
     nc = NINT ( REAL(n/4) ** (1.0/3.0) )
-    IF ( n /= 4 * nc ** 3 ) STOP 'n, nc mismatch in initialize_orientations_lattice'
-    IF ( .NOT. ALLOCATED ( e ) ) STOP 'Allocation error in initialize_orientations_lattice'
-    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) STOP 'Array mismatch in initialize_orientations_lattice'
-    IF ( UBOUND(e,dim=1) /= 3 ) STOP 'Array mismatch in initialize_orientations_lattice'
-    IF ( SIZE(e,dim=2) /= n   ) STOP 'Array mismatch in initialize_orientations_lattice'
+    IF ( n /= 4 * nc ** 3 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'n, nc mismatch ', n, 4 * nc ** 3
+       STOP 'Error in initialize_orientations_lattice'
+    END IF
+    IF ( .NOT. ALLOCATED ( e ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'Array e is not allocated'
+       STOP 'Error in initialize_orientations_lattice'
+    END IF
+    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e lower bound mismatch ', LBOUND(e,dim=1)
+       STOP 'Error in initialize_orientations_lattice'
+    END IF
+    IF ( UBOUND(e,dim=1) /= 3 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e upper bound mismatch ', UBOUND(e,dim=1)
+       STOP 'Error in initialize_orientations_lattice'
+    END IF
+    IF ( SIZE(e,dim=2) /= n   ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array e bounds mismatch ', SIZE(e,dim=2), n
+       STOP 'Error in initialize_orientations_lattice'
+    END IF
 
     IF ( LBOUND(e,dim=1) == 0 ) THEN
        DO k = 1, n
@@ -129,15 +154,26 @@ CONTAINS
 
     ! Sets up random orientations for linear or nonlinear molecules
 
-    INTEGER :: i
+    INTEGER              :: i
     REAL, DIMENSION(0:3) :: eq
     REAL, DIMENSION(3)   :: ev
 
-    WRITE(*,'(''Initializing orientations randomly'')')
-    IF ( .NOT. ALLOCATED ( e ) ) STOP 'Allocation error in initialize_orientations_random'
-    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) STOP 'Array mismatch in initialize_orientations_random'
-    IF ( UBOUND(e,dim=1) /= 3 ) STOP 'Array mismatch in initialize_orientations_random'
-    IF ( SIZE(e,dim=2) /= n   ) STOP 'Array mismatch in initialize_orientations_random'
+    IF ( .NOT. ALLOCATED ( e ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'Array e is not allocated'
+       STOP 'Error in initialize_orientations_random'
+    END IF
+    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e lower bound mismatch ', LBOUND(e,dim=1)
+       STOP 'Error in initialize_orientations_random'
+    END IF
+    IF ( UBOUND(e,dim=1) /= 3 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e upper bound mismatch ', UBOUND(e,dim=1)
+       STOP 'Error in initialize_orientations_random'
+    END IF
+    IF ( SIZE(e,dim=2) /= n   ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array e bounds mismatch ', SIZE(e,dim=2), n
+       STOP 'Error in initialize_orientations_random'
+    END IF
 
     IF ( LBOUND(e,dim=1) == 0 ) THEN
        DO i = 1, n
@@ -171,9 +207,14 @@ CONTAINS
     REAL, DIMENSION(3) :: v_sum ! total momentum
     INTEGER            :: i, k
 
-    WRITE(*,'(''Initializing velocities at temperature'',t40,f15.5)') temperature
-    IF ( .NOT. ALLOCATED ( v ) ) STOP 'Allocation error in initialize_velocities'
-    IF ( ANY ( SHAPE(v) /= [3,n] ) ) STOP 'Array mismatch in initialize_velocities'
+    IF ( .NOT. ALLOCATED ( v ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'Array v is not allocated'
+       STOP 'Error in initialize_velocities'
+    END IF
+    IF ( ANY ( SHAPE(v) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'error in shape of v', SHAPE(v), 3, n
+       STOP 'Error in initialize_velocities'
+    END IF
 
     v_rms = SQRT ( temperature )
 
@@ -207,13 +248,22 @@ CONTAINS
     REAL    ::  w_sq, w_sq_mean, w_std_dev,  zeta
     INTEGER ::  i, k
 
-    WRITE(*,'(''Initializing angular velocities at temperature'',t40,f15.5)') temperature
-    WRITE(*,'(''Moment of inertia'',                             t40,f15.5)') inertia
-
-    IF ( .NOT. ALLOCATED ( w ) ) STOP 'Allocation error in initialize_angular_velocities'
-    IF ( ANY ( SHAPE(w) /= [3,n] ) ) STOP 'Array mismatch in initialize_angular_velocities'
-    IF ( .NOT. ALLOCATED ( e ) ) STOP 'Allocation error in initialize_angular_velocities'
-    IF ( SIZE(e,dim=2) /= n ) STOP 'Array mismatch in initialize_angular_velocities'
+    IF ( .NOT. ALLOCATED ( w ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'array w is not allocated'
+       STOP 'Error in initialize_angular_velocities'
+    END IF
+    IF ( ANY ( SHAPE(w) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'error in shape of w', SHAPE(r), 3, n
+       STOP 'Error in initialize_angular_velocities'
+    END IF
+    IF ( .NOT. ALLOCATED ( e ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'array e is not allocated'
+       STOP 'Error in initialize_angular_velocities'
+    END IF
+    IF ( SIZE(e,dim=2) /= n ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array e bounds mismatch ', SIZE(e,dim=2), n
+       STOP 'Error in initialize_angular_velocities'
+    END IF
 
     IF ( LBOUND(e,dim=1) == 0 ) THEN ! nonlinear molecule, treat as spherical top
        w_std_dev = SQRT(temperature/inertia)
@@ -257,12 +307,19 @@ CONTAINS
     INTEGER, DIMENSION(2)     :: istart, istop, istep
     REAL, PARAMETER           :: tol = 1.0e-9
 
-    WRITE(*,'(''Initializing positions on fcc lattice'')')
-
     nc = NINT ( ( REAL(n)/4.0 )**(1.0/3.0) )
-    IF ( n /= 4 * nc ** 3 ) STOP 'n, nc mismatch in initialize_chain_lattice'
-    IF ( .NOT. ALLOCATED ( r ) ) STOP 'Allocation error in initialize_chain_lattice'
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) STOP 'Array mismatch in initialize_chain_lattice'
+    IF ( n /= 4 * nc ** 3 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'n, nc mismatch ', n, 4 * nc ** 3
+       STOP 'Error in initialize_chain_lattice'
+    END IF
+    IF ( .NOT. ALLOCATED ( r ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'array r is not allocated'
+       STOP 'Error in initialize_chain_lattice'
+    END IF
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'error in shape of r', SHAPE(r), 3, n
+       STOP 'Error in initialize_chain_lattice'
+    END IF
 
     ! define sequences of atoms through unit cells
     atoms_inp(:,1,1) = [1,4,2,3]
@@ -319,9 +376,9 @@ CONTAINS
        DO j = i+1, n
           rsq =  SUM((r(:,i)-r(:,j))**2)
           IF ( j == i+1 ) THEN
-             IF ( ABS(rsq-1.0) > tol ) PRINT *, 'Bond length warning ', i, i+1, rsq
+             IF ( ABS(rsq-1.0) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, i+1, rsq
           ELSE
-             IF ( ABS(rsq) < 1.0 - tol ) PRINT *, 'Overlap warning ', i, i+1, rsq
+             IF ( ABS(rsq) < 1.0 - tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Overlap warning ', i, i+1, rsq
           END IF
        END DO
     END DO
@@ -340,9 +397,14 @@ CONTAINS
     INTEGER, PARAMETER :: iter_max = 1000
     LOGICAL            :: overlap
 
-    WRITE(*,'(''Initializing chain positions randomly'')')
-    IF ( .NOT. ALLOCATED ( r ) ) STOP 'Allocation error in initialize_chain_random'
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) STOP 'Array mismatch in initialize_chain_random'
+    IF ( .NOT. ALLOCATED ( r ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
+       STOP 'Error in initialize_chain_random'
+    END IF
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of r', SHAPE(r), 3, n
+       STOP 'Error in initialize_chain_random'
+    END IF
 
     ! First atom at origin
     r(:,1) = [0.0,0.0,0.0]
@@ -367,8 +429,11 @@ CONTAINS
           IF ( .NOT. overlap ) EXIT
 
           iter = iter + 1
-          IF ( iter > iter_max ) STOP 'too many iterations in initialize_chain_random'
-          
+          IF ( iter > iter_max ) THEN
+             WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Too many iterations ', iter, iter_max
+             STOP 'Error in initialize_chain_random'
+          END IF
+
        END DO ! End loop until non-overlapping position found
 
     END DO ! End loop over atom indices
@@ -381,9 +446,9 @@ CONTAINS
        DO j = i+1, n
           rsq =  SUM((r(:,i)-r(:,j))**2)
           IF ( j == i+1 ) THEN
-             IF ( ABS(rsq-1.0) > tol ) PRINT *, 'Bond length warning ', i, j, rsq
+             IF ( ABS(rsq-1.0) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, j, rsq
           ELSE
-             IF ( ABS(rsq) < 1.0 - tol ) PRINT *, 'Overlap warning ', i, j, rsq
+             IF ( ABS(rsq) < 1.0 - tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Overlap warning ', i, j, rsq
           END IF
        END DO
     END DO
@@ -409,9 +474,14 @@ CONTAINS
     REAL, DIMENSION(3) :: v_vec ! total momentum
     INTEGER            :: i, k
 
-    WRITE(*,'(''Initializing chain velocities at temperature'',t40,f15.5)') temperature
-    IF ( .NOT. ALLOCATED ( v ) ) STOP 'Allocation error in initialize_chain_velocities'
-    IF ( ANY ( SHAPE(v) /= [3,n] ) ) STOP 'Array mismatch in initialize_chain_velocities'
+    IF ( .NOT. ALLOCATED ( v ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'Array v is not allocated'
+       STOP 'Error in initialize_chain_velocities'
+    END IF
+    IF ( ANY ( SHAPE(v) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of v', SHAPE(v), 3, n
+       STOP 'Error in initialize_chain_velocities'
+    END IF
 
     DO i = 1, n
        IF ( i == 1 ) THEN

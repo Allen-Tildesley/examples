@@ -42,6 +42,7 @@ variants['build_mc_npt_lj_ll']     = (['mc_npt_lj.f90','mc_lj_ll_module.f90','li
 variants['build_mc_zvt_lj_ll']     = (['mc_zvt_lj.f90','mc_lj_ll_module.f90','link_list_module.f90','utility_module.f90'],env_normal)
 variants['build_cluster']          = (['cluster.f90','utility_module.f90'],env_normal)
 variants['build_diffusion']        = (['diffusion.f90'],env_normal)
+variants['build_hit_and_miss']     = (['hit_and_miss.f90'],env_normal)
 variants['build_mesh']             = (['mesh.f90'],env_normal)
 variants['build_fft3dwrap']        = (['fft3dwrap.f90'],env_fftw)
 variants['build_test_pot_at']      = (['test_pot_atom.f90','test_pot_at.f90','utility_module.f90'],env_normal)

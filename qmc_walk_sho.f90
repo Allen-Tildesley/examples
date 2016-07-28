@@ -2,7 +2,8 @@
 ! Quantum Monte Carlo, random walk, simple harmonic oscillator
 PROGRAM qmc_walk_sho
 
-  USE utility_module, ONLY: random_normal
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+  USE               utility_module,  ONLY : random_normal, time_stamp
   IMPLICIT NONE
 
   ! Program to calculate the ground state wavefunction
@@ -19,6 +20,8 @@ PROGRAM qmc_walk_sho
   ! results are output as averages over the production period.
   ! The simulated ground state wave function may be compared with the exact result for this simple problem.
 
+  ! Reads several variables and options from standard input using a namelist nml
+  ! Leave namelist empty to accept supplied defaults
   ! The default parameters run the simulation with et = 0.5, the exact groundstate energy for this potential.
   ! You can then try, say, et = 0.6 and et = 0.4, observing the behaviour of the number of walkers in each case.
 
@@ -34,17 +37,18 @@ PROGRAM qmc_walk_sho
 
   REAL, PARAMETER :: pi = 4.0 * ATAN ( 1.0 ), const = (1.0/pi) ** (1.0/4.0)
 
-  INTEGER :: n, n_max, n_target, n_add, n_bin, nlive, ibin
+  INTEGER :: n, n_max, n_target, n_add, n_bin, nlive, ibin, ioerr
   INTEGER :: i, production_steps, equilibration_steps, output_interval, step, step_count
   REAL    :: x_max, de, ds, et, k, et_avg, pot_avg, pot
   REAL    :: zeta, dx
   REAL    :: factor, pexact, x_bin
 
-  NAMELIST /params/ production_steps, equilibration_steps, output_interval, x_max, et, ds, n_bin, n_max, n_target
+  NAMELIST /nml/ production_steps, equilibration_steps, output_interval, x_max, et, ds, n_bin, n_max, n_target
 
-  WRITE(*,'(''qmc_walk_sho'')')
-  WRITE(*,'(''Diffusion Monte Carlo simulation of a quantum oscillator'')')
-  WRITE(*,'(''Results in atomic units'')')
+  WRITE ( unit=output_unit, fmt='(a)') 'qmc_walk_sho'
+  WRITE ( unit=output_unit, fmt='(a)') 'Diffusion Monte Carlo simulation of a quantum oscillator'
+  WRITE ( unit=output_unit, fmt='(a)') 'Results in atomic units'
+  CALL time_stamp ( output_unit )
 
   ! Set up default parameters for the simulation
   n_max               = 2000  ! max number of walkers
@@ -56,19 +60,28 @@ PROGRAM qmc_walk_sho
   ds                  = 0.1   ! timestep in imaginary time
   x_max               = 10.0  ! half length of the line, centred at x = 0.0 
   n_bin               = 200   ! number of bins covering -x_max .. x_max
-  READ(*,nml=params)
-  WRITE(*,'(a,t40,i15)'  ) 'Max number of walkers = ',                   n_max
-  WRITE(*,'(a,t40,i15)'  ) 'Target number of walkers = ',                n_target
-  WRITE(*,'(a,t40,i15)'  ) 'Number of steps for production = ',          production_steps
-  WRITE(*,'(a,t40,i15)'  ) 'Number of steps for equilibration = ',       equilibration_steps
-  WRITE(*,'(a,t40,i15)'  ) 'Output interval = ',                         output_interval
-  WRITE(*,'(a,t40,f15.5)') 'Initial estimate of ground state energy = ', et
-  WRITE(*,'(a,t40,f15.5)') 'Time step = ',                               ds
-  WRITE(*,'(a,t40,f15.5)') 'Max x for wavefunction = ',                  x_max
-  WRITE(*,'(a,t40,i15)'  ) 'Number of bins for wavefunction = ',         n_bin
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in qmc_walk_sho'
+  END IF
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Max number of walkers = ',                   n_max
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Target number of walkers = ',                n_target
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps for production = ',          production_steps
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps for equilibration = ',       equilibration_steps
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Output interval = ',                         output_interval
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial estimate of ground state energy = ', et
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step = ',                               ds
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Max x for wavefunction = ',                  x_max
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of bins for wavefunction = ',         n_bin
 
   dx = 2.0*x_max / REAL(n_bin)  ! Bin interval for calculating the wavefunction
-  IF ( n_target > n_max ) STOP 'n_target exceeds n_max at start'
+  IF ( n_target > n_max ) THEN
+     WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'n_target exceeds n_max at start', n_target, n_max
+     STOP 'Error in qmc_walk_sho'
+  END IF
 
   ALLOCATE ( x(n_max), v(n_max), replica(n_max), alive(n_max) )
   ALLOCATE ( psi(n_bin), bin(n_bin) )
@@ -85,7 +98,7 @@ PROGRAM qmc_walk_sho
   et_avg       = 0.0
   pot_avg      = 0.0
 
-  WRITE(*,'(''           step       nwalkers             e0            <v>'')')
+  WRITE ( unit=output_unit, fmt='(a)' ) '           step       nwalkers             e0            <v>'
 
   DO step = 1, equilibration_steps+production_steps  ! Loop over steps
 
@@ -118,7 +131,10 @@ PROGRAM qmc_walk_sho
      DO i = 1, nlive
         n_add = replica(i) - 1
         IF ( n_add > 0 ) THEN
-           IF ( n + n_add > n_max ) STOP 'n exceeds n_max in run'
+           IF ( n + n_add > n_max ) THEN
+              WRITE ( unit=error_unit, fmt='(a,3i15)' ) 'n+n_add exceeds n_max', n, n_add, n_max
+              STOP 'Error in qmc_walk_sho'
+           END IF
            x(n+1:n+n_add) = x(i)
            v(n+1:n+n_add) = v(i)
            n = n + n_add
@@ -129,15 +145,17 @@ PROGRAM qmc_walk_sho
 
      ! Stop if n is too large or too small
      IF ( n < 3 ) THEN
-        STOP 'n is too small, increase the value of et'
+        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'n is too small, increase the value of et', n
+        STOP 'Error in qmc_walk_sho'
      ELSE IF (n > (n_max-3) ) THEN
-        STOP 'n is too large, decrease the value of et'
+        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'n is too large, decrease the value of et', n
+        STOP 'Error in qmc_walk_sho'
      END IF
 
      ! Periodically write the current number of walkers, trial energy, average potential
 
      IF( MOD(step,output_interval) == 0 ) THEN
-        WRITE(*,'(i15,i15,2f15.5)') step, n, et, pot
+        WRITE ( unit=output_unit, fmt='(i15,i15,2f15.5)') step, n, et, pot
      ENDIF
 
      ! Calculate the distribution of walkers on the line and energy averages
@@ -169,17 +187,18 @@ PROGRAM qmc_walk_sho
   et_avg  = et_avg / REAL(step_count)
   pot_avg = pot_avg / REAL(step_count)
 
-  WRITE(*,'(a,t40,f15.5)') 'Average trial energy = ',     et_avg
-  WRITE(*,'(a,t40,f15.5)') 'Average potential energy = ', pot_avg
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Average trial energy = ',     et_avg
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Average potential energy = ', pot_avg
 
   ! Print ground state wave function
-  WRITE(*, '(''              x         psi(x)   psi_exact(x)'')')
+  WRITE ( unit=output_unit, fmt= '(a)' ) '              x         psi(x)   psi_exact(x)'
 
   DO i = 1, n_bin
      x_bin  = -x_max + ( REAL(i - 1) + 0.5 ) * dx
      pexact = const * EXP(- 0.5 * x_bin * x_bin)
-     WRITE(*,'(3f15.5)') x_bin, psi(i), pexact
+     WRITE ( unit=output_unit, fmt='(3f15.5)') x_bin, psi(i), pexact
   END DO
+  CALL time_stamp ( output_unit )
 
   DEALLOCATE ( x, v, replica, alive, bin, psi )
 

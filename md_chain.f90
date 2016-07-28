@@ -1,10 +1,10 @@
 ! md_chain.f90
 ! Molecular dynamics, NVE ensemble, WCA Lennard-Jones chain
 PROGRAM md_chain
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE utility_module,  ONLY : read_cnf_atoms, write_cnf_atoms, time_stamp, lowercase, &
        &                      run_begin, run_end, blk_begin, blk_end, blk_add
-  USE md_chain_module, ONLY : allocate_arrays, deallocate_arrays, check_constraints, force, &
+  USE md_chain_module, ONLY : allocate_arrays, deallocate_arrays, worst_bond, force, &
        &                      milcshake_a, milcshake_b, rattle_a, rattle_b, r, v, n
   IMPLICIT NONE
 
@@ -13,8 +13,10 @@ PROGRAM md_chain
   ! Conducts molecular dynamics with constraints (RATTLE or MILCSHAKE)
   ! Uses no special neighbour lists
 
-  ! However, input configuration, output configuration,
-  ! all calculations, and all results 
+  ! Reads several variables and options from standard input using a namelist nml
+  ! Leave namelist empty to accept supplied defaults
+
+  ! Input configuration, output configuration, all calculations, and all results 
   ! are given in LJ units sigma = 1, epsilon = 1, mass = 1
 
   ! Most important variables
@@ -26,20 +28,22 @@ PROGRAM md_chain
   REAL :: energy      ! total energy per atom (LJ sigma=1 units, to be averaged)
   REAL :: wc          ! constraint virial (not used in this example)
 
-  INTEGER :: blk, stp, nstep, nblock
+  INTEGER :: blk, stp, nstep, nblock, ioerr
 
-  CHARACTER(len=12), PARAMETER :: cnf_prefix = 'md_chain.cnf'
-  CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
-  CHARACTER(len=3)             :: sav_tag = 'sav' ! may be overwritten with block number
-  CHARACTER(len=10)            :: constraints
+  CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
+  CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
+  CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
+  CHARACTER(len=10)           :: constraints
+
+  ! Define procedure pointers with interfaces like those of rattle_a and rattle_b
   PROCEDURE(rattle_a), pointer :: move_a => null()
   PROCEDURE(rattle_b), pointer :: move_b => null()
 
-  NAMELIST /params/ nblock, nstep, dt, constraints
+  NAMELIST /nml/ nblock, nstep, dt, constraints
 
-  WRITE(*,'(''md_chain'')')
-  WRITE(*,'(''Molecular dynamics, constant-NVE, repulsive Lennard-Jones chain'')')
-  WRITE(*,'(''Results in units epsilon = sigma = 1'')')
+  WRITE ( unit=output_unit, fmt='(a)' ) 'md_chain'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE, repulsive Lennard-Jones chain'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Results in units epsilon = sigma = 1'
   CALL time_stamp ( output_unit )
 
   ! Set sensible default run parameters for testing
@@ -48,38 +52,44 @@ PROGRAM md_chain
   dt          = 0.002
   constraints = 'rattle'
 
-  READ(*,nml=params)
-  WRITE(*,'(''Number of blocks'',         t40,i15)'  ) nblock
-  WRITE(*,'(''Number of steps per block'',t40,i15)'  ) nstep
-  WRITE(*,'(''Time step'',                t40,f15.5)') dt
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in md_chain'
+  END IF
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
   IF ( INDEX( lowercase(constraints), 'rattle' ) /= 0 ) THEN
      move_a => rattle_a
      move_b => rattle_b
-     WRITE(*,'(a)') 'RATTLE constraint method'
+     WRITE ( unit=output_unit, fmt='(a)' ) 'RATTLE constraint method'
   ELSE IF ( INDEX( lowercase(constraints), 'milcshake' ) /= 0 ) THEN
      move_a => milcshake_a
      move_b => milcshake_b
-     WRITE(*,'(a)') 'MILCSHAKE constraint method'
+     WRITE ( unit=output_unit, fmt='(a)' ) 'MILCSHAKE constraint method'
   ELSE
-     WRITE(*,'(a,t40,a)') 'Unrecognized constraint method', constraints
-     STOP
+     WRITE ( unit=error_unit, fmt='(a,a)' ) 'Unrecognized constraint method ', constraints
+     STOP 'Error in md_chain'
   END IF
   
-  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond )
-  WRITE(*,'(''Number of particles'', t40,i15)'          ) n
-  WRITE(*,'(''Bond length (in sigma units)'',t40,f15.5)') bond
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond ) ! First call is just to get n and bond
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',          n
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length (in sigma units)', bond
 
   CALL allocate_arrays
 
-  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r, v )
-  CALL check_constraints ( bond )
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r, v ) ! Second call gets r and v
+  WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
 
   CALL force ( pot )
   kin         = 0.5*SUM(v**2)
   energy      = ( pot + kin ) / REAL ( n )
   temperature = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
-  WRITE(*,'(''Initial total energy (sigma units)'',  t40,f15.5)') energy
-  WRITE(*,'(''Initial temperature (sigma units)'',   t40,f15.5)') temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy (sigma units)', energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature (sigma units)',  temperature
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temperature' ] )
 
@@ -115,9 +125,9 @@ PROGRAM md_chain
   kin         = 0.5*SUM(v**2)
   energy      = ( pot + kin ) / REAL ( n )
   temperature = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
-  WRITE(*,'(''Final total energy (sigma units)'',  t40,f15.5)') energy
-  WRITE(*,'(''Final temperature (sigma units)'',   t40,f15.5)') temperature
-  CALL check_constraints ( bond )
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Final total energy (sigma units)', energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Final temperature (sigma units)',  temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ',   worst_bond ( bond )
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r, v )

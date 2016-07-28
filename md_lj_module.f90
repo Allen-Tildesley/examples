@@ -2,6 +2,7 @@
 ! Force routine for MD simulation, Lennard-Jones atoms
 MODULE md_lj_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, v, f
@@ -17,6 +18,7 @@ CONTAINS
   SUBROUTINE initialize ( r_cut )
     REAL, INTENT(in) :: r_cut ! not used in initialization for this version
     ALLOCATE ( r(3,n), v(3,n), f(3,n) )
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'No lists or link cells based on r_cut =', r_cut
   END SUBROUTINE initialize
 
   SUBROUTINE finalize

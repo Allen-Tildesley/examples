@@ -1,6 +1,7 @@
 ! link_list_module.f90
 ! Link list handling routines for MC or MD simulation
 MODULE link_list_module
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: initialize_list, finalize_list, make_list, check_list
@@ -18,10 +19,11 @@ CONTAINS
     INTEGER, INTENT(in) :: n
     REAL,    INTENT(in) :: r_cut ! We assume that r_cut (in box=1 units) never changes
 
-    WRITE(*,'(''Link list initialization'')')
-    WRITE(*,'(''Link cells based on r_cut ='',t40,f15.5)') r_cut
     sc = FLOOR ( 1.0 / r_cut ) ! number of cells
-    IF ( sc < 3 ) STOP 'System is too small to use link cells'
+    IF ( sc < 3 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,i15)') 'System is too small to use link cells', sc
+       STOP 'Error in initialize_list'
+    END IF
 
     ALLOCATE ( list(n), c(3,n) )
     ALLOCATE ( head(0:sc-1,0:sc-1,0:sc-1) )
@@ -56,7 +58,11 @@ CONTAINS
 
     ! We do not want to do any periodic imaging here, so as to cope with 
     ! Lees-Edwards boundaries as well as normal ones
-    IF ( ANY ( ABS(ri) > 0.5 ) ) STOP 'atom not in main box in c_index'
+    IF ( ANY ( ABS(ri) > 0.5 ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,3f15.5)') 'Atom not in main box', ri
+       STOP 'Error in c_index'
+    END IF
+    
     ci(:) = FLOOR ( ( ri(:) + 0.5 ) * REAL(sc) ) ! The index formula
 
     ! Guard against small chance of roundoff error
@@ -86,7 +92,7 @@ CONTAINS
 
   END SUBROUTINE create_in_list
 
-  SUBROUTINE destroy_in_list ( i, ci )      ! Destroy i in cell ci
+  SUBROUTINE destroy_in_list ( i, ci ) ! Destroy i in cell ci
     INTEGER,               INTENT(in) :: i
     INTEGER, DIMENSION(3), INTENT(in) :: ci
 
@@ -108,7 +114,8 @@ CONTAINS
              EXIT ! leave the loop
 
           ELSE IF ( next == 0 ) THEN ! this should never happen
-             STOP 'could not find particle in its cell'
+             WRITE ( unit=error_unit, fmt='(a,4i15)') 'Could not find particle in its cell', i, ci
+             STOP 'Error in destroy_in_list'
 
           ELSE ! move on to the next
              this = next
@@ -130,7 +137,10 @@ CONTAINS
     ! First check that the cells are correct
     DO i = 1, n 
        ci = c_index ( r(:,i) ) ! Index function
-       IF ( ANY ( ci(:) /= c(:,i) ) ) STOP 'check_list index error 1'
+       IF ( ANY ( ci(:) /= c(:,i) ) ) THEN
+          WRITE ( unit=error_unit, fmt='(a,7i10)') 'Inconsistency 1 found:', i, ci, c(:,i)
+          STOP 'Error in check_list'
+       END IF
     END DO
 
     ! Next check that atoms in cells really are in those cells
@@ -141,7 +151,10 @@ CONTAINS
              i = head(ci1,ci2,ci3)
              DO
                 IF ( i == 0 ) EXIT
-                IF ( ANY ( ci(:) /= c(:,i) ) ) STOP 'check_list index error 2'
+                IF ( ANY ( ci(:) /= c(:,i) ) ) THEN
+                   WRITE ( unit=error_unit, fmt='(a,7i10)') 'Inconsistency 2 found:', i, ci, c(:,i)
+                   STOP 'Error in check_list'
+                END IF
                 i = list(i)
              END DO
           END DO

@@ -1,7 +1,7 @@
 ! mc_zvt_lj.f90
 ! Monte Carlo, zVT (grand) ensemble, Lennard-Jones atoms
 PROGRAM mc_zvt_lj
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add, random_integer
   USE mc_lj_module,   ONLY : initialize, finalize, resize, energy_1, energy, energy_lrc, &
@@ -13,6 +13,9 @@ PROGRAM mc_zvt_lj
   ! Cubic periodic boundary conditions
   ! Conducts Monte Carlo at the given temperature
   ! Uses no special neighbour lists
+
+  ! Reads several variables and options from standard input using a namelist nml
+  ! Leave namelist empty to accept supplied defaults
 
   ! Box is taken to be of unit length during the Monte Carlo
   ! However, input configuration, output configuration,
@@ -35,22 +38,22 @@ PROGRAM mc_zvt_lj
 
   LOGICAL                  :: overlap
   INTEGER                  :: blk, stp, i, nstep, nblock
-  INTEGER                  :: try, ntry
+  INTEGER                  :: try, ntry, ioerr
   INTEGER, DIMENSION(-1:1) :: tries, moves ! count tries and moves of different kinds
   REAL                     :: pot_old, pot_new, pot_lrc, del_pot, vir_old, vir_new, vir_lrc, del_vir, delta
   REAL                     :: prob_move, prob_create
   REAL, DIMENSION(3)       :: ri   ! position of atom i
   REAL, DIMENSION(3)       :: zeta ! random numbers
 
-  CHARACTER(len=13), PARAMETER :: cnf_prefix = 'mc_zvt_lj.cnf'
-  CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
-  CHARACTER(len=3)             :: sav_tag = 'sav' ! may be overwritten with block number
+  CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
+  CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
+  CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
 
-  NAMELIST /run_parameters/ nblock, nstep, temperature, activity, prob_move, r_cut, dr_max
+  NAMELIST /nml/ nblock, nstep, temperature, activity, prob_move, r_cut, dr_max
 
-  WRITE(*,'(''mc_zvt_lj'')')
-  WRITE(*,'(''Monte Carlo, constant-zVT, Lennard-Jones'')')
-  WRITE(*,'(''Results in units epsilon = sigma = 1'')')
+  WRITE( unit=output_unit, fmt='(a)' ) 'mc_zvt_lj'
+  WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-zVT, Lennard-Jones'
+  WRITE( unit=output_unit, fmt='(a)' ) 'Results in units epsilon = sigma = 1'
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -62,35 +65,44 @@ PROGRAM mc_zvt_lj
   prob_move   = 0.34
   r_cut       = 2.5
   dr_max      = 0.15
-  READ(*,nml=run_parameters)
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in mc_zvt_lj'
+  END IF
   prob_create = (1.0-prob_move)/2.0
-  WRITE(*,'(''Number of blocks'',             t40,i15)'  ) nblock
-  WRITE(*,'(''Number of steps per block'',    t40,i15)'  ) nstep
-  WRITE(*,'(''Temperature'',                  t40,f15.5)') temperature
-  WRITE(*,'(''Activity'',                     t40,f15.5)') activity
-  WRITE(*,'(''Probability of move'',          t40,f15.5)') prob_move
-  WRITE(*,'(''Probability of create/destroy'',t40,f15.5)') prob_create
-  WRITE(*,'(''Potential cutoff distance'',    t40,f15.5)') r_cut
-  WRITE(*,'(''Maximum displacement'',         t40,f15.5)') dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',              nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',     nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',                   temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Activity',                      activity
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Probability of move',           prob_move
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Probability of create/destroy', prob_create
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance',     r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum displacement',          dr_max
 
-  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box )
-  WRITE(*,'(''Number of particles'', t40,i15)'  ) n
-  WRITE(*,'(''Box (in sigma units)'',t40,f15.5)') box
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
   sigma   = 1.0
   density = REAL(n) * ( sigma / box ) ** 3
-  WRITE(*,'(''Reduced density'',t40,f15.5)') density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
   ! Convert run and potential parameters to box units
   sigma  = sigma / box
   r_cut  = r_cut / box
   dr_max = dr_max / box
-  WRITE(*,'(''sigma (in box units)'',t40,f15.5)') sigma
-  WRITE(*,'(''r_cut (in box units)'',t40,f15.5)') r_cut
-  IF ( r_cut > 0.5 ) STOP 'r_cut too large '
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'sigma (in box units)', sigma
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'r_cut (in box units)', r_cut
+  IF ( r_cut > 0.5 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_cut too large ', r_cut
+     STOP 'Error in mc_zvt_lj'
+  END IF
 
   CALL initialize ( r_cut ) ! Allocate r
 
-  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r )
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! second call is to get r
 
   ! Convert to box units
   r(:,:) = r(:,:) / box
@@ -99,14 +111,17 @@ PROGRAM mc_zvt_lj
   CALL resize ! Increase the size of the r array
 
   CALL energy ( sigma, r_cut, overlap, pot, vir )
-  IF ( overlap ) STOP 'Overlap in initial configuration'
+  IF ( overlap ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
+     STOP 'Error in mc_zvt_lj'
+  END IF
   CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE(*,'(''Initial potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(*,'(''Initial pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial potential energy (sigma units)', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial pressure (sigma units)',         pressure
 
   CALL run_begin ( [ CHARACTER(len=15) :: &
        &            'Move ratio', 'Create ratio', 'Destroy ratio', &
@@ -136,7 +151,10 @@ PROGRAM mc_zvt_lj
               i = random_integer ( 1, n )
               ri(:) = r(:,i)
               CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot_old, vir_old )
-              IF ( overlap ) STOP 'Overlap in current configuration'
+              IF ( overlap ) THEN ! should never happen
+                 WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
+                 STOP 'Error in mc_zvt_lj'
+              END IF
               ri(:) = ri(:) + zeta * dr_max   ! trial move to new position
               ri(:) = ri(:) - ANINT ( ri(:) ) ! periodic boundary correction
               CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot_new, vir_new )
@@ -190,7 +208,10 @@ PROGRAM mc_zvt_lj
               del_pot = -del_pot ! change sign for a removal
               del_vir = -del_vir ! change sign for a removal
 
-              IF ( overlap ) STOP 'Overlap found on particle removal'
+              IF ( overlap ) THEN ! should never happen
+                 WRITE ( unit=error_unit, fmt='(a)') 'Overlap found on particle removal'
+                 STOP 'Error in mc_zvt_lj'
+              END IF
               delta = del_pot/temperature - LOG ( REAL ( n ) / activity )
               IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
                  call destroy ( i )            ! destroy chosen particle
@@ -224,21 +245,24 @@ PROGRAM mc_zvt_lj
   potential = pot / REAL ( n )
   density   = REAL(n)*sigma**3
   pressure  = density * temperature + vir / box**3
-  WRITE(*,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(*,'(''Final reduced density'',               t40,f15.5)') density
-  WRITE(*,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final reduced density',                density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
 
   CALL energy ( sigma, r_cut, overlap, pot, vir )
-  IF ( overlap ) STOP 'Overlap in final configuration'
+  IF ( overlap ) THEN ! should never happen
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
+     STOP 'Error in mc_zvt_lj'
+  END IF
   CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE(*,'(''Final check'')')
-  WRITE(*,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(*,'(''Final reduced density'',               t40,f15.5)') density
-  WRITE(*,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final reduced density',                density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
 

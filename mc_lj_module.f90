@@ -2,6 +2,7 @@
 ! Energy and move routines for MC simulation, LJ potential
 MODULE mc_lj_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, lt, ne, gt
@@ -18,6 +19,7 @@ CONTAINS
   SUBROUTINE initialize ( r_cut )
     REAL, INTENT(in) :: r_cut ! not used in initialization for this version
     ALLOCATE ( r(3,n) )
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'No lists or link cells based on r_cut =', r_cut
   END SUBROUTINE initialize
 
   SUBROUTINE finalize
@@ -33,7 +35,7 @@ CONTAINS
 
     n_old = SIZE(r,dim=2)
     n_new = 2*n_old
-    WRITE(*,'(a,i5,a,i5)') 'Warning: reallocating r array, from old size = ', n_old, ' to ', n_new
+    WRITE( unit=output_unit, fmt='(a,i10,a,i10)' ) 'Reallocating r from old ', n_old, ' to ', n_new
 
     ALLOCATE ( tmp(3,n_new) ) ! new size for r
     tmp(:,1:n_old) = r(:,:)   ! copy elements across
@@ -60,7 +62,10 @@ CONTAINS
     REAL, DIMENSION(2) :: pot2_i, vir2_i, pot2_sum, vir2_sum
     INTEGER            :: i
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in energy'
+    END IF
     
     overlap  = .FALSE.
     pot_sum  = 0.0
@@ -109,7 +114,10 @@ CONTAINS
     REAL, DIMENSION(3) :: rij
     REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy_1'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in energy_1'
+    END IF
 
     r_cut_sq = r_cut**2
     sigma_sq = sigma**2

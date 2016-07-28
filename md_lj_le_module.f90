@@ -2,6 +2,7 @@
 ! Force routine for MD, LJ atoms, Lees-Edwards boundaries
 MODULE md_lj_le_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, v, f
@@ -16,9 +17,8 @@ CONTAINS
 
   SUBROUTINE initialize ( r_cut )
     REAL, INTENT(in) :: r_cut
-
     ALLOCATE ( r(3,n), v(3,n), f(3,n) )
-
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'No lists or link cells based on r_cut =', r_cut
   END SUBROUTINE initialize
 
   SUBROUTINE finalize
@@ -28,7 +28,7 @@ CONTAINS
   SUBROUTINE force ( sigma, r_cut, strain, pot, pot_sh, vir )
 
     REAL, INTENT(in)  :: sigma, r_cut ! potential parameters
-    REAL, intent(in)  :: strain       ! shear strain
+    REAL, INTENT(in)  :: strain       ! shear strain
     REAL, INTENT(out) :: pot          ! total potential energy
     REAL, INTENT(out) :: pot_sh       ! potential shifted to zero at cutoff
     REAL, INTENT(out) :: vir          ! virial

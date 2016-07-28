@@ -2,6 +2,7 @@
 ! Collisions and overlap for MD of hard spheres
 MODULE md_nve_hs_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, v, coltime, partner, lt, ne, gt
@@ -16,14 +17,14 @@ MODULE md_nve_hs_module
 
 CONTAINS
 
-  subroutine initialize
+  SUBROUTINE initialize
     ALLOCATE ( r(3,n), v(3,n), coltime(n), partner(n) )
-  end subroutine initialize
+  END SUBROUTINE initialize
 
-  subroutine finalize
+  SUBROUTINE finalize
     DEALLOCATE ( r, v, coltime, partner )
-  end subroutine finalize
-  
+  END SUBROUTINE finalize
+
   SUBROUTINE update ( i, j_range, sigma_sq ) ! updates collision details for atom i
     INTEGER, INTENT(in) :: i, j_range
     REAL,    INTENT(in) :: sigma_sq
@@ -100,7 +101,7 @@ CONTAINS
 
           IF ( rij_sq < sigma_sq ) THEN
              rij_mag = SQRT ( rij_sq / sigma_sq )
-             WRITE(*,'(''i,j,rij/sigma = '',2i5,f15.8)') i, j, rij_mag ! Warning
+             WRITE ( unit=error_unit, fmt='(a,2i5,f15.8)' ) 'Warning: i,j,rij/sigma = ', i, j, rij_mag
              IF ( ( 1.0 - rij_mag ) > tol ) overlap = .TRUE.
           END IF
 

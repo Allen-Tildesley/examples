@@ -1,6 +1,7 @@
 ! test_pot_dq.f90
 ! dipole-quadrupole potential
 MODULE test_pot_module
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, force
@@ -28,14 +29,20 @@ CONTAINS
     ! Written for ease of comparison with the text, rather than efficiency!
 
     ! check dimensions to be sure
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) STOP 'r shape error'
-    IF ( ANY ( SHAPE(e) /= [3,n] ) ) STOP 'e shape error'
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'r shape error', SHAPE(r), 3, n
+       STOP 'Error in test_pot_dq'
+    END IF
+    IF ( ANY ( SHAPE(e) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'e shape error', SHAPE(e), 3, n
+       STOP 'Error in test_pot_dq'
+    END IF
 
     ! Check unit vectors
     IF ( ABS(SUM(e(:,i)**2)-1.0) > tol .OR. ABS(SUM(e(:,j)**2)-1.0) > tol ) THEN
-       WRITE(*,'(a)') 'Warning, non-unit vectors'
-       WRITE(*,'(4f10.5)') e(:,i), SUM(e(:,i)**2)
-       WRITE(*,'(4f10.5)') e(:,j), SUM(e(:,j)**2)
+       WRITE ( unit=error_unit, fmt='(a)'      ) 'Warning, non-unit vectors'
+       WRITE ( unit=error_unit, fmt='(4f10.5)' ) e(:,i), SUM(e(:,i)**2)
+       WRITE ( unit=error_unit, fmt='(4f10.5)' ) e(:,j), SUM(e(:,j)**2)
     END IF
 
     rij = r(:,i) - r(:,j)
@@ -61,9 +68,19 @@ CONTAINS
     pot = pot + vij_qd
 
     IF ( .NOT. PRESENT(f) ) RETURN
-    IF ( .NOT. PRESENT(t) ) STOP 'both f and t expected'
-    IF ( ANY ( SHAPE(f) /= [3,n] ) ) STOP 'f shape error'
-    IF ( ANY ( SHAPE(t) /= [3,n] ) ) STOP 't shape error'
+
+    IF ( .NOT. PRESENT(t) ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'Both f and t expected'
+       STOP 'Error in test_pot_dq'
+    END IF
+    IF ( ANY ( SHAPE(f) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'f shape error', SHAPE(f), 3, n
+       STOP 'Error in test_pot_dq'
+    END IF
+    IF ( ANY ( SHAPE(t) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 't shape error', SHAPE(t), 3, n
+       STOP 'Error in test_pot_dq'
+    END IF
 
     ! Forces and torques for dipole-quadrupole potential with mu_i = 1, Q_j = 1
     dvdrij = -4.0*vij_dq/rij_mag

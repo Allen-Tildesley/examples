@@ -2,6 +2,7 @@
 ! Energy and move routines for MC, LJ potential, link-lists
 MODULE mc_lj_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, lt, ne, gt
@@ -18,8 +19,9 @@ CONTAINS
 
   SUBROUTINE initialize ( r_cut )
     USE link_list_module, ONLY : initialize_list
-    REAL, INTENT(in) :: r_cut ! not used in initialization for this version
+    REAL, INTENT(in) :: r_cut
     ALLOCATE ( r(3,n), j_list(n) )
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Link cells based on r_cut =', r_cut
     CALL initialize_list ( n, r_cut )
   END SUBROUTINE initialize
 
@@ -38,7 +40,7 @@ CONTAINS
 
     n_old = SIZE(r,dim=2)
     n_new = 2*n_old
-    WRITE(*,'(a,i5,a,i5)') 'Warning: reallocating r array, from old size = ', n_old, ' to ', n_new
+    WRITE( unit=output_unit, fmt='(a,i10,a,i10)' ) 'Reallocating r from old ', n_old, ' to ', n_new
 
     ALLOCATE ( tmp(3,n_new) ) ! new size for r
     tmp(:,1:n_old) = r(:,:)   ! copy elements across
@@ -66,13 +68,16 @@ CONTAINS
     REAL               :: pot_i, vir_i, pot_sum, vir_sum
     REAL, DIMENSION(2) :: pot2_i, vir2_i, pot2_sum, vir2_sum
     INTEGER            :: i
-    LOGICAL, save      :: first_call = .true.
+    LOGICAL, SAVE      :: first_call = .TRUE.
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in energy'
+    END IF
     IF ( first_call ) THEN
        r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
        CALL make_list ( n, r )
-       first_call = .false.
+       first_call = .FALSE.
     END IF
 
     overlap  = .FALSE.
@@ -122,7 +127,10 @@ CONTAINS
     REAL, DIMENSION(3) :: rij
     REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy_1'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in energy_1'
+    END IF
 
     r_cut_sq = r_cut**2
     sigma_sq = sigma**2
@@ -172,22 +180,22 @@ CONTAINS
     USE link_list_module, ONLY : sc, list, head, c
 
     ! Arguments
-    INTEGER, intent(in)  :: i  ! particle whose neighbours are required
-    INTEGER, intent(in)  :: op ! ne or gt, determining the range of neighbours
+    INTEGER, INTENT(in)  :: i  ! particle whose neighbours are required
+    INTEGER, INTENT(in)  :: op ! ne or gt, determining the range of neighbours
     INTEGER, INTENT(out) :: nj ! number of j-partners
 
     ! Set up vectors to each cell in neighbourhood of 3x3x3 cells in cubic lattice
-  INTEGER, PARAMETER :: nk = 13 
-  INTEGER, DIMENSION(3,-nk:nk), PARAMETER :: d = RESHAPE( [ &
-       &   -1,-1,-1,    0,-1,-1,    1,-1,-1, &
-       &   -1, 1,-1,    0, 1,-1,    1, 1,-1, &
-       &   -1, 0,-1,    1, 0,-1,    0, 0,-1, &
-       &    0,-1, 0,    1,-1, 0,   -1,-1, 0, &
-       &   -1, 0, 0,    0, 0, 0,    1, 0, 0, &
-       &    1, 1, 0,   -1, 1, 0,    0, 1, 0, &
-       &    0, 0, 1,   -1, 0, 1,    1, 0, 1, &
-       &   -1,-1, 1,    0,-1, 1,    1,-1, 1, &
-       &   -1, 1, 1,    0, 1, 1,    1, 1, 1    ], [ 3, 2*nk+1 ] )
+    INTEGER, PARAMETER :: nk = 13 
+    INTEGER, DIMENSION(3,-nk:nk), PARAMETER :: d = RESHAPE( [ &
+         &   -1,-1,-1,    0,-1,-1,    1,-1,-1, &
+         &   -1, 1,-1,    0, 1,-1,    1, 1,-1, &
+         &   -1, 0,-1,    1, 0,-1,    0, 0,-1, &
+         &    0,-1, 0,    1,-1, 0,   -1,-1, 0, &
+         &   -1, 0, 0,    0, 0, 0,    1, 0, 0, &
+         &    1, 1, 0,   -1, 1, 0,    0, 1, 0, &
+         &    0, 0, 1,   -1, 0, 1,    1, 0, 1, &
+         &   -1,-1, 1,    0,-1, 1,    1,-1, 1, &
+         &   -1, 1, 1,    0, 1, 1,    1, 1, 1    ], [ 3, 2*nk+1 ] )
 
     ! Local variables
     INTEGER :: k1, k2, k, j
@@ -200,8 +208,9 @@ CONTAINS
     CASE ( gt ) ! check half neighbour cells and j downlist from i in current cell
        k1 = 0
        k2 = nk
-    CASE default
-       STOP 'This should never happen'
+    CASE default ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Argument op incorrect', op
+       STOP 'Error in get_neighbours'
     END SELECT
 
     nj = 0 ! Will store number of neighbours found
@@ -220,7 +229,7 @@ CONTAINS
        DO ! Begin loop over j atoms in list
 
           IF ( j == 0 ) EXIT
-          
+
           IF ( j /= i ) THEN
              nj         = nj + 1 ! increment count of j atoms
              j_list(nj) = j      ! store new j atom

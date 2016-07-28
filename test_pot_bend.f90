@@ -1,6 +1,7 @@
 ! test_pot_bend.f90
 ! bend angle, cos(theta) potential
 MODULE test_pot_module
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, force
@@ -27,7 +28,10 @@ CONTAINS
     ! Written for ease of comparison with the text, rather than efficiency!
 
     ! check dimensions to be sure
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) STOP 'r shape error'
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'r shape error', SHAPE(r), 3, n
+       STOP 'Error in test_pot_bend'
+    END IF
 
     ! Set up d vectors
     DO a = 2, n
@@ -55,7 +59,11 @@ CONTAINS
     pot    = - prefac*fac ! this is -cos(theta)
 
     IF ( .NOT. PRESENT(f) ) RETURN
-    IF ( ANY ( SHAPE(f) /= [3,n] ) ) STOP 'f shape error'
+
+    IF ( ANY ( SHAPE(f) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'f shape error', SHAPE(f), 3, n
+       STOP 'Error in test_pot_bend'
+    END IF
 
     ! Here we include the derivative of the potential with respect to cos(theta) in the prefactor
     ! For this simple case it is -1, so the forces are simply gradients of cos(theta) as in the text

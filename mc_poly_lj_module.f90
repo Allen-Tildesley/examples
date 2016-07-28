@@ -2,6 +2,7 @@
 ! Routines for MC simulation, polyatomic molecule, LJ atoms
 MODULE mc_poly_lj_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, na, r, e, d, lt, ne, gt
@@ -37,10 +38,13 @@ CONTAINS
     ! It is assumed that r, sigma, r_cut and rm_cut are in units where box = 1
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
-    REAL               :: pot_i, vir_i, pot_sum, vir_sum
-    INTEGER            :: i
+    REAL    :: pot_i, vir_i, pot_sum, vir_sum
+    INTEGER :: i
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
+    IF ( SIZE(r,dim=2)  /= n ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in energy'
+    END IF
     
     overlap  = .FALSE.
     pot_sum  = 0.0
@@ -81,9 +85,18 @@ CONTAINS
     REAL, DIMENSION(3) :: rij, rab, fab
     REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
 
-    IF ( SIZE(r,dim=2)  /= n  ) STOP 'Array bounds error for r in energy_1'
-    IF ( SIZE(di,dim=1) /= 3  ) STOP 'Array bounds error for di in energy_1'
-    IF ( SIZE(di,dim=2) /= na ) STOP 'Array bounds error for di in energy_1'
+    IF ( SIZE(r,dim=2)  /= n ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in energy_1'
+    END IF
+    IF ( SIZE(di,dim=1) /= 3 ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array bounds error for di', SIZE(di,dim=1)
+       STOP 'Error in energy_1'
+    END IF
+    IF ( SIZE(di,dim=2) /= na ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for di', SIZE(di,dim=2), na
+       STOP 'Error in energy_1'
+    END IF
 
     r_cut_sq  = r_cut**2
     rm_cut_sq = rm_cut**2
@@ -164,17 +177,23 @@ CONTAINS
   END SUBROUTINE energy_1
 
   FUNCTION q_to_d ( q, db ) RESULT ( ds ) ! convert quaternion to bond vectors in space-fixed frame
-    USE utility_module, only : q_to_a
-    implicit none
+    USE utility_module, ONLY : q_to_a
+    IMPLICIT NONE
     REAL, DIMENSION(0:3),                          INTENT(in) :: q  ! quaternion
     REAL, DIMENSION(:,:),                          INTENT(in) :: db ! body-fixed bonds
     REAL, DIMENSION(SIZE(db,dim=1),SIZE(db,dim=2))            :: ds ! space-fixed bonds
 
     REAL, DIMENSION(3,3) :: a ! rotation matrix
-    integer              :: i
+    INTEGER              :: i
 
-    IF ( SIZE(db,dim=1) /= 3  ) STOP 'Array mismatch in q_to_d'
-    IF ( SIZE(db,dim=2) /= na ) STOP 'Array mismatch in q_to_d'
+    IF ( SIZE(db,dim=1) /= 3  ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array mismatch', SIZE(db,dim=1)
+       STOP 'Error in q_to_d'
+    END IF
+    IF ( SIZE(db,dim=2) /= na ) then ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array mismatch', SIZE(db,dim=2), na
+       STOP 'Error in q_to_d'
+    END IF
     a = q_to_a ( q )
     DO i = 1, na
        ds(:,i) = MATMUL ( db(:,i), a ) ! NB: using transpose of rotation matrix

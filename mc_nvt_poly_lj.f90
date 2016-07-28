@@ -1,17 +1,21 @@
 ! mc_nvt_poly_lj.f90
 ! Monte Carlo, NVT ensemble, polyatomic molecule, LJ atoms
 PROGRAM mc_nvt_poly_lj
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit
-  USE utility_module,    ONLY : metropolis, read_cnf_mols, write_cnf_mols, random_rotate_quaternion, &
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+  USE utility_module,    ONLY : metropolis, read_cnf_mols, write_cnf_mols, time_stamp, random_rotate_quaternion, &
        &                        run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_poly_lj_module, ONLY : allocate_arrays, deallocate_arrays, energy_1, energy, q_to_d, &
        &                        n, na, r, e, d, ne
   IMPLICIT NONE
 
   ! Takes in a configuration of polyatomic molecules (positions and quaternions)
+  ! For this example we specialize to triatomic molecules, natom=3
   ! Cubic periodic boundary conditions
   ! Conducts Monte Carlo at the given temperature
   ! Uses no special neighbour lists
+
+  ! Reads several variables and options from standard input using a namelist nml
+  ! Leave namelist empty to accept supplied defaults
 
   ! Box is taken to be of unit length during the Monte Carlo
   ! However, input configuration, output configuration,
@@ -34,7 +38,7 @@ PROGRAM mc_nvt_poly_lj
   REAL :: potential   ! potential energy per molecule (LJ sigma=1 units, to be averaged)
 
   LOGICAL            :: overlap
-  INTEGER            :: blk, stp, i, nstep, nblock, moves
+  INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL               :: pot_old, pot_new, vir_old, vir_new, delta
 
   REAL, DIMENSION(3)       :: ri   ! position of atom i
@@ -43,15 +47,16 @@ PROGRAM mc_nvt_poly_lj
   REAL, DIMENSION(3,natom) :: di, db ! bond vectors
   REAL, DIMENSION(3)       :: zeta ! random numbers
 
-  CHARACTER(len=18), PARAMETER :: cnf_prefix = 'mc_nvt_poly_lj.cnf'
-  CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
-  CHARACTER(len=3)             :: sav_tag = 'sav' ! may be overwritten with block number
+  CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
+  CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
+  CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
 
-  NAMELIST /params/ nblock, nstep, temperature, r_cut, dr_max, de_max
+  NAMELIST /nml/ nblock, nstep, temperature, r_cut, dr_max, de_max
 
-  WRITE(*,'(''mc_nvt_poly_lj'')')
-  WRITE(*,'(''Monte Carlo, constant-NVT, polyatomic, Lennard-Jones'')')
-  WRITE(*,'(''Results in units epsilon = sigma = 1'')')
+  WRITE( unit=output_unit, fmt='(a)' ) 'mc_nvt_poly_lj'
+  WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT, polyatomic, Lennard-Jones'
+  WRITE( unit=output_unit, fmt='(a)' ) 'Results in units epsilon = sigma = 1'
+  CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -62,32 +67,38 @@ PROGRAM mc_nvt_poly_lj
   r_cut       = 2.5
   dr_max      = 0.15
   de_max      = 0.1
-  READ(*,nml=params)
-  WRITE(*,'(''Number of blocks'',         t40,i15)'  ) nblock
-  WRITE(*,'(''Number of steps per block'',t40,i15)'  ) nstep
-  WRITE(*,'(''Temperature'',              t40,f15.5)') temperature
-  WRITE(*,'(''Potential cutoff distance'',t40,f15.5)') r_cut
-  WRITE(*,'(''Maximum r displacement'',   t40,f15.5)') dr_max
-  WRITE(*,'(''Maximum e displacement'',   t40,f15.5)') de_max
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in mc_nvt_poly_lj'
+  END IF
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',               temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum r displacement',    dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum e displacement',    de_max
 
-  CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box )
-  WRITE(*,'(''Number of molecules'', t40,i15)'  ) n
-  WRITE(*,'(''Box (in sigma units)'',t40,f15.5)') box
+  CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of molecules',  n
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
   sigma = 1.0
   density = REAL(n) * ( sigma / box ) ** 3
-  WRITE(*,'(''Reduced density'',t40,f15.5)') density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
   ! Body-fixed bond vectors in sigma units
   na = natom
-  WRITE(*,'(''Number of atoms per molecule'',t40,i15)') na
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Number of atoms per molecule', na
   db(:,1) = [ 0.0, 0.0,  1.0/SQRT(3.0) ]
   db(:,2) = [-0.5, 0.0, -0.5/SQRT(3.0) ]
   db(:,3) = [ 0.5, 0.0, -0.5/SQRT(3.0) ]
   rm_cut = r_cut + 2.0 * SQRT ( MAXVAL ( SUM(db**2,dim=1) ) )
   DO i = 1, 3
-     WRITE(*,'(''Body-fixed bond vector '',i1,t40,3f15.5)') i, db(:,i)
+     WRITE ( unit=output_unit, fmt='(a,i1,t40,3f15.5)' ) 'Body-fixed bond vector ', i, db(:,i)
   END DO
-  WRITE(*,'(''Molecule-molecule cutoff distance'',t40,f15.5)') rm_cut
+  WRITE( unit=output_unit, fmt='(a,t40,f15.5)') 'Molecule-molecule cutoff distance', rm_cut
 
   ! Convert run and potential parameters to box units
   sigma  = sigma / box
@@ -95,13 +106,16 @@ PROGRAM mc_nvt_poly_lj
   rm_cut = rm_cut / box
   dr_max = dr_max / box
   db     = db / box
-  WRITE(*,'(''sigma (in box units)'', t40,f15.5)') sigma
-  WRITE(*,'(''rm_cut (in box units)'',t40,f15.5)') rm_cut
-  IF ( rm_cut > 0.5 ) STOP 'rm_cut too large '
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'sigma  (in box units)', sigma
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'rm_cut (in box units)', rm_cut
+  IF ( rm_cut > 0.5 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'rm_cut too large ', rm_cut
+     STOP 'Error in mc_nvt_poly_lj'
+  END IF
 
   CALL allocate_arrays
 
-  CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box, r, e )
+  CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box, r, e ) ! second call is to get r and e
 
   ! Convert to box units
   r(:,:) = r(:,:) / box
@@ -113,11 +127,14 @@ PROGRAM mc_nvt_poly_lj
   END DO
 
   CALL energy ( sigma, r_cut, rm_cut, overlap, pot, vir )
-  IF ( overlap ) STOP 'Overlap in initial configuration'
+  IF ( overlap ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
+     STOP 'Error in mc_nvt_poly_lj'
+  END IF
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE(*,'(''Initial potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(*,'(''Initial pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial potential energy (sigma units)', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial pressure (sigma units)',         pressure
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Potential', 'Pressure' ] )
 
@@ -138,7 +155,10 @@ PROGRAM mc_nvt_poly_lj
            ei(:)   = e(:,i)   ! copy old quaternion
            di(:,:) = d(:,:,i) ! copy old bond vectors
            CALL  energy_1 ( ri, di, i, ne, sigma, r_cut, rm_cut, overlap, pot_old, vir_old )
-           IF ( overlap ) STOP 'Overlap in current configuration'
+           IF ( overlap ) THEN ! should never happen
+              WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
+              STOP 'Error in mc_nvt_poly_lj'
+           END IF
            ri(:) = ri(:) + zeta * dr_max   ! trial move to new position
            ri(:) = ri(:) - ANINT ( ri(:) ) ! periodic boundary correction
            ei = random_rotate_quaternion ( de_max, ei ) ! trial rotation
@@ -177,18 +197,22 @@ PROGRAM mc_nvt_poly_lj
 
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE(*,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(*,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
 
   CALL energy ( sigma, r_cut, rm_cut, overlap, pot, vir )
-  IF ( overlap ) STOP 'Overlap in final configuration'
+  IF ( overlap ) THEN ! should never happen
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
+     STOP 'Error in mc_nvt_poly_lj'
+  END IF
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE(*,'(''Final check'')')
-  WRITE(*,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(*,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
 
   CALL write_cnf_mols ( cnf_prefix//out_tag, n, box, r*box, e )
+  CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
 

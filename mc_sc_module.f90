@@ -2,6 +2,7 @@
 ! Overlap routines for MC simulation, hard spherocylinders
 MODULE mc_sc_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, e, lt, ne, gt
@@ -15,13 +16,13 @@ MODULE mc_sc_module
 
 CONTAINS
 
-  subroutine allocate_arrays
+  SUBROUTINE allocate_arrays
     ALLOCATE ( r(3,n), e(3,n) )
-  end subroutine allocate_arrays
+  END SUBROUTINE allocate_arrays
 
-  subroutine deallocate_arrays
+  SUBROUTINE deallocate_arrays
     DEALLOCATE ( r, e )
-  end subroutine deallocate_arrays
+  END SUBROUTINE deallocate_arrays
   
   FUNCTION overlap ( sigma, length )
     LOGICAL             :: overlap ! shows if an overlap was detected
@@ -30,8 +31,14 @@ CONTAINS
 
     INTEGER :: i
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in overlap'
-    IF ( n > SIZE(e,dim=2) ) STOP 'Array bounds error for e in overlap'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in overlap'
+    END IF
+    IF ( n > SIZE(e,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for e', n, SIZE(e,dim=2)
+       STOP 'Error in overlap'
+    END IF
 
     overlap  = .FALSE.
 
@@ -60,8 +67,14 @@ CONTAINS
     REAL               :: sigma_sq, range_sq, rij_sq, rei, rej, eij
     REAL, DIMENSION(3) :: rij
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
-    IF ( n > SIZE(e,dim=2) ) STOP 'Array bounds error for e in energy'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in overlap_1'
+    END IF
+    IF ( n > SIZE(e,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for e', n, SIZE(e,dim=2)
+       STOP 'Error in overlap_1'
+    END IF
 
     sigma_sq = sigma**2
     range_sq = ( sigma + length ) ** 2
@@ -110,7 +123,14 @@ CONTAINS
 
     INTEGER :: i
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in n_overlap'
+    END IF
+    IF ( n > SIZE(e,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for e', n, SIZE(e,dim=2)
+       STOP 'Error in n_overlap'
+    END IF
 
     n_overlap  = 0
 
@@ -136,7 +156,14 @@ CONTAINS
     REAL               :: sigma_sq, range_sq, rij_sq, rei, rej, eij
     REAL, DIMENSION(3) :: rij
 
-    IF ( n > SIZE(r,dim=2) ) STOP 'Array bounds error for r in energy'
+    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in n_overlap_1'
+    END IF
+    IF ( n > SIZE(e,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for e', n, SIZE(e,dim=2)
+       STOP 'Error in n_overlap_1'
+    END IF
 
     sigma_sq = sigma**2
     range_sq = ( sigma + length ) ** 2

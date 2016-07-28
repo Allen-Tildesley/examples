@@ -1,8 +1,8 @@
 ! mc_nvt_lj_re.f90
 ! Monte Carlo, NVT ensemble, Lennard-Jones, replica exchange
 PROGRAM mc_nvt_lj_re
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit
-  USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, error_unit, iostat_end, iostat_eor
+  USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, time_stamp, &
        &                     run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_lj_module,   ONLY : initialize, finalize, energy_1, energy, energy_lrc, move, &
        &                     n, r, ne
@@ -13,7 +13,14 @@ PROGRAM mc_nvt_lj_re
   ! Cubic periodic boundary conditions
   ! Conducts Monte Carlo at the given temperature
   ! Uses no special neighbour lists
-  ! Exchanges configurations with neighbouring temperatures
+  ! Uses MPI to run replica exchange of configurations with neighbouring temperatures
+  ! Assume at most 100 processes numbered 0 to 99
+
+  ! Reads several variables and options from standard input using a namelist nml
+  ! Leave namelist empty to accept supplied defaults
+  ! Note that the various processes running this program will share standard input and error units
+  ! but will write "standard" output to a file std##.out where ## is the process rank
+  ! Similarly, configurations are read, saved, and written to files named cnf##.inp etc
 
   ! Box is taken to be of unit length during the Monte Carlo
   ! However, input configuration, output configuration,
@@ -34,99 +41,126 @@ PROGRAM mc_nvt_lj_re
   REAL :: pressure    ! pressure (LJ sigma=1 units, to be averaged)
   REAL :: potential   ! potential energy per atom (LJ sigma=1 units, to be averaged)
 
-  REAL, DIMENSION(:), ALLOCATABLE :: every_temperature, every_dr_max
+  REAL, DIMENSION(:), ALLOCATABLE :: every_temperature, every_beta, every_dr_max
 
   LOGICAL            :: overlap, swap
-  INTEGER            :: blk, stp, i, nstep, nblock, moves, swap_interval, swapped, updown
+  INTEGER            :: blk, stp, i, nstep, nblock, moves, swap_interval, swapped, updown, ioerr
   REAL               :: pot_old, pot_new, pot_lrc, vir_old, vir_new, vir_lrc, delta
-  REAL               :: beta, other_beta, other_pot, ran
+  REAL               :: beta, other_beta, other_pot
   REAL, DIMENSION(3) :: ri   ! position of atom i
   REAL, DIMENSION(3) :: zeta ! random numbers
 
-  INTEGER :: output_unit ! log file unit number 
-  CHARACTER(len=3),  PARAMETER :: run_prefix = 'mc_'
-  CHARACTER(len=7),  PARAMETER :: cnfinp_tag = '.cnfinp', cnfout_tag = '.cnfout'
-  CHARACTER(len=7)             :: cnfsav_tag = '.cnfsav' ! may be overwritten with block number
-  CHARACTER(len=3)             :: rank_tag = 'xxx' ! will be overwritten with processor rank
+  INTEGER                      :: output_unit                                  ! output file unit number 
+  CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
+  CHARACTER(len=6)             :: cnf_prefix = 'cnf##.', std_prefix = 'std##.' ! will have rank inserted
+  CHARACTER(len=3)             :: sav_tag = 'sav'                              ! may be overwritten with block number
+  CHARACTER(len=2)             :: m_tag                                        ! will contain rank number
 
-  INTEGER                             :: m      ! MPI processor rank (id of this process)
-  INTEGER                             :: p      ! MPI world size (number of processes)
-  INTEGER                             :: error  ! MPI error return
-  INTEGER                             :: msg_error  ! MPI error return
-  INTEGER, DIMENSION(MPI_STATUS_SIZE) :: msg_status ! MPI status return
-  INTEGER, PARAMETER                  :: msg1_id = 999, msg2_id = 888, msg3_id = 777
+  INTEGER                             :: m             ! MPI process rank (id of this process)
+  INTEGER                             :: p             ! MPI world size (number of processes)
+  INTEGER                             :: error         ! MPI error return
+  INTEGER                             :: msg_error     ! MPI error return
+  INTEGER, DIMENSION(MPI_STATUS_SIZE) :: msg_status    ! MPI status return
+  INTEGER, PARAMETER                  :: msg1_id = 999 ! MPI message identifier
+  INTEGER, PARAMETER                  :: msg2_id = 888 ! MPI message identifier
+  INTEGER, PARAMETER                  :: msg3_id = 777 ! MPI message identifier
 
-  NAMELIST /params/ nblock, nstep, swap_interval, every_temperature, r_cut, every_dr_max
+  NAMELIST /nml/ nblock, nstep, swap_interval, every_temperature, r_cut, every_dr_max
 
   CALL MPI_Init(error)
   CALL MPI_Comm_rank(MPI_COMM_WORLD,m,error)
   CALL MPI_Comm_size(MPI_COMM_WORLD,p,error)
-  WRITE(rank_tag,'(i3.3)') m
+  IF ( p > 100 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Number of proccesses is too large', p
+     STOP 'Error in mc_nvt_lj_re'
+  END IF
+  WRITE(m_tag,fmt='(i2.2)') m ! convert rank into character form
+  cnf_prefix(4:5) = m_tag     ! insert process rank into configuration filename
+  std_prefix(4:5) = m_tag     ! insert process rank into standard output filename
 
-  OPEN(newunit=output_unit, file = run_prefix // rank_tag // '.log' )
-  WRITE(output_unit,'(''mc_nvt_lj_re'')')
-  WRITE(output_unit,'(''Monte Carlo, constant-NVT, Lennard-Jones, replica exchange'')')
-  WRITE(output_unit,'(''Results in units epsilon = sigma = 1'')')
-  WRITE(output_unit,'(a,t40,i15)') 'This is processor rank', m
-  WRITE(output_unit,'(a,t40,i15)') 'Number of processors is', p
+  OPEN ( newunit=output_unit, file = std_prefix // out_tag, iostat=ioerr ) ! open file for standard output
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,a)') 'Could not open file ', std_prefix // out_tag
+     STOP 'Error in mc_nvt_lj_re'
+  END IF
+
+  WRITE( unit=output_unit, fmt='(a)'        ) 'mc_nvt_lj_re'
+  WRITE( unit=output_unit, fmt='(a)'        ) 'Monte Carlo, constant-NVT, Lennard-Jones, replica exchange'
+  WRITE( unit=output_unit, fmt='(a)'        ) 'Results in units epsilon = sigma = 1'
+  WRITE( unit=output_unit, fmt='(a,t40,i15)') 'This is process rank',   m
+  WRITE( unit=output_unit, fmt='(a,t40,i15)') 'Number of processes is', p
+  CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! Initialize random number generator
-  CALL random_NUMBER ( zeta )
-  WRITE(output_unit,'(a,t40,3f15.5)') 'First three random numbers', zeta
+  CALL RANDOM_NUMBER ( zeta )
+  WRITE( unit=output_unit, fmt='(a,t40,3f15.5)') 'First three random numbers', zeta
 
-  ALLOCATE ( every_temperature(0:p-1), every_dr_max(0:p-1) )
+  ALLOCATE ( every_temperature(0:p-1), every_beta(0:p-1), every_dr_max(0:p-1) )
 
   ! Set sensible defaults for testing
-  nblock      = 10
-  nstep       = 1000
-  swap_interval = 20
-  r_cut       = 2.5
+  nblock            = 10
+  nstep             = 1000
+  swap_interval     = 20
+  r_cut             = 2.5
   every_temperature = [ ( 0.7*(1.05)**i, i = 0, p-1 ) ]
   every_dr_max      = [ ( 0.15*(1.05)**i, i = 0, p-1 ) ]
-  READ(*,nml=params)
-  temperature = every_temperature(m) ! temperature for this process
-  dr_max = every_dr_max(m) ! max displacement for this process
-  beta = 1.0 / temperature
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in mc_nvt_lj_re'
+  END IF
+  every_beta  = 1.0 / every_temperature ! all the inverse temperatures
+  temperature = every_temperature(m)    ! temperature for this process
+  dr_max      = every_dr_max(m)         ! max displacement for this process
+  beta        = every_beta(m)           ! inverse temperature for this process
 
-  WRITE(output_unit,'(''Number of blocks'',         t40,i15)'  ) nblock
-  WRITE(output_unit,'(''Number of steps per block'',t40,i15)'  ) nstep
-  WRITE(output_unit,'(''Replica exchange swap interval'',t40,i15)'  ) swap_interval
-  WRITE(output_unit,'(''Temperature'',              t40,f15.5)') temperature
-  WRITE(output_unit,'(''Potential cutoff distance'',t40,f15.5)') r_cut
-  WRITE(output_unit,'(''Maximum displacement'',     t40,f15.5)') dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',               nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',      nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Replica exchange swap interval', swap_interval
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',                    temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance',      r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum displacement',           dr_max
 
-  CALL read_cnf_atoms ( run_prefix//rank_tag//cnfinp_tag, n, box )
-  WRITE(output_unit,'(''Number of particles'', t40,i15)'  ) n
-  WRITE(output_unit,'(''Box (in sigma units)'',t40,f15.5)') box
-  sigma = 1.0
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
+  sigma   = 1.0
   density = REAL(n) * ( sigma / box ) ** 3
-  WRITE(output_unit,'(''Reduced density'',t40,f15.5)') density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
   ! Convert run and potential parameters to box units
   sigma  = sigma / box
   r_cut  = r_cut / box
   dr_max = dr_max / box
-  WRITE(output_unit,'(''sigma (in box units)'',t40,f15.5)') sigma
-  WRITE(output_unit,'(''r_cut (in box units)'',t40,f15.5)') r_cut
-  IF ( r_cut > 0.5 ) STOP 'r_cut too large '
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'sigma (in box units)', sigma
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'r_cut (in box units)', r_cut
+  IF ( r_cut > 0.5 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_cut too large ', r_cut
+     STOP 'Error in mc_nvt_lj_re'
+  END IF
 
   CALL initialize ( r_cut ) ! Allocate r
 
-  CALL read_cnf_atoms ( run_prefix//rank_tag//cnfinp_tag, n, box, r )
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! second call is to get r
 
   ! Convert to box units
   r(:,:) = r(:,:) / box
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   CALL energy ( sigma, r_cut, overlap, pot, vir )
-  IF ( overlap ) STOP 'Overlap in initial configuration'
+  IF ( overlap ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
+     STOP 'Error in mc_nvt_lj_re'
+  END IF
   CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE(output_unit,'(''Initial potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(output_unit,'(''Initial pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial potential energy (sigma units)', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial pressure (sigma units)',         pressure
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Swap ratio', 'Potential', 'Pressure' ] )
 
@@ -145,7 +179,10 @@ PROGRAM mc_nvt_lj_re
 
            ri(:) = r(:,i)
            CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot_old, vir_old )
-           IF ( overlap ) STOP 'Overlap in current configuration'
+           IF ( overlap ) THEN ! should never happen
+              WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
+              STOP 'Error in mc_nvt_lj_re'
+           END IF
            ri(:) = ri(:) + zeta * dr_max   ! trial move to new position
            ri(:) = ri(:) - ANINT ( ri(:) ) ! periodic boundary correction
            CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot_new, vir_new )
@@ -162,18 +199,17 @@ PROGRAM mc_nvt_lj_re
 
         END DO ! End loop over atoms
 
-        IF ( MOD(stp, swap_interval) == 0 ) THEN ! test for swap interval
+        IF ( MOD (stp, swap_interval) == 0 ) THEN ! test for swap interval
            swapped = 0
            DO updown = 1, 2 ! loop to look one way then the other
               IF ( MOD(m,2) == MOD(updown,2) ) THEN ! look up, partner is m+1
                  IF ( m+1 < p ) THEN ! ensure partner exists
-                    other_beta = 1.0 / every_temperature(m+1)
+                    other_beta = every_beta(m+1)
                     CALL MPI_Sendrecv ( pot,       1, MPI_REAL, m+1, msg1_id, &
                          &              other_pot, 1, MPI_REAL, m+1, msg2_id, &
                          &              MPI_COMM_WORLD, msg_status, msg_error )
                     delta = -(beta - other_beta) * (pot - other_pot)
-                    CALL random_NUMBER(ran)
-                    swap = EXP(-delta) > ran
+                    swap  = metropolis ( delta )
                     CALL MPI_Send ( swap, 1, MPI_LOGICAL, m+1, msg3_id, &
                          &          MPI_COMM_WORLD, msg_error )
                     IF ( swap ) THEN ! exchange configurations
@@ -185,12 +221,12 @@ PROGRAM mc_nvt_lj_re
                  END IF ! end ensure partner exists
               ELSE ! look down, partner is m-1
                  IF ( m-1 >= 0 ) THEN ! ensure partner exists
-                    other_beta = 1.0 / every_temperature(m-1)
+                    other_beta = every_beta(m-1)
                     CALL MPI_Sendrecv (  pot,       1, MPI_REAL, m-1, msg2_id, &
                          &               other_pot, 1, MPI_REAL, m-1, msg1_id, &
                          &               MPI_COMM_WORLD, msg_status, msg_error )
                     CALL MPI_Recv ( swap, 1, MPI_LOGICAL, m-1, msg3_id, &
-                         &  MPI_COMM_WORLD, msg_status, msg_error )
+                         &          MPI_COMM_WORLD, msg_status, msg_error )
                     IF ( swap ) THEN ! exchange configurations
                        CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m-1, msg2_id, m-1, msg1_id, &
                             &                      MPI_COMM_WORLD,msg_status,msg_error)
@@ -203,7 +239,7 @@ PROGRAM mc_nvt_lj_re
 
         ! Calculate all variables for this step
         move_ratio = REAL(moves) / REAL(n)
-        swap_ratio = REAL(swapped*swap_interval) ! correct for only attempting at intervals
+        swap_ratio = REAL(swapped*swap_interval) ! factor for only attempting at intervals
         potential  = pot / REAL(n)
         pressure   = density * temperature + vir / box**3
         CALL blk_add ( [move_ratio,swap_ratio,potential,pressure] )
@@ -211,8 +247,8 @@ PROGRAM mc_nvt_lj_re
      END DO ! End loop over steps
 
      CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(cnfsav_tag(5:7),'(i3.3)') blk            ! number configuration by block
-     CALL write_cnf_atoms ( run_prefix//rank_tag//cnfsav_tag, n, box, r*box ) ! save configuration
+     IF ( nblock < 1000 ) WRITE(sav_tag,fmt='(i3.3)') blk        ! number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box ) ! save configuration
 
   END DO ! End loop over blocks
 
@@ -220,25 +256,30 @@ PROGRAM mc_nvt_lj_re
 
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE(output_unit,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(output_unit,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
 
   CALL energy ( sigma, r_cut, overlap, pot, vir )
-  IF ( overlap ) STOP 'Overlap in final configuration'
+  IF ( overlap ) THEN ! should never happen
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
+     STOP 'Error in mc_nvt_lj_re'
+  END IF
   CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE(output_unit,'(''Final check'')')
-  WRITE(output_unit,'(''Final potential energy (sigma units)'',t40,f15.5)') potential
-  WRITE(output_unit,'(''Final pressure (sigma units)'',        t40,f15.5)') pressure
+  WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
 
-  CALL write_cnf_atoms ( run_prefix//rank_tag//cnfout_tag, n, box, r*box )
+  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
+  CALL time_stamp ( output_unit )
 
   CALL finalize
+  DEALLOCATE ( every_temperature, every_beta, every_dr_max )
 
-  CLOSE ( output_unit )
+  CLOSE ( unit=output_unit )
   CALL MPI_Finalize(error)
 
 END PROGRAM mc_nvt_lj_re

@@ -2,6 +2,7 @@
 ! Force routine for MD simulation, LJ atoms, multiple time steps
 MODULE md_lj_mts_module
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, v, f
@@ -14,8 +15,11 @@ MODULE md_lj_mts_module
 
 CONTAINS
 
-  SUBROUTINE allocate_arrays ( k_max )
-    INTEGER, INTENT(in) :: k_max
+  SUBROUTINE allocate_arrays ( r_cut )
+    REAL, DIMENSION(:), INTENT(in)  :: r_cut  ! shell cutoff distances
+
+    INTEGER :: k_max
+    k_max = SIZE(r_cut)
     ALLOCATE ( r(3,n), v(3,n), f(3,n,k_max) )
   END SUBROUTINE allocate_arrays
 
@@ -50,7 +54,10 @@ CONTAINS
 
     ! Distances for switching function
     k_max = SIZE(r_cut)
-    IF ( k < 1 .OR. k > k_max ) STOP 'k_max error in force'
+    IF ( k < 1 .OR. k > k_max ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'k, k_max error', k, k_max
+       STOP 'Error in force'
+    END IF
     rk      = r_cut(k)
     rk_l    = rk-lambda
     rk_sq   = rk ** 2

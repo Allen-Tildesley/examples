@@ -1,6 +1,7 @@
 ! test_pot_twist.f90
 ! twist angle, cos(phi) potential
 MODULE test_pot_module
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, force
@@ -27,8 +28,11 @@ CONTAINS
     ! Written for ease of comparison with the text, rather than efficiency!
 
     ! check dimensions to be sure
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) STOP 'r shape error'
-
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'r shape error', SHAPE(r), 3, n
+       STOP 'Error in test_pot_twist'
+    END IF
+    
     ! Set up d vectors
     DO a = 2, n
        d(:,a) = r(:,a) - r(:,a-1)
@@ -39,7 +43,7 @@ CONTAINS
     ! and also we would make use of the symmetry cc(b,a)=cc(a,b)
     DO a = 2, n
        DO b = 2, n
-          cc(a,b) = dot_PRODUCT ( d(:,a), d(:,b) )
+          cc(a,b) = DOT_PRODUCT ( d(:,a), d(:,b) )
        END DO
     END DO
 
@@ -64,7 +68,11 @@ CONTAINS
     pot = prefac * fac ! this is -cos(phi)
 
     IF ( .NOT. PRESENT(f) ) RETURN
-    IF ( ANY ( SHAPE(f) /= [3,n] ) ) STOP 'f shape error'
+
+    IF ( ANY ( SHAPE(f) /= [3,n] ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'f shape error', SHAPE(f), 3, n
+       STOP 'Error in test_pot_twist'
+    END IF
 
     ! Here we include the derivative of the potential with respect to cos(phi) in the prefactor
     ! For this simple case it is -1, so the forces are simply gradients of cos(phi) as in the text
