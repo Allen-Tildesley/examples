@@ -22,7 +22,7 @@ MODULE utility_module
   PUBLIC :: metropolis
 
   ! Low-level mathematical routines and string operations
-  PUBLIC :: rotate_vector, cross_product, q_to_a, lowercase
+  PUBLIC :: rotate_vector, cross_product, outer_product, q_to_a, lowercase
 
   ! Order parameter calculations
   PUBLIC :: orientational_order, translational_order, nematic_order
@@ -32,6 +32,12 @@ MODULE utility_module
   CHARACTER(len=15), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
   REAL,              DIMENSION(:), ALLOCATABLE, SAVE :: blk_averages, run_averages, errors
   REAL,                                         SAVE :: run_norm, blk_norm
+
+  ! Define a generic interface for the outer_product functions
+  INTERFACE outer_product
+     MODULE PROCEDURE outer_product_2
+     MODULE PROCEDURE outer_product_3
+  END INTERFACE outer_product
 
 CONTAINS
 
@@ -410,7 +416,7 @@ CONTAINS
   END SUBROUTINE run_end
 
   ! Routines associated with random number generation
-  
+
   ! This routine, and the next one, are taken from the online GNU documentation
   ! https://gcc.gnu.org/onlinedocs/gfortran/RANDOM_005fSEED.html
   ! and is specific to the gfortran compiler
@@ -749,7 +755,7 @@ CONTAINS
   END FUNCTION metropolis
 
   ! Low level mathematical operations and string manipulation
-  
+
   FUNCTION rotate_vector ( delta, axis, e_old ) RESULT ( e )
     REAL, DIMENSION(3)             :: e           ! orientation vector result
     REAL, INTENT(in)               :: delta       ! rotation angle
@@ -785,6 +791,39 @@ CONTAINS
     c(3) = a(1)*b(2) - a(2)*b(1)
   END FUNCTION cross_product
 
+  FUNCTION outer_product_2 ( a, b ) RESULT (c)
+    REAL, DIMENSION(:), INTENT(IN)   :: a, b
+    REAL, DIMENSION(SIZE(a),SIZE(b)) :: c ! function result
+
+    INTEGER :: i, j
+
+    DO i = 1, SIZE(a)
+       DO j = 1, SIZE(b)
+          c(i,j) = a(i) * b(j)
+       END DO
+    END DO
+
+    ! The following one-line statement is equivalent, but the above loops are clearer
+    ! c = SPREAD(a,dim=2,ncopies=SIZE(b)) * SPREAD(b,dim=1,ncopies=SIZE(a))
+
+  END FUNCTION outer_product_2
+
+  FUNCTION outer_product_3 ( a, b, c ) RESULT (d)
+    REAL, DIMENSION(:), INTENT(IN)           :: a, b, c
+    REAL, DIMENSION(SIZE(a),SIZE(b),size(c)) :: d ! function result
+
+    INTEGER :: i, j, k
+
+    DO i = 1, SIZE(a)
+       DO j = 1, SIZE(b)
+          do k = 1, size(c)
+             d(i,j,k) = a(i) * b(j) * c(k)
+             end do
+       END DO
+    END DO
+
+  END FUNCTION outer_product_3
+
   FUNCTION lowercase ( oldstring ) RESULT ( newstring )
     IMPLICIT NONE
     CHARACTER(len=*),             INTENT(in)    :: oldstring 
@@ -804,7 +843,7 @@ CONTAINS
   END FUNCTION lowercase
 
   ! Order parameter routines
-  
+
   FUNCTION translational_order ( r, k ) RESULT ( order )
     REAL                                          :: order ! result order parameter
     REAL,    DIMENSION(:,:), INTENT(in)           :: r     ! set of molecular position vectors (3,n)
