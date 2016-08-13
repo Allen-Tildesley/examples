@@ -10,7 +10,7 @@ MODULE mc_lj_module
   PUBLIC :: move, create, destroy
 
   INTEGER                              :: n ! number of atoms
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
 
   INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
 

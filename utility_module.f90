@@ -385,9 +385,9 @@ CONTAINS
     run_norm     = run_norm + 1.0              ! Increment run normalizer
 
     IF ( first_call ) THEN  ! Write headings
-       WRITE ( unit=output_unit, fmt='(*(a16))'   ) REPEAT ( '=', 16*(nvariables+1) ) 
+       WRITE ( unit=output_unit, fmt='(a)'        ) REPEAT ( '=', 16*(nvariables+1) ) 
        WRITE ( unit=output_unit, fmt='(*(1x,a15))') 'Block', ADJUSTR ( variable_names )
-       WRITE ( unit=output_unit, fmt='(*(a16))'   ) REPEAT ( '=', 16*(nvariables+1) )
+       WRITE ( unit=output_unit, fmt='(a)'        ) REPEAT ( '=', 16*(nvariables+1) )
        first_call = .FALSE.
     END IF
 
@@ -406,10 +406,10 @@ CONTAINS
        errors = SQRT ( errors / run_norm ) ! Normalize and get estimated errors
     END WHERE
 
-    WRITE ( unit=output_unit, fmt='(*(a16))'             ) REPEAT('-',16*(nvariables+1))
+    WRITE ( unit=output_unit, fmt='(a)'                  ) REPEAT('-',16*(nvariables+1))
     WRITE ( unit=output_unit, fmt='(1x,a15,*(1x,f15.5))' ) 'Run averages', run_averages
     WRITE ( unit=output_unit, fmt='(1x,a15,*(1x,f15.5))' ) 'Run errors', errors
-    WRITE ( unit=output_unit, fmt='(*(a16))'             ) REPEAT('=',16*(nvariables+1))
+    WRITE ( unit=output_unit, fmt='(a)'                  ) REPEAT('=',16*(nvariables+1))
 
     DEALLOCATE ( variable_names, blk_averages, run_averages, errors )
 

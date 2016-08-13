@@ -59,6 +59,8 @@ variants['build_mc_nvt_poly_lj']   = (['mc_nvt_poly_lj.f90','mc_poly_lj_module.f
 variants['build_qmc_walk_sho']     = (['qmc_walk_sho.f90','utility_module.f90'],env_normal)
 variants['build_t_tensor']         = (['t_tensor.f90','utility_module.f90'],env_normal)
 variants['build_mc_nvt_lj_re']     = (['mc_nvt_lj_re.f90','mc_lj_module.f90','utility_module.f90'],env_mpi)
+variants['build_qmc_pi_sho']       = (['qmc_pi_sho.f90','utility_module.f90'],env_normal)
+variants['build_qmc_pi_lj']        = (['qmc_pi_lj.f90','qmc_pi_lj_module.f90','utility_module.f90'],env_normal)
 
 # Build each variant in appropriate variant directory
 for variant_dir,(sources,env) in variants.iteritems():
