@@ -24,8 +24,8 @@ PROGRAM qmc_pi_lj
   ! The importance of quantum effects is specified through the reduced de Boer length
   ! lambda = (hbar/sqrt(mass*epsilon))/sigma which takes typical values of
   ! 0.01 for Xe, 0.03 for Ar, and 0.095 for Ne.
-  ! This means that the quantum spring constant may be expressed k_spring = P*T**2/lambda**2
-  ! where T is the reduced temperature kB*T/epsilon
+  ! This means that the quantum spring constant may be expressed k_spring = P*(T/lambda)**2
+  ! where T stands for the reduced temperature kB*T/epsilon
 
   ! Most important variables
   REAL :: sigma        ! atomic diameter (in units where box=1)
@@ -49,9 +49,9 @@ PROGRAM qmc_pi_lj
   REAL, DIMENSION(3) :: zeta ! random numbers
 
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
-  CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
+  CHARACTER(len=3)            :: sav_tag = 'sav'       ! may be overwritten with block number
   CHARACTER(len=6)            :: cnf_prefix = 'cnf##.' ! will have polymer id inserted
-  CHARACTER(len=2)            :: k_tag           ! will contain polymer id
+  CHARACTER(len=2)            :: k_tag                 ! will contain polymer id
 
   NAMELIST /nml/ nblock, nstep, p, temperature, r_cut, dr_max, lambda
 
@@ -91,13 +91,13 @@ PROGRAM qmc_pi_lj
      STOP 'Error in qmc_pi_lj'
   END IF
 
-  k_spring = REAL(p) * ( temperature/lambda )**2
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'quantum spring constant', k_spring
+  k_spring = REAL(p) * ( temperature / lambda ) ** 2
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Quantum spring constant', k_spring
 
+  ! Read first polymer configuration to get basic parameters n and box
   WRITE(k_tag,fmt='(i2.2)') 1 ! convert into character form
   cnf_prefix(4:5) = k_tag     ! insert into configuration filename
-
-  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box )
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
   sigma   = 1.0
@@ -117,7 +117,7 @@ PROGRAM qmc_pi_lj
 
   CALL initialize ! Allocate r
 
-  ! read each ring polymer from a unique file
+  ! Read each ring polymer from a unique file; we assume that n and box are compatible!
   DO k = 1, p
      WRITE(k_tag,fmt='(i2.2)') k ! convert into character form
      cnf_prefix(4:5) = k_tag     ! insert into configuration filename
@@ -128,25 +128,24 @@ PROGRAM qmc_pi_lj
   r(:,:,:) = r(:,:,:) / box
   r(:,:,:) = r(:,:,:) - ANINT ( r(:,:,:) ) ! Periodic boundaries
 
-  ! Calculate classical LJ potential energy
+  ! Calculate classical LJ and quantum spring potential energies
   CALL energy_cl ( sigma, r_cut, overlap, pot_cl )
   IF ( overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
-
-  ! Calculate quantum spring potential energy
   CALL energy_qu ( k_spring, sigma, pot_qu )
-  kin   = 1.5 * n * p * temperature  ! Kinetic energy
-  potential_cl = pot_cl / REAL(n)
-  potential_qu = pot_qu / REAL(n)
-  energy = ( kin + pot_cl - pot_qu ) / REAL(n) ! total energy per atom
+
+  ! Calculate derived energies
+  kin   = 1.5 * n * p * temperature            ! Kinetic energy
+  potential_cl = pot_cl / REAL(n)              ! Classical potential per atom
+  potential_qu = pot_qu / REAL(n)              ! Quantum potential per atom
+  energy = ( kin + pot_cl - pot_qu ) / REAL(n) ! Total energy per atom
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial classical potential energy', potential_cl
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial quantum potential energy',   potential_qu
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial energy',                     energy
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Pot-classical', 'Pot-quantum', 'Energy' ] )
-
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -171,7 +170,7 @@ PROGRAM qmc_pi_lj
               END IF
               CALL energy_qu_1 ( rik, i, k, ne, k_spring, sigma, pot_qu_old )
 
-              rik(:) = rik(:) + zeta * dr_max   ! trial move to new position
+              rik(:) = rik(:) + zeta * dr_max    ! trial move to new position
               rik(:) = rik(:) - ANINT ( rik(:) ) ! periodic boundary correction
 
               CALL energy_cl_1 ( rik, i, k, ne, sigma, r_cut, overlap, pot_cl_new )
@@ -192,22 +191,22 @@ PROGRAM qmc_pi_lj
         END DO ! End loop over atoms
 
         ! Calculate all variables for this step
-        move_ratio = REAL(moves) / REAL(n)
+        move_ratio   = REAL(moves) / REAL(n)
         potential_cl = pot_cl / REAL(n)
         potential_qu = pot_qu / REAL(n)
-        energy = ( kin + pot_cl - pot_qu ) / REAL(n) ! total energy per atom
+        energy       = ( kin + pot_cl - pot_qu ) / REAL(n)
         CALL blk_add ( [move_ratio,potential_cl,potential_qu,energy] )
 
      END DO ! End loop over steps
 
      CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,fmt='(i3.3)') blk        ! number configuration by block
+     IF ( nblock < 1000 ) WRITE(sav_tag,fmt='(i3.3)') blk ! number configuration by block
 
-     ! save each ring polymer to a unique file
+     ! Save each ring polymer to a unique file
      DO k = 1, p
         WRITE(k_tag,fmt='(i2.2)') k ! convert into character form
         cnf_prefix(4:5) = k_tag     ! insert into configuration filename
-        CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r(:,:,k)*box ) ! save configuration
+        CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r(:,:,k)*box )
      END DO
 
   END DO ! End loop over blocks
@@ -216,7 +215,7 @@ PROGRAM qmc_pi_lj
 
   potential_cl = pot_cl / REAL(n)
   potential_qu = pot_qu / REAL(n)
-  energy = ( kin + pot_cl - pot_qu ) / REAL(n) ! total energy per atom
+  energy = ( kin + pot_cl - pot_qu ) / REAL(n)
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final classical potential energy', potential_cl
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final quantum potential energy',   potential_qu
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',                     energy
@@ -226,15 +225,15 @@ PROGRAM qmc_pi_lj
      STOP 'Error in qmc_pi_lj'
   END IF
   CALL energy_qu ( k_spring, sigma, pot_qu )
-  WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Final check'
   potential_cl = pot_cl / REAL(n)
   potential_qu = pot_qu / REAL(n)
-  energy = ( kin + pot_cl - pot_qu ) / REAL(n) ! total energy per atom
+  energy = ( kin + pot_cl - pot_qu ) / REAL(n)
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final classical potential energy', potential_cl
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final quantum potential energy',   potential_qu
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',                     energy
 
-  ! write each ring polymer to a unique file
+  ! Write each ring polymer to a unique file
   DO k = 1, p
      WRITE(k_tag,fmt='(i2.2)') k ! convert into character form
      cnf_prefix(4:5) = k_tag     ! insert into configuration filename

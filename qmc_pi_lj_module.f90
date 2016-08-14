@@ -13,7 +13,7 @@ MODULE qmc_pi_lj_module
   INTEGER                                :: p ! number of beads
   REAL,    DIMENSION(:,:,:), ALLOCATABLE :: r ! positions (3,n,p)
 
-  INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
+  INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range and l-range options
 
 CONTAINS
 
@@ -57,9 +57,7 @@ CONTAINS
           IF ( overlap ) EXIT ! jump out of loop
           pot  = pot + pot_i
        END DO ! End loop over atoms within polymer
-    end do ! End loop over ring polymers
-
-    pot  = pot / real ( p )
+    END DO ! End loop over ring polymers
 
   END SUBROUTINE energy_cl
 
@@ -81,8 +79,8 @@ CONTAINS
 
     INTEGER            :: j, j1, j2
     REAL               :: r_cut_sq, sigma_sq
-    REAL               :: sr2, sr6, rij_sq
-    REAL, DIMENSION(3) :: rij
+    REAL               :: sr2, sr6, r_ik_jk_sq
+    REAL, DIMENSION(3) :: r_ik_jk
     REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
 
     IF ( n /= SIZE(r,dim=2) ) THEN ! should never happen
@@ -116,13 +114,13 @@ CONTAINS
 
        IF ( i == j ) CYCLE
 
-       rij(:) = rik(:) - r(:,j,k)
-       rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units
-       rij_sq = SUM ( rij**2 )
+       r_ik_jk(:) = rik(:) - r(:,j,k)
+       r_ik_jk(:) = r_ik_jk(:) - ANINT ( r_ik_jk(:) ) ! periodic boundaries in box=1 units
+       r_ik_jk_sq = SUM ( r_ik_jk**2 )
 
-       IF ( rij_sq < r_cut_sq ) THEN
+       IF ( r_ik_jk_sq < r_cut_sq ) THEN
 
-          sr2 = sigma_sq / rij_sq ! now dimensionless
+          sr2 = sigma_sq / r_ik_jk_sq ! now dimensionless
 
           IF ( sr2 > sr2_overlap ) THEN
              overlap = .TRUE.
@@ -135,7 +133,8 @@ CONTAINS
        END IF
 
     END DO
-    pot = 4.0 * pot
+    pot = 4.0 * pot        ! factor of 4*epsilon
+    pot = pot / real ( p ) ! classical potentials are weaker by a factor p
 
   END SUBROUTINE energy_cl_1
 
@@ -159,14 +158,14 @@ CONTAINS
        STOP 'Error in energy_qu'
     END IF
 
-    pot      = 0.0
+    pot = 0.0
 
     DO k = 1, p ! Loop over ring polymers
        DO i = 1, n ! Loop over atoms within polymer
           CALL energy_qu_1 ( r(:,i,k), i, k, gt, k_spring, sigma, pot_i )
           pot  = pot + pot_i
        END DO ! End loop over atoms within polymer
-    end do ! End loop over ring polymers
+    END DO ! End loop over ring polymers
 
   END SUBROUTINE energy_qu
 
@@ -185,8 +184,8 @@ CONTAINS
 
     INTEGER            :: l
     REAL               :: sigma_sq
-    REAL               :: rkl_sq
-    REAL, DIMENSION(3) :: rkl
+    REAL               :: r_ik_il_sq
+    REAL, DIMENSION(3) :: r_ik_il
 
     IF ( n /= SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r, n=', n, SIZE(r,dim=2)
@@ -198,24 +197,24 @@ CONTAINS
     END IF
 
     sigma_sq = sigma**2
-    pot = 0.0
+    pot      = 0.0
 
-    IF (  l_range == lt .OR. l_range == ne ) THEN ! l = k-1
+    IF (  l_range == lt .OR. l_range == ne ) THEN ! look at l = k-1
        l = k-1
        IF ( l < 1 ) l = p
-       rkl(:) = rik(:) - r(:,i,l)
-       rkl(:) = rkl(:) - ANINT ( rkl(:) ) ! periodic boundaries in box=1 units
-       rkl_sq = SUM ( rkl**2 ) / sigma_sq ! squared distance in LJ units
-       pot = pot + 0.5 * k_spring * rkl_sq
+       r_ik_il(:) = rik(:) - r(:,i,l)
+       r_ik_il(:) = r_ik_il(:) - ANINT ( r_ik_il(:) ) ! periodic boundaries in box=1 units
+       r_ik_il_sq = SUM ( r_ik_il**2 ) / sigma_sq     ! squared distance in LJ units
+       pot = pot + 0.5 * k_spring * r_ik_il_sq
     END IF
 
-    IF (  l_range == gt .OR. l_range == ne ) THEN ! l = k+1
+    IF (  l_range == gt .OR. l_range == ne ) THEN ! look at l = k+1
        l = k+1
        IF ( l > p ) l = 1
-       rkl(:) = rik(:) - r(:,i,l)
-       rkl(:) = rkl(:) - ANINT ( rkl(:) ) ! periodic boundaries in box=1 units
-       rkl_sq = SUM ( rkl**2 ) / sigma_sq ! squared distance in LJ units
-       pot = pot + 0.5 * k_spring * rkl_sq
+       r_ik_il(:) = rik(:) - r(:,i,l)
+       r_ik_il(:) = r_ik_il(:) - ANINT ( r_ik_il(:) ) ! periodic boundaries in box=1 units
+       r_ik_il_sq = SUM ( r_ik_il**2 ) / sigma_sq     ! squared distance in LJ units
+       pot = pot + 0.5 * k_spring * r_ik_il_sq
     END IF
 
   END SUBROUTINE energy_qu_1
