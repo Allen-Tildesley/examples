@@ -14,7 +14,7 @@ MODULE utility_module
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add, time_stamp
 
   ! Random number routines
-  PUBLIC :: init_random_seed, random_integer, random_normal
+  PUBLIC :: init_random_seed, random_integer, random_normal, random_normals
   PUBLIC :: random_orientation_vector, random_perpendicular_vector
   PUBLIC :: random_orientation_vector_alt1, random_orientation_vector_alt2
   PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
@@ -39,6 +39,12 @@ MODULE utility_module
      MODULE PROCEDURE outer_product_3
   END INTERFACE outer_product
 
+  ! Define a generic interface for the random_normals functions
+  INTERFACE random_normals
+     MODULE PROCEDURE random_normals_1
+     MODULE PROCEDURE random_normals_2
+  END INTERFACE random_normals
+  
 CONTAINS
 
   ! Routines associated with input/output and quantities to be averaged
@@ -519,6 +525,32 @@ CONTAINS
     END IF
   END FUNCTION random_normal
 
+  SUBROUTINE random_normals_1 ( mean, std, r )   ! returns vector of normal random numbers
+    REAL,               INTENT(in)  :: mean, std ! required mean and standard deviation
+    REAL, DIMENSION(:), INTENT(out) :: r         ! output argument
+
+    INTEGER :: i
+
+    DO i = 1, SIZE(r)
+       r(i) = random_normal ( mean, std )
+    END DO
+    
+  END SUBROUTINE random_normals_1
+
+  SUBROUTINE random_normals_2 ( mean, std, r )     ! returns array of normal random numbers
+    REAL,                 INTENT(in)  :: mean, std ! required mean and standard deviation
+    REAL, DIMENSION(:,:), INTENT(out) :: r         ! output argument
+
+    INTEGER :: i, j
+
+    DO j = 1, SIZE(r,dim=2)
+       DO i = 1, SIZE(r,dim=1)
+          r(i,j) = random_normal ( mean, std )
+       END DO
+    END DO
+
+  END SUBROUTINE random_normals_2
+  
   SUBROUTINE random_orientation_vector ( e )
     REAL, DIMENSION(3), INTENT(out) :: e ! Uniformly sampled orientation
 
