@@ -3,8 +3,10 @@
 MODULE qmc_pi_lj_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: n, p, r, lt, ne, gt
   PUBLIC :: initialize, finalize, energy_cl_1, energy_cl, energy_qu_1, energy_qu
   PUBLIC :: move

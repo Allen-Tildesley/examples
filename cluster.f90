@@ -3,7 +3,9 @@
 PROGRAM cluster
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               utility_module,  ONLY : read_cnf_atoms
+
+  USE config_io_module, ONLY : read_cnf_atoms
+
   IMPLICIT NONE
 
   ! Reads an atomic configuration with periodic boundary conditions from inp.cnf

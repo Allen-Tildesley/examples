@@ -1,6 +1,8 @@
 PROGRAM sample_mean
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
+
   IMPLICIT NONE
+
   REAL                          :: v, z_sum
   REAL, DIMENSION(2)            :: r, zeta
   REAL, DIMENSION(2), PARAMETER :: r_0 = [1.0, 2.0]

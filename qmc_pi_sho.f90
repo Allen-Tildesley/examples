@@ -3,8 +3,10 @@
 PROGRAM qmc_pi_sho
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               utility_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, &
-       &                                    metropolis
+
+  USE averages_module, ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE utility_module,  ONLY : metropolis
+
   IMPLICIT NONE
 
   ! Program to calculate the average total energy E at temperature T

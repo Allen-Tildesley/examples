@@ -1,7 +1,9 @@
 ! diffusion.f90
 ! Calculates vacf and msd
 PROGRAM diffusion
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+
   IMPLICIT NONE
 
   ! TODO (MPA): simplify this to use read_cnf_atoms and block numbers

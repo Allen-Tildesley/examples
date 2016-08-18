@@ -1,9 +1,12 @@
 ! verlet_list_module.f90
 ! Verlet list handling routines for MD simulation
 MODULE verlet_list_module
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: initialize_list, finalize_list, make_list
   PUBLIC :: point, list
 

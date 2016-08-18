@@ -1,14 +1,18 @@
 ! initialize.f90
 ! Sets up initial configuration for MD or MC
 PROGRAM initialize
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE utility_module,    ONLY : write_cnf_atoms, write_cnf_mols, lowercase
+
+  USE config_io_module,  ONLY : write_cnf_atoms, write_cnf_mols
+  USE utility_module,    ONLY : lowercase
   USE initialize_module, ONLY : allocate_arrays, deallocate_arrays, &
        &                        initialize_positions_lattice, initialize_orientations_lattice, &
        &                        initialize_positions_random,  initialize_orientations_random, &
        &                        initialize_chain_lattice, initialize_chain_random, initialize_chain_velocities, &
        &                        initialize_velocities, initialize_angular_velocities, &
        &                        n, r, e, v, w
+
   IMPLICIT NONE
 
   ! Reads several variables and options from standard input using a namelist nml

@@ -1,9 +1,12 @@
 ! test_pot_gb.f90
 ! Pair potential, Gay-Berne
 MODULE test_pot_module
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: n, force
 
   INTEGER, PARAMETER :: n = 2 ! pair potential

@@ -1,9 +1,12 @@
 ! test_pot_linear.f90
 ! Test potential, forces, torques for linear molecule
 PROGRAM test_pot_linear
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
-  USE               test_pot_module, ONLY : n, force
-  USE               utility_module,  ONLY : init_random_seed, rotate_vector, cross_product
+
+  USE test_pot_module, ONLY : n, force
+  USE utility_module,  ONLY : init_random_seed, rotate_vector, cross_product
+
   IMPLICIT NONE
 
   LOGICAL              :: ok

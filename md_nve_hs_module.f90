@@ -3,8 +3,10 @@
 MODULE md_nve_hs_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: n, r, v, coltime, partner, lt, ne, gt
   PUBLIC :: initialize, finalize, update, overlap, collide
 

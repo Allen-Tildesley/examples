@@ -1,11 +1,15 @@
 ! mc_nvt_poly_lj.f90
 ! Monte Carlo, NVT ensemble, polyatomic molecule, LJ atoms
 PROGRAM mc_nvt_poly_lj
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE utility_module,    ONLY : metropolis, read_cnf_mols, write_cnf_mols, time_stamp, random_rotate_quaternion, &
-       &                        run_begin, run_end, blk_begin, blk_end, blk_add
+
+  USE config_io_module,  ONLY : read_cnf_mols, write_cnf_mols
+  USE averages_module,   ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE utility_module,    ONLY : metropolis, random_rotate_quaternion
   USE mc_poly_lj_module, ONLY : allocate_arrays, deallocate_arrays, energy_1, energy, q_to_d, &
        &                        n, na, r, e, d, ne
+
   IMPLICIT NONE
 
   ! Takes in a configuration of polyatomic molecules (positions and quaternions)

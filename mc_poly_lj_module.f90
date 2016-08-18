@@ -3,8 +3,10 @@
 MODULE mc_poly_lj_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: n, na, r, e, d, lt, ne, gt
   PUBLIC :: allocate_arrays, deallocate_arrays, energy_1, energy, q_to_d
  

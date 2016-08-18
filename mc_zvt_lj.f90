@@ -1,12 +1,16 @@
 ! mc_zvt_lj.f90
 ! Monte Carlo, zVT (grand) ensemble, Lennard-Jones atoms
 PROGRAM mc_zvt_lj
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE utility_module, ONLY : metropolis, read_cnf_atoms, write_cnf_atoms, &
-       &                     run_begin, run_end, blk_begin, blk_end, blk_add, random_integer
-  USE mc_lj_module,   ONLY : initialize, finalize, resize, energy_1, energy, energy_lrc, &
-       &                     move, create, destroy, &
-       &                     n, r, ne
+
+  USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
+  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE utility_module,   ONLY : metropolis, random_integer
+  USE mc_lj_module,     ONLY : initialize, finalize, resize, energy_1, energy, energy_lrc, &
+       &                       move, create, destroy, &
+       &                       n, r, ne
+
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -54,6 +58,7 @@ PROGRAM mc_zvt_lj
   WRITE( unit=output_unit, fmt='(a)' ) 'mc_zvt_lj'
   WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-zVT, Lennard-Jones'
   WRITE( unit=output_unit, fmt='(a)' ) 'Results in units epsilon = sigma = 1'
+  CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -263,6 +268,7 @@ PROGRAM mc_zvt_lj
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final reduced density',                density
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
+  CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
 

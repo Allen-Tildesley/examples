@@ -3,8 +3,10 @@
 MODULE md_lj_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: n, r, v, f
   PUBLIC :: initialize, finalize, force, energy_lrc
 

@@ -1,7 +1,9 @@
 ! ewald_module.f90
 ! r-space and k-space parts of Ewald sum for ions
 MODULE ewald_module
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: pot_r_ewald, pot_k_ewald

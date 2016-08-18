@@ -9,7 +9,9 @@ PROGRAM t_tensor
   ! The vector r12 = r1-r2 points from 2 to 1.
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
-  USE               utility_module,  ONLY : init_random_seed, random_orientation_vector, outer_product
+
+  USE utility_module, ONLY : init_random_seed, random_orientation_vector, outer_product
+
   IMPLICIT NONE
 
   REAL, DIMENSION(3)      :: r12, r12_hat, e1, e2, econ, mu1, mu2, f12t, f12e

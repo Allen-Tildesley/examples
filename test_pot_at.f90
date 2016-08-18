@@ -1,9 +1,12 @@
 ! test_pot_at.f90
 ! Axilrod-Teller triple-dipole potential
 MODULE test_pot_module
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: n, force
 
   INTEGER, PARAMETER :: n = 3 ! three-body potential

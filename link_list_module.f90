@@ -2,8 +2,10 @@
 ! Link list handling routines for MC or MD simulation
 MODULE link_list_module
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: initialize_list, finalize_list, make_list, check_list
   PUBLIC :: move_in_list, create_in_list, destroy_in_list, c_index
   PUBLIC :: sc, head, list, c

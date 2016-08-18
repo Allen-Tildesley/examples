@@ -3,8 +3,10 @@
 MODULE md_lj_mts_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: n, r, v, f
   PUBLIC :: allocate_arrays, deallocate_arrays, force
 

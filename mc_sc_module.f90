@@ -3,8 +3,10 @@
 MODULE mc_sc_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: n, r, e, lt, ne, gt
   PUBLIC :: allocate_arrays, deallocate_arrays, overlap_1, overlap, n_overlap_1, n_overlap
 

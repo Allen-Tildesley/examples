@@ -3,7 +3,10 @@
 PROGRAM qmc_walk_sho
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               utility_module,  ONLY : random_normal, time_stamp
+
+  USE averages_module, ONLY : time_stamp
+  USE utility_module,  ONLY : random_normal
+
   IMPLICIT NONE
 
   ! Program to calculate the ground state wavefunction

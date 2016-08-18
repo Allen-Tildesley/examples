@@ -8,6 +8,7 @@ PROGRAM mesh
   ! The charge mesh is indexed from 0 to sc-1 in each coordinate direction
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
+
   IMPLICIT NONE
 
   INTEGER                             :: n   ! number of charges

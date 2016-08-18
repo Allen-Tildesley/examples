@@ -1,7 +1,9 @@
 ! initialize_module.f90
 ! Routines to initialize configurations and velocities
 MODULE initialize_module
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: allocate_arrays, deallocate_arrays

@@ -3,8 +3,10 @@
 MODULE md_chain_lj_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: n, r, v, f, f_spring
   PUBLIC :: allocate_arrays, deallocate_arrays, force, spring
   PUBLIC :: rattle_a, rattle_b, worst_bond, milcshake_a, milcshake_b 

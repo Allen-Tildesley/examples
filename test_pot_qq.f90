@@ -1,9 +1,12 @@
 ! test_pot_qq.f90
 ! Pair potential, quadrupole-quadrupole, quadrupole moment Q=1
 MODULE test_pot_module
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+
   IMPLICIT NONE
   PRIVATE
+
   PUBLIC :: n, force
 
   INTEGER, PARAMETER :: n = 2 ! pair potential
