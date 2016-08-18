@@ -1,5 +1,5 @@
 ! md_lj_mts_module.f90
-! Force routine for MD simulation, LJ atoms, multiple time steps
+! Force routine for MD, LJ atoms, multiple timesteps
 MODULE md_lj_mts_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit

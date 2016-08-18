@@ -1,6 +1,6 @@
 ! mesh.f90
 ! Assignment of charges to a 3-d mesh
-PROGRAM meshup3d
+PROGRAM mesh
 
   ! This program assigns a set of charges to a cubic mesh using the
   ! triangular shape cloud distribution described by Hockney and Eastwood (1988)
@@ -92,4 +92,4 @@ PROGRAM meshup3d
 
   DEALLOCATE ( r, dr, q, rho )
   
-END PROGRAM meshup3d
+END PROGRAM mesh

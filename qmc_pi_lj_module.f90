@@ -1,5 +1,5 @@
 ! qmc_pi_lj_module.f90
-! Energy and move routines for path integral MC simulation, LJ potential
+! Energy and move routines for PIMC simulation, LJ potential
 MODULE qmc_pi_lj_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit

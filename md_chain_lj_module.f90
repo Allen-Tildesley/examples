@@ -1,6 +1,6 @@
-! md_chain_module.f90
-! Force & constraint routines for MD simulation, repulsive Lennard-Jones atom chain
-MODULE md_chain_module
+! md_chain_lj_module.f90
+! Force & constraint routines for MD, LJ chain
+MODULE md_chain_lj_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   IMPLICIT NONE
@@ -406,4 +406,4 @@ CONTAINS
 
   END SUBROUTINE milcshake_b
 
-END MODULE md_chain_module
+END MODULE md_chain_lj_module

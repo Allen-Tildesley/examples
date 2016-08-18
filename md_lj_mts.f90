@@ -1,5 +1,5 @@
 ! md_lj_mts.f90
-! Molecular dynamics, NVE ensemble, Lennard-Jones atoms
+! Molecular dynamics, NVE, multiple timesteps, LJ atoms
 PROGRAM md_lj_mts
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE utility_module,   ONLY : read_cnf_atoms, write_cnf_atoms, time_stamp, &

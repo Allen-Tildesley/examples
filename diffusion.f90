@@ -4,6 +4,9 @@ PROGRAM diffusion
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   IMPLICIT NONE
 
+  ! TODO (MPA): simplify this to use read_cnf_atoms and block numbers
+  ! TODO (MPA): add cross term v(0) dr(t)
+  
   ! Reads a trajectory from an unformatted (binary) file inp.trj
   ! The first record should contain n (number of atoms) and box (box length)
   ! Each subsequent record contains positions r and velocities v at a single time

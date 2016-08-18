@@ -1,6 +1,6 @@
 ! test_pot_atom.f90
 ! Test potential, forces for atoms
-PROGRAM test_pot
+PROGRAM test_pot_atom
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
   USE               test_pot_module, ONLY : n, force
   USE               utility_module,  ONLY : init_random_seed, cross_product
@@ -99,6 +99,4 @@ CONTAINS
 
   END SUBROUTINE random_positions
 
-END PROGRAM test_pot
-
-
+END PROGRAM test_pot_atom
