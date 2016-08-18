@@ -1,9 +1,8 @@
 ! utility_module.f90
-! routines for I/O, random numbers, averages, order parameters
+! routines for mathematical operations, random numbers, order parameters
 MODULE utility_module
 
   ! We use the standard error_unit for error messages
-  ! but allow the output_unit to be passed in as an argument, when needed
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit, iostat_end, iostat_eor
 
   IMPLICIT NONE
@@ -34,7 +33,7 @@ MODULE utility_module
      MODULE PROCEDURE random_normals_1
      MODULE PROCEDURE random_normals_2
   END INTERFACE random_normals
-  
+
 CONTAINS
 
   ! Routines associated with random number generation
@@ -150,7 +149,7 @@ CONTAINS
     DO i = 1, SIZE(r)
        r(i) = random_normal ( mean, std )
     END DO
-    
+
   END SUBROUTINE random_normals_1
 
   SUBROUTINE random_normals_2 ( mean, std, r )     ! returns array of normal random numbers
@@ -166,7 +165,7 @@ CONTAINS
     END DO
 
   END SUBROUTINE random_normals_2
-  
+
   SUBROUTINE random_orientation_vector ( e )
     REAL, DIMENSION(3), INTENT(out) :: e ! Uniformly sampled orientation
 
@@ -445,8 +444,8 @@ CONTAINS
 
     INTEGER :: i, j
 
-    DO i = 1, SIZE(a)
-       DO j = 1, SIZE(b)
+    DO j = 1, SIZE(b)
+       DO i = 1, SIZE(a)
           c(i,j) = a(i) * b(j)
        END DO
     END DO
@@ -458,15 +457,15 @@ CONTAINS
 
   FUNCTION outer_product_3 ( a, b, c ) RESULT (d)
     REAL, DIMENSION(:), INTENT(IN)           :: a, b, c
-    REAL, DIMENSION(SIZE(a),SIZE(b),size(c)) :: d ! function result
+    REAL, DIMENSION(SIZE(a),SIZE(b),SIZE(c)) :: d ! function result
 
     INTEGER :: i, j, k
 
-    DO i = 1, SIZE(a)
+    DO k = 1, SIZE(c)
        DO j = 1, SIZE(b)
-          do k = 1, size(c)
+          DO i = 1, SIZE(a)
              d(i,j,k) = a(i) * b(j) * c(k)
-             end do
+          END DO
        END DO
     END DO
 
