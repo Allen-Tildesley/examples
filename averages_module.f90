@@ -13,10 +13,11 @@ MODULE averages_module
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add, time_stamp
 
   ! These variables (run averages etc) are only accessed within this module
-  INTEGER,                                      SAVE :: nvariables
-  CHARACTER(len=15), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
-  REAL,              DIMENSION(:), ALLOCATABLE, SAVE :: blk_averages, run_averages, errors
-  REAL,                                         SAVE :: run_norm, blk_norm
+  INTEGER,                                     SAVE :: nvariables, col_width, line_width
+  CHARACTER(len=:), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
+  REAL,             DIMENSION(:), ALLOCATABLE, SAVE :: blk_averages, run_averages, run_errors
+  REAL,                                        SAVE :: run_norm, blk_norm
+  CHARACTER(len=13),                           SAVE :: col_fmt = '(*(1x,f##.5))' ! width to be inserted
 
 CONTAINS
   
@@ -38,18 +39,38 @@ CONTAINS
   END SUBROUTINE time_stamp
 
   SUBROUTINE run_begin ( names ) ! Set up averaging variables based on supplied names
-    CHARACTER(len=15), DIMENSION(:), INTENT(in) :: names
+    CHARACTER(len=*), DIMENSION(:), INTENT(in) :: names
+
+    INTEGER          :: i
+    CHARACTER(len=2) :: ch_col_width
 
     nvariables = SIZE ( names )
-    ALLOCATE ( variable_names(nvariables) )
+    col_width = MAX ( 10, LEN(names) ) ! We don't allow columns to be too narrow
+    IF ( col_width > 99 ) THEN         ! or too large
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'col_width too large', col_width
+       STOP 'Error in run_begin'
+    END IF
+
+    ! Set up format string for columns
+    WRITE ( ch_col_width, fmt='(i2)' ) col_width
+    col_fmt(8:9) = ch_col_width
+
+    ! First column is 15 characters; allow one space between columns 
+    line_width = 15 + nvariables * ( col_width + 1 )
+
+    ALLOCATE ( CHARACTER(col_width) :: variable_names(nvariables) )
     ALLOCATE ( blk_averages(nvariables) )
     ALLOCATE ( run_averages(nvariables) )
-    ALLOCATE ( errors(nvariables) )
+    ALLOCATE ( run_errors  (nvariables) )
 
     variable_names = names
-    run_norm       = 0.0
-    run_averages   = 0.0
-    errors         = 0.0
+    DO i = 1, nvariables
+       variable_names(i) = ADJUSTR ( variable_names(i) )
+    END DO
+
+    run_norm     = 0.0
+    run_averages = 0.0
+    run_errors   = 0.0
 
   END SUBROUTINE run_begin
 
@@ -75,39 +96,43 @@ CONTAINS
 
     LOGICAL, SAVE :: first_call = .TRUE.
 
-    blk_averages = blk_averages / blk_norm     ! Normalize block averages
-    run_averages = run_averages + blk_averages ! Increment run averages
-    errors       = errors + blk_averages**2    ! Increment error accumulators
-    run_norm     = run_norm + 1.0              ! Increment run normalizer
+    blk_averages = blk_averages / blk_norm        ! Normalize block averages
+    run_averages = run_averages + blk_averages    ! Increment run averages
+    run_errors   = run_errors   + blk_averages**2 ! Increment error accumulators
+    run_norm     = run_norm + 1.0                 ! Increment run normalizer
 
     IF ( first_call ) THEN  ! Write headings
-       WRITE ( unit=output_unit, fmt='(a)'        ) REPEAT ( '=', 16*(nvariables+1) ) 
-       WRITE ( unit=output_unit, fmt='(*(1x,a15))') 'Block', ADJUSTR ( variable_names )
-       WRITE ( unit=output_unit, fmt='(a)'        ) REPEAT ( '=', 16*(nvariables+1) )
+       WRITE ( unit=output_unit, fmt='(a)'                 ) REPEAT ( '=', line_width ) 
+       WRITE ( unit=output_unit, fmt='(a15)', advance='no' ) 'Block'
+       WRITE ( unit=output_unit, fmt='(*(1x,a))'           ) variable_names
+       WRITE ( unit=output_unit, fmt='(a)'                 ) REPEAT ( '=', line_width )
        first_call = .FALSE.
     END IF
 
     ! Write out block averages
-    WRITE ( unit=output_unit, fmt='(1x,i15,*(1x,f15.5))') blk, blk_averages
+    WRITE ( unit=output_unit, fmt='(i15)', advance='no' ) blk
+    WRITE ( unit=output_unit, fmt=col_fmt               ) blk_averages
 
   END SUBROUTINE blk_end
 
   SUBROUTINE run_end ( output_unit ) ! Write out run averages
     INTEGER, INTENT(in) :: output_unit
 
-    run_averages = run_averages / run_norm  ! Normalize run averages
-    errors       = errors / run_norm        ! Normalize error estimates
-    errors       = errors - run_averages**2 ! Compute fluctuations
-    WHERE ( errors > 0.0 )
-       errors = SQRT ( errors / run_norm ) ! Normalize and get estimated errors
+    run_averages = run_averages / run_norm          ! Normalize run averages
+    run_errors       = run_errors / run_norm        ! Normalize error estimates
+    run_errors       = run_errors - run_averages**2 ! Compute fluctuations
+    WHERE ( run_errors > 0.0 )
+       run_errors = SQRT ( run_errors / run_norm )  ! Normalize and get estimated errors
     END WHERE
 
-    WRITE ( unit=output_unit, fmt='(a)'                  ) REPEAT('-',16*(nvariables+1))
-    WRITE ( unit=output_unit, fmt='(1x,a15,*(1x,f15.5))' ) 'Run averages', run_averages
-    WRITE ( unit=output_unit, fmt='(1x,a15,*(1x,f15.5))' ) 'Run errors', errors
-    WRITE ( unit=output_unit, fmt='(a)'                  ) REPEAT('=',16*(nvariables+1))
+    WRITE ( unit=output_unit, fmt='(a)'                  ) REPEAT('-', line_width )
+    WRITE ( unit=output_unit, fmt='(a15)', advance='no'  ) 'Run averages'
+    WRITE ( unit=output_unit, fmt=col_fmt                ) run_averages
+    WRITE ( unit=output_unit, fmt='(a15)', advance='no'  ) 'Run errors'
+    WRITE ( unit=output_unit, fmt=col_fmt                ) run_errors
+    WRITE ( unit=output_unit, fmt='(a)'                  ) REPEAT('=', line_width )
 
-    DEALLOCATE ( variable_names, blk_averages, run_averages, errors )
+    DEALLOCATE ( variable_names, blk_averages, run_averages, run_errors )
 
   END SUBROUTINE run_end
 

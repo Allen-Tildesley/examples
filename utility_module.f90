@@ -1,5 +1,5 @@
 ! utility_module.f90
-! routines for mathematical operations, random numbers, order parameters
+! routines for maths, random numbers, order parameters
 MODULE utility_module
 
   ! We use the standard error_unit for error messages
@@ -21,6 +21,9 @@ MODULE utility_module
 
   ! Order parameter calculations
   PUBLIC :: orientational_order, translational_order, nematic_order
+
+  ! Constants used throughout the module
+  REAL, PARAMETER :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
 
   ! Define a generic interface for the outer_product functions
   INTERFACE outer_product
@@ -125,7 +128,6 @@ CONTAINS
     REAL, DIMENSION(2)      :: zeta
     REAL,              SAVE :: r_save
     LOGICAL,           SAVE :: saved = .FALSE.
-    REAL,         PARAMETER :: pi = 4.0*ATAN(1.0)
 
     IF ( saved ) THEN
        r = r_save
@@ -193,7 +195,6 @@ CONTAINS
     ! First alternative routine for choosing a random orientation in 3D
 
     REAL               :: c, s, phi
-    REAL, PARAMETER    :: pi = 4.0*ATAN(1.0)
     REAL, DIMENSION(2) :: zeta ! random numbers
 
     CALL RANDOM_NUMBER ( zeta )        ! Two uniformly sampled random numbers in range (0,1)
@@ -510,7 +511,6 @@ CONTAINS
     REAL, DIMENSION(3) :: k_real
     REAL               :: kr
     COMPLEX            :: rho ! Fourier component of single-particle density
-    REAL, PARAMETER    :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
 
     IF ( SIZE(r,dim=1) /= 3 ) THEN
        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Error in r dimension ', SIZE(r,dim=1)
@@ -594,7 +594,6 @@ CONTAINS
     INTEGER              :: i, n
     REAL, DIMENSION(3,3) :: q         ! order tensor
     REAL                 :: h, g, psi ! used in eigenvalue calculation
-    REAL, PARAMETER      :: pi = 4.0*ATAN(1.0)
 
     IF ( SIZE(e,dim=1) /= 3 ) THEN
        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Error in e dimension ', SIZE(e,dim=1)
