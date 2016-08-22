@@ -5,7 +5,7 @@ PROGRAM test_pot_linear
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
 
   USE test_pot_module, ONLY : n, force
-  USE utility_module,  ONLY : init_random_seed, rotate_vector, cross_product
+  USE maths_module,  ONLY : init_random_seed, rotate_vector, cross_product
 
   IMPLICIT NONE
 
@@ -85,7 +85,7 @@ PROGRAM test_pot_linear
 CONTAINS
 
   SUBROUTINE random_orientations ( e )
-    USE utility_module, ONLY : random_orientation_vector
+    USE maths_module, ONLY : random_orientation_vector
     REAL, DIMENSION (3,n), INTENT(out) :: e
 
     INTEGER :: i
@@ -97,7 +97,7 @@ CONTAINS
   END SUBROUTINE random_orientations
 
   SUBROUTINE random_positions ( d_min, d_max, r )
-    USE utility_module, ONLY : random_orientation_vector
+    USE maths_module, ONLY : random_orientation_vector
     REAL,                  INTENT(in)  :: d_min, d_max
     REAL, DIMENSION (3,n), INTENT(out) :: r
 

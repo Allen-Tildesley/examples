@@ -10,29 +10,33 @@ MODULE verlet_list_module
   PUBLIC :: initialize_list, finalize_list, make_list
   PUBLIC :: point, list
 
-  ! The initialize_list routine reads the value of r_list_factor from standard input using a namelist nml_list
+  ! The initialize_list routine reads the value of r_list_factor
+  ! from standard input using a NAMELIST nml_list
   ! Leave namelist empty to accept supplied default
-  ! r_list is set to r_cut*r_list_factor
+  ! It is assumed that all positions and displacements are divided by box
+  ! r_list_box is set to r_cut_box*r_list_factor
   
-  INTEGER                              :: nl     ! size of list
-  REAL                                 :: r_list ! list range parameter
-  REAL                                 :: r_skin ! list skin parameter
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: r_save ! saved positions for list (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: dr     ! displacements (3,n)
-  INTEGER, DIMENSION(:),   ALLOCATABLE :: point  ! index to neighbour list (n)
-  INTEGER, DIMENSION(:),   ALLOCATABLE :: list   ! Verlet neighbour list (nl)
+  INTEGER                                         :: nl         ! size of list
+  REAL                                            :: r_list_box ! list range parameter / box length
+  REAL                                            :: r_skin_box ! list skin parameter / box_length
+  REAL,    DIMENSION(:,:), ALLOCATABLE            :: r_save     ! saved positions for list (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE            :: dr         ! displacements (3,n)
+  INTEGER, DIMENSION(:),   ALLOCATABLE, PROTECTED :: point      ! index to neighbour list (n)
+  INTEGER, DIMENSION(:),   ALLOCATABLE, PROTECTED :: list       ! Verlet neighbour list (nl)
 
 CONTAINS
 
-  SUBROUTINE initialize_list ( n, r_cut )
-    INTEGER, INTENT(in) :: n
-    REAL,    INTENT(in) :: r_cut
+  SUBROUTINE initialize_list ( n, r_cut_box )
+    INTEGER, INTENT(in) :: n         ! number of particles
+    REAL,    INTENT(in) :: r_cut_box ! r_cut / box
 
     REAL    :: r_list_factor
     INTEGER :: ioerr
 
     REAL, PARAMETER :: pi = 4.0*ATAN(1.0)
     NAMELIST /nml_list/ r_list_factor
+
+        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list based on r_cut/box =', r_cut_box
 
     ! Sensible default for r_list_factor
     r_list_factor = 1.2
@@ -48,17 +52,17 @@ CONTAINS
        WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_list_factor must be > 1', r_list_factor
        STOP 'Error in initialize_list'
     END IF
-    r_list = r_cut * r_list_factor
-    IF ( r_list > 0.5   ) THEN
-       WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_list too large', r_list
+    r_list_box = r_cut_box * r_list_factor
+    IF ( r_list_box > 0.5 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_list/box too large', r_list_box
        STOP 'Error in initialize_list'
     END IF
-    r_skin = r_list - r_cut
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list range (box units) = ', r_list
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list skin  (box units) = ', r_skin
+    r_skin_box = r_list_box - r_cut_box
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list range (box units) = ', r_list_box
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list skin  (box units) = ', r_skin_box
 
     ! Estimate list size based on density + 10 per cent
-    nl = CEILING ( 1.1*(4.0*pi/6.0)*(r_list**3)*REAL(n**2) )
+    nl = CEILING ( 1.1*(4.0*pi/3.0)*(r_list_box**3)*REAL(n*(n-1)) / 2.0 )
     WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'Verlet list size = ', nl
     ALLOCATE ( r_save(3,n), dr(3,n), point(n), list(nl) )
   END SUBROUTINE initialize_list
@@ -89,22 +93,22 @@ CONTAINS
     REAL,    DIMENSION(3,n), INTENT(in) :: r
 
     INTEGER            :: i, j, k
-    REAL               :: r_list_sq, rij_sq, dr_sq_max
+    REAL               :: r_list_box_sq, rij_sq, dr_sq_max
     REAL, DIMENSION(3) :: rij
 
     LOGICAL, SAVE :: first_call = .TRUE.
 
     IF ( .NOT. first_call ) THEN
-       dr = r - r_save                           ! displacement since last list update
-       dr = dr - ANINT ( dr )                    ! periodic boundaries in box=1
-       dr_sq_max = MAXVAL ( SUM(dr**2,dim=1) )   ! squared maximum displacement
-       IF ( 4.0*dr_sq_max < r_skin ** 2 ) RETURN ! no need to make list
+       dr = r - r_save                             ! displacement since last list update
+       dr = dr - ANINT ( dr )                      ! periodic boundaries in box=1 units
+       dr_sq_max = MAXVAL ( SUM(dr**2,dim=1) )     ! squared maximum displacement
+       IF ( 4.0*dr_sq_max < r_skin_box**2 ) RETURN ! no need to make list
     END IF
 
     first_call = .FALSE.
 
     k = 0
-    r_list_sq = r_list ** 2
+    r_list_box_sq = r_list_box ** 2
 
     DO i = 1, n - 1 ! Begin outer loop over atoms
 
@@ -116,7 +120,7 @@ CONTAINS
           rij(:) = rij(:) - ANINT ( rij(:) )
           rij_sq = SUM ( rij**2 )
 
-          IF ( rij_sq < r_list_sq ) THEN
+          IF ( rij_sq < r_list_box_sq ) THEN
 
              k = k + 1
              IF ( k > nl ) CALL resize_list

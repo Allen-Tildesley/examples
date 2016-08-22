@@ -10,18 +10,20 @@ MODULE link_list_module
   PUBLIC :: move_in_list, create_in_list, destroy_in_list, c_index
   PUBLIC :: sc, head, list, c
 
-  INTEGER,                                PROTECTED :: sc     ! dimensions of head array, assume cubic box
-  INTEGER, DIMENSION(:,:,:), ALLOCATABLE, PROTECTED :: head   ! head(0:sc-1,0:sc-1,0:sc-1), assume cubic box
-  INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED :: list   ! list(n)
-  INTEGER, DIMENSION(:,:),   ALLOCATABLE, PROTECTED :: c      ! c(3,n) 3D cell index of each atom
+  INTEGER,                                PROTECTED :: sc   ! dimensions of head array, assume cubic box
+  INTEGER, DIMENSION(:,:,:), ALLOCATABLE, PROTECTED :: head ! head(0:sc-1,0:sc-1,0:sc-1), assume cubic box
+  INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED :: list ! list(n)
+  INTEGER, DIMENSION(:,:),   ALLOCATABLE, PROTECTED :: c    ! c(3,n) 3D cell index of each atom
 
 CONTAINS
 
-  SUBROUTINE initialize_list ( n, r_cut )
-    INTEGER, INTENT(in) :: n
-    REAL,    INTENT(in) :: r_cut ! We assume that r_cut (in box=1 units) never changes
+  SUBROUTINE initialize_list ( n, r_cut_box )
+    INTEGER, INTENT(in) :: n         ! number of particles
+    REAL,    INTENT(in) :: r_cut_box ! rcut/box, assume never changes
 
-    sc = FLOOR ( 1.0 / r_cut ) ! number of cells
+            WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Link cells based on r_cut/box =', r_cut_box
+
+    sc = FLOOR ( 1.0 / r_cut_box ) ! number of cells
     IF ( sc < 3 ) THEN
        WRITE ( unit=error_unit, fmt='(a,i15)') 'System is too small to use link cells', sc
        STOP 'Error in initialize_list'

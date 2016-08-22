@@ -6,8 +6,8 @@ PROGRAM mc_zvt_lj
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE utility_module,   ONLY : metropolis, random_integer
-  USE mc_lj_module,     ONLY : initialize, finalize, resize, energy_1, energy, energy_lrc, &
+  USE maths_module,   ONLY : metropolis, random_integer
+  USE mc_lj_module,     ONLY : allocate_arrays, deallocate_arrays, resize, energy_1, energy, energy_lrc, &
        &                       move, create, destroy, &
        &                       n, r, ne
 
@@ -27,7 +27,6 @@ PROGRAM mc_zvt_lj
   ! are given in LJ units sigma = 1, epsilon = 1
 
   ! Most important variables
-  REAL                  :: sigma       ! atomic diameter (in units where box=1)
   REAL                  :: box         ! box length (in units where sigma=1)
   REAL                  :: density     ! reduced density n*sigma**3/box**3
   REAL                  :: dr_max      ! maximum MC displacement
@@ -90,22 +89,10 @@ PROGRAM mc_zvt_lj
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
-  sigma   = 1.0
-  density = REAL(n) * ( sigma / box ) ** 3
+  density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
-  ! Convert run and potential parameters to box units
-  sigma  = sigma / box
-  r_cut  = r_cut / box
-  dr_max = dr_max / box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'sigma (in box units)', sigma
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'r_cut (in box units)', r_cut
-  IF ( r_cut > 0.5 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_cut too large ', r_cut
-     STOP 'Error in mc_zvt_lj'
-  END IF
-
-  CALL initialize ( r_cut ) ! Allocate r
+  CALL allocate_arrays ( box, r_cut ) ! Allocate r
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! second call is to get r
 
@@ -115,12 +102,12 @@ PROGRAM mc_zvt_lj
 
   CALL resize ! Increase the size of the r array
 
-  CALL energy ( sigma, r_cut, overlap, pot, vir )
+  CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_zvt_lj'
   END IF
-  CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
@@ -155,14 +142,14 @@ PROGRAM mc_zvt_lj
 
               i = random_integer ( 1, n )
               ri(:) = r(:,i)
-              CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot_old, vir_old )
+              CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_old, vir_old )
               IF ( overlap ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in mc_zvt_lj'
               END IF
-              ri(:) = ri(:) + zeta * dr_max   ! trial move to new position
-              ri(:) = ri(:) - ANINT ( ri(:) ) ! periodic boundary correction
-              CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot_new, vir_new )
+              ri(:) = ri(:) + zeta * dr_max / box  ! trial move to new position (in box=1 units)
+              ri(:) = ri(:) - ANINT ( ri(:) )      ! periodic boundary correction
+              CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_new, vir_new )
 
               IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
                  delta = ( pot_new - pot_old ) / temperature
@@ -181,11 +168,11 @@ PROGRAM mc_zvt_lj
 
               CALL RANDOM_NUMBER ( ri ) ! three uniform random numbers in range (0,1)
               ri = ri - 0.5             ! now in range (-0.5,+0.5)
-              CALL energy_1 ( ri, n+1, ne, sigma, r_cut, overlap, del_pot, del_vir )
-              CALL energy_lrc ( n+1, sigma, r_cut, pot_lrc, vir_lrc ) ! LRC for n+1 atoms
+              CALL energy_1 ( ri, n+1, ne, box, r_cut, overlap, del_pot, del_vir )
+              CALL energy_lrc ( n+1, box, r_cut, pot_lrc, vir_lrc ) ! LRC for n+1 atoms
               del_pot = del_pot + pot_lrc
               del_vir = del_vir + vir_lrc
-              CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc ) ! LRC for n atoms
+              CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc ) ! LRC for n atoms
               del_pot = del_pot - pot_lrc
               del_vir = del_vir - vir_lrc
 
@@ -203,11 +190,11 @@ PROGRAM mc_zvt_lj
               tries(-1) = tries(-1) + 1
               i = random_integer ( 1, n )
 
-              CALL energy_1 ( r(:,i), i, ne, sigma, r_cut, overlap, del_pot, del_vir )
-              CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc ) ! LRC for n atoms
+              CALL energy_1 ( r(:,i), i, ne, box, r_cut, overlap, del_pot, del_vir )
+              CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc ) ! LRC for n atoms
               del_pot = del_pot + pot_lrc
               del_vir = del_vir + vir_lrc
-              CALL energy_lrc ( n-1, sigma, r_cut, pot_lrc, vir_lrc ) ! LRC for n-1 atoms
+              CALL energy_lrc ( n-1, box, r_cut, pot_lrc, vir_lrc ) ! LRC for n-1 atoms
               del_pot = del_pot - pot_lrc
               del_vir = del_vir - vir_lrc
               del_pot = -del_pot ! change sign for a removal
@@ -232,7 +219,7 @@ PROGRAM mc_zvt_lj
         ! Calculate all variables for this step
         move_ratio = REAL(moves) / REAL(tries)
         potential  = pot / REAL(n)
-        density    = REAL(n)*sigma**3
+        density    = REAL(n) / box**3
         pressure   = density * temperature + vir / box**3
         CALL blk_add ( [move_ratio(0),move_ratio(1),move_ratio(-1), &
              &          potential,pressure,density] )
@@ -248,18 +235,18 @@ PROGRAM mc_zvt_lj
   CALL run_end ( output_unit )
 
   potential = pot / REAL ( n )
-  density   = REAL(n)*sigma**3
+  density   = REAL(n) / box**3
   pressure  = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final reduced density',                density
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
 
-  CALL energy ( sigma, r_cut, overlap, pot, vir )
+  CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_zvt_lj'
   END IF
-  CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
@@ -272,7 +259,7 @@ PROGRAM mc_zvt_lj
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
 
-  CALL finalize
+  CALL deallocate_arrays
 
 END PROGRAM mc_zvt_lj
 

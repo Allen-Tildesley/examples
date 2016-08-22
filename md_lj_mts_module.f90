@@ -37,10 +37,11 @@ CONTAINS
     REAL,                  INTENT(out) :: pot    ! total potential energy for this shell
     REAL,                  INTENT(out) :: vir    ! virial for this shell
 
-    ! Calculates potential, virial and forces
+    ! Calculates potential, virial and forces for the given shell k
     ! Each shell carries its own contribution to potential and forces
     ! The contribution includes a multiplicative switching function
     ! All quantities are calculated in units where sigma = 1 and epsilon = 1
+    ! Positions are assumed to be in these units as well
 
     INTEGER            :: i, j, k_max
     REAL               :: rij_sq, rij_mag, sr2, sr6, sr12, s, ds, x

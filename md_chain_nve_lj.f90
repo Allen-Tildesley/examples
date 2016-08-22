@@ -6,7 +6,7 @@ PROGRAM md_chain_nve_lj
 
   USE config_io_module,   ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,    ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE utility_module,     ONLY : lowercase
+  USE maths_module,     ONLY : lowercase
   USE md_chain_lj_module, ONLY : allocate_arrays, deallocate_arrays, worst_bond, force, &
        &                         milcshake_a, milcshake_b, rattle_a, rattle_b, r, v, n
 

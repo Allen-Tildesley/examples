@@ -1,6 +1,6 @@
-! utility_module.f90
+! maths_module.f90
 ! routines for maths, random numbers, order parameters
-MODULE utility_module
+MODULE maths_module
 
   ! We use the standard error_unit for error messages
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit, iostat_end, iostat_eor
@@ -646,4 +646,4 @@ CONTAINS
     a(3,:) = [     2*(q(1)*q(3)+q(0)*q(2)),       2*(q(2)*q(3)-q(0)*q(1)),   q(0)**2-q(1)**2-q(2)**2+q(3)**2 ] ! 3rd row
   END FUNCTION q_to_a
 
-END MODULE utility_module
+END MODULE maths_module

@@ -6,8 +6,8 @@ PROGRAM mc_npt_lj
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE utility_module,   ONLY : metropolis
-  USE mc_lj_module,     ONLY : initialize, finalize, energy_1, energy, energy_lrc, move, &
+  USE maths_module,   ONLY : metropolis
+  USE mc_lj_module,     ONLY : allocate_arrays, deallocate_arrays, energy_1, energy, energy_lrc, move, &
        &                       n, r, ne
   IMPLICIT NONE
 
@@ -19,35 +19,36 @@ PROGRAM mc_npt_lj
   ! Leave namelist empty to accept supplied defaults
 
   ! Box is taken to be of unit length during the Monte Carlo
-  ! However, input configuration, output configuration,
-  ! most calculations, and all results 
+  ! However, input configuration, output configuration, most calculations, and all results 
   ! are given in LJ units sigma = 1, epsilon = 1
 
-  ! This program uses the known scaling of the separate parts of the LJ potential
+  ! For this potential we could use the known scaling of the separate parts of the LJ potential
   ! with distances (i.e. with box scaling) to handle the volume move.
-  ! However, this requires us to scale the cutoff distance with the box
+  ! However, this would require us to scale the cutoff distance with the box
+  ! We do not do this here; instead we simply recalculate the potential energy,
+  ! keeping r_cut fixed (in sigma=1 units)
+
   ! The logarithm of the box length is sampled uniformly
 
   ! Most important variables
-  REAL               :: sigma          ! atomic diameter (in units where box=1)
-  REAL               :: box            ! box length (in units where sigma=1)
-  REAL               :: dr_max         ! maximum MC particle displacement
-  REAL               :: db_max         ! maximum MC box displacement
-  REAL               :: temperature    ! specified temperature
-  REAL               :: pressure_inp   ! specified pressure
-  REAL               :: r_cut          ! potential cutoff distance
-  REAL, DIMENSION(2) :: pot            ! total potential energy (LJ12 and LJ6 parts separate)
-  REAL, DIMENSION(2) :: vir            ! total virial (LJ12 and LJ6 parts separate)
-  REAL               :: move_ratio     ! acceptance ratio of moves (to be averaged)
-  REAL               :: box_move_ratio ! acceptance ratio of box moves (to be averaged)
-  REAL               :: density        ! reduced density n*sigma**3/box**3 (to be averaged)
-  REAL               :: pressure       ! pressure (LJ sigma=1 units, to be averaged)
-  REAL               :: potential      ! potential energy per atom (LJ sigma=1 units, to be averaged)
+  REAL :: box            ! box length (in units where sigma=1)
+  REAL :: dr_max         ! maximum MC particle displacement
+  REAL :: db_max         ! maximum MC box displacement
+  REAL :: temperature    ! specified temperature
+  REAL :: pressure_inp   ! specified pressure
+  REAL :: r_cut          ! potential cutoff distance
+  REAL :: pot            ! total potential energy
+  REAL :: vir            ! total virial
+  REAL :: move_ratio     ! acceptance ratio of moves (to be averaged)
+  REAL :: box_move_ratio ! acceptance ratio of box moves (to be averaged)
+  REAL :: density        ! reduced density n*sigma**3/box**3 (to be averaged)
+  REAL :: pressure       ! pressure (LJ sigma=1 units, to be averaged)
+  REAL :: potential      ! potential energy per atom (LJ sigma=1 units, to be averaged)
 
   LOGICAL            :: overlap
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
-  REAL               :: sigma_scale, box_new, sigma_new, density_new, delta
-  REAL, DIMENSION(2) :: pot_old, pot_new, pot_lrc, vir_old, vir_new, vir_lrc, lj_scale
+  REAL               :: box_scale, box_new, density_new, delta, zeta1
+  REAL               :: pot_old, pot_new, pot_lrc, vir_old, vir_new, vir_lrc
   REAL, DIMENSION(3) :: ri   ! position of atom i
   REAL, DIMENSION(3) :: zeta ! random numbers
 
@@ -90,22 +91,10 @@ PROGRAM mc_npt_lj
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'  ) 'Number of particles',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Box (in sigma units)', box
-  sigma = 1.0
-  density = REAL(n) * ( sigma / box ) ** 3
+  density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Reduced density', density
 
-  ! Convert run and potential parameters to box units
-  sigma  = 1.0 / box
-  r_cut  = r_cut / box
-  dr_max = dr_max / box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'sigma (in box units)', sigma
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'r_cut (in box units)', r_cut
-  IF ( r_cut > 0.5 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_cut too large ', r_cut
-     STOP 'Error in mc_npt_lj'
-  END IF
-
-  CALL initialize ( r_cut ) ! Allocate r
+  CALL allocate_arrays ( box, r_cut ) ! Allocate r
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! second call is to get r
 
@@ -113,16 +102,16 @@ PROGRAM mc_npt_lj
   r(:,:) = r(:,:) / box
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  CALL energy ( sigma, r_cut, overlap, pot2=pot, vir2=vir )
+  CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_npt_lj'
   END IF
-  CALL energy_lrc ( n, sigma, r_cut, pot2=pot_lrc, vir2=vir_lrc )
+  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
-  potential = SUM ( pot ) / REAL ( n )
-  pressure  = density * temperature + SUM ( vir ) / box**3
+  potential = pot / REAL ( n )
+  pressure  = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial potential energy (sigma units)', potential
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial pressure (sigma units)',         pressure
 
@@ -143,18 +132,18 @@ PROGRAM mc_npt_lj
            zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
            ri(:) = r(:,i)
-           CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot2=pot_old, vir2=vir_old )
+           CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_old, vir_old )
            IF ( overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_npt_lj'
            END IF
            ri(:) = ri(:) + zeta * dr_max   ! trial move to new position
            ri(:) = ri(:) - ANINT ( ri(:) ) ! periodic boundary correction
-           CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot2=pot_new, vir2=vir_new )
+           CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_new, vir_new )
 
            IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
 
-              delta = SUM ( pot_new - pot_old ) / temperature
+              delta = ( pot_new - pot_old ) / temperature
 
               IF (  metropolis ( delta )  ) THEN ! accept Metropolis test
                  pot = pot + pot_new - pot_old   ! update potential energy
@@ -170,68 +159,68 @@ PROGRAM mc_npt_lj
         move_ratio = REAL(moves) / REAL(n)
 
         box_move_ratio = 0.0
-        CALL RANDOM_NUMBER ( zeta(1) )                 ! uniform random number in range (0,1)
-        zeta(1)     = 2.0*zeta(1) - 1.0                ! now in range (-1,+1)
-        sigma_scale = EXP ( zeta(1)*db_max )           ! sampling log(sigma), log(box) and log(vol) uniformly
-        sigma_new   = sigma * sigma_scale              ! new sigma (in box units)
-        box_new     = box / sigma_scale                ! new box (in sigma units)
-        density_new = density * sigma_scale**3         ! reduced density
-        lj_scale    = [sigma_scale**12,sigma_scale**6] ! scaling for LJ potential
-        pot_new     = pot * lj_scale                   ! scaled potential
-        vir_new     = vir * lj_scale                   ! scaled virial
+        CALL RANDOM_NUMBER ( zeta1 )         ! uniform random number in range (0,1)
+        zeta(1)     = 2.0*zeta1 - 1.0        ! now in range (-1,+1)
+        box_scale   = EXP ( zeta1*db_max )   ! sampling log(box) and log(vol) uniformly
+        box_new     = box * box_scale        ! new box (in sigma units)
+        density_new = density / box_scale**3 ! new reduced density
+        CALL energy ( box_new, r_cut, overlap, pot_new, vir_new )
 
-        delta =  ( SUM(pot_new-pot) + pressure_inp * ( box_new**3 - box**3 )  ) / temperature &
-             &   + REAL(n+1) * LOG(density_new/density) ! factor (n+1) consistent with box scaling
+        IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
 
-        IF ( metropolis ( delta ) ) THEN ! accept because Metropolis test
-           pot     = pot_new     ! update both parts of potential
-           vir     = vir_new     ! update both parts of virial
-           sigma   = sigma_new   ! update sigma
-           box     = box_new     ! update box
-           density = density_new ! update density
-           box_move_ratio = 1.0  ! increment move counter
-        END IF ! reject Metropolis test
+           delta = ( (pot_new-pot) + pressure_inp * ( box_new**3 - box**3 )  ) / temperature &
+                &   + REAL(n+1) * LOG(density_new/density) ! factor (n+1) consistent with box scaling
+
+           IF ( metropolis ( delta ) ) THEN ! accept because Metropolis test
+              pot     = pot_new     ! update both parts of potential
+              vir     = vir_new     ! update both parts of virial
+              box     = box_new     ! update box
+              density = density_new ! update density
+              box_move_ratio = 1.0  ! increment move counter
+           END IF ! reject Metropolis test
+
+        END IF ! reject overlapping configuration
 
         ! Calculate all variables for this step
-        potential = SUM ( pot ) / REAL(n)
-        pressure  = density * temperature + SUM ( vir ) / box**3
+        potential = pot  / REAL(n)
+        pressure  = density * temperature + vir / box**3
         CALL blk_add ( [move_ratio,box_move_ratio,density,potential,pressure] )
 
      END DO ! End loop over steps
 
      CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,fmt='(i3.3)') blk            ! number configuration by block
+     IF ( nblock < 1000 ) WRITE(sav_tag,fmt='(i3.3)') blk        ! number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box ) ! save configuration
 
   END DO ! End loop over blocks
 
   CALL run_end ( output_unit )
 
-  potential = SUM ( pot ) / REAL ( n )
-  pressure  = density * temperature + SUM ( vir ) / box**3
+  potential = pot / REAL ( n )
+  pressure  = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final density (sigma units)',          density
 
-  CALL energy ( sigma, r_cut, overlap, pot2=pot, vir2=vir )
+  CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_npt_lj'
   END IF
-  CALL energy_lrc ( n, sigma, r_cut, pot2=pot_lrc, vir2=vir_lrc )
+  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
-  potential = SUM ( pot ) / REAL ( n )
-  pressure  = density * temperature + SUM ( vir ) / box**3
+  potential = pot / REAL ( n )
+  pressure  = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final density (sigma units)',          REAL(n) * sigma **3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final density (sigma units)',          REAL(n) / box**3
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
   CALL time_stamp ( output_unit )
 
-  CALL finalize
+  CALL deallocate_arrays
 
 END PROGRAM mc_npt_lj
 

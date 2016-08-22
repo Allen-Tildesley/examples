@@ -20,27 +20,39 @@ MODULE mc_poly_lj_module
 
 CONTAINS
 
-  SUBROUTINE allocate_arrays
+  SUBROUTINE allocate_arrays ( box, rm_cut )
+    REAL, INTENT(in) :: box    ! simulation box length
+    REAL, INTENT(in) :: rm_cut ! potential molecule cutoff distance
+
+    REAL :: rm_cut_box
+    
     ALLOCATE ( r(3,n), e(0:3,n), d(3,na,n) )
+
+    rm_cut_box = rm_cut / box
+    IF ( rm_cut_box > 0.5 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,f15.5)') 'rm_cut/box too large ', rm_cut_box
+       STOP 'Error in allocate_arrays'
+    END IF
+
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
     DEALLOCATE ( r, e, d )
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE energy ( sigma, r_cut, rm_cut, overlap, pot, vir )
-    REAL,    INTENT(in)  :: sigma, r_cut ! potential parameters
-    REAL,    INTENT(in)  :: rm_cut       ! molecule-molecule cutoff distance
-    LOGICAL, INTENT(out) :: overlap      ! shows if an overlap was detected
-    REAL,    INTENT(out) :: pot, vir     ! potential and virial 
+  SUBROUTINE energy ( box, r_cut, rm_cut, overlap, pot, vir )
+    REAL,    INTENT(in)  :: box      ! simulation box length
+    REAL,    INTENT(in)  :: r_cut    ! potential cutoff distance
+    REAL,    INTENT(in)  :: rm_cut   ! molecule-molecule cutoff distance
+    LOGICAL, INTENT(out) :: overlap  ! shows if an overlap was detected
+    REAL,    INTENT(out) :: pot, vir ! potential and virial 
 
     ! Calculates potential and virial for whole system
     ! Includes a check for overlap (potential too high) to avoid overflow
     ! If overlap==.true., the values of pot and vir should not be used
-    ! It is assumed that r, sigma, r_cut and rm_cut are in units where box = 1
-    ! Results are in LJ units where sigma = 1, epsilon = 1
+    ! Actual calculation is performed by subroutine energy_1
 
-    REAL    :: pot_i, vir_i, pot_sum, vir_sum
+    REAL    :: pot_i, vir_i
     INTEGER :: i
 
     IF ( SIZE(r,dim=2)  /= n ) THEN ! should never happen
@@ -48,41 +60,39 @@ CONTAINS
        STOP 'Error in energy'
     END IF
     
-    overlap  = .FALSE.
-    pot_sum  = 0.0
-    vir_sum  = 0.0
+    overlap = .FALSE.
+    pot     = 0.0
+    vir     = 0.0
 
     DO i = 1, n - 1
-       CALL energy_1 ( r(:,i), d(:,:,i), i, gt, sigma, r_cut, rm_cut, overlap, pot_i, vir_i )
+       CALL energy_1 ( r(:,i), d(:,:,i), i, gt, box, r_cut, rm_cut, overlap, pot_i, vir_i )
        IF ( overlap ) EXIT ! jump out of loop
-       pot_sum  = pot_sum  + pot_i
-       vir_sum  = vir_sum  + vir_i
+       pot = pot + pot_i
+       vir = vir + vir_i
     END DO
-
-    pot  = pot_sum
-    vir  = vir_sum
     
   END SUBROUTINE energy
 
-  SUBROUTINE energy_1 ( ri, di, i, j_range, sigma, r_cut, rm_cut, overlap, pot, vir )
+  SUBROUTINE energy_1 ( ri, di, i, j_range, box, r_cut, rm_cut, overlap, pot, vir )
 
-    REAL,    INTENT(in), DIMENSION(3)   :: ri           ! position of i, may differ from r(:,i)
-    REAL,    INTENT(in), DIMENSION(:,:) :: di           ! bond vectors of i, may differ from d(:,:,i)
-    INTEGER, INTENT(in)                 :: i, j_range   ! index, and partner index range
-    REAL,    INTENT(in)                 :: r_cut, sigma ! LJ potential parameters
-    REAL,    INTENT(in)                 :: rm_cut       ! molecule-molecule cutoff distance
-    LOGICAL, INTENT(out)                :: overlap      ! shows if an overlap was detected
-    REAL,    INTENT(out)                :: pot, vir     ! potential and virial
+    REAL,    INTENT(in), DIMENSION(3)   :: ri         ! position of i, may differ from r(:,i)
+    REAL,    INTENT(in), DIMENSION(:,:) :: di         ! bond vectors of i, may differ from d(:,:,i)
+    INTEGER, INTENT(in)                 :: i, j_range ! index, and partner index range
+    REAL,    INTENT(in)                 :: box        ! simulation box length
+    REAL,    INTENT(in)                 :: r_cut      ! potential cutoff distance
+    REAL,    INTENT(in)                 :: rm_cut     ! molecule-molecule cutoff distance
+    LOGICAL, INTENT(out)                :: overlap    ! shows if an overlap was detected
+    REAL,    INTENT(out)                :: pot, vir   ! potential and virial
 
     ! Calculates potential energy and virial of molecule i
     ! with j/=i, j>i, or j<i depending on j_range
     ! Includes a check for overlap (potential too high) to avoid overflow
     ! If overlap==.true., the values of pot and vir should not be used
-    ! It is assumed that r, sigma, r_cut and rm_cut are in units where box = 1
+    ! It is assumed that r and d have been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
     INTEGER            :: j, j1, j2, a, b, n_cut
-    REAL               :: r_cut_sq, rm_cut_sq, sigma_sq
+    REAL               :: r_cut_box, r_cut_box_sq, rm_cut_box, rm_cut_box_sq, box_sq
     REAL               :: sr2, sr6, sr12, rij_sq, rab_sq, potab, virab
     REAL, DIMENSION(3) :: rij, rab, fab
     REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
@@ -100,9 +110,11 @@ CONTAINS
        STOP 'Error in energy_1'
     END IF
 
-    r_cut_sq  = r_cut**2
-    rm_cut_sq = rm_cut**2
-    sigma_sq  = sigma**2
+    r_cut_box     = r_cut / box
+    r_cut_box_sq  = r_cut_box**2
+    rm_cut_box    = rm_cut / box
+    rm_cut_box_sq = rm_cut_box**2
+    box_sq        = box**2
 
     overlap = .FALSE.
 
@@ -130,17 +142,18 @@ CONTAINS
        rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units
        rij_sq = SUM ( rij**2 )
 
-       IF ( rij_sq < rm_cut_sq ) THEN ! test within molecular cutoff
+       IF ( rij_sq < rm_cut_box_sq ) THEN ! test within molecular cutoff
 
           ! double loop over atoms on both molecules
           DO a = 1, na
              DO b = 1, na
-                rab = rij + di(:,a) - d(:,b,j) ! atom-atom vector
+                rab = rij + di(:,a) - d(:,b,j) ! atom-atom vector, box=1 units
                 rab_sq = SUM ( rab**2 )
 
-                IF ( rab_sq < r_cut_sq ) THEN ! test within potential cutoff 
+                IF ( rab_sq < r_cut_box_sq ) THEN ! test within potential cutoff 
 
-                   sr2 = sigma_sq / rab_sq ! now dimensionless
+                   rab_sq = rab_sq * box_sq ! now in sigma=1 units
+                   sr2    = 1.0 / rab_sq    ! (sigma/rab)**2
 
                    IF ( sr2 > sr2_overlap ) THEN
                       overlap = .TRUE.
@@ -166,11 +179,11 @@ CONTAINS
     END DO j_loop ! end loop over j-molecules
 
     ! shift potentials at cutoff
-    sr2 = sigma_sq / r_cut_sq
-    sr6 = sr2**3
-    sr12 = sr6**2
-    potab  = sr12 - sr6
-    pot = pot - potab * REAL(n_cut)
+    sr2   = 1.0 / r_cut**2 ! in sigma=1 units
+    sr6   = sr2**3
+    sr12  = sr6**2
+    potab = sr12 - sr6
+    pot   = pot - potab * REAL(n_cut)
 
     ! scale potential and virial
     pot = pot * 4.0
@@ -179,7 +192,7 @@ CONTAINS
   END SUBROUTINE energy_1
 
   FUNCTION q_to_d ( q, db ) RESULT ( ds ) ! convert quaternion to bond vectors in space-fixed frame
-    USE utility_module, ONLY : q_to_a
+    USE maths_module, ONLY : q_to_a
     IMPLICIT NONE
     REAL, DIMENSION(0:3),                          INTENT(in) :: q  ! quaternion
     REAL, DIMENSION(:,:),                          INTENT(in) :: db ! body-fixed bonds
@@ -196,9 +209,10 @@ CONTAINS
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array mismatch', SIZE(db,dim=2), na
        STOP 'Error in q_to_d'
     END IF
-    a = q_to_a ( q )
+
+    a = q_to_a ( q ) ! compute rotation matrix from quaternions
     DO i = 1, na
-       ds(:,i) = MATMUL ( db(:,i), a ) ! NB: using transpose of rotation matrix
+       ds(:,i) = MATMUL ( db(:,i), a ) ! NB: equivalent to ds = at*db, at=transpose of a
     END DO
 
   END FUNCTION q_to_d

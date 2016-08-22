@@ -5,7 +5,7 @@ PROGRAM qmc_pi_sho
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE averages_module, ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE utility_module,  ONLY : metropolis
+  USE maths_module,  ONLY : metropolis
 
   IMPLICIT NONE
 

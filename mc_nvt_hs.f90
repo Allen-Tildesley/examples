@@ -6,7 +6,7 @@ PROGRAM mc_nvt_hs
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_hs_module,     ONLY : initialize, finalize, overlap_1, overlap, n_overlap, n, r, ne
+  USE mc_hs_module,     ONLY : allocate_arrays, deallocate_arrays, overlap_1, overlap, n_overlap, n, r, ne
 
   IMPLICIT NONE
 
@@ -23,7 +23,6 @@ PROGRAM mc_nvt_hs
   ! are given in reduced units sigma = 1 kT=1
 
   ! Most important variables
-  REAL :: sigma       ! atomic diameter (in units where box=1)
   REAL :: box         ! box length (in units where sigma=1)
   REAL :: density     ! reduced density n*sigma**3/box**3
   REAL :: pressure    ! measured pressure in units kT/sigma**3
@@ -32,8 +31,9 @@ PROGRAM mc_nvt_hs
   REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
-  REAL, DIMENSION(3) :: ri   ! position of atom i
-  REAL, DIMENSION(3) :: zeta ! random numbers
+  REAL, DIMENSION(3) :: ri         ! position of atom i
+  REAL, DIMENSION(3) :: zeta       ! random numbers
+  REAL               :: box_scaled ! scaled box for pressure calculation
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -68,23 +68,18 @@ PROGRAM mc_nvt_hs
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
-  sigma = 1.0
-  density = REAL(n) * ( sigma / box ) ** 3
+  density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
-  CALL initialize ! Allocates r
+  CALL allocate_arrays ! Allocates r
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! second call to get r
 
   ! Convert to box units
   r(:,:) = r(:,:) / box
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
-  sigma  = sigma / box
-  dr_max = dr_max / box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'sigma (in box units)',  sigma
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'dr_max (in box units)', dr_max
 
-  IF ( overlap ( sigma ) ) THEN
+  IF ( overlap ( box ) ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_hs'
   END IF
@@ -104,10 +99,10 @@ PROGRAM mc_nvt_hs
            CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
            zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
-           ri(:) = r(:,i) + zeta * dr_max  ! trial move to new position
-           ri(:) = ri(:) - ANINT ( ri(:) ) ! periodic boundary correction
+           ri(:) = r(:,i) + zeta * dr_max / box ! trial move to new position (in box=1 units)
+           ri(:) = ri(:) - ANINT ( ri(:) )      ! periodic boundary correction
 
-           IF ( .NOT. overlap_1 ( ri, i, ne, sigma ) ) THEN ! accept
+           IF ( .NOT. overlap_1 ( ri, i, ne, box ) ) THEN ! accept
               r(:,i) = ri(:)     ! update position
               moves  = moves + 1 ! increment move counter
            END IF ! reject overlapping configuration
@@ -116,8 +111,9 @@ PROGRAM mc_nvt_hs
 
         ! Calculate all variables for this step
         move_ratio = REAL(moves) / REAL(n)
-        pressure = REAL ( n_overlap ( (1.0+epsilon)*sigma ) ) / (3.0*epsilon) ! virial part
-        pressure = density + pressure * sigma**3 ! convert to sigma units and add ideal gas part
+        box_scaled = box / (1.0+epsilon) 
+        pressure   = REAL ( n_overlap ( box_scaled ) ) / (3.0*epsilon) ! virial part
+        pressure   = density + pressure / box**3 ! divide virial by volume and add ideal gas part
         CALL blk_add ( [move_ratio,pressure] )
 
      END DO ! End loop over steps
@@ -130,7 +126,7 @@ PROGRAM mc_nvt_hs
 
   CALL run_end ( output_unit )
 
-  IF ( overlap ( sigma ) ) THEN ! should never happen
+  IF ( overlap ( box ) ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_hs'
   END IF
@@ -138,6 +134,6 @@ PROGRAM mc_nvt_hs
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
   CALL time_stamp ( output_unit )
 
-  CALL finalize ! Deallocates r
+  CALL deallocate_arrays ! Deallocates r
 
 END PROGRAM mc_nvt_hs

@@ -2,13 +2,13 @@
 ! Force routine for MD, LJ atoms, Lees-Edwards boundaries
 MODULE md_lj_le_module
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
 
   IMPLICIT NONE
   PRIVATE
 
   PUBLIC :: n, r, v, f
-  PUBLIC :: initialize, finalize, force, energy_lrc
+  PUBLIC :: allocate_arrays, deallocate_arrays, force, energy_lrc
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
@@ -17,39 +17,48 @@ MODULE md_lj_le_module
 
 CONTAINS
 
-  SUBROUTINE initialize ( r_cut )
-    REAL, INTENT(in) :: r_cut
+  SUBROUTINE allocate_arrays ( box, r_cut )
+    REAL, INTENT(in) :: box   ! simulation box length
+    REAL, INTENT(in) :: r_cut ! potential cutoff distance
+
+    REAL :: r_cut_box
+
     ALLOCATE ( r(3,n), v(3,n), f(3,n) )
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'No lists or link cells based on r_cut =', r_cut
-  END SUBROUTINE initialize
 
-  SUBROUTINE finalize
+    r_cut_box = r_cut / box
+    IF ( r_cut_box > 0.5 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,f15.5)' ) 'r_cut/box too large ', r_cut_box
+       STOP 'Error in allocate_arrays'
+    END IF
+
+  END SUBROUTINE allocate_arrays
+
+  SUBROUTINE deallocate_arrays
     DEALLOCATE ( r, v, f )
-  END SUBROUTINE finalize
+  END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE force ( sigma, r_cut, strain, pot, pot_sh, vir )
+  SUBROUTINE force ( box, r_cut, strain, pot, pot_sh, vir )
 
-    REAL, INTENT(in)  :: sigma, r_cut ! potential parameters
-    REAL, INTENT(in)  :: strain       ! shear strain
-    REAL, INTENT(out) :: pot          ! total potential energy
-    REAL, INTENT(out) :: pot_sh       ! potential shifted to zero at cutoff
-    REAL, INTENT(out) :: vir          ! virial
+    REAL, INTENT(in)  :: box    ! simulation box length
+    REAL, INTENT(in)  :: r_cut  ! potential cutoff distance
+    REAL, INTENT(in)  :: strain ! shear strain
+    REAL, INTENT(out) :: pot    ! total potential energy
+    REAL, INTENT(out) :: pot_sh ! potential shifted to zero at cutoff
+    REAL, INTENT(out) :: vir    ! virial
 
     ! Calculates potential (unshifted and shifted), virial and forces
-    ! It is assumed that potential parameters and positions are in units where box = 1
-    ! The Lennard-Jones energy parameter is taken to be epsilon = 1
-    ! Forces are calculated in units where box = 1 and epsilon = 1
+    ! It is assumed that positions are in units where box = 1
+    ! Forces are calculated in units where sigma = 1 and epsilon = 1
     ! Lees-Edwards boundaries, in sliding brick arrangement
-    ! Flow direction is x (=1)
-    ! Gradient direction is y (=2)
-    ! Vorticity direction is z (=3)
+    ! Flow/gradient/vorticity directions are x/y/z == 1/2/3
 
     INTEGER               :: i, j, n_cut
-    REAL                  :: r_cut_sq, sigma_sq, rij_sq, sr2, sr6, sr12, potij, virij
+    REAL                  :: r_cut_box, r_cut_box_sq, box_sq, rij_sq, sr2, sr6, sr12, potij, virij
     REAL,    DIMENSION(3) :: rij, fij
 
-    r_cut_sq = r_cut ** 2
-    sigma_sq = sigma ** 2
+    r_cut_box    = r_cut / box
+    r_cut_box_sq = r_cut_box ** 2
+    box_sq       = box ** 2
 
     f     = 0.0
     pot   = 0.0
@@ -61,13 +70,15 @@ CONTAINS
        DO j = i + 1, n ! Begin inner loop over atoms
 
           rij(:) = r(:,i) - r(:,j)                    ! separation vector
-          rij(1) = rij(1) - ANINT ( rij(2) ) * strain ! Extra correction
-          rij(:) = rij(:) - ANINT ( rij(:) )          ! periodic boundary conditions
+          rij(1) = rij(1) - ANINT ( rij(2) ) * strain ! Extra correction in box=1 units
+          rij(:) = rij(:) - ANINT ( rij(:) )          ! periodic boundary conditions in box=1 units
           rij_sq = SUM ( rij**2 )                     ! squared separation
 
-          IF ( rij_sq < r_cut_sq ) THEN ! check within cutoff
+          IF ( rij_sq < r_cut_box_sq ) THEN ! check within cutoff
 
-             sr2    = sigma_sq / rij_sq
+             rij_sq = rij_sq * box_sq ! Now in sigma=1 units
+             rij(:) = rij(:) * box    ! Now in sigma=1 units
+             sr2    = 1.0 / rij_sq
              sr6    = sr2 ** 3
              sr12   = sr6 ** 2
              potij  = sr12 - sr6
@@ -86,7 +97,7 @@ CONTAINS
     END DO ! End outer loop over atoms
 
     ! Calculate shifted potential
-    sr2    = sigma_sq / r_cut_sq
+    sr2    = 1.0 / r_cut**2 ! in sigma=1 units
     sr6    = sr2 ** 3
     sr12   = sr6 **2
     potij  = sr12 - sr6
@@ -100,28 +111,25 @@ CONTAINS
 
   END SUBROUTINE force
 
-  SUBROUTINE energy_lrc ( n, sigma, r_cut, pot, vir )
-    INTEGER, INTENT(in)  :: n            ! number of atoms
-    REAL,    INTENT(in)  :: sigma, r_cut ! LJ potential parameters
-    REAL,    INTENT(out) :: pot, vir     ! potential and virial
+  SUBROUTINE energy_lrc ( n, box, r_cut, pot, vir )
+    INTEGER, INTENT(in)  :: n        ! number of atoms
+    REAL,    INTENT(in)  :: box      ! simulation box length
+    REAL,    INTENT(in)  :: r_cut    ! potential cutoff distance
+    REAL,    INTENT(out) :: pot, vir ! potential and virial
 
     ! Calculates long-range corrections for Lennard-Jones potential and virial
     ! These are the corrections to the total values
-    ! It is assumed that sigma and r_cut are in units where box = 1
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
     REAL               :: sr3, density
-    REAL, DIMENSION(2) :: pot2_lrc, vir2_lrc
     REAL, PARAMETER    :: pi = 4.0 * ATAN(1.0)
 
-    sr3         = ( sigma / r_cut ) ** 3
-    density     =  REAL(n)*sigma**3
-    pot2_lrc(1) =  REAL(n)*(8.0/9.0)  * pi * density * sr3**3 ! LJ12 term
-    pot2_lrc(2) = -REAL(n)*(8.0/3.0)  * pi * density * sr3    ! LJ6  term
-    vir2_lrc(1) =  REAL(n)*(32.0/9.0) * pi * density * sr3**3 ! LJ12 term
-    vir2_lrc(2) = -REAL(n)*(32.0/6.0) * pi * density * sr3    ! LJ6  term
-    pot = SUM ( pot2_lrc )
-    vir = SUM ( vir2_lrc )
+    sr3     = 1.0 / r_cut**3
+    pot     = (8.0/9.0)  * sr3**3 - (8.0/3.0)  * sr3
+    vir     = (32.0/9.0) * sr3**3 - (32.0/6.0) * sr3
+    density = REAL(n)/box**3
+    pot     = pot * pi * density * REAL(n)
+    vir     = pot * pi * density * REAL(n)
 
   END SUBROUTINE energy_lrc
 

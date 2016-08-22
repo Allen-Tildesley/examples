@@ -14,7 +14,7 @@ MODULE test_pot_module
 CONTAINS
 
   SUBROUTINE force  ( r, e, pot, f, t )
-    USE utility_module, ONLY : cross_product
+    USE maths_module, ONLY : cross_product
     IMPLICIT NONE
 
     REAL, DIMENSION(:,:),           INTENT(in)  :: r, e

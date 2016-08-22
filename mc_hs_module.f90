@@ -7,26 +7,26 @@ MODULE mc_hs_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, lt, ne, gt
-  PUBLIC :: overlap_1, overlap, n_overlap_1, n_overlap, initialize, finalize
+  PUBLIC :: overlap_1, overlap, n_overlap_1, n_overlap, allocate_arrays, deallocate_arrays
 
   INTEGER                             :: n ! number of atoms
-  REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
+  REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
 
   INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
 
 CONTAINS
 
-  SUBROUTINE initialize
+  SUBROUTINE allocate_arrays
     ALLOCATE ( r(3,n) )
-  END SUBROUTINE initialize
+  END SUBROUTINE allocate_arrays
 
-  SUBROUTINE finalize
+  SUBROUTINE deallocate_arrays
     DEALLOCATE ( r )
-  END SUBROUTINE finalize
+  END SUBROUTINE deallocate_arrays
 
-  FUNCTION overlap ( sigma )
+  FUNCTION overlap ( box )
     LOGICAL             :: overlap ! shows if an overlap was detected
-    REAL,    INTENT(in) :: sigma   ! hard sphere diameter
+    REAL,    INTENT(in) :: box     ! simulation box length
 
     INTEGER :: i
 
@@ -38,7 +38,7 @@ CONTAINS
     overlap  = .FALSE.
 
     DO i = 1, n - 1
-       IF ( overlap_1 ( r(:,i), i, gt, sigma ) ) THEN
+       IF ( overlap_1 ( r(:,i), i, gt, box ) ) THEN
           overlap = .TRUE.
           EXIT ! jump out of loop
        END IF
@@ -46,18 +46,18 @@ CONTAINS
 
   END FUNCTION overlap
 
-  FUNCTION overlap_1 ( ri, i, j_range, sigma ) RESULT ( overlap )
+  FUNCTION overlap_1 ( ri, i, j_range, box ) RESULT ( overlap )
     LOGICAL                        :: overlap    ! shows if an overlap was detected
     REAL, DIMENSION(3), INTENT(in) :: ri         ! coordinates of atom of interest
     INTEGER,            INTENT(in) :: i, j_range ! index, and partner index range
-    REAL,               INTENT(in) :: sigma      ! hard sphere diameter
+    REAL,               INTENT(in) :: box        ! simulation box length
 
     ! Detects overlap of atom in ri
     ! with j/=i, j>i, or j<i depending on j_range
-    ! It is assumed that r, sigma are in units where box = 1
+    ! It is assumed that r is in units where box = 1
 
     INTEGER            :: j, j1, j2
-    REAL               :: sigma_sq, rij_sq
+    REAL               :: box_sq, rij_sq
     REAL, DIMENSION(3) :: rij
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
@@ -65,7 +65,7 @@ CONTAINS
        STOP 'Error in overlap_1'
     END IF
 
-    sigma_sq = sigma**2
+    box_sq = box**2
 
     overlap = .FALSE.
 
@@ -88,8 +88,9 @@ CONTAINS
        rij(:) = ri(:) - r(:,j)
        rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units
        rij_sq = SUM ( rij**2 )
+       rij_sq = rij_sq * box_sq ! now in sigma=1 units
 
-       IF ( rij_sq < sigma_sq ) THEN
+       IF ( rij_sq < 1.0 ) THEN
           overlap = .TRUE.
           EXIT ! jump out of loop
        END IF
@@ -98,9 +99,9 @@ CONTAINS
 
   END FUNCTION overlap_1
 
-  FUNCTION n_overlap ( sigma )
+  FUNCTION n_overlap ( box )
     INTEGER             :: n_overlap ! counts overlaps
-    REAL,    INTENT(in) :: sigma     ! hard sphere diameter
+    REAL,    INTENT(in) :: box       ! simulation box length
 
     INTEGER :: i
 
@@ -112,23 +113,23 @@ CONTAINS
     n_overlap  = 0
 
     DO i = 1, n - 1
-       n_overlap = n_overlap + n_overlap_1 ( r(:,i), i, gt, sigma )
+       n_overlap = n_overlap + n_overlap_1 ( r(:,i), i, gt, box )
     END DO
 
   END FUNCTION n_overlap
 
-  FUNCTION n_overlap_1 ( ri, i, j_range, sigma ) RESULT ( n_overlap )
+  FUNCTION n_overlap_1 ( ri, i, j_range, box ) RESULT ( n_overlap )
     INTEGER                        :: n_overlap  ! counts overlaps
     REAL, DIMENSION(3), INTENT(in) :: ri         ! coordinates of atom of interest
     INTEGER,            INTENT(in) :: i, j_range ! index, and partner index range
-    REAL,               INTENT(in) :: sigma      ! hard sphere diameter
+    REAL,               INTENT(in) :: box        ! simulation box length
 
     ! Counts overlaps of atom in ri
     ! with j/=i, j>i, or j<i depending on j_range
-    ! It is assumed that r, sigma are in units where box = 1
+    ! It is assumed that r is in units where box = 1
 
     INTEGER            :: j, j1, j2
-    REAL               :: sigma_sq, rij_sq
+    REAL               :: box_sq, rij_sq
     REAL, DIMENSION(3) :: rij
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
@@ -136,7 +137,7 @@ CONTAINS
        STOP 'Error in n_overlap_1'
     END IF
 
-    sigma_sq = sigma**2
+    box_sq = box**2
 
     n_overlap = 0
 
@@ -159,8 +160,9 @@ CONTAINS
        rij(:) = ri(:) - r(:,j)
        rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units
        rij_sq = SUM ( rij**2 )
+       rij_sq = rij_sq * box_sq ! now in sigma=1 units
 
-       IF ( rij_sq < sigma_sq ) n_overlap = n_overlap + 1
+       IF ( rij_sq < 1.0 ) n_overlap = n_overlap + 1
 
     END DO
 

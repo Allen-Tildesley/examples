@@ -6,7 +6,7 @@ PROGRAM md_nvt_lj_le
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE md_lj_le_module,  ONLY : initialize, finalize, force, r, v, f, n, energy_lrc
+  USE md_lj_le_module,  ONLY : allocate_arrays, deallocate_arrays, force, r, v, f, n, energy_lrc
 
   IMPLICIT NONE
 
@@ -21,22 +21,12 @@ PROGRAM md_nvt_lj_le
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
 
-  ! Box is taken to be of unit length during the dynamics
+  ! Positions r are divided by box length
   ! However, input configuration, output configuration,
   ! most calculations, and all results 
   ! are given in LJ units sigma = 1, epsilon = 1, mass = 1
-  ! property      program units            Lennard-Jones units
-  ! length        box                      sigma
-  ! mass          m                        m
-  ! energy        epsilon                  epsilon
-  ! time          box*sqrt(m/epsilon)      sigma*sqrt(m/epsilon)
-  ! velocity      sqrt(epsilon/m)          sqrt(epsilon/m)
-  ! pressure      epsilon/box**3           epsilon/sigma**3
-  ! strain        dimensionless            dimensionless
-  ! strain_rate   sqrt(epsilon/m)/box      sqrt(epsilon/m)/sigma
 
   ! Most important variables
-  REAL :: sigma       ! atomic diameter (in units where box=1)
   REAL :: box         ! box length (in units where sigma=1)
   REAL :: density     ! reduced density n*sigma**3/box**3
   REAL :: dt          ! time step
@@ -91,37 +81,21 @@ PROGRAM md_nvt_lj_le
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
-  sigma = 1.0
-  density = REAL(n) * ( sigma / box ) ** 3
+  density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
-  ! Convert run and potential parameters to box units
-  sigma       = sigma / box
-  r_cut       = r_cut / box
-  dt          = dt / box
-  strain_rate = strain_rate * box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'sigma  (in box units)',      sigma
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'r_cut  (in box units)',      r_cut
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'dt     (in box units)',      dt
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'strain rate (in box units)', strain_rate
-  IF ( r_cut > 0.5  ) THEN
-     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_cut too large ', r_cut
-     STOP 'Error in md_nvt_lj_le'
-  END IF
-
-  CALL initialize ( r_cut )
+  CALL allocate_arrays ( box, r_cut )
 
   ! For simplicity we assume that input configuration has strain = 0
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
   strain = 0.0
 
-  ! Convert to box units
-  r(:,:) = r(:,:) / box
-  r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain ! Extra correction
-  r(:,:) = r(:,:) - ANINT ( r(:,:) )          ! Periodic boundaries
+  r(:,:) = r(:,:) / box                       ! Convert positions to box units
+  r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain ! Extra correction (box=1 units)
+  r(:,:) = r(:,:) - ANINT ( r(:,:) )          ! Periodic boundaries (box=1 units)
 
-  CALL force ( sigma, r_cut, strain, pot, pot_sh, vir )
-  CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+  CALL force ( box, r_cut, strain, pot, pot_sh, vir )
+  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot         = pot + pot_lrc
   vir         = vir + vir_lrc
   kin         = 0.5*SUM(v**2)
@@ -145,13 +119,13 @@ PROGRAM md_nvt_lj_le
         ! Isokinetic SLLOD algorithm (Pan et al)
 
         ! Operator A for half a step
-        d_strain = 0.5 * dt * strain_rate
-        r(1,:)   = r(1,:) + d_strain * r(2,:)  ! Extra strain term
-        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:)  ! Drift half-step
-        strain   = strain + d_strain           ! Advance boundaries
+        d_strain = 0.5 * dt * strain_rate            ! change in strain (dimensionless)
+        r(1,:)   = r(1,:) + d_strain * r(2,:)        ! Extra strain term
+        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:) / box  ! Drift half-step (positions in box=1 units)
+        strain   = strain + d_strain                 ! Advance boundaries
 
-        r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain   ! Extra correction
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )            ! Periodic boundaries
+        r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain   ! Extra correction (box=1 units)
+        r(:,:) = r(:,:) - ANINT ( r(:,:) )            ! Periodic boundaries (box=1 units)
 
         ! Operator B1 for half a step
         d_strain = 0.5*dt * strain_rate
@@ -160,7 +134,7 @@ PROGRAM md_nvt_lj_le
         v(1,:)   = v(1,:) - d_strain*v(2,:)
         v(:,:)   = v(:,:) / SQRT ( 1.0 - 2.0*c1 + c2 )
         
-        CALL force ( sigma, r_cut, strain, pot, pot_sh, vir ) ! Force evaluation
+        CALL force ( box, r_cut, strain, pot, pot_sh, vir ) ! Force evaluation
 
         ! Operator B2 for a full step
         alpha     = SUM ( f(:,:)*v(:,:) ) / SUM ( v(:,:)**2 )
@@ -179,15 +153,15 @@ PROGRAM md_nvt_lj_le
         v(:,:)   = v(:,:) / SQRT ( 1.0 - 2.0*c1 + c2 )
 
         ! Operator A for half a step
-        d_strain = 0.5 * dt * strain_rate
-        r(1,:)   = r(1,:) + d_strain * r(2,:)  ! Extra strain term
-        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:)  ! Drift half-step
-        strain   = strain + d_strain           ! Advance boundaries
+        d_strain = 0.5 * dt * strain_rate           ! change in strain (dimensionless)
+        r(1,:)   = r(1,:) + d_strain * r(2,:)       ! Extra strain term
+        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:) / box ! Drift half-step (positions in box=1 units)
+        strain   = strain + d_strain                ! Advance boundaries
 
-        r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain   ! Extra correction
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )            ! Periodic boundaries
+        r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain   ! Extra correction (box=1 units)
+        r(:,:) = r(:,:) - ANINT ( r(:,:) )            ! Periodic boundaries (box=1 units)
 
-        CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+        CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
         pot         = pot + pot_lrc
         vir         = vir + vir_lrc
         kin         = 0.5*SUM(v**2)
@@ -209,8 +183,8 @@ PROGRAM md_nvt_lj_le
 
   CALL run_end ( output_unit )
 
-  CALL force ( sigma, r_cut, strain, pot, pot_sh, vir )
-  CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+  CALL force ( box, r_cut, strain, pot, pot_sh, vir )
+  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot         = pot + pot_lrc
   vir         = vir + vir_lrc
   kin         = 0.5*SUM(v**2)
@@ -226,7 +200,7 @@ PROGRAM md_nvt_lj_le
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
   CALL time_stamp ( output_unit )
 
-  CALL finalize
+  CALL deallocate_arrays
 
 END PROGRAM md_nvt_lj_le
 

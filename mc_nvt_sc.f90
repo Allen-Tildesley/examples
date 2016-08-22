@@ -6,14 +6,14 @@ PROGRAM mc_nvt_sc
 
   USE config_io_module, ONLY : read_cnf_mols, write_cnf_mols
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE utility_module,   ONLY : random_rotate_vector, orientational_order
+  USE maths_module,   ONLY : random_rotate_vector, orientational_order
   USE mc_sc_module,     ONLY : allocate_arrays, deallocate_arrays, overlap_1, overlap, n_overlap, n, r, e, ne
 
   IMPLICIT NONE
 
   ! Takes in a configuration of linear molecules (positions and orientations)
   ! Cubic periodic boundary conditions
-  ! Conducts Monte Carlo (the temperature is irrelevant)
+  ! Conducts Monte Carlo for hard particles (the temperature is irrelevant)
   ! Uses no special neighbour lists
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
@@ -24,8 +24,7 @@ PROGRAM mc_nvt_sc
   ! are given in reduced units sigma = 1 kT=1
 
   ! Most important variables
-  REAL :: sigma       ! cylinder diameter (in units where box=1)
-  REAL :: length      ! cylinder length (in units where box=1)
+  REAL :: length      ! cylinder length (in units where sigma=1)
   REAL :: box         ! box length (in units where sigma=1)
   REAL :: density     ! reduced density n*sigma**3/box**3
   REAL :: pressure    ! measured pressure in units kT/sigma**3
@@ -36,8 +35,9 @@ PROGRAM mc_nvt_sc
   REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
-  REAL, DIMENSION(3) :: ri, ei ! position and orientation of atom i
-  REAL, DIMENSION(3) :: zeta   ! random numbers
+  REAL, DIMENSION(3) :: ri, ei     ! position and orientation of atom i
+  REAL, DIMENSION(3) :: zeta       ! random numbers
+  REAL               :: box_scaled ! scaled box for pressure calculation
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -75,8 +75,7 @@ PROGRAM mc_nvt_sc
   CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box ) ! first call just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
-  sigma = 1.0
-  density = REAL(n) * ( sigma / box ) ** 3
+  density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
   CALL allocate_arrays
@@ -86,14 +85,8 @@ PROGRAM mc_nvt_sc
   ! Convert to box units
   r(:,:) = r(:,:) / box
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
-  sigma  = sigma / box
-  length = length / box
-  dr_max = dr_max / box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'sigma (in box units)',  sigma
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'length (in box units)', length
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'dr_max (in box units)', dr_max
 
-  IF ( overlap ( sigma, length ) ) then
+  IF ( overlap ( box, length ) ) then
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_sc'
   END IF
@@ -113,11 +106,11 @@ PROGRAM mc_nvt_sc
            CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
            zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
-           ri(:) = r(:,i) + zeta * dr_max                  ! trial move to new position
+           ri(:) = r(:,i) + zeta * dr_max / box            ! trial move to new position (in box=1 units)
            ri(:) = ri(:) - ANINT ( ri(:) )                 ! periodic boundary correction
            ei(:) = random_rotate_vector ( de_max, e(:,i) ) ! trial move to new orientation
 
-           IF ( .NOT. overlap_1 ( ri, ei, i, ne, sigma, length ) ) THEN ! accept
+           IF ( .NOT. overlap_1 ( ri, ei, i, ne, box, length ) ) THEN ! accept
               r(:,i) = ri(:)     ! update position
               e(:,i) = ei(:)     ! update orientation
               moves  = moves + 1 ! increment move counter
@@ -127,9 +120,10 @@ PROGRAM mc_nvt_sc
 
         ! Calculate all variables for this step
         move_ratio = REAL(moves) / REAL(n)
-        pressure = REAL ( n_overlap ( (1.0+epsilon)*sigma, (1.0+epsilon)*length ) ) / (3.0*epsilon) ! virial part
-        pressure = density + pressure * sigma**3 ! convert to sigma units and add ideal gas part
-        order    = orientational_order ( e )
+        box_scaled = box / (1.0+epsilon) 
+        pressure   = REAL ( n_overlap ( box_scaled, length ) ) / (3.0*epsilon) ! virial part
+        pressure   = density + pressure / box**3 ! divide virial by volume and add ideal gas part
+        order      = orientational_order ( e )
         CALL blk_add ( [move_ratio,pressure,order] )
 
      END DO ! End loop over steps
@@ -142,7 +136,7 @@ PROGRAM mc_nvt_sc
 
   CALL run_end ( output_unit )
 
-  IF ( overlap ( sigma, length ) ) THEN ! should never happen
+  IF ( overlap ( box, length ) ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_sc'
   END IF

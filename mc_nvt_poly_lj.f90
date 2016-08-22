@@ -6,7 +6,7 @@ PROGRAM mc_nvt_poly_lj
 
   USE config_io_module,  ONLY : read_cnf_mols, write_cnf_mols
   USE averages_module,   ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE utility_module,    ONLY : metropolis, random_rotate_quaternion
+  USE maths_module,    ONLY : metropolis, random_rotate_quaternion
   USE mc_poly_lj_module, ONLY : allocate_arrays, deallocate_arrays, energy_1, energy, q_to_d, &
        &                        n, na, r, e, d, ne
 
@@ -14,6 +14,7 @@ PROGRAM mc_nvt_poly_lj
 
   ! Takes in a configuration of polyatomic molecules (positions and quaternions)
   ! For this example we specialize to triatomic molecules, natom=3
+  ! Shifted LJ potential with no long range corrections
   ! Cubic periodic boundary conditions
   ! Conducts Monte Carlo at the given temperature
   ! Uses no special neighbour lists
@@ -27,7 +28,6 @@ PROGRAM mc_nvt_poly_lj
   ! are given in LJ units sigma = 1, epsilon = 1
 
   ! Most important variables
-  REAL :: sigma       ! atomic diameter (in units where box=1)
   REAL :: box         ! box length (in units where sigma=1)
   REAL :: density     ! reduced density n*sigma**3/box**3
   REAL :: dr_max      ! maximum MC translational displacement
@@ -88,8 +88,7 @@ PROGRAM mc_nvt_poly_lj
   CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of molecules',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
-  sigma = 1.0
-  density = REAL(n) * ( sigma / box ) ** 3
+  density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
   ! Body-fixed bond vectors in sigma units
@@ -104,33 +103,21 @@ PROGRAM mc_nvt_poly_lj
   END DO
   WRITE( unit=output_unit, fmt='(a,t40,f15.5)') 'Molecule-molecule cutoff distance', rm_cut
 
-  ! Convert run and potential parameters to box units
-  sigma  = sigma / box
-  r_cut  = r_cut / box
-  rm_cut = rm_cut / box
-  dr_max = dr_max / box
-  db     = db / box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'sigma  (in box units)', sigma
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'rm_cut (in box units)', rm_cut
-  IF ( rm_cut > 0.5 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'rm_cut too large ', rm_cut
-     STOP 'Error in mc_nvt_poly_lj'
-  END IF
-
-  CALL allocate_arrays
+  CALL allocate_arrays ( box, rm_cut )
 
   CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box, r, e ) ! second call is to get r and e
 
   ! Convert to box units
   r(:,:) = r(:,:) / box
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
+  db     = db / box                  ! bond vectors
 
   ! Convert quaternions to space-fixed bond vectors
   DO i = 1, n
      d(:,:,i) = q_to_d ( e(:,i), db )
   END DO
 
-  CALL energy ( sigma, r_cut, rm_cut, overlap, pot, vir )
+  CALL energy ( box, r_cut, rm_cut, overlap, pot, vir )
   IF ( overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_poly_lj'
@@ -158,16 +145,16 @@ PROGRAM mc_nvt_poly_lj
            ri(:)   = r(:,i)   ! copy old position
            ei(:)   = e(:,i)   ! copy old quaternion
            di(:,:) = d(:,:,i) ! copy old bond vectors
-           CALL  energy_1 ( ri, di, i, ne, sigma, r_cut, rm_cut, overlap, pot_old, vir_old )
+           CALL  energy_1 ( ri, di, i, ne, box, r_cut, rm_cut, overlap, pot_old, vir_old )
            IF ( overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_poly_lj'
            END IF
-           ri(:) = ri(:) + zeta * dr_max   ! trial move to new position
-           ri(:) = ri(:) - ANINT ( ri(:) ) ! periodic boundary correction
+           ri(:) = ri(:) + zeta * dr_max / box  ! trial move to new position (in box=1 units)
+           ri(:) = ri(:) - ANINT ( ri(:) )      ! periodic boundary correction
            ei = random_rotate_quaternion ( de_max, ei ) ! trial rotation
-           di = q_to_d ( ei, db ) ! new space-fixed bond vectors
-           CALL  energy_1 ( ri, di, i, ne, sigma, r_cut, rm_cut, overlap, pot_new, vir_new )
+           di = q_to_d ( ei, db ) ! new space-fixed bond vectors (in box=1 units)
+           CALL  energy_1 ( ri, di, i, ne, box, r_cut, rm_cut, overlap, pot_new, vir_new )
 
            IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
               delta = ( pot_new - pot_old ) / temperature
@@ -204,7 +191,7 @@ PROGRAM mc_nvt_poly_lj
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
 
-  CALL energy ( sigma, r_cut, rm_cut, overlap, pot, vir )
+  CALL energy ( box, r_cut, rm_cut, overlap, pot, vir )
   IF ( overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_poly_lj'

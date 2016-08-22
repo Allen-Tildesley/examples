@@ -6,8 +6,8 @@ PROGRAM mc_nvt_lj_re
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE utility_module,   ONLY : metropolis
-  USE mc_lj_module,     ONLY : initialize, finalize, energy_1, energy, energy_lrc, move, &
+  USE maths_module,   ONLY : metropolis
+  USE mc_lj_module,     ONLY : allocate_arrays, deallocate_arrays, energy_1, energy, energy_lrc, move, &
        &                       n, r, ne
   USE mpi
 
@@ -32,7 +32,6 @@ PROGRAM mc_nvt_lj_re
   ! are given in LJ units sigma = 1, epsilon = 1
 
   ! Most important variables
-  REAL :: sigma       ! atomic diameter (in units where box=1)
   REAL :: box         ! box length (in units where sigma=1)
   REAL :: density     ! reduced density n*sigma**3/box**3
   REAL :: dr_max      ! maximum MC displacement
@@ -130,22 +129,10 @@ PROGRAM mc_nvt_lj_re
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
-  sigma   = 1.0
-  density = REAL(n) * ( sigma / box ) ** 3
+  density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
-  ! Convert run and potential parameters to box units
-  sigma  = sigma / box
-  r_cut  = r_cut / box
-  dr_max = dr_max / box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'sigma (in box units)', sigma
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'r_cut (in box units)', r_cut
-  IF ( r_cut > 0.5 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_cut too large ', r_cut
-     STOP 'Error in mc_nvt_lj_re'
-  END IF
-
-  CALL initialize ( r_cut ) ! Allocate r
+  CALL allocate_arrays ( box, r_cut ) ! Allocate r
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! second call is to get r
 
@@ -153,12 +140,12 @@ PROGRAM mc_nvt_lj_re
   r(:,:) = r(:,:) / box
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  CALL energy ( sigma, r_cut, overlap, pot, vir )
+  CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_lj_re'
   END IF
-  CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
@@ -182,14 +169,14 @@ PROGRAM mc_nvt_lj_re
            zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
            ri(:) = r(:,i)
-           CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot_old, vir_old )
+           CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_old, vir_old )
            IF ( overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_lj_re'
            END IF
-           ri(:) = ri(:) + zeta * dr_max   ! trial move to new position
-           ri(:) = ri(:) - ANINT ( ri(:) ) ! periodic boundary correction
-           CALL  energy_1 ( ri, i, ne, sigma, r_cut, overlap, pot_new, vir_new )
+           ri(:) = ri(:) + zeta * dr_max / box  ! trial move to new position (in box=1 units)
+           ri(:) = ri(:) - ANINT ( ri(:) )      ! periodic boundary correction
+           CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_new, vir_new )
 
            IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
               delta = ( pot_new - pot_old ) / temperature
@@ -263,12 +250,12 @@ PROGRAM mc_nvt_lj_re
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
 
-  CALL energy ( sigma, r_cut, overlap, pot, vir )
+  CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_lj_re'
   END IF
-  CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
@@ -280,7 +267,7 @@ PROGRAM mc_nvt_lj_re
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
   CALL time_stamp ( output_unit )
 
-  CALL finalize
+  CALL deallocate_arrays
   DEALLOCATE ( every_temperature, every_beta, every_dr_max )
 
   CLOSE ( unit=output_unit )

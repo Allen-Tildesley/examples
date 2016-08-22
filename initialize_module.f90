@@ -152,7 +152,7 @@ CONTAINS
   END SUBROUTINE initialize_orientations_lattice
 
   SUBROUTINE initialize_orientations_random
-    USE utility_module, ONLY : random_quaternion, random_orientation_vector
+    USE maths_module, ONLY : random_quaternion, random_orientation_vector
 
     ! Sets up random orientations for linear or nonlinear molecules
 
@@ -192,7 +192,7 @@ CONTAINS
   END SUBROUTINE initialize_orientations_random
 
   SUBROUTINE initialize_velocities ( temperature )
-    USE utility_module, ONLY : random_normal
+    USE maths_module, ONLY : random_normal
     REAL, INTENT(in) :: temperature ! reduced temperature
 
     ! Chooses velocities from Maxwell-Boltzmann (Gaussian) distribution
@@ -236,7 +236,7 @@ CONTAINS
   END SUBROUTINE initialize_velocities
 
   SUBROUTINE initialize_angular_velocities ( temperature, inertia )
-    USE utility_module, ONLY : random_perpendicular_vector, random_normal
+    USE maths_module, ONLY : random_perpendicular_vector, random_normal
     REAL, INTENT(in) :: temperature ! reduced temperature
     REAL, INTENT(in) :: inertia     ! reduced moment of inertia
 
@@ -388,7 +388,7 @@ CONTAINS
   END SUBROUTINE initialize_chain_lattice
 
   SUBROUTINE initialize_chain_random
-    USE utility_module, ONLY : random_bond => random_orientation_vector_alt1
+    USE maths_module, ONLY : random_bond => random_orientation_vector_alt1
 
     ! Chooses chain positions randomly, at unit bond length, avoiding overlap
 
@@ -458,7 +458,7 @@ CONTAINS
   END SUBROUTINE initialize_chain_random
 
   SUBROUTINE initialize_chain_velocities ( temperature )
-    USE utility_module, ONLY : random_normal, cross_product, random_perpendicular_vector
+    USE maths_module, ONLY : random_normal, cross_product, random_perpendicular_vector
     REAL, INTENT(in) :: temperature ! reduced temperature
 
     ! Chooses velocities from Maxwell-Boltzmann (Gaussian) distribution

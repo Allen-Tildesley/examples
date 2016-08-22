@@ -6,8 +6,8 @@ PROGRAM qmc_pi_lj
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE utility_module,   ONLY : metropolis
-  USE qmc_pi_lj_module, ONLY : initialize, finalize, energy_cl_1, energy_qu_1, energy_cl, energy_qu, move, &
+  USE maths_module,   ONLY : metropolis
+  USE qmc_pi_lj_module, ONLY : allocate_arrays, deallocate_arrays, energy_cl_1, energy_qu_1, energy_cl, energy_qu, move, &
        &                       n, p, r, ne
 
   IMPLICIT NONE
@@ -20,7 +20,7 @@ PROGRAM qmc_pi_lj
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
 
-  ! Box is taken to be of unit length during the Monte Carlo
+  ! Positions r are divided by box length
   ! However, input configuration, output configuration,
   ! most calculations, and all results 
   ! are given in LJ units sigma = 1, epsilon = 1
@@ -31,7 +31,6 @@ PROGRAM qmc_pi_lj
   ! where T stands for the reduced temperature kB*T/epsilon
 
   ! Most important variables
-  REAL :: sigma        ! atomic diameter (in units where box=1)
   REAL :: box          ! box length (in units where sigma=1)
   REAL :: lambda       ! de Boer length (in units where sigma=1)
   REAL :: density      ! reduced density n*sigma**3/box**3
@@ -103,22 +102,10 @@ PROGRAM qmc_pi_lj
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box )
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
-  sigma   = 1.0
-  density = REAL(n) * ( sigma / box ) ** 3
+  density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
-  ! Convert run and potential parameters to box units
-  sigma  = sigma / box
-  r_cut  = r_cut / box
-  dr_max = dr_max / box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'sigma (in box units)', sigma
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'r_cut (in box units)', r_cut
-  IF ( r_cut > 0.5 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_cut too large ', r_cut
-     STOP 'Error in qmc_pi_lj'
-  END IF
-
-  CALL initialize ! Allocate r
+  CALL allocate_arrays ( box, r_cut ) ! Allocate r
 
   ! Read each ring polymer from a unique file; we assume that n and box are compatible!
   DO k = 1, p
@@ -127,20 +114,19 @@ PROGRAM qmc_pi_lj
      CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r(:,:,k) )
   END DO
 
-  ! Convert to box units
-  r(:,:,:) = r(:,:,:) / box
-  r(:,:,:) = r(:,:,:) - ANINT ( r(:,:,:) ) ! Periodic boundaries
+  r(:,:,:) = r(:,:,:) / box                ! Convert positions to box units
+  r(:,:,:) = r(:,:,:) - ANINT ( r(:,:,:) ) ! Periodic boundaries (box=1 units)
 
   ! Calculate classical LJ and quantum spring potential energies
-  CALL energy_cl ( sigma, r_cut, overlap, pot_cl )
+  CALL energy_cl ( box, r_cut, overlap, pot_cl )
   IF ( overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
-  CALL energy_qu ( k_spring, sigma, pot_qu )
+  CALL energy_qu ( box, k_spring, pot_qu )
 
   ! Calculate derived energies
-  kin   = 1.5 * n * p * temperature            ! Kinetic energy
+  kin          = 1.5 * n * p * temperature     ! Kinetic energy
   potential_cl = pot_cl / REAL(n)              ! Classical potential per atom
   potential_qu = pot_qu / REAL(n)              ! Quantum potential per atom
   energy = ( kin + pot_cl - pot_qu ) / REAL(n) ! Total energy per atom
@@ -166,20 +152,20 @@ PROGRAM qmc_pi_lj
               zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
               rik(:) = r(:,i,k)
-              CALL energy_cl_1 ( rik, i, k, ne, sigma, r_cut, overlap, pot_cl_old )
+              CALL energy_cl_1 ( rik, i, k, ne, box, r_cut, overlap, pot_cl_old )
               IF ( overlap ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in qmc_pi_lj'
               END IF
-              CALL energy_qu_1 ( rik, i, k, ne, k_spring, sigma, pot_qu_old )
+              CALL energy_qu_1 ( rik, i, k, ne, box, k_spring, pot_qu_old )
 
-              rik(:) = rik(:) + zeta * dr_max    ! trial move to new position
-              rik(:) = rik(:) - ANINT ( rik(:) ) ! periodic boundary correction
+              rik(:) = rik(:) + zeta * dr_max / box ! trial move to new position (in box=1 units) 
+              rik(:) = rik(:) - ANINT ( rik(:) )    ! periodic boundary correction
 
-              CALL energy_cl_1 ( rik, i, k, ne, sigma, r_cut, overlap, pot_cl_new )
+              CALL energy_cl_1 ( rik, i, k, ne, box, r_cut, overlap, pot_cl_new )
 
               IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
-                 CALL energy_qu_1 ( rik, i, k, ne, k_spring, sigma, pot_qu_new )
+                 CALL energy_qu_1 ( rik, i, k, ne, box, k_spring, pot_qu_new )
                  delta = ( pot_cl_new + pot_qu_new - pot_cl_old - pot_qu_old ) / temperature
                  IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
                     pot_cl = pot_cl + pot_cl_new - pot_cl_old ! update classical LJ potential energy
@@ -218,20 +204,20 @@ PROGRAM qmc_pi_lj
 
   potential_cl = pot_cl / REAL(n)
   potential_qu = pot_qu / REAL(n)
-  energy = ( kin + pot_cl - pot_qu ) / REAL(n)
+  energy       = ( kin + pot_cl - pot_qu ) / REAL(n)
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final classical potential energy', potential_cl
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final quantum potential energy',   potential_qu
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',                     energy
-  CALL energy_cl ( sigma, r_cut, overlap, pot_cl )
+  CALL energy_cl ( box, r_cut, overlap, pot_cl )
   IF ( overlap ) THEN ! this should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
-  CALL energy_qu ( k_spring, sigma, pot_qu )
+  CALL energy_qu ( box, k_spring, pot_qu )
   WRITE ( unit=output_unit, fmt='(a)' ) 'Final check'
   potential_cl = pot_cl / REAL(n)
   potential_qu = pot_qu / REAL(n)
-  energy = ( kin + pot_cl - pot_qu ) / REAL(n)
+  energy       = ( kin + pot_cl - pot_qu ) / REAL(n)
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final classical potential energy', potential_cl
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final quantum potential energy',   potential_qu
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',                     energy
@@ -244,7 +230,7 @@ PROGRAM qmc_pi_lj
   END DO
   CALL time_stamp ( output_unit )
 
-  CALL finalize
+  CALL deallocate_arrays
 
 END PROGRAM qmc_pi_lj
 

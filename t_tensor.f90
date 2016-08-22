@@ -10,7 +10,7 @@ PROGRAM t_tensor
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
 
-  USE utility_module, ONLY : init_random_seed, random_orientation_vector, outer_product
+  USE maths_module, ONLY : init_random_seed, random_orientation_vector, outer_product
 
   IMPLICIT NONE
 

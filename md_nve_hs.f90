@@ -6,7 +6,7 @@ PROGRAM md_nve_hs
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE md_nve_hs_module, ONLY : initialize, finalize, update, overlap, collide, &
+  USE md_nve_hs_module, ONLY : allocate_arrays, deallocate_arrays, update, overlap, collide, &
        &                       n, r, v, coltime, partner, lt, gt
 
   IMPLICIT NONE
@@ -23,13 +23,12 @@ PROGRAM md_nve_hs
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
 
-  ! Box is taken to be of unit length during the dynamics.
+  ! Positions r are stored divided by the box length
   ! However, input configuration, output configuration,
   ! most calculations, and all results 
   ! are given in units sigma = 1, mass = 1
 
   ! Most important variables
-  REAL :: sigma       ! atomic diameter (in units where box=1)
   REAL :: box         ! box length (in units where sigma=1)
   REAL :: density     ! reduced density n*sigma**3/box**3
   REAL :: vir         ! total collisional virial
@@ -44,8 +43,7 @@ PROGRAM md_nve_hs
   REAL :: coll_rate, pressure ! quantities to be averaged
   
   INTEGER            :: i, j, k, ncoll, coll, blk, nblock, ioerr
-  REAL               :: tij
-  REAL               :: vir_sum, sigma_sq
+  REAL               :: tij, vir_sum
   REAL, DIMENSION(3) :: total_momentum
 
   NAMELIST /nml/ nblock, ncoll
@@ -71,11 +69,10 @@ PROGRAM md_nve_hs
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
-  sigma = 1.0
-  density = REAL (n) * ( sigma / box ) ** 3
+  density = REAL (n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
 
-  CALL initialize
+  CALL allocate_arrays
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
   total_momentum = SUM(v,dim=2)
@@ -86,15 +83,10 @@ PROGRAM md_nve_hs
   temperature = 2.0 * kin / REAL ( 3*(n-1) )
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature (sigma units)', temperature
 
-  ! Convert to box units (time units are unaffected)
-  r(:,:) = r(:,:) / box
-  v(:,:) = v(:,:) / box
+  r(:,:) = r(:,:) / box              ! Convert positions to box=1 units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
-  sigma = sigma / box
-  sigma_sq = sigma ** 2
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Sigma (in box units)', sigma
 
-  IF ( overlap ( sigma_sq ) ) THEN
+  IF ( overlap ( box ) ) THEN
      WRITE ( unit=error_unit, fmt='(a)' ) 'Particle overlap in initial configuration'
      STOP 'Error in md_nve_hs'
   END IF
@@ -103,7 +95,7 @@ PROGRAM md_nve_hs
   partner(:) = n
 
   DO i = 1, n
-     CALL update ( i, gt, sigma_sq ) ! initial search for collision partners >i
+     CALL update ( i, gt, box ) ! initial search for collision partners >i
   END DO
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Collision Rate', 'Pressure' ] )
@@ -112,7 +104,7 @@ PROGRAM md_nve_hs
 
      CALL blk_begin
      vir_sum = 0.0
-     t = 0.0
+     t       = 0.0
 
      DO coll = 1, ncoll ! Begin loop over collisions
 
@@ -120,33 +112,33 @@ PROGRAM md_nve_hs
         j   = partner(i)                ! collision partner
         tij = coltime(i)                ! time to collision
 
-        t          = t          + tij           ! advance time by tij
-        coltime(:) = coltime(:) - tij           ! reduce times to next collision by tij
-        r(:,:)     = r(:,:)     + tij * v(:,:)  ! advance all particles by tij
-        r(:,:)     = r(:,:) - ANINT ( r(:,:) )  ! apply periodic boundaries
+        t          = t + tij                     ! advance time by tij
+        coltime(:) = coltime(:) - tij            ! reduce times to next collision by tij
+        r(:,:)     = r(:,:) + tij * v(:,:) / box ! advance all positions by tij (box=1 units)
+        r(:,:)     = r(:,:) - ANINT ( r(:,:) )   ! apply periodic boundaries
 
-        CALL collide ( i, j, sigma_sq, vir ) ! compute collision dynamics
+        CALL collide ( i, j, box, vir ) ! compute collision dynamics
 
         vir_sum = vir_sum + vir
 
         DO k = 1, n
            IF ( ( k == i ) .OR. ( partner(k) == i ) .OR. ( k == j ) .OR. ( partner(k) == j ) ) THEN
-              CALL update ( k, gt, sigma_sq ) ! search for partners >k
+              CALL update ( k, gt, box ) ! search for partners >k
            ENDIF
         END DO
 
-        CALL update ( i, lt, sigma_sq ) ! search for partners <i
-        CALL update ( j, lt, sigma_sq ) ! search for partners <j
+        CALL update ( i, lt, box ) ! search for partners <i
+        CALL update ( j, lt, box ) ! search for partners <j
 
      END DO ! End loop over collisions
 
       ! Collisional time averages in sigma units
      coll_rate = 2.0*REAL (ncoll) / t / REAL(n)             ! collision rate per particle
-     pressure  = density*temperature + vir_sum / t / box**3 ! ideal + collisional
+     pressure  = density*temperature + vir_sum / t / box**3 ! ideal + collisional virial / volume
      CALL blk_add ( [coll_rate, pressure] ) ! time averages
      CALL blk_end ( blk, output_unit )
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk ! number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v*box ) ! save configuration
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! save configuration
 
   END DO ! End loop over blocks
 
@@ -154,15 +146,13 @@ PROGRAM md_nve_hs
 
   WRITE ( unit=output_unit, fmt='(a,t40,2i5)' ) 'Final colliding pair', i, j
 
-  IF ( overlap ( sigma_sq ) ) STOP 'Particle overlap in final configuration'
+  IF ( overlap ( box ) ) STOP 'Particle overlap in final configuration'
 
-  ! Convert from box units
-  r(:,:) = r(:,:) * box
-  v(:,:) = v(:,:) * box
+  r(:,:) = r(:,:) * box ! Convert positions back from box=1 units
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r, v )
   CALL time_stamp ( output_unit )
 
-  CALL finalize
+  CALL deallocate_arrays
 
 END PROGRAM md_nve_hs
 

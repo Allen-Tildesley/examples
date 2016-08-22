@@ -5,7 +5,7 @@ PROGRAM initialize
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module,  ONLY : write_cnf_atoms, write_cnf_mols
-  USE utility_module,    ONLY : lowercase
+  USE maths_module,    ONLY : lowercase
   USE initialize_module, ONLY : allocate_arrays, deallocate_arrays, &
        &                        initialize_positions_lattice, initialize_orientations_lattice, &
        &                        initialize_positions_random,  initialize_orientations_random, &
