@@ -1,12 +1,13 @@
 ! md_lj_mts.f90
-! Molecular dynamics, NVE, multiple timesteps, LJ atoms
+! Molecular dynamics, NVE, multiple timesteps
 PROGRAM md_lj_mts
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE md_lj_mts_module, ONLY : allocate_arrays, deallocate_arrays, force, r, v, f, n
+  USE md_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+       &                       force, r, v, f, n
 
   IMPLICIT NONE
 
@@ -20,18 +21,25 @@ PROGRAM md_lj_mts
 
   ! This program just illustrates the idea of splitting the non-bonded interactions
   ! using a criterion based on distance, for use in a MTS scheme
-  ! This would hardly ever be efficient for a simple LJ potential alone
+  ! This would hardly ever be efficient for a simple potential of the LJ kind alone
 
-  ! This program uses LJ units sigma = 1, epsilon = 1, mass = 1 throughout
+  ! This program uses mass = 1 throughout
+  ! Unlike most other example programs, positions are not divided by box length at all
+  ! Input configuration, output configuration, most calculations, and all results 
+  ! are given in simulation units defined by the model
+  ! For example, for Lennard-Jones, sigma = 1, epsilon = 1
+
+  ! Despite the program name, there is nothing here specific to Lennard-Jones
+  ! The model is defined in md_module
 
   ! Most important variables
-  REAL :: box         ! box length (in units where sigma=1)
-  REAL :: density     ! reduced density n*sigma**3/box**3
+  REAL :: box         ! box length
+  REAL :: density     ! density
   REAL :: dt          ! time step (smallest)
   REAL :: kin         ! total kinetic energy
-  REAL :: pressure    ! pressure (LJ sigma=1 units, to be averaged)
-  REAL :: temperature ! temperature (LJ sigma=1 units, to be averaged)
-  REAL :: energy      ! total energy per atom (LJ sigma=1 units, to be averaged)
+  REAL :: pressure    ! pressure (to be averaged)
+  REAL :: temperature ! temperature (to be averaged)
+  REAL :: energy      ! total energy per atom (to be averaged)
   REAL :: lambda      ! healing length for switch function
 
   INTEGER, PARAMETER        :: k_max = 3   ! number of shells
@@ -52,8 +60,9 @@ PROGRAM md_lj_mts
   NAMELIST /nml/ nblock, nstep, r_cut, lambda, dt, n_mts
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_lj_mts'
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE, Lennard-Jones, multiple time steps'
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Results in units epsilon = sigma = 1'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE ensemble, multiple time steps'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
+  CALL model_description ( output_unit )
   CALL time_stamp ( output_unit )
 
   ! Set sensible default run parameters for testing
@@ -103,10 +112,10 @@ PROGRAM md_lj_mts
   END DO
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
   density = REAL(n) / box ** 3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
   IF ( r_cut(k_max) > box/2.0  ) THEN
      WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_cut(k_max) too large ', r_cut(k_max)
      STOP 'Error in md_lj_mts'
@@ -126,9 +135,9 @@ PROGRAM md_lj_mts
   energy      = ( SUM(pot) + kin ) / REAL ( n )
   temperature = 2.0 * kin / REAL ( 3*(n-1) )
   pressure    = density * temperature + SUM(vir) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy (sigma units)', energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature (sigma units)',  temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure (sigma units)',     pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy', energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature',  temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',     pressure
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temperature', 'Pressure' ] )
 
@@ -191,9 +200,9 @@ PROGRAM md_lj_mts
   energy      = ( SUM(pot) + kin ) / REAL ( n )
   temperature = 2.0 * kin / REAL ( 3*(n-1) )
   pressure    = density * temperature + SUM(vir) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy (sigma units)', energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temperature (sigma units)',  temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',     pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy', energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temperature',  temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',     pressure
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r, v )

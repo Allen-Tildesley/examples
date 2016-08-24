@@ -1,6 +1,6 @@
 ! mc_lj_module.f90
 ! Energy and move routines for MC simulation, LJ potential
-MODULE mc_lj_module
+MODULE mc_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
@@ -8,15 +8,26 @@ MODULE mc_lj_module
   PRIVATE
 
   PUBLIC :: n, r, lt, ne, gt
-  PUBLIC :: allocate_arrays, deallocate_arrays, resize, energy_1, energy, energy_lrc
+  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  public :: resize, energy_1, energy, energy_lrc
   PUBLIC :: move, create, destroy
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
 
   INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
+  REAL,    PARAMETER :: sigma = 1.0             ! Lennard-Jones diameter (unit of length)
+  REAL,    PARAMETER :: epslj = 1.0             ! Lennard-Jones well depth (unit of energy)
 
 CONTAINS
+
+  SUBROUTINE model_description ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',   sigma    
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epslj = ', epslj    
+  END SUBROUTINE model_description
 
   SUBROUTINE allocate_arrays ( box, r_cut )
     REAL, INTENT(in) :: box   ! simulation box length
@@ -213,4 +224,4 @@ CONTAINS
 
   END SUBROUTINE destroy
   
-END MODULE mc_lj_module
+END MODULE mc_module

@@ -1,15 +1,15 @@
 ! mc_zvt_lj.f90
-! Monte Carlo, zVT (grand) ensemble, Lennard-Jones atoms
+! Monte Carlo, zVT (grand) ensemble
 PROGRAM mc_zvt_lj
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE maths_module,   ONLY : metropolis, random_integer
-  USE mc_lj_module,     ONLY : allocate_arrays, deallocate_arrays, resize, energy_1, energy, energy_lrc, &
-       &                       move, create, destroy, &
-       &                       n, r, ne
+  USE maths_module,     ONLY : metropolis, random_integer
+  USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+       &                       resize, energy_1, energy, energy_lrc, &
+       &                       move, create, destroy, n, r, ne
 
   IMPLICIT NONE
 
@@ -21,32 +21,39 @@ PROGRAM mc_zvt_lj
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
 
-  ! Box is taken to be of unit length during the Monte Carlo
-  ! However, input configuration, output configuration,
-  ! most calculations, and all results 
-  ! are given in LJ units sigma = 1, epsilon = 1
+  ! Positions r are divided by box length after reading in
+  ! However, input configuration, output configuration, most calculations, and all results 
+  ! are given in simulation units defined by the model
+  ! For example, for Lennard-Jones, sigma = 1, epsilon = 1
+
+  ! Despite the program name, there is nothing here specific to Lennard-Jones
+  ! The model is defined in mc_module
 
   ! Most important variables
-  REAL                  :: box         ! box length (in units where sigma=1)
-  REAL                  :: density     ! reduced density n*sigma**3/box**3
-  REAL                  :: dr_max      ! maximum MC displacement
-  REAL                  :: temperature ! specified temperature
-  REAL                  :: activity    ! specified activity z
-  REAL                  :: r_cut       ! potential cutoff distance
-  REAL                  :: pot         ! total potential energy
-  REAL                  :: vir         ! total virial
-  REAL, DIMENSION(-1:1) :: move_ratio  ! acceptance ratio of moves (to be averaged)
-  REAL                  :: pressure    ! pressure (LJ sigma=1 units, to be averaged)
-  REAL                  :: potential   ! potential energy per atom (LJ sigma=1 units, to be averaged)
+  REAL :: box         ! box length
+  REAL :: density     ! density
+  REAL :: dr_max      ! maximum MC displacement
+  REAL :: temperature ! specified temperature
+  REAL :: activity    ! specified activity z
+  REAL :: r_cut       ! potential cutoff distance
+  REAL :: pot         ! total potential energy
+  REAL :: vir         ! total virial
+  REAL :: m_ratio     ! acceptance ratio of moves (to be averaged)
+  REAL :: c_ratio     ! acceptance ratio of creation attempts (to be averaged)
+  REAL :: d_ratio     ! acceptance ratio of destruction attempts (to be averaged)
+  REAL :: pressure    ! pressure (to be averaged)
+  REAL :: potential   ! potential energy per atom (to be averaged)
 
-  LOGICAL                  :: overlap
-  INTEGER                  :: blk, stp, i, nstep, nblock
-  INTEGER                  :: try, ntry, ioerr
-  INTEGER, DIMENSION(-1:1) :: tries, moves ! count tries and moves of different kinds
-  REAL                     :: pot_old, pot_new, pot_lrc, del_pot, vir_old, vir_new, vir_lrc, del_vir, delta
-  REAL                     :: prob_move, prob_create
-  REAL, DIMENSION(3)       :: ri   ! position of atom i
-  REAL, DIMENSION(3)       :: zeta ! random numbers
+  LOGICAL            :: overlap
+  INTEGER            :: blk, stp, i, nstep, nblock
+  INTEGER            :: try, ntry, ioerr
+  INTEGER            :: m_tries, m_moves ! count tries and moves
+  INTEGER            :: c_tries, c_moves ! count tries and moves for creation
+  INTEGER            :: d_tries, d_moves ! count tries and moves for destruction
+  REAL               :: pot_old, pot_new, pot_lrc, del_pot, vir_old, vir_new, vir_lrc, del_vir, delta
+  REAL               :: prob_move, prob_create
+  REAL, DIMENSION(3) :: ri   ! position of atom i
+  REAL, DIMENSION(3) :: zeta ! random numbers
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -55,8 +62,8 @@ PROGRAM mc_zvt_lj
   NAMELIST /nml/ nblock, nstep, temperature, activity, prob_move, r_cut, dr_max
 
   WRITE( unit=output_unit, fmt='(a)' ) 'mc_zvt_lj'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-zVT, Lennard-Jones'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Results in units epsilon = sigma = 1'
+  WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-zVT ensemble'
+  CALL model_description ( output_unit )
   CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! Initialize random number generator
@@ -87,17 +94,16 @@ PROGRAM mc_zvt_lj
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum displacement',          dr_max
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
   density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
 
   CALL allocate_arrays ( box, r_cut ) ! Allocate r
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! second call is to get r
 
-  ! Convert to box units
-  r(:,:) = r(:,:) / box
+  r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   CALL resize ! Increase the size of the r array
@@ -112,8 +118,9 @@ PROGRAM mc_zvt_lj
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial potential energy (sigma units)', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial pressure (sigma units)',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial density',          density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial potential energy', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',         pressure
 
   CALL run_begin ( [ CHARACTER(len=15) :: &
        &            'Move ratio', 'Create ratio', 'Destroy ratio', &
@@ -127,8 +134,12 @@ PROGRAM mc_zvt_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        tries = 0
-        moves = 0
+        m_tries = 0
+        m_moves = 0
+        c_tries = 0
+        c_moves = 0
+        d_tries = 0
+        d_moves = 0
 
         DO try = 1, ntry ! Begin loop over tries of different kinds
 
@@ -136,7 +147,7 @@ PROGRAM mc_zvt_lj
 
            IF ( zeta(1) < prob_move ) THEN ! try particle move
 
-              tries(0) = tries(0) + 1
+              m_tries = m_tries + 1
               CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
               zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
@@ -153,16 +164,16 @@ PROGRAM mc_zvt_lj
 
               IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
                  delta = ( pot_new - pot_old ) / temperature
-                 IF ( metropolis ( delta ) ) THEN    ! accept Metropolis test
-                    pot    = pot + pot_new - pot_old ! update potential energy
-                    vir    = vir + vir_new - vir_old ! update virial
-                    CALL move ( i, ri )              ! update position
-                    moves(0)  = moves(0) + 1         ! increment move counter
+                 IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
+                    pot = pot + pot_new - pot_old ! update potential energy
+                    vir = vir + vir_new - vir_old ! update virial
+                    CALL move ( i, ri )           ! update position
+                    m_moves = m_moves + 1         ! increment move counter
                  END IF ! reject Metropolis test
               END IF ! reject overlapping configuration
 
            ELSE IF ( zeta(1) < prob_move + prob_create ) THEN ! try create
-              tries(1) = tries(1) + 1
+              c_tries = c_tries + 1
 
               IF ( n+1 > SIZE(r,dim=2) ) CALL resize
 
@@ -180,14 +191,14 @@ PROGRAM mc_zvt_lj
                  delta = del_pot / temperature - LOG ( activity / REAL ( n+1 ) )
                  IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
                     call create ( ri )            ! create new particle
-                    pot      = pot + del_pot      ! update total potential energy
-                    vir      = vir + del_vir      ! update total virial
-                    moves(1) = moves(1) + 1       ! increment creation move counter
+                    pot     = pot + del_pot       ! update total potential energy
+                    vir     = vir + del_vir       ! update total virial
+                    c_moves = c_moves + 1         ! increment creation move counter
                  END IF ! reject Metropolis test
               END IF ! reject overlapping configuration
 
            ELSE ! try destroy
-              tries(-1) = tries(-1) + 1
+              d_tries = d_tries + 1
               i = random_integer ( 1, n )
 
               CALL energy_1 ( r(:,i), i, ne, box, r_cut, overlap, del_pot, del_vir )
@@ -207,9 +218,9 @@ PROGRAM mc_zvt_lj
               delta = del_pot/temperature - LOG ( REAL ( n ) / activity )
               IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
                  call destroy ( i )            ! destroy chosen particle
-                 pot       = pot + del_pot     ! update total potential energy
-                 vir       = vir + del_vir     ! update total virial
-                 moves(-1) = moves(-1) + 1     ! increment destruction move counter
+                 pot     = pot + del_pot       ! update total potential energy
+                 vir     = vir + del_vir       ! update total virial
+                 d_moves = d_moves + 1         ! increment destruction move counter
               END IF ! reject Metropolis test
 
            END IF ! end choice of move type
@@ -217,12 +228,13 @@ PROGRAM mc_zvt_lj
         END DO ! End loop over tries of different kinds
 
         ! Calculate all variables for this step
-        move_ratio = REAL(moves) / REAL(tries)
-        potential  = pot / REAL(n)
-        density    = REAL(n) / box**3
-        pressure   = density * temperature + vir / box**3
-        CALL blk_add ( [move_ratio(0),move_ratio(1),move_ratio(-1), &
-             &          potential,pressure,density] )
+        m_ratio   = REAL(m_moves) / REAL(m_tries)
+        c_ratio   = REAL(c_moves) / REAL(c_tries)
+        d_ratio   = REAL(d_moves) / REAL(d_tries)
+        potential = pot / REAL(n)
+        density   = REAL(n) / box**3
+        pressure  = density * temperature + vir / box**3
+        CALL blk_add ( [m_ratio,c_ratio,d_ratio,potential,pressure,density] )
 
      END DO ! End loop over steps
 
@@ -237,9 +249,9 @@ PROGRAM mc_zvt_lj
   potential = pot / REAL ( n )
   density   = REAL(n) / box**3
   pressure  = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final reduced density',                density
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final density',          density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
 
   CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN ! should never happen
@@ -247,14 +259,14 @@ PROGRAM mc_zvt_lj
      STOP 'Error in mc_zvt_lj'
   END IF
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot = pot + pot_lrc
-  vir = vir + vir_lrc
+  pot       = pot + pot_lrc
+  vir       = vir + vir_lrc
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final reduced density',                density
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final density',          density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )

@@ -1,6 +1,6 @@
 ! md_lj_omp_module.f90
 ! Force routine for MD simulation, Lennard-Jones atoms, OpenMP
-MODULE md_lj_module
+MODULE md_module
 
   ! TODO MPA complete this code
   
@@ -9,14 +9,26 @@ MODULE md_lj_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, v, f
-  PUBLIC :: allocate_arrays, deallocate_arrays, force, energy_lrc
+  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  public :: force, energy_lrc
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
   REAL,    DIMENSION(:,:), ALLOCATABLE :: v ! velocities (3,:)
   REAL,    DIMENSION(:,:), ALLOCATABLE :: f ! forces (3,:)
 
+  REAL, PARAMETER :: sigma = 1.0 ! LJ diameter (unit of length)
+  REAL, PARAMETER :: epslj = 1.0 ! LJ well depth (unit of energy)
+
 CONTAINS
+
+  SUBROUTINE model_description ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',     sigma    
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epsilon = ', epslj    
+  END SUBROUTINE model_description
 
   SUBROUTINE allocate_arrays ( box, r_cut )
     REAL, INTENT(in) :: box   ! simulation box length
@@ -129,4 +141,4 @@ CONTAINS
 
   END SUBROUTINE energy_lrc
 
-END MODULE md_lj_module
+END MODULE md_module

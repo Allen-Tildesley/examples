@@ -1,13 +1,14 @@
 ! mc_nvt_sc.f90
-! Monte Carlo, NVT ensemble, hard spherocylinders
+! Monte Carlo, NVT ensemble, linear hard molecules
 PROGRAM mc_nvt_sc
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_mols, write_cnf_mols
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE maths_module,   ONLY : random_rotate_vector, orientational_order
-  USE mc_sc_module,     ONLY : allocate_arrays, deallocate_arrays, overlap_1, overlap, n_overlap, n, r, e, ne
+  USE maths_module,     ONLY : random_rotate_vector, orientational_order
+  USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+       &                       overlap_1, overlap, n_overlap, n, r, e, ne
 
   IMPLICIT NONE
 
@@ -19,9 +20,11 @@ PROGRAM mc_nvt_sc
   ! Leave namelist empty to accept supplied defaults
 
   ! Box is taken to be of unit length during the Monte Carlo
-  ! However, input configuration, output configuration,
-  ! most calculations, and all results 
-  ! are given in reduced units sigma = 1 kT=1
+  ! However, input configuration, output configuration, most calculations, and all results 
+  ! are given in reduced units kT=1
+
+  ! Despite the program name, there is nothing here specific to spherocylinders
+  ! The model is defined in mc_module
 
   ! Most important variables
   REAL :: length      ! cylinder length (in units where sigma=1)
@@ -46,8 +49,8 @@ PROGRAM mc_nvt_sc
   NAMELIST /nml/ nblock, nstep, dr_max, de_max, length, epsilon
 
   WRITE( unit=output_unit, fmt='(a)' ) 'mc_nvt_sc'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT, hard spherocylinders'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Results in units sigma = 1'
+  WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT, hard linear molecules'
+  CALL model_description ( output_unit )
   CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! initialize random number generator

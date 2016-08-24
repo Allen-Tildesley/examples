@@ -1,13 +1,13 @@
 ! md_chain_mts_lj.f90
-! Molecular dynamics, multiple timesteps, LJ chain
+! Molecular dynamics, multiple timesteps, chain molecule
 PROGRAM md_chain_mts_lj
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
-  USE config_io_module,   ONLY : read_cnf_atoms, write_cnf_atoms
-  USE averages_module,    ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE md_chain_lj_module, ONLY : allocate_arrays, deallocate_arrays, force, spring, worst_bond, &
-       &                         r, v, f, f_spring, n
+  USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
+  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE md_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+       &                       force, r, v, f, f_spring, n, spring, worst_bond
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms in a linear chain (positions, velocities)
@@ -19,7 +19,11 @@ PROGRAM md_chain_mts_lj
   ! Leave namelist empty to accept supplied defaults
 
   ! Input configuration, output configuration, all calculations, and all results 
-  ! are given in LJ units sigma = 1, epsilon = 1, mass = 1
+  ! are given in mass = 1 units, and in simulation units defined by the model 
+  ! For example, for Lennard-Jones, sigma = 1, epsilon = 1
+
+  ! Despite the program name, there is nothing here specific to Lennard-Jones
+  ! The model is defined in md_module
 
   ! Most important variables
   REAL    :: dt          ! time step (smallest)
@@ -40,9 +44,10 @@ PROGRAM md_chain_mts_lj
 
   NAMELIST /nml/ nblock, nstep, dt, k_spring, n_mts
 
-  WRITE( unit=output_unit, fmt='(a)' ) 'md_chain_mts_lj'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE, repulsive LJ chain, multiple time steps'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Results in units epsilon = sigma = 1'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'md_chain_mts_lj'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE ensemble, chain molecule, multiple time steps'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
+  CALL model_description ( output_unit )
   CALL time_stamp ( output_unit )
 
   ! Set sensible default run parameters for testing

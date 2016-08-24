@@ -1,7 +1,9 @@
-! md_lj_module.f90
-! Force routine for MD simulation, Lennard-Jones atoms
-MODULE md_module
+! smc_lj_module.f90
+! Energy, force, and move routines for SMC, LJ potential
+MODULE smc_module
 
+  ! TODO (MPA): adapt this to SMC
+  
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
 
   IMPLICIT NONE
@@ -140,4 +142,4 @@ CONTAINS
 
   END SUBROUTINE energy_lrc
 
-END MODULE md_module
+END MODULE smc_module

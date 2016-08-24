@@ -1,6 +1,6 @@
 ! mc_poly_lj_module.f90
 ! Routines for MC simulation, polyatomic molecule, LJ atoms
-MODULE mc_poly_lj_module
+MODULE mc_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
 
@@ -8,7 +8,8 @@ MODULE mc_poly_lj_module
   PRIVATE
 
   PUBLIC :: n, na, r, e, d, lt, ne, gt
-  PUBLIC :: allocate_arrays, deallocate_arrays, energy_1, energy, q_to_d
+  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  public :: energy_1, energy, q_to_d
  
   INTEGER                                :: n  ! number of molecules
   INTEGER                                :: na ! number of atoms per molecule
@@ -17,8 +18,18 @@ MODULE mc_poly_lj_module
   REAL,    DIMENSION(:,:,:), ALLOCATABLE :: d  ! bond vectors (3,na,n)
 
   INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
+  REAL,    PARAMETER :: sigma = 1.0             ! Lennard-Jones diameter (unit of length)
+  REAL,    PARAMETER :: epslj = 1.0             ! Lennard-Jones well depth (unit of energy)
 
 CONTAINS
+
+  SUBROUTINE model_description ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Shifted Lennard-Jones potential (no LRC)'
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',   sigma    
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epslj = ', epslj    
+  END SUBROUTINE model_description
 
   SUBROUTINE allocate_arrays ( box, rm_cut )
     REAL, INTENT(in) :: box    ! simulation box length
@@ -217,4 +228,4 @@ CONTAINS
 
   END FUNCTION q_to_d
   
-END MODULE mc_poly_lj_module
+END MODULE mc_module

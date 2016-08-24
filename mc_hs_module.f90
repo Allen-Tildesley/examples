@@ -1,21 +1,30 @@
 ! mc_hs_module.f90
 ! Overlap routines for MC simulation, hard spheres
-MODULE mc_hs_module
+MODULE mc_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
 
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, lt, ne, gt
-  PUBLIC :: overlap_1, overlap, n_overlap_1, n_overlap, allocate_arrays, deallocate_arrays
+  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  PUBLIC :: overlap_1, overlap, n_overlap_1, n_overlap
 
   INTEGER                             :: n ! number of atoms
   REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
 
   INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
+  REAL,    PARAMETER :: sigma = 1.0             ! hard-sphere diameter (unit of length)
 
 CONTAINS
 
+  SUBROUTINE model_description ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Hard sphere potential'
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ', sigma    
+  END SUBROUTINE model_description
+  
   SUBROUTINE allocate_arrays
     ALLOCATE ( r(3,n) )
   END SUBROUTINE allocate_arrays
@@ -168,4 +177,4 @@ CONTAINS
 
   END FUNCTION n_overlap_1
 
-END MODULE mc_hs_module
+END MODULE mc_module

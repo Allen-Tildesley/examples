@@ -1,6 +1,6 @@
 ! md_nve_hs_module.f90
 ! Collisions and overlap for MD of hard spheres
-MODULE md_nve_hs_module
+MODULE md_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
 
@@ -136,4 +136,4 @@ CONTAINS
     virial = DOT_PRODUCT ( vij, rij ) / 3.0
   END SUBROUTINE collide
 
-END MODULE md_nve_hs_module
+END MODULE md_module

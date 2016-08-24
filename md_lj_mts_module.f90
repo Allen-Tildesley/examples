@@ -1,6 +1,6 @@
 ! md_lj_mts_module.f90
 ! Force routine for MD, LJ atoms, multiple timesteps
-MODULE md_lj_mts_module
+MODULE md_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
 
@@ -8,14 +8,26 @@ MODULE md_lj_mts_module
   PRIVATE
 
   PUBLIC :: n, r, v, f
-  PUBLIC :: allocate_arrays, deallocate_arrays, force
+  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  public :: force
 
   INTEGER                                :: n      ! number of atoms
   REAL,    DIMENSION(:,:),   ALLOCATABLE :: r      ! positions (3,n)
   REAL,    DIMENSION(:,:),   ALLOCATABLE :: v      ! velocities (3,n)
   REAL,    DIMENSION(:,:,:), ALLOCATABLE :: f      ! forces for each shell (3,n,k_max) 
 
+  REAL, PARAMETER :: sigma = 1.0 ! LJ diameter (unit of length)
+  REAL, PARAMETER :: epslj = 1.0 ! LJ well depth (unit of energy)
+
 CONTAINS
+
+  SUBROUTINE model_description ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',     sigma    
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epsilon = ', epslj    
+  END SUBROUTINE model_description
 
   SUBROUTINE allocate_arrays ( r_cut )
     REAL, DIMENSION(:), INTENT(in)  :: r_cut  ! shell cutoff distances
@@ -142,4 +154,4 @@ CONTAINS
 
   END SUBROUTINE force
 
-END MODULE md_lj_mts_module
+END MODULE md_module

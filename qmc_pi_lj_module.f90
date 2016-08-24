@@ -1,14 +1,15 @@
 ! qmc_pi_lj_module.f90
 ! Energy and move routines for PIMC simulation, LJ potential
-MODULE qmc_pi_lj_module
+MODULE qmc_module
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
 
   IMPLICIT NONE
   PRIVATE
 
   PUBLIC :: n, p, r, lt, ne, gt
-  PUBLIC :: allocate_arrays, deallocate_arrays, energy_cl_1, energy_cl, energy_qu_1, energy_qu
+  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  public :: energy_cl_1, energy_cl, energy_qu_1, energy_qu
   PUBLIC :: move
 
   INTEGER                                :: n ! number of atoms
@@ -16,8 +17,18 @@ MODULE qmc_pi_lj_module
   REAL,    DIMENSION(:,:,:), ALLOCATABLE :: r ! positions (3,n,p)
 
   INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range and l-range options
+  REAL,    PARAMETER :: sigma = 1.0             ! Lennard-Jones diameter (unit of length)
+  REAL,    PARAMETER :: epslj = 1.0             ! Lennard-Jones well depth (unit of energy)
 
 CONTAINS
+
+  SUBROUTINE model_description ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',   sigma    
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epslj = ', epslj    
+  END SUBROUTINE model_description
 
   SUBROUTINE allocate_arrays ( box, r_cut )
     REAL, INTENT(in) :: box   ! simulation box length
@@ -245,4 +256,4 @@ CONTAINS
 
   END SUBROUTINE move
 
-END MODULE qmc_pi_lj_module
+END MODULE qmc_module

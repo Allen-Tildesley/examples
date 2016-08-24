@@ -1,6 +1,6 @@
 ! mc_sc_module.f90
 ! Overlap routines for MC simulation, hard spherocylinders
-MODULE mc_sc_module
+MODULE mc_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
 
@@ -8,15 +8,24 @@ MODULE mc_sc_module
   PRIVATE
 
   PUBLIC :: n, r, e, lt, ne, gt
-  PUBLIC :: allocate_arrays, deallocate_arrays, overlap_1, overlap, n_overlap_1, n_overlap
+  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  public :: overlap_1, overlap, n_overlap_1, n_overlap
 
   INTEGER                             :: n ! number of atoms
   REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
   REAL,   DIMENSION(:,:), ALLOCATABLE :: e ! orientations (3,n)
 
   INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
+  REAL,    PARAMETER :: sigma = 1.0             ! hard-spherocylinder diameter (unit of length)
 
 CONTAINS
+
+  SUBROUTINE model_description ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Hard spherocylinder potential'
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ', sigma    
+  END SUBROUTINE model_description
 
   SUBROUTINE allocate_arrays
     ALLOCATE ( r(3,n), e(3,n) )
@@ -246,4 +255,4 @@ CONTAINS
     sij_sq = rij_sq + ci * di + cj * dj
   END FUNCTION sc_dist_sq
 
-END MODULE mc_sc_module
+END MODULE mc_module

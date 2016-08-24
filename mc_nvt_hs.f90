@@ -6,7 +6,8 @@ PROGRAM mc_nvt_hs
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_hs_module,     ONLY : allocate_arrays, deallocate_arrays, overlap_1, overlap, n_overlap, n, r, ne
+  USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+       &                       overlap_1, overlap, n_overlap, n, r, ne
 
   IMPLICIT NONE
 
@@ -14,18 +15,20 @@ PROGRAM mc_nvt_hs
   ! Cubic periodic boundary conditions
   ! Conducts Monte Carlo (the temperature is irrelevant)
   ! Uses no special neighbour lists
+
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
 
-  ! Box is taken to be of unit length during the Monte Carlo
-  ! However, input configuration, output configuration,
-  ! most calculations, and all results 
-  ! are given in reduced units sigma = 1 kT=1
+  ! We take kT=1 throughout defining the unit of energy
+  ! Positions r are divided by box length after reading in
+  ! However, input configuration, output configuration, most calculations, and all results 
+  ! are given in simulation units defined by the model,
+  ! in this case, for hard spheres, sigma = 1
 
   ! Most important variables
-  REAL :: box         ! box length (in units where sigma=1)
-  REAL :: density     ! reduced density n*sigma**3/box**3
-  REAL :: pressure    ! measured pressure in units kT/sigma**3
+  REAL :: box         ! box length
+  REAL :: density     ! density
+  REAL :: pressure    ! pressure (to be averaged)
   REAL :: dr_max      ! maximum MC displacement
   REAL :: epsilon     ! pressure scaling parameter
   REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
@@ -42,8 +45,8 @@ PROGRAM mc_nvt_hs
   NAMELIST /nml/ nblock, nstep, dr_max, epsilon
 
   WRITE( unit=output_unit, fmt='(a)' ) 'mc_nvt_hs'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT, hard spheres'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Results in units sigma = 1'
+  WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT'
+  CALL model_description ( output_unit )
   CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! Initialize random number generator
@@ -66,17 +69,16 @@ PROGRAM mc_nvt_hs
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Pressure scaling parameter', epsilon
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call just to get n and box
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
   density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
 
   CALL allocate_arrays ! Allocates r
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! second call to get r
 
-  ! Convert to box units
-  r(:,:) = r(:,:) / box
+  r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   IF ( overlap ( box ) ) THEN

@@ -1,5 +1,5 @@
 ! mc_chain_nvt_cbmc_lj.f90
-! Monte Carlo, single chain, NVT, CBMC, LJ
+! Monte Carlo, single chain, NVT, CBMC
 PROGRAM mc_chain_nvt_cbmc_lj
   !
   ! TODO MPA provide code

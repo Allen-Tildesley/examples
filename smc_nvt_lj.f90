@@ -1,28 +1,29 @@
-! md_nvt_lj_le.f90
-! MD, NVT ensemble, Lees-Edwards boundaries
-PROGRAM md_nvt_lj_le
+! smc_nvt_lj.f90
+! Smart Monte Carlo, NVT ensemble
+PROGRAM smc_nvt_lj
 
+  ! TODO (MPA) adapt this to SMC
+  
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE maths_module,     ONLY : random_normals
   USE md_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
        &                       force, r, v, f, n, energy_lrc
 
   IMPLICIT NONE
 
-  ! MPA TODO: double check this program!!!
-  
   ! Takes in a configuration of atoms (positions, velocities)
-  ! Cubic periodic boundary conditions, with Lees-Edwards shear
-  ! Conducts molecular dynamics, SLLOD algorithm, with isokinetic thermostat
-  ! Refs: Pan et al J Chem Phys 122 094114 (2005)
+  ! Cubic periodic boundary conditions
+  ! Conducts molecular dynamics using BAOAB algorithm of BJ Leimkuhler and C Matthews
+  ! Appl. Math. Res. eXpress 2013, 34–56 (2013); J. Chem. Phys. 138, 174102 (2013)
   ! Uses no special neighbour lists
 
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
 
-  ! Positions r are divided by box length after reading in and we assume mass=1 throughout
+  ! Positions r are divided by box length after reading in, and we assume mass=1 throughout
   ! However, input configuration, output configuration, most calculations, and all results 
   ! are given in simulation units defined by the model
   ! For example, for Lennard-Jones, sigma = 1, epsilon = 1
@@ -34,30 +35,28 @@ PROGRAM md_nvt_lj_le
   REAL :: box         ! box length
   REAL :: density     ! density
   REAL :: dt          ! time step
-  REAL :: strain_rate ! strain_rate (velocity gradient) dv_x/dr_y
-  REAL :: strain      ! strain (integrated velocity gradient) dr_x/dr_y
   REAL :: r_cut       ! potential cutoff distance
   REAL :: pot         ! total potential energy
   REAL :: pot_sh      ! total shifted potential energy
   REAL :: kin         ! total kinetic energy
   REAL :: vir         ! total virial
   REAL :: pressure    ! pressure (to be averaged)
-  REAL :: temperature ! temperature (to be averaged)
+  REAL :: temperature ! temperature (specified)
   REAL :: energy      ! total energy per atom (to be averaged)
   REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
+  REAL :: gamma       ! friction coefficient
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
-  REAL    :: pot_lrc, vir_lrc
-  REAL    :: c1, c2, alpha, beta, e, h, d_strain, dt_factor, prefactor
+  REAL    :: pot_lrc, vir_lrc, c0, c1
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
 
-  NAMELIST /nml/ nblock, nstep, r_cut, dt, strain_rate
+  NAMELIST /nml/ nblock, nstep, r_cut, dt, gamma, temperature
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'md_nvt_lj_le'
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVT ensemble, Lees-Edwards'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'bd_nvt_lj'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Brownian dynamics, constant-NVT ensemble'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
   CALL model_description ( output_unit )
   CALL time_stamp ( output_unit )
@@ -67,39 +66,50 @@ PROGRAM md_nvt_lj_le
   nstep       = 1000
   r_cut       = 2.5
   dt          = 0.005
-  strain_rate = 0.01
+  gamma       = 0.1
+  temperature = 0.7
 
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
      IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
-     STOP 'Error in md_nvt_lj_le'
+     STOP 'Error in bd_nvt_lj'
   END IF
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Strain rate',               strain_rate
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Friction coefficient',      gamma
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',               temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Ideal diffusion coefft',    temperature / gamma
 
-  ! For simplicity we assume that input configuration has strain = 0
-  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
+  ! Dimensionless coefficients for random momentum term
+  gamma = gamma * dt ! incorporate timestep into friction
+  c0 = EXP(-gamma)
+  IF ( gamma > 1.e-5 ) THEN
+     c1 = 1-c0**2
+  ELSE
+     c1 = gamma * ( 2.0 - gamma * ( 2.0 - 4.0 * gamma / 3.0 ) ) ! Taylor expansion for low gamma
+  END IF
+  c1 = SQRT ( c1 )
+  WRITE ( unit=output_unit, fmt='(a,t40,es15.4)' ) 'Algorithm coefficient c0', c0
+  WRITE ( unit=output_unit, fmt='(a,t40,es15.4)' ) 'Algorithm coefficient c1', c1
+
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
   density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
 
   CALL allocate_arrays ( box, r_cut )
 
-  ! For simplicity we assume that input configuration has strain = 0
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
-  strain = 0.0
 
-  r(:,:) = r(:,:) / box                       ! Convert positions to box units
-  r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain ! Extra correction (box=1 units)
-  r(:,:) = r(:,:) - ANINT ( r(:,:) )          ! Periodic boundaries (box=1 units)
+  r(:,:) = r(:,:) / box              ! Convert positions to box units
+  r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  CALL force ( box, r_cut, strain, pot, pot_sh, vir )
+  CALL force ( box, r_cut, pot, pot_sh, vir )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot         = pot + pot_lrc
   vir         = vir + vir_lrc
@@ -108,7 +118,7 @@ PROGRAM md_nvt_lj_le
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
   temperature = 2.0 * kin / REAL ( 3*(n-1) )
   pressure    = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',   energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial energy',         energy
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy', energy_sh
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature',    temperature
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',       pressure
@@ -121,50 +131,15 @@ PROGRAM md_nvt_lj_le
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        ! Isokinetic SLLOD algorithm (Pan et al)
-
-        ! Operator A for half a step
-        d_strain = 0.5 * dt * strain_rate            ! change in strain (dimensionless)
-        r(1,:)   = r(1,:) + d_strain * r(2,:)        ! Extra strain term
-        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:) / box  ! Drift half-step (positions in box=1 units)
-        strain   = strain + d_strain                 ! Advance boundaries
-
-        r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain   ! Extra correction (box=1 units)
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )            ! Periodic boundaries (box=1 units)
-
-        ! Operator B1 for half a step
-        d_strain = 0.5*dt * strain_rate
-        c1       = d_strain * SUM ( v(1,:)*v(2,:) ) / SUM ( v(:,:)**2 )
-        c2       = ( d_strain**2 ) * SUM ( v(2,:)**2 ) / SUM ( v(:,:)**2 )
-        v(1,:)   = v(1,:) - d_strain*v(2,:)
-        v(:,:)   = v(:,:) / SQRT ( 1.0 - 2.0*c1 + c2 )
-        
-        CALL force ( box, r_cut, strain, pot, pot_sh, vir ) ! Force evaluation
-
-        ! Operator B2 for a full step
-        alpha     = SUM ( f(:,:)*v(:,:) ) / SUM ( v(:,:)**2 )
-        beta      = SQRT ( SUM ( f(:,:)**2 ) / SUM ( v(:,:)**2 ) )
-        h         = ( alpha + beta ) / ( alpha - beta )
-        e         = EXP ( -beta * dt )
-        dt_factor = ( 1 + h - e - h / e ) / ( ( 1 - h ) * beta )
-        prefactor = ( 1 - h ) / ( e - h / e )
-        v(:,:)    = prefactor * ( v(:,:) + dt_factor * f(:,:) )
-
-        ! Operator B1 for half a step
-        d_strain = 0.5*dt * strain_rate
-        c1       = d_strain * SUM ( v(1,:)*v(2,:) ) / SUM ( v(:,:)**2 )
-        c2       = (d_strain**2 ) * SUM ( v(2,:)**2 ) / SUM ( v(:,:)**2 )
-        v(1,:)   = v(1,:) - d_strain*v(2,:)
-        v(:,:)   = v(:,:) / SQRT ( 1.0 - 2.0*c1 + c2 )
-
-        ! Operator A for half a step
-        d_strain = 0.5 * dt * strain_rate           ! change in strain (dimensionless)
-        r(1,:)   = r(1,:) + d_strain * r(2,:)       ! Extra strain term
-        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:) / box ! Drift half-step (positions in box=1 units)
-        strain   = strain + d_strain                ! Advance boundaries
-
-        r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain   ! Extra correction (box=1 units)
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )            ! Periodic boundaries (box=1 units)
+        ! BAOAB algorithm
+        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)               ! Kick half-step (B)
+        r(:,:) = r(:,:) + 0.5 * dt * v(:,:) / box         ! Drift half-step (A) (positions in box=1 units)
+        CALL random_normals ( 0.0, SQRT(temperature), f ) ! Use f to hold random momenta
+        v(:,:) = c0 * v(:,:) + c1 * f                     ! Friction and random effects (O)
+        r(:,:) = r(:,:) + 0.5 * dt * v(:,:) / box         ! Drift half-step (A) (positions in box=1 units)
+        r(:,:) = r(:,:) - ANINT ( r(:,:) )                ! Periodic boundaries (box=1 units)
+        CALL force ( box, r_cut, pot, pot_sh, vir )       ! Force evaluation
+        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)               ! Kick half-step (B)
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
         pot         = pot + pot_lrc
@@ -188,7 +163,7 @@ PROGRAM md_nvt_lj_le
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, r_cut, strain, pot, pot_sh, vir )
+  CALL force ( box, r_cut, pot, pot_sh, vir )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot         = pot + pot_lrc
   vir         = vir + vir_lrc
@@ -197,15 +172,15 @@ PROGRAM md_nvt_lj_le
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
   temperature = 2.0 * kin / REAL ( 3*(n-1) )
   pressure    = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',   energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',         energy
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy', energy_sh
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temperature',    temperature
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',       pressure
+  CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
-  CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
 
-END PROGRAM md_nvt_lj_le
+END PROGRAM smc_nvt_lj
 

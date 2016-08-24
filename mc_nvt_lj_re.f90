@@ -1,14 +1,14 @@
 ! mc_nvt_lj_re.f90
-! Monte Carlo, NVT ensemble, Lennard-Jones, replica exchange
+! Monte Carlo, NVT ensemble, replica exchange
 PROGRAM mc_nvt_lj_re
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE maths_module,   ONLY : metropolis
-  USE mc_lj_module,     ONLY : allocate_arrays, deallocate_arrays, energy_1, energy, energy_lrc, move, &
-       &                       n, r, ne
+  USE maths_module,     ONLY : metropolis
+  USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+       &                       energy_1, energy, energy_lrc, move, n, r, ne
   USE mpi
 
   IMPLICIT NONE
@@ -22,18 +22,22 @@ PROGRAM mc_nvt_lj_re
 
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
+
   ! Note that the various processes running this program will share standard input and error units
-  ! but will write "standard" output to a file std##.out where ## is the process rank
+  ! but will write "standard output" to a file std##.out where ## is the process rank
   ! Similarly, configurations are read, saved, and written to files named cnf##.inp etc
 
-  ! Box is taken to be of unit length during the Monte Carlo
-  ! However, input configuration, output configuration,
-  ! most calculations, and all results 
-  ! are given in LJ units sigma = 1, epsilon = 1
+  ! Positions r are divided by box length after reading in
+  ! However, input configuration, output configuration, most calculations, and all results 
+  ! are given in simulation units defined by the model
+  ! For example, for Lennard-Jones, sigma = 1, epsilon = 1
+
+  ! Despite the program name, there is nothing here specific to Lennard-Jones
+  ! The model is defined in mc_module
 
   ! Most important variables
-  REAL :: box         ! box length (in units where sigma=1)
-  REAL :: density     ! reduced density n*sigma**3/box**3
+  REAL :: box         ! box length
+  REAL :: density     ! density
   REAL :: dr_max      ! maximum MC displacement
   REAL :: temperature ! specified temperature
   REAL :: r_cut       ! potential cutoff distance
@@ -41,8 +45,8 @@ PROGRAM mc_nvt_lj_re
   REAL :: vir         ! total virial
   REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
   REAL :: swap_ratio  ! acceptance ratio of swaps with higher neighbour (to be averaged)
-  REAL :: pressure    ! pressure (LJ sigma=1 units, to be averaged)
-  REAL :: potential   ! potential energy per atom (LJ sigma=1 units, to be averaged)
+  REAL :: pressure    ! pressure (to be averaged)
+  REAL :: potential   ! potential energy per atom (to be averaged)
 
   REAL, DIMENSION(:), ALLOCATABLE :: every_temperature, every_beta, every_dr_max
 
@@ -88,8 +92,8 @@ PROGRAM mc_nvt_lj_re
   END IF
 
   WRITE( unit=output_unit, fmt='(a)'        ) 'mc_nvt_lj_re'
-  WRITE( unit=output_unit, fmt='(a)'        ) 'Monte Carlo, constant-NVT, Lennard-Jones, replica exchange'
-  WRITE( unit=output_unit, fmt='(a)'        ) 'Results in units epsilon = sigma = 1'
+  WRITE( unit=output_unit, fmt='(a)'        ) 'Monte Carlo, constant-NVT, replica exchange'
+  CALL model_description ( output_unit )
   WRITE( unit=output_unit, fmt='(a,t40,i15)') 'This is process rank',   m
   WRITE( unit=output_unit, fmt='(a,t40,i15)') 'Number of processes is', p
   CALL time_stamp ( output_unit )
@@ -97,6 +101,7 @@ PROGRAM mc_nvt_lj_re
   CALL RANDOM_SEED () ! Initialize random number generator
   CALL RANDOM_NUMBER ( zeta )
   WRITE( unit=output_unit, fmt='(a,t40,3f15.5)') 'First three random numbers', zeta
+  WRITE( unit=output_unit, fmt='(a)'           ) 'These should be different for different processes!'
 
   ALLOCATE ( every_temperature(0:p-1), every_beta(0:p-1), every_dr_max(0:p-1) )
 
@@ -127,17 +132,16 @@ PROGRAM mc_nvt_lj_re
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum displacement',           dr_max
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
   density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
 
   CALL allocate_arrays ( box, r_cut ) ! Allocate r
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! second call is to get r
 
-  ! Convert to box units
-  r(:,:) = r(:,:) / box
+  r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   CALL energy ( box, r_cut, overlap, pot, vir )
@@ -150,8 +154,8 @@ PROGRAM mc_nvt_lj_re
   vir = vir + vir_lrc
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial potential energy (sigma units)', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial pressure (sigma units)',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial potential energy', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',         pressure
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Swap ratio', 'Potential', 'Pressure' ] )
 
@@ -247,8 +251,8 @@ PROGRAM mc_nvt_lj_re
 
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
 
   CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN ! should never happen
@@ -261,8 +265,8 @@ PROGRAM mc_nvt_lj_re
   potential = pot / REAL ( n )
   pressure  = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy (sigma units)', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure (sigma units)',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
   CALL time_stamp ( output_unit )

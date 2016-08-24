@@ -1,13 +1,14 @@
 ! qmc_pi_lj.f90
-! Quantum Monte Carlo, path-integral, LJ atoms
+! Quantum Monte Carlo, path-integral method
 PROGRAM qmc_pi_lj
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE maths_module,   ONLY : metropolis
-  USE qmc_pi_lj_module, ONLY : allocate_arrays, deallocate_arrays, energy_cl_1, energy_qu_1, energy_cl, energy_qu, move, &
+  USE maths_module,     ONLY : metropolis
+  USE qmc_module,       ONLY : model_description, allocate_arrays, deallocate_arrays, &
+       &                       energy_cl_1, energy_qu_1, energy_cl, energy_qu, move, &
        &                       n, p, r, ne
 
   IMPLICIT NONE
@@ -20,29 +21,32 @@ PROGRAM qmc_pi_lj
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
 
-  ! Positions r are divided by box length
-  ! However, input configuration, output configuration,
-  ! most calculations, and all results 
-  ! are given in LJ units sigma = 1, epsilon = 1
+  ! Positions r are divided by box length after reading in
+  ! However, input configuration, output configuration, most calculations, and all results 
+  ! are given in simulation units defined by the model
+  ! For example, for Lennard-Jones, sigma = 1, epsilon = 1
   ! The importance of quantum effects is specified through the reduced de Boer length
   ! lambda = (hbar/sqrt(mass*epsilon))/sigma which takes typical values of
   ! 0.01 for Xe, 0.03 for Ar, and 0.095 for Ne.
   ! This means that the quantum spring constant may be expressed k_spring = P*(T/lambda)**2
   ! where T stands for the reduced temperature kB*T/epsilon
 
+  ! Despite the program name, there is nothing here specific to Lennard-Jones
+  ! The model is defined in qmc_module
+
   ! Most important variables
-  REAL :: box          ! box length (in units where sigma=1)
-  REAL :: lambda       ! de Boer length (in units where sigma=1)
-  REAL :: density      ! reduced density n*sigma**3/box**3
+  REAL :: box          ! box length
+  REAL :: lambda       ! de Boer length
+  REAL :: density      ! density
   REAL :: dr_max       ! maximum MC displacement
   REAL :: temperature  ! specified temperature
   REAL :: r_cut        ! potential cutoff distance
   REAL :: pot_cl       ! classical potential energy
   REAL :: pot_qu       ! quantum potential energy
   REAL :: move_ratio   ! acceptance ratio of moves (to be averaged)
-  REAL :: potential_cl ! classical potential energy per atom (LJ sigma=1 units, to be averaged)
-  REAL :: potential_qu ! quantum potential energy per atom (LJ sigma=1 units, to be averaged)
-  REAL :: energy       ! total energy per atom (LJ sigma=1 units, to be averaged)
+  REAL :: potential_cl ! classical potential energy per atom (to be averaged)
+  REAL :: potential_qu ! quantum potential energy per atom (to be averaged)
+  REAL :: energy       ! total energy per atom (to be averaged)
 
   LOGICAL            :: overlap
   INTEGER            :: blk, stp, i, k, nstep, nblock, moves, ioerr
@@ -58,8 +62,8 @@ PROGRAM qmc_pi_lj
   NAMELIST /nml/ nblock, nstep, p, temperature, r_cut, dr_max, lambda
 
   WRITE( unit=output_unit, fmt='(a)' ) 'qmc_pi_lj'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Path-integral Monte Carlo, constant-NVT, Lennard-Jones'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Results in units epsilon = sigma = 1'
+  WRITE( unit=output_unit, fmt='(a)' ) 'Path-integral Monte Carlo, constant-NVT ensemble'
+  CALL model_description ( output_unit )
   CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! Initialize random number generator
@@ -100,10 +104,10 @@ PROGRAM qmc_pi_lj
   WRITE(k_tag,fmt='(i2.2)') 1 ! convert into character form
   cnf_prefix(4:5) = k_tag     ! insert into configuration filename
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box )
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
   density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Reduced density', density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
 
   CALL allocate_arrays ( box, r_cut ) ! Allocate r
 

@@ -1,6 +1,6 @@
 ! md_chain_lj_module.f90
 ! Force & constraint routines for MD, LJ chain
-MODULE md_chain_lj_module
+MODULE md_module
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
 
@@ -8,7 +8,8 @@ MODULE md_chain_lj_module
   PRIVATE
 
   PUBLIC :: n, r, v, f, f_spring
-  PUBLIC :: allocate_arrays, deallocate_arrays, force, spring
+  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  public :: force, spring
   PUBLIC :: rattle_a, rattle_b, worst_bond, milcshake_a, milcshake_b 
 
   INTEGER                              :: n ! number of atoms
@@ -24,11 +25,22 @@ MODULE md_chain_lj_module
   REAL,    DIMENSION(:),   ALLOCATABLE :: dl, dl_tmp                 ! sub-diagonal part of constraint matrix (n-2)
   REAL,    DIMENSION(:),   ALLOCATABLE :: du, du_tmp                 ! super-diagonal part of constraint matrix (n-2)
 
+  REAL, PARAMETER :: sigma = 1.0 ! LJ diameter (unit of length)
+  REAL, PARAMETER :: epslj = 1.0 ! LJ well depth (unit of energy)
+
   ! all masses are unity
   ! all bond lengths are the same
   ! no periodic boundary conditions
 
 CONTAINS
+
+  SUBROUTINE model_description ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'WCA shifted Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',     sigma    
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epsilon = ', epslj    
+  END SUBROUTINE model_description
 
   SUBROUTINE allocate_arrays
     ALLOCATE ( r(3,n), v(3,n), f(3,n), f_spring(3,n), r_old(3,n), r_new(3,n) )
@@ -408,4 +420,4 @@ CONTAINS
 
   END SUBROUTINE milcshake_b
 
-END MODULE md_chain_lj_module
+END MODULE md_module
