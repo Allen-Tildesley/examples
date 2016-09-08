@@ -26,6 +26,7 @@ env_mpi.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFIX='
 
 variants={}
 variants['build_bd_nvt_lj']        = (['bd_nvt_lj.f90','md_lj_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
+variants['build_dpd']              = (['dpd.f90','dpd_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
 variants['build_cluster']          = (['cluster.f90','config_io_module.f90'],env_normal)
 variants['build_diffusion']        = (['diffusion.f90'],env_normal)
 variants['build_fft3dwrap']        = (['fft3dwrap.f90'],env_fftw)
