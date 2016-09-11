@@ -18,8 +18,7 @@ MODULE dpd_module
   INTEGER, DIMENSION(:,:), ALLOCATABLE :: ij ! list of ij pairs within range (2,n*(n-1)/2)
   INTEGER                              :: np ! number of pairs within range
 
-  REAL, PARAMETER :: sigma = 1.0  ! cutoff distance (unit of length)
-  REAL, PARAMETER :: alpha = 25.0 ! repulsion strength (unit of energy)
+  REAL, PARAMETER :: r_cut = 1.0  ! cutoff distance (unit of length)
 
 CONTAINS
 
@@ -27,8 +26,7 @@ CONTAINS
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'DPD soft potential'
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ', sigma    
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Strength, alpha = ', alpha    
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, r_cut = ', r_cut    
   END SUBROUTINE model_description
 
   SUBROUTINE allocate_arrays
@@ -53,7 +51,7 @@ CONTAINS
 
           rij(:)  = r(:,i) - r(:,j)
           rij(:) = rij(:) - ANINT ( rij(:) )
-          rij(:) = rij(:) * box ! now in sigma=1 units
+          rij(:) = rij(:) * box ! now in r_cut=1 units
           rij_sq = SUM ( rij(:)**2 )
 
           IF ( rij_sq < 1.0 ) THEN ! Test for centre-centre spherical cutoff
@@ -74,44 +72,51 @@ CONTAINS
 
   END SUBROUTINE make_ij
 
-  SUBROUTINE force ( box, pot, vir )
+  SUBROUTINE force ( box, alpha, pot, vir, lap )
     REAL, INTENT(in)  :: box    ! simulation box length
+    REAL, INTENT(in)  :: alpha  ! force strength parameter
     REAL, INTENT(out) :: pot    ! total potential energy
     REAL, INTENT(out) :: vir    ! virial
+    REAL, INTENT(out) :: lap    ! Laplacian
 
     ! Calculates potential, virial and forces
     ! It is assumed that positions are in units where box = 1
-    ! Forces are calculated in units where sigma = 1
+    ! Forces are calculated in units where r_cut = 1
     ! It is assumed that ij contains a list of all pairs within range
 
     INTEGER            :: p, i, j
-    REAL               :: rij_sq, rij_mag, wij, potij, virij
+    REAL               :: rij_sq, rij_mag, wij
     REAL, DIMENSION(3) :: rij, fij, rij_hat
 
-    f      = 0.0
-    pot    = 0.0
-    vir    = 0.0
+    f   = 0.0
+    pot = 0.0
+    vir = 0.0
+    lap = 0.0
 
     DO p = 1, np ! loop over all pairs within range
        i = ij(1,p)
        j = ij(2,p)
 
-       rij(:) = r(:,i) - r(:,j)           ! separation vector
-       rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundary conditions in box=1 units
-       rij(:) = rij(:) * box              ! now in sigma=1 units
-       rij_sq = SUM ( rij**2 )            ! squared separation
-       rij_mag = SQRT ( rij_sq )          ! separation distance
-       wij     = 1.0-rij_mag              ! weight function
-       rij_hat = rij / rij_mag            ! unit separation vector
-       potij  = 0.5 * alpha * wij**2
-       pot    = pot + potij
-       virij  = alpha * wij * rij_mag
-       vir    = vir + virij
-       fij    = alpha * wij * rij_hat(:)
-       f(:,i) = f(:,i) + fij
-       f(:,j) = f(:,j) - fij
+       rij(:)  = r(:,i) - r(:,j)           ! separation vector
+       rij(:)  = rij(:) - ANINT ( rij(:) ) ! periodic boundary conditions in box=1 units
+       rij(:)  = rij(:) * box              ! now in r_cut=1 units
+       rij_sq  = SUM ( rij**2 )            ! squared separation
+       rij_mag = SQRT ( rij_sq )           ! separation distance
+       wij     = 1.0-rij_mag               ! weight function
+       rij_hat = rij / rij_mag             ! unit separation vector
+       pot     = pot + 0.5 * wij**2        ! potential
+       vir     = vir + wij * rij_mag       ! virial
+       lap     = lap + (6.0-4.0/rij_mag)   ! Laplacian
+       fij     = wij * rij_hat(:)
+       f(:,i)  = f(:,i) + fij
+       f(:,j)  = f(:,j) - fij
 
     END DO ! End loop over all pairs within range
+
+    pot = pot * alpha
+    vir = vir * alpha
+    lap = lap * alpha
+    f   = f   * alpha
 
   END SUBROUTINE force
 
@@ -138,7 +143,7 @@ CONTAINS
 
           rij(:)  = r(:,i) - r(:,j)
           rij(:)  = rij(:) - ANINT ( rij(:) )
-          rij(:)  = rij(:) * box ! now in sigma=1 units
+          rij(:)  = rij(:) * box ! now in r_cut=1 units
           rij_sq  = SUM ( rij(:)**2 )
           rij_mag = SQRT ( rij_sq )
           rij_hat = rij / rij_mag
@@ -175,7 +180,7 @@ CONTAINS
 
        rij(:) = r(:,i) - r(:,j)
        rij(:) = rij(:) - ANINT ( rij(:) )
-       rij(:) = rij(:) * box ! now in sigma=1 units
+       rij(:) = rij(:) * box ! now in r_cut=1 units
        rij_sq = SUM ( rij(:)**2 )
        rij_mag = SQRT ( rij_sq )
        rij_hat = rij / rij_mag
