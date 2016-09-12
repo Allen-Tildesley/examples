@@ -7,13 +7,14 @@ PROGRAM mc_chain_nvt_sw
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
        &                       regrow, cranks, pivots, write_histogram, verbose, qcount, weight, &
-       &                       n, nq, range, bond, r, h, s
+       &                       n, nq, range, bond, r, h, s, wl
 
   IMPLICIT NONE
 
   ! Takes in a configuration of atom positions in a linear chain
   ! NO periodic boundary conditions, no box
-  ! Conducts Monte Carlo using various moves (CBMC regrowth, pivot, crankshaft)
+  ! Conducts Monte Carlo, NVT ensemble using various moves
+  ! such as CBMC regrowth, pivot, crankshaft
   ! Uses no special neighbour lists
 
   ! Reads several variables and options from standard input using a namelist nml
@@ -40,7 +41,7 @@ PROGRAM mc_chain_nvt_sw
   REAL    :: pivot_max      ! maximum move angle in pivot
   REAL    :: pivot_fraction ! fraction of atoms to try in pivot
   INTEGER :: n_pivot        ! number of atoms to try in pivot
-  integer :: q              ! total attractive interaction (negative of energy)
+  INTEGER :: q              ! total attractive interaction (negative of energy)
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
 
@@ -55,6 +56,7 @@ PROGRAM mc_chain_nvt_sw
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, chain molecule, square wells'
   CALL model_description ( output_unit )
   CALL time_stamp ( output_unit )
+  wl = .FALSE. ! not using the Wang-Landau method
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -127,7 +129,7 @@ PROGRAM mc_chain_nvt_sw
         CALL cranks ( n_crank, crank_max, q, crank_ratio )
 
         ! Calculate all variables for this step
-        CALL blk_add ( [regrow_ratio,crank_ratio,pivot_ratio,real(q)] )
+        CALL blk_add ( [regrow_ratio,crank_ratio,pivot_ratio,REAL(q)] )
 
      END DO ! End loop over steps
 

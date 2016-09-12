@@ -6,17 +6,20 @@ MODULE mc_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: model_description, allocate_arrays, deallocate_arrays
-  PUBLIC :: regrow, cranks, pivots, weight, qcount, write_histogram
-  PUBLIC :: range, bond, n, nq, verbose, h, s, r
+  PUBLIC :: regrow, cranks, pivots, weight, qcount, write_histogram, histogram_flat
+  PUBLIC :: range, bond, n, nq, verbose, h, s, hit, r, ds, wl
 
-  INTEGER                           :: n       ! number of atoms
-  INTEGER                           :: nq      ! maximum anticipated energy
-  LOGICAL                           :: verbose ! flag for verbose output
-  REAL                              :: bond    ! bond length
-  REAL                              :: range   ! range of attractive well
-  REAL, DIMENSION(:,:), ALLOCATABLE :: r       ! atomic positions (3,n)
-  REAL, DIMENSION(:),   ALLOCATABLE :: h       ! histogram of q values (0:nq)
-  REAL, DIMENSION(:),   ALLOCATABLE :: s       ! histogram used in acceptance (0:nq)
+  INTEGER                              :: n       ! number of atoms
+  INTEGER                              :: nq      ! maximum anticipated energy
+  LOGICAL                              :: verbose ! flag for verbose output
+  LOGICAL                              :: wl      ! flag for Wang-Landau method
+  REAL                                 :: bond    ! bond length
+  REAL                                 :: range   ! range of attractive well
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: r       ! atomic positions (3,n)
+  REAL,    DIMENSION(:),   ALLOCATABLE :: h       ! histogram of q values (0:nq)
+  REAL,    DIMENSION(:),   ALLOCATABLE :: s       ! histogram used in acceptance (0:nq)
+  LOGICAL, DIMENSION(:),   ALLOCATABLE :: hit     ! identifies q-values that have been visited (0:nq)
+  REAL                                 :: ds      ! entropy increment for Wang-Landau method
 
   REAL, DIMENSION(:,:), ALLOCATABLE :: r_old, r_new ! working arrays (3,n)
 
@@ -36,11 +39,11 @@ CONTAINS
   SUBROUTINE allocate_arrays
     nq = 6*n ! anticipated maximum possible pair interactions
     ALLOCATE ( r(3,n), r_old(3,n), r_new(3,n) ) 
-    ALLOCATE ( h(0:nq), s(0:nq) )
+    ALLOCATE ( h(0:nq), s(0:nq), hit(0:nq) )
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
-    DEALLOCATE ( r, r_old, r_new, h, s )
+    DEALLOCATE ( r, r_old, r_new, h, s, hit )
   END SUBROUTINE deallocate_arrays
 
   SUBROUTINE regrow ( m_max, k_max, q, ratio ) ! regrow polymer
@@ -100,7 +103,7 @@ CONTAINS
        IF ( SUM(w) == 0 ) THEN ! early exit
           r = r_old   ! restore original configuration
           q = q_old   ! redundant, but for clarity
-          IF ( q <= nq .AND. q >= 0 ) h(q) = h(q) + 1.0 ! accumulate energy histogram
+          call update_histogram ( q )
           RETURN      ! and return
        END IF
 
@@ -113,7 +116,7 @@ CONTAINS
     IF ( w_new < w_tol ) THEN ! this should be a redundant test
        r = r_old   ! restore original configuration
        q = q_old   ! redundant, but for clarity
-       IF ( q <= nq .AND. q >= 0 ) h(q) = h(q) + 1.0 ! accumulate energy histogram
+       CALL update_histogram ( q )
        RETURN      ! no possible move
     END IF
 
@@ -160,7 +163,7 @@ CONTAINS
        q = q_old
     END IF
 
-    IF ( q <= nq .AND. q >= 0 ) h(q) = h(q) + 1.0 ! accumulate energy histogram
+    CALL update_histogram ( q )
 
     IF ( verbose ) THEN
        IF ( q /= qcount() ) THEN
@@ -218,7 +221,7 @@ CONTAINS
           IF ( weight1(i,lt) == 0 ) THEN
              r = r_old  ! restore original configuration
              q = q_old  ! redundant but for clarity
-             IF ( q <= nq .AND. q >= 0 ) h(q) = h(q) + 1 ! increment histogram
+             CALL update_histogram ( q )
              CYCLE tries ! and escape immediately
           END IF
        END DO
@@ -234,7 +237,7 @@ CONTAINS
           r = r_old
           q = q_old
        END IF
-       IF ( q <= nq .AND. q >= 0 ) h(q) = h(q) + 1
+          call update_histogram ( q )
 
     END DO tries ! end loop over pivot move attempts
 
@@ -297,7 +300,7 @@ CONTAINS
        IF ( weight1 ( i, ne ) == 0 ) THEN
           r = r_old ! restore original configuration
           q = q_old ! redundant but for clarity
-          IF ( q <= nq .AND. q >= 0 ) h(q) = h(q) + 1.0
+          call update_histogram ( q )
           CYCLE tries
        END IF
        q_new = q_new + qcount_1 ( i, ne ) ! add energies for moving atom
@@ -311,7 +314,7 @@ CONTAINS
           r = r_old
           q = q_old
        END IF
-       IF ( q <= nq .AND. q >= 0 ) h(q) = h(q) + 1
+          call update_histogram ( q )
 
     END DO tries ! end loop over crankshaft move attempts
 
@@ -471,6 +474,37 @@ CONTAINS
     END IF
 
   END FUNCTION accept
+
+  SUBROUTINE update_histogram ( q )
+    INTEGER, INTENT(in) :: q
+    IF ( q <= nq .AND. q >= 0 ) THEN
+       h(q) = h(q) + 1.0
+       IF ( wl ) THEN ! only for Wang-Landau method
+          s(q)   = s(q) + ds
+          hit(q) = .TRUE.
+       END IF
+    ELSE
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'q out of range ', q, nq
+       STOP 'Error in update_histogram'
+    END IF
+
+  END SUBROUTINE update_histogram
+
+  FUNCTION histogram_flat ( flatness ) RESULT ( flat )
+    REAL,   INTENT(in) :: flatness
+    LOGICAL            :: flat
+
+    REAL :: norm, avg
+
+    norm = REAL(COUNT(hit))
+    avg  = SUM(REAL(h)/norm,mask=hit)
+    IF ( avg < 0.0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2es20.8)' ) 'Error in h ', norm, avg
+       STOP 'Overflow in histogram_flat'
+    END IF
+    flat = REAL(MINVAL(h,mask=hit)) > flatness*avg
+
+  END FUNCTION histogram_flat
 
   SUBROUTINE write_histogram ( filename )
   USE, INTRINSIC :: iso_fortran_env, ONLY : iostat_end, iostat_eor
