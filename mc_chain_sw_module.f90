@@ -95,9 +95,8 @@ CONTAINS
 
        DO k = 1, k_max ! loop over k_max tries
           CALL random_orientation_vector ( u )
-          r(:,i)     = r(:,i-1) + bond*u ! generate trial position
-          r_try(:,k) = r(:,i)            ! store trial position
-          w(k)       = weight1 ( i, lt ) ! store overlap weight for this try
+          r_try(:,k) = r(:,i-1) + bond*u ! generate trial position
+          w(k)       = weight1 ( r_try(:,k), i, lt ) ! store overlap weight for this try
        END DO ! end loop over k_max tries
 
        IF ( SUM(w) == 0 ) THEN ! early exit
@@ -140,12 +139,12 @@ CONTAINS
     DO i = n-m+1, n ! Loop to regrow last m atoms calculating old weight
 
        r_try(:,1) = r(:,i) ! store old position in try 1
-       w(1) = 1            ! store overlap weight in try 1
+       w(1) = 1            ! store overlap weight in try 1 (must be 1)
 
        DO k = 2, k_max ! loop over k_max-1 other tries
           CALL random_orientation_vector ( u )
-          r(:,i) = r(:,i-1) + bond*u ! generate trial position
-          w(k)   = weight1 ( i, lt ) ! store overlap weight
+          r_try(:,k) = r(:,i-1) + bond*u ! generate trial position
+          w(k)   = weight1 ( r_try(:,k), i, lt ) ! store overlap weight
        END DO ! end loop over k_max-1 other tries
 
        r(:,i) = r_try(:,1)           ! restore winning position (always the original one)
@@ -218,7 +217,7 @@ CONTAINS
           rij = rotate_vector ( phi, u, rij ) ! rotate relative vector
           r(:,i) = rj + rij                   ! new position
 
-          IF ( weight1(i,lt) == 0 ) THEN
+          IF ( weight1 ( r(:,i), i, lt ) == 0 ) THEN
              r = r_old  ! restore original configuration
              q = q_old  ! redundant but for clarity
              CALL update_histogram ( q )
@@ -297,7 +296,7 @@ CONTAINS
        r(:,i) = rj + rij                   ! new position
 
        ! Check for overlaps in new configuration
-       IF ( weight1 ( i, ne ) == 0 ) THEN
+       IF ( weight1 ( r(:,i), i, ne ) == 0 ) THEN
           r = r_old ! restore original configuration
           q = q_old ! redundant but for clarity
           call update_histogram ( q )
@@ -357,14 +356,15 @@ CONTAINS
 
     w = 1
     DO i = 1, n-1
-       w = w  * weight1 ( i, gt )
+       w = w  * weight1 ( r(:,i), i, gt )
     END DO
 
   END FUNCTION weight
 
-  FUNCTION weight1 ( i, j_range ) RESULT ( w ) !  compute single atom weight
-    INTEGER, INTENT(in) :: i       ! atom of interest
-    INTEGER, INTENT(in) :: j_range ! range of atoms to be studied
+  FUNCTION weight1 ( ri, i, j_range ) RESULT ( w ) !  compute single atom weight
+    REAL,    DIMENSION(3), intent(in) :: ri      ! coordinates of atom of interest
+    INTEGER,               INTENT(in) :: i       ! atom of interest
+    INTEGER,               INTENT(in) :: j_range ! range of atoms to be studied
     INTEGER             :: w       ! Result
 
     INTEGER            :: j, j_lo, j_hi
@@ -388,7 +388,7 @@ CONTAINS
 
     DO j = j_lo, j_hi
        IF ( ABS(j-i) > 1 ) THEN ! skip self and bonded neighbours
-          rij = r(:,i) - r(:,j)
+          rij = ri(:) - r(:,j)
           rij_sq = SUM(rij**2)
           IF (  rij_sq < 1.0 ) THEN ! test against core sigma = 1.0
              IF ( verbose ) THEN
@@ -409,14 +409,15 @@ CONTAINS
 
     q = 0
     DO i = 1, n-1
-       q = q + qcount_1 ( i, gt )
+       q = q + qcount_1 ( r(:,i), i, gt )
     END DO
   END FUNCTION qcount
 
-  FUNCTION qcount_1 ( i, j_range ) RESULT ( q ) !  counts single atom energy
-    INTEGER, INTENT(in) :: i       ! atom of interest
-    INTEGER, INTENT(in) :: j_range ! range of atoms to be studied
-    INTEGER             :: q
+  FUNCTION qcount_1 ( ri, i, j_range ) RESULT ( q ) !  counts single atom energy
+    REAL,    DIMENSION(3), intent(in) :: ri      ! coordinates of atom of interest
+    INTEGER,               INTENT(in) :: i       ! atom of interest
+    INTEGER,               INTENT(in) :: j_range ! range of atoms to be studied
+    INTEGER                           :: q
 
     INTEGER            :: j, j_lo, j_hi
     REAL, DIMENSION(3) :: rij
@@ -442,7 +443,7 @@ CONTAINS
     q = 0
     DO j = j_lo, j_hi
        IF ( ABS(i-j) > 1 ) THEN  ! skip self and bonded neighbours
-          rij = r(:,i) - r(:,j)
+          rij = ri(:) - r(:,j)
           rij_sq = SUM(rij**2)
           IF ( rij_sq < range_sq ) q = q + 1
        END IF ! end skip self and bonded neighbours
