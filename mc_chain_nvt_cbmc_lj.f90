@@ -1,8 +1,6 @@
 ! mc_chain_nvt_cbmc_lj.f90
 ! Monte Carlo, single chain, NVT, CBMC
 PROGRAM mc_chain_nvt_cbmc_lj
-  !
-  ! TODO MPA provide code
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
