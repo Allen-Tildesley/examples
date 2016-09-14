@@ -55,6 +55,7 @@ variants['build_md_nve_lj_ll']         = (['md_nve_lj.f90','md_lj_ll_module.f90'
 variants['build_md_nvt_lj_le']         = (['md_nvt_lj_le.f90','md_lj_le_module.f90','config_io_module.f90','averages_module.f90'],env_normal)
 variants['build_md_nvt_lj_llle']       = (['md_nvt_lj_le.f90','md_lj_llle_module.f90','link_list_module.f90','config_io_module.f90','averages_module.f90'],env_normal)
 variants['build_mesh']                 = (['mesh.f90'],env_normal)
+variants['build_pair_distribution']    = (['pair_distribution.f90','config_io_module.f90'],env_normal)
 variants['build_qmc_pi_sho']           = (['qmc_pi_sho.f90','averages_module.f90','maths_module.f90'],env_normal)
 variants['build_qmc_pi_lj']            = (['qmc_pi_lj.f90','qmc_pi_lj_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
 variants['build_qmc_walk_sho']         = (['qmc_walk_sho.f90','averages_module.f90','maths_module.f90'],env_normal)
