@@ -273,8 +273,8 @@ CONTAINS
 
        r = r_old
 
-       i = random_integer ( 1, n ) ! pick random atom to move
-       q_new = q_old - qcount_1 ( i, ne ) ! subtract energies for moving atom
+       i     = random_integer ( 1, n )            ! pick random atom to move
+       q_new = q_old - qcount_1 ( r(:,i), i, ne ) ! subtract energies for moving atom
 
        CALL RANDOM_NUMBER ( phi )
        phi = ( 2.0*phi - 1.0 ) * phi_max ! rotation angle
@@ -302,7 +302,7 @@ CONTAINS
           call update_histogram ( q )
           CYCLE tries
        END IF
-       q_new = q_new + qcount_1 ( i, ne ) ! add energies for moving atom
+       q_new = q_new + qcount_1 ( r(:,i), i, ne ) ! add energies for moving atom
        r_new = r
 
        IF ( accept ( q_old, q_new ) ) THEN

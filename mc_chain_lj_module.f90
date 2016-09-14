@@ -56,11 +56,18 @@ CONTAINS
     INTEGER                      :: k       ! try index
     REAL,    DIMENSION(k_max)    :: w       ! Rosenbluth weights (involving non-bonded interactions)
     REAL,    DIMENSION(3,k_max)  :: r_try   ! coordinates of trial atoms
-    REAL,    DIMENSION(3)        :: u       ! vector
-    INTEGER                      :: i       ! atom index
-    real                         :: stddev  ! spring bond standard deviation
 
-    stddev = temperature / k_spring
+    INTEGER              :: i
+    LOGICAL              :: overlap
+    REAL                 :: d, d_range, stddev, zeta
+    REAL,   DIMENSION(3) :: u
+
+    stddev  = SQRT(temperature / k_spring) ! spring bond standard deviation
+    d_range = 3.0*stddev                   ! impose a limit on variation
+    IF ( d_range > bond ) THEN             ! must not be too large
+       WRITE ( unit=error_unit, fmt='(a,2f15.5)' ) 'Spring bond strength error', d_range, bond
+       STOP 'Error in regrow'
+    END IF
 
     ratio   = 0.0
     r_old   = r   ! store old configuration
@@ -92,15 +99,14 @@ CONTAINS
 
        DO k = 1, k_max ! loop over k_max tries
           CALL random_orientation_vector ( u )
-          d = random_bond ( bond, stddev ) ! generate random bond length around d=bond
-          r(:,i)     = r(:,i-1) + d*u      ! generate trial position
-          r_try(:,k) = r(:,i)              ! store trial position
-          CALL energy1 ( i, lt, overlap, pot1 )       ! non-bonded interactions
+          d = random_bond ( bond, stddev, d_range )         ! generate random bond length around d=bond
+          r_try(:,k) = r(:,i-1) + d * u                     ! generate trial position
+          CALL energy_1 ( r_try(:,k), i, lt, overlap, pot ) ! non-bonded interactions with earlier atoms
           IF ( overlap ) THEN
              w(k) = 0.0
           ELSE
-             w(k) = EXP(-pot1/temperature)  ! store overlap weight for this try
-             END IF
+             w(k) = EXP(-pot/temperature)  ! store overlap weight for this try
+          END IF
        END DO ! end loop over k_max tries
 
        k      = pick(w)              ! pick winning position
@@ -110,7 +116,7 @@ CONTAINS
     END DO ! end loop to regrow last m atoms, computing new weight
 
     ! New configuration and weight are complete
-    CALL energy(overlap,pot_new) ! compute energy
+    CALL energy ( overlap, pot_new ) ! compute full energy
     r_new = r
 
     ! PART 2: RECONSTRUCT OLD CONFIGURATION WITH OLD WEIGHT
@@ -129,23 +135,23 @@ CONTAINS
     DO i = n-m+1, n ! Loop to regrow last m atoms calculating old weight
 
        r_try(:,1) = r(:,i) ! store old position in try 1
-       CALL energy1 ( i, lt, overlap, pot1 )
+       CALL energy_1 ( r_try(:,1), i, lt, overlap, pot ) ! nonbonded energy with earlier atoms
        IF ( overlap ) THEN
           w(1) = 0.0 ! this should not happen
        ELSE
-          w(1) = EXP(-pot1/temperature) ! store overlap weight in try 1
-          END IF
+          w(1) = EXP(-pot/temperature) ! store overlap weight in try 1
+       END IF
 
        DO k = 2, k_max ! loop over k_max-1 other tries
           CALL random_orientation_vector ( u )
-          d = random_bond ( bond, stddev ) ! generate random bond length around d=bond
-          r(:,i) = r(:,i-1) + d*u          ! generate trial position
-          CALL energy1 ( i, lt, overlap, pot1 )
+          d = random_bond ( bond, stddev, d_range )         ! generate random bond length around d=bond
+          r_try(:,k) = r(:,i-1) + d * u                     ! generate trial position
+          CALL energy_1 ( r_try(:,k), i, lt, overlap, pot ) ! nonbonded energy with earlier atoms
           IF ( overlap ) THEN
              w(k) = 0.0
           ELSE
-             w(k) = EXP(-pot1/temperature) ! store overlap weight
-             END IF
+             w(k) = EXP(-pot/temperature) ! store overlap weight
+          END IF
        END DO ! end loop over k_max-1 other tries
 
        r(:,i) = r_try(:,1)           ! restore winning position (always the original one)
@@ -154,12 +160,13 @@ CONTAINS
     END DO ! end loop to regrow last m atoms calculating old weight
 
     ! Choose either old or new configuration
-    IF ( accept ( w_old, w_new ) ) THEN
+    CALL RANDOM_NUMBER(zeta)
+    IF ( zeta < (w_new/w_old) ) THEN ! accept
        ratio = 1.0
        r     = r_new
        pot   = pot_new
-    ELSE
-       r = r_old
+    ELSE ! reject
+       r   = r_old
        pot = pot_old
     END IF
 
@@ -202,7 +209,7 @@ CONTAINS
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
        STOP 'Error in energy'
     END IF
-    
+
     overlap  = .FALSE.
     pot      = 0.0
 
@@ -211,7 +218,7 @@ CONTAINS
        IF ( overlap ) EXIT ! jump out of loop
        pot  = pot  + pot_i
     END DO
-    
+
   END SUBROUTINE energy
 
   SUBROUTINE energy_1 ( ri, i, j_range, overlap, pot )
@@ -272,6 +279,33 @@ CONTAINS
     pot = 4.0 * pot
 
   END SUBROUTINE energy_1
+
+  FUNCTION random_bond ( bond, stddev, d_range ) RESULT ( d ) ! generate random bond length around d=bond
+    USE maths_module, ONLY : random_normal
+    REAL, INTENT(in) :: bond    ! reference bond length
+    REAL, INTENT(in) :: stddev  ! standard deviation in Gaussian
+    REAL, INTENT(in) :: d_range ! max allowed range of d
+    REAL             :: d       ! result
+
+    REAL :: zeta, d_max
+
+    ! Uses von Neumann's rejection method to sample (d**2)*exp(-0.5*(d-bond)**2/stddev**2)
+    ! The sampled distribution is the same but with d replaced by the constant d_max
+    ! Hence, the range must be restricted to d<d_max, for the rejection method to work
+    ! and we actually restrict d symmetrically about d=bond
+    ! It will be reasonably efficient provided stddev is small compared with bond
+    ! This is essentially the same method as an example in
+    ! Understanding Molecular Simulation by D Frenkel and B Smit
+
+    d_max = bond + d_range
+    DO
+       d = random_normal ( 0.0, stddev )
+       IF ( ABS(d) > d_range ) CYCLE ! reject outside range
+       d = d + bond
+       CALL RANDOM_NUMBER ( zeta )
+       IF ( zeta <= (d/d_max)**2 ) EXIT ! accept
+    END DO
+  END FUNCTION random_bond
 
 END MODULE mc_module
 

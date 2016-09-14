@@ -8,8 +8,8 @@ PROGRAM mc_chain_nvt_cbmc_lj
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
-       &                       regrow, verbose, energy, &
-       &                       n, bond, k_stretch, r
+       &                       regrow, energy, &
+       &                       n, bond, r
 
   IMPLICIT NONE
 
@@ -30,13 +30,17 @@ PROGRAM mc_chain_nvt_cbmc_lj
   ! The model is defined in mc_module
 
   ! Most important variables
-  REAL    :: temperature    ! temperature (in units of well depth)
-  real    :: k_spring                ! strength of intramolecular bond springs
-  REAL    :: move_ratio     ! acceptance ratio for regrowth moves
-  INTEGER :: m_max          ! maximum atoms in regrow
-  INTEGER :: k_max          ! number of random tries per atom in regrow
+  REAL    :: temperature ! temperature (in units of well depth)
+  REAL    :: k_spring    ! strength of intramolecular bond springs
+  REAL    :: spring_pot  ! bond spring potential energy (for averaging)
+  REAL    :: pot         ! nonbonded potential energy
+  REAL    :: potential   ! nonbonded potential energy per atom (for averaging)
+  REAL    :: move_ratio  ! acceptance ratio for regrowth moves
+  INTEGER :: m_max       ! maximum atoms in regrow
+  INTEGER :: k_max       ! number of random tries per atom in regrow
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
+  LOGICAL :: overlap
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -48,7 +52,6 @@ PROGRAM mc_chain_nvt_cbmc_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, CBMC, chain molecule'
   CALL model_description ( output_unit )
   CALL time_stamp ( output_unit )
-  wl = .FALSE. ! not using the Wang-Landau method
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -88,10 +91,12 @@ PROGRAM mc_chain_nvt_cbmc_lj
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_chain_nvt_cbmc_lj'
   END IF
-  potential = pot / REAL ( n )
+  potential  = pot / REAL ( n )
+  spring_pot = 0.5 * k_spring * SUM((r(:,1:n-1)-r(:,2:n))**2) / REAL(n)
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial potential energy', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial spring energy',    spring_pot
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'Energy' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'Energy', 'Spring' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -100,8 +105,9 @@ PROGRAM mc_chain_nvt_cbmc_lj
      DO stp = 1, nstep ! Begin loop over steps
 
         CALL regrow ( temperature, m_max, k_max, k_spring, pot, move_ratio )
-  potential = pot / REAL ( n )
-        CALL blk_add ( [move_ratio,potential] )
+        potential  = pot / REAL ( n )
+        spring_pot = 0.5 * k_spring * SUM((r(:,1:n-1)-r(:,2:n))**2) / REAL(n)
+        CALL blk_add ( [move_ratio,potential,spring_pot] )
 
      END DO ! End loop over steps
 
@@ -113,8 +119,10 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
   CALL run_end ( output_unit )
 
-  potential = pot / real(n)
+  potential  = pot / REAL(n)
+  spring_pot = 0.5 * k_spring * SUM((r(:,1:n-1)-r(:,2:n))**2) / REAL(n)
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Final potential energy', potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Final spring energy',    spring_pot
 
   CALL energy ( overlap, pot )
   IF ( overlap ) THEN ! should never happen
