@@ -59,15 +59,16 @@ CONTAINS
 
     INTEGER              :: i
     LOGICAL              :: overlap
-    REAL                 :: d, d_range, stddev, zeta
+    REAL                 :: d, d_max, stddev, zeta
     REAL,   DIMENSION(3) :: u
 
-    stddev  = SQRT(temperature / k_spring) ! spring bond standard deviation
-    d_range = 3.0*stddev                   ! impose a limit on variation
-    IF ( d_range > bond ) THEN             ! must not be too large
-       WRITE ( unit=error_unit, fmt='(a,2f15.5)' ) 'Spring bond strength error', d_range, bond
+    stddev = SQRT(temperature / k_spring) ! spring bond standard deviation
+    d_max  = 3.0*stddev                   ! impose a limit on variation, say 3*stddev
+    IF ( d_max > 0.5*bond ) THEN          ! must not be too large, say 0.5*bond
+       WRITE ( unit=error_unit, fmt='(a,2f15.5)' ) 'Spring bond strength error', d_max, bond
        STOP 'Error in regrow'
     END IF
+    d_max = d_max + bond ! this is the actual max d allowed
 
     ratio   = 0.0
     r_old   = r   ! store old configuration
@@ -99,7 +100,7 @@ CONTAINS
 
        DO k = 1, k_max ! loop over k_max tries
           CALL random_orientation_vector ( u )
-          d = random_bond ( bond, stddev, d_range )         ! generate random bond length around d=bond
+          d = random_bond ( bond, stddev, d_max )         ! generate random bond length around d=bond
           r_try(:,k) = r(:,i-1) + d * u                     ! generate trial position
           CALL energy_1 ( r_try(:,k), i, lt, overlap, pot ) ! non-bonded interactions with earlier atoms
           IF ( overlap ) THEN
@@ -144,7 +145,7 @@ CONTAINS
 
        DO k = 2, k_max ! loop over k_max-1 other tries
           CALL random_orientation_vector ( u )
-          d = random_bond ( bond, stddev, d_range )         ! generate random bond length around d=bond
+          d = random_bond ( bond, stddev, d_max )         ! generate random bond length around d=bond
           r_try(:,k) = r(:,i-1) + d * u                     ! generate trial position
           CALL energy_1 ( r_try(:,k), i, lt, overlap, pot ) ! nonbonded energy with earlier atoms
           IF ( overlap ) THEN
@@ -280,28 +281,25 @@ CONTAINS
 
   END SUBROUTINE energy_1
 
-  FUNCTION random_bond ( bond, stddev, d_range ) RESULT ( d ) ! generate random bond length around d=bond
+  FUNCTION random_bond ( bond, stddev, d_max ) RESULT ( d ) ! generate random bond length around d=bond
     USE maths_module, ONLY : random_normal
-    REAL, INTENT(in) :: bond    ! reference bond length
-    REAL, INTENT(in) :: stddev  ! standard deviation in Gaussian
-    REAL, INTENT(in) :: d_range ! max allowed range of d
-    REAL             :: d       ! result
+    REAL, INTENT(in) :: bond   ! reference bond length
+    REAL, INTENT(in) :: stddev ! standard deviation in Gaussian
+    REAL, INTENT(in) :: d_max  ! max allowed value of d
+    REAL             :: d      ! result
 
-    REAL :: zeta, d_max
+    REAL :: zeta
 
     ! Uses von Neumann's rejection method to sample (d**2)*exp(-0.5*(d-bond)**2/stddev**2)
     ! The sampled distribution is the same but with d replaced by the constant d_max
     ! Hence, the range must be restricted to d<d_max, for the rejection method to work
-    ! and we actually restrict d symmetrically about d=bond
     ! It will be reasonably efficient provided stddev is small compared with bond
     ! This is essentially the same method as an example in
     ! Understanding Molecular Simulation by D Frenkel and B Smit
 
-    d_max = bond + d_range
     DO
-       d = random_normal ( 0.0, stddev )
-       IF ( ABS(d) > d_range ) CYCLE ! reject outside range
-       d = d + bond
+       d = random_normal ( bond, stddev )
+       IF ( d < 0.0 .OR. d > d_max ) CYCLE ! reject outside range
        CALL RANDOM_NUMBER ( zeta )
        IF ( zeta <= (d/d_max)**2 ) EXIT ! accept
     END DO
