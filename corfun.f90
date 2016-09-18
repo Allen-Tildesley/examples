@@ -8,13 +8,20 @@ PROGRAM corfun
 
   IMPLICIT NONE
   INCLUDE 'fftw3.f03'
-  !
-  ! TODO MPA nearly done: normalization (which will include a t-dependent part) still needs fixing
 
   ! Define underlying process by generalized Langevin equation
   ! with memory function expressed as sum of exponentials
   ! see G Ciccotti and JP Ryckaert Mol Phys 40 141 (1980)
   ! and AD Baczewski and SD Bond J Chem Phys 139 044107 (2013)
+
+  ! We assume that the program is linked with the FFTW library (version 3)
+  ! but it could easily be adapted to use a different library
+  ! With older FFT routines it was necessary to transform a number of points = exact power of 2
+  ! which, for us, would mean nstep = 2**j (for integer j) and fft_len=2*nstep
+  ! This is no longer true, so we do not restrict nstep in this way,
+  ! but the transform should be more efficient if nstep happens to take such values
+  ! Advantage can be taken of the fact that the data is real, but for clarity
+  ! we just use the complex FFT with imaginary parts of the data set to zero
 
   INTEGER                            :: np    ! number of memory function terms
   REAL,    DIMENSION(:), ALLOCATABLE :: m     ! memory function coefficients (np)
@@ -25,10 +32,11 @@ PROGRAM corfun
   REAL,    DIMENSION(:), ALLOCATABLE :: s     ! GLE auxiliary variables
   REAL                               :: delta ! time step
   REAL                               :: vt    ! velocity at time t
-  REAL,    DIMENSION(:), ALLOCATABLE :: v     ! stored velocities (0:nstep)
+  REAL,    DIMENSION(:), ALLOCATABLE :: v     ! stored velocities (nstep)
   REAL,    DIMENSION(:), ALLOCATABLE :: v0    ! stored velocity origins (n0)
   INTEGER, DIMENSION(:), ALLOCATABLE :: t0    ! times of origins (n0)
-  REAL,    DIMENSION(:), ALLOCATABLE :: c     ! velocity correlation function (0:nt)
+  REAL,    DIMENSION(:), ALLOCATABLE :: c     ! velocity correlation function (direct method) (0:nt)
+  REAL,    DIMENSION(:), ALLOCATABLE :: c_fft ! velocity correlation function (FFT method) (0:nt)
   REAL,    DIMENSION(:), ALLOCATABLE :: n     ! normalizing function (0:nt)
 
   INTEGER :: nt              ! number of timesteps to correlate
@@ -40,20 +48,22 @@ PROGRAM corfun
   LOGICAL :: full
   INTEGER :: k, mk, nk
   INTEGER :: unit, ioerr
-  REAL    :: temperature, stddev
+  REAL    :: temperature, stddev, cpu_1, cpu_2, cpu_3, cpu_4
 
   INTEGER(C_INT)                                       :: fft_len         ! the number of points for FFT
-  COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_in, fft_out ! Contains the data to be transformed (0:nstep2)
+  COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_in, fft_out ! data to be transformed (0:fft_len-1)
   TYPE(C_PTR)                                          :: fft_plan        ! plan needed for FFTW
+
+  INTEGER, PARAMETER :: nequil = 10000 ! number of equilibration timesteps
 
   NAMELIST /nml/ nt, origin_interval, nstep, delta
 
   ! Example default values
-  nt              = 1000
-  origin_interval = 10 
-  nstep           = 1000000
-  delta           = 0.01
-  temperature     = 1.0
+  nt              = 1000  ! max time for correlation function
+  origin_interval = 1     ! This could reasonably be increased to 10 or 20 
+  nstep           = 2**20 ! number of steps, about a million for example
+  delta           = 0.01  ! timestep for simulation
+  temperature     = 1.0   ! temperature for simulation
 
   ! Namelist from standard input
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
@@ -73,9 +83,10 @@ PROGRAM corfun
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'temperature = ',               temperature
   stddev = SQRT(2.0*temperature)
 
-  ALLOCATE ( v(0:nstep), v0(n0), t0(n0) )
-  ALLOCATE ( c(0:nt), n(0:nt) )
-  ALLOCATE ( fft_in(0:2*nstep), fft_out(0:2*nstep) )
+  ALLOCATE ( v(nstep), v0(n0), t0(n0) )
+  ALLOCATE ( c(0:nt), c_fft(0:nt), n(0:nt) )
+  fft_len = 2*nstep ! actual length of data
+  ALLOCATE ( fft_in(0:fft_len-1), fft_out(0:fft_len-1) )
 
   ! The memory function model is defined here
   ! Values used by Baczewski and Bond in their Np=1 example are
@@ -96,32 +107,34 @@ PROGRAM corfun
   WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'theta(p) coefficients ',       theta
   WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'alpha(p) coefficients ',       alpha
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Data generation'
+  ! Data generation
+  CALL CPU_TIME ( cpu_1 )
 
   ! Initial values
-  vt   = 0.0
-  s    = 0.0
-  v(0) = vt
+  vt = 0.0
+  s  = 0.0
 
-  DO t = 1, nstep
+  DO t = -nequil, nstep ! include an equilibration period
      vt = vt + 0.5*delta*SUM(s)
      CALL random_normals ( 0.0, stddev, zeta )
      s    = theta*s - (1.0-theta)*m*vt + alpha*SQRT(m)*zeta
      vt   = vt + 0.5*delta*SUM(s)
-     v(t) = vt ! store velocities
+     IF ( t >= 1 ) v(t) = vt ! store velocities
   END DO
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Data analysis'
+  CALL CPU_TIME ( cpu_2 )
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'CPU time to generate data = ', cpu_2-cpu_1
+
+  ! Data analysis (direct method)
 
   c(:) = 0.0
   n(:) = 0.0
-  t    = 0 ! time of each velocity
   mk   = 0 ! storage location of time origin
   full = .FALSE.
 
-  DO t = 0, nstep ! main loop correlating data
+  DO t = 1, nstep ! main loop correlating data
 
-     IF ( MOD(t,origin_interval) == 0 ) THEN
+     IF ( MOD(t-1,origin_interval) == 0 ) THEN
         mk = mk + 1
         IF ( mk > n0 ) THEN
            full = .TRUE.
@@ -148,16 +161,19 @@ PROGRAM corfun
   END DO  ! End main loop correlating data
   c(:) = c(:) / n(:) ! normalise
 
+  CALL CPU_TIME ( cpu_3 )
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'CPU time for direct method = ', cpu_3-cpu_2
+
+  ! Data analysis (FFT method)
+
   ! Prepare data for FFT
-  fft_len         = 2*nstep+1         ! actual length of data
-  fft_in          = CMPLX(0.0,0.0)    ! fill input array with zeros
-  fft_in(0:nstep) = CMPLX(v(0:nstep)) ! put data into first part (real only)
+  fft_in            = CMPLX(0.0,0.0) ! fill input array with zeros
+  fft_in(0:nstep-1) = CMPLX(v)       ! put data into first part (real only)
 
   ! Forward FFT
   fft_plan = fftw_plan_dft_1d ( fft_len, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE) ! set up plan
   CALL fftw_execute_dft ( fft_plan, fft_in, fft_out )                                  ! execute FFT
   CALL fftw_destroy_plan ( fft_plan )                                                  ! release plan
-  fft_out = fft_out / REAL(nstep) ! normalize
 
   fft_out = fft_out * CONJG ( fft_out ) ! square modulus
 
@@ -165,6 +181,13 @@ PROGRAM corfun
   fft_plan = fftw_plan_dft_1d ( fft_len, fft_out, fft_in, FFTW_BACKWARD, FFTW_ESTIMATE) ! set up plan
   CALL fftw_execute_dft ( fft_plan, fft_out, fft_in )                                   ! execute FFT
   CALL fftw_destroy_plan ( fft_plan )                                                   ! release plan
+
+  fft_in = fft_in / REAL ( fft_len ) ! normalization factor associated with FFT itself
+  n(:)   = [ ( nstep-t, t = 0, nt ) ]
+  c_fft  = REAL ( fft_in(0:nt) ) / n(:) ! normalization associated with time origins
+
+  CALL CPU_TIME ( cpu_4 )
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'CPU time for FFT method = ', cpu_4-cpu_3
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'Output to corfun.out'
 
@@ -175,10 +198,14 @@ PROGRAM corfun
   END IF
 
   DO t = 0, nt
-     WRITE ( unit=unit, fmt='(i10,3f15.8)' ) t, c(t), REAL(fft_in(t)), c_exact(t*delta)
+     WRITE ( unit=unit, fmt='(i10,3f15.8)' ) t, c(t), c_fft(t), c_exact(t*delta)
   END DO
 
   CLOSE(unit=unit)
+
+  DEALLOCATE ( v, v0, t0, c, c_fft, n )
+  DEALLOCATE ( fft_in, fft_out )
+  DEALLOCATE ( m, kappa, theta, alpha, zeta, s )
 
 CONTAINS
 
