@@ -1,37 +1,59 @@
 ! corfun.f90
 ! Time correlation function, directly and by FFT
 PROGRAM corfun
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+  USE, INTRINSIC :: iso_c_binding
+
+  USE maths_module, ONLY : random_normals
+
+  IMPLICIT NONE
+  INCLUDE 'fftw3.f03'
   !
-  ! TODO MPA provide code
+  ! TODO MPA nearly done: normalization (which will include a t-dependent part) still needs fixing
 
   ! Define underlying process by generalized Langevin equation
   ! with memory function expressed as sum of exponentials
   ! see G Ciccotti and JP Ryckaert Mol Phys 40 141 (1980)
   ! and AD Baczewski and SD Bond J Chem Phys 139 044107 (2013)
 
-  integer                         :: nk    ! number of memory function terms
-  real, dimension(:), allocatable :: c     ! memory function coefficients (nk)
-  real, dimension(:), allocatable :: tau   ! memory function decay times (nk)
-  real, dimension(:), allocatable :: theta ! auxiliary coefficient (nk)
-  real, dimension(:), allocatable :: alpha ! auxiliary coefficient (nk)
-  real, dimension(:), allocatable :: zeta  ! random numbers
-  real, dimension(:), allocatable :: s     ! GLE auxiliary variables
-  real                            :: delta ! time step
-  real                            :: vt    ! velocity at time t
-  real, dimension(:), allocatable :: v     ! stored velocities (0:nstep)
-  REAL, DIMENSION(:), ALLOCATABLE :: vacf  ! velocity correlation function (0:nt)
+  INTEGER                            :: np    ! number of memory function terms
+  REAL,    DIMENSION(:), ALLOCATABLE :: m     ! memory function coefficients (np)
+  REAL,    DIMENSION(:), ALLOCATABLE :: kappa ! memory function decay rates (np)
+  REAL,    DIMENSION(:), ALLOCATABLE :: theta ! auxiliary coefficient (np)
+  REAL,    DIMENSION(:), ALLOCATABLE :: alpha ! auxiliary coefficient (np)
+  REAL,    DIMENSION(:), ALLOCATABLE :: zeta  ! random numbers
+  REAL,    DIMENSION(:), ALLOCATABLE :: s     ! GLE auxiliary variables
+  REAL                               :: delta ! time step
+  REAL                               :: vt    ! velocity at time t
+  REAL,    DIMENSION(:), ALLOCATABLE :: v     ! stored velocities (0:nstep)
+  REAL,    DIMENSION(:), ALLOCATABLE :: v0    ! stored velocity origins (n0)
+  INTEGER, DIMENSION(:), ALLOCATABLE :: t0    ! times of origins (n0)
+  REAL,    DIMENSION(:), ALLOCATABLE :: c     ! velocity correlation function (0:nt)
+  REAL,    DIMENSION(:), ALLOCATABLE :: n     ! normalizing function (0:nt)
 
   INTEGER :: nt              ! number of timesteps to correlate
+  INTEGER :: nstep           ! number of timesteps in run
   INTEGER :: n0              ! number of time origins to store
   INTEGER :: origin_interval ! interval for time origins
   INTEGER :: dt              ! time difference
   INTEGER :: t               ! time (equivalent to step number in file)
+  LOGICAL :: full
+  INTEGER :: k, mk, nk
+  INTEGER :: unit, ioerr
+  REAL    :: temperature, stddev
 
-  NAMELIST /nml/ nt, origin_interval, nstep
+  INTEGER(C_INT)                                       :: fft_len         ! the number of points for FFT
+  COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_in, fft_out ! Contains the data to be transformed (0:nstep2)
+  TYPE(C_PTR)                                          :: fft_plan        ! plan needed for FFTW
+
+  NAMELIST /nml/ nt, origin_interval, nstep, delta
 
   ! Example default values
   nt              = 1000
   origin_interval = 10 
+  nstep           = 1000000
+  delta           = 0.01
+  temperature     = 1.0
 
   ! Namelist from standard input
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
@@ -43,43 +65,59 @@ PROGRAM corfun
   END IF
 
   n0 = nt / origin_interval + 1
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'number of steps in run = ',    nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'max correlation time nt = ',   nt
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'origin interval = ',           origin_interval
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'number of time origins n0 = ', n0
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'time step delta = ',           delta
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'temperature = ',               temperature
+  stddev = SQRT(2.0*temperature)
 
-  nstep = 100000
   ALLOCATE ( v(0:nstep), v0(n0), t0(n0) )
-  ALLOCATE ( vacf(0:nt), norm(0:nt) )
+  ALLOCATE ( c(0:nt), n(0:nt) )
+  ALLOCATE ( fft_in(0:2*nstep), fft_out(0:2*nstep) )
 
-  ! Decide on model and allocate arrays
-  nk = 1
-  allocate ( c(nk), tau(nk), theta(nk), alpha(nk), zeta, s(nk) )
-  ! Values used by Baczewski and Bond are c=tau=1 (underdamped) 0.5 (critically damped) and 0.25 (overdamped)
-  c(1) = 1.0
-  tau(1) = 1.0
-  
-  delta = 0.01
-  temperature = 1.0
-  stddev = sqrt(2.0*temperature)
-  
-  theta = exp(-delta/tau)
-  alpha = sqrt((1.0-theta**2)/(2.0*tau))
+  ! The memory function model is defined here
+  ! Values used by Baczewski and Bond in their Np=1 example are
+  ! (m,kappa)
+  ! (1.0,1.0)  (underdamped)
+  ! (0.5,2.0)  (critically damped)
+  ! (0.25,4.0) (overdamped)
+  np       = 1
+  ALLOCATE ( m(np), kappa(np), theta(np), alpha(np), zeta(np), s(np) )
+  m(1)     = 1.0
+  kappa(1) = 1.0
+  theta = EXP(-delta*kappa)
+  alpha = SQRT( (1.0-theta**2)*kappa/2.0 )
+
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'      ) 'number of terms in mem func ', np
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'm(p)     coefficients ',       m
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'kappa(p) coefficients ',       kappa
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'theta(p) coefficients ',       theta
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'alpha(p) coefficients ',       alpha
+
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Data generation'
 
   ! Initial values
-  vt = 0.0
-  s = 0.0
+  vt   = 0.0
+  s    = 0.0
   v(0) = vt
 
-  do t = 1, nstep
-     vt = vt + 0.5*delta*sum(s)
-     call random_normals ( 0.0, stddev, zeta )
-     s = theta*s - (1.0-theta)*c*vt + alpha*sqrt(c)*zeta
-     vt = vt + 0.5*delta*sum(s)
+  DO t = 1, nstep
+     vt = vt + 0.5*delta*SUM(s)
+     CALL random_normals ( 0.0, stddev, zeta )
+     s    = theta*s - (1.0-theta)*m*vt + alpha*SQRT(m)*zeta
+     vt   = vt + 0.5*delta*SUM(s)
      v(t) = vt ! store velocities
-  end do
+  END DO
 
-  vacf(:) = 0.0
-  norm(:) = 0.0
-  t       = 0 ! time of each velocity
-  mk      = 0 ! storage location of time origin
-  full    = .FALSE.
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Data analysis'
+
+  c(:) = 0.0
+  n(:) = 0.0
+  t    = 0 ! time of each velocity
+  mk   = 0 ! storage location of time origin
+  full = .FALSE.
 
   DO t = 0, nstep ! main loop correlating data
 
@@ -102,29 +140,84 @@ PROGRAM corfun
      DO k = 1, nk
         dt = t - t0(k)
         IF ( dt >= 0 .AND. dt <= nt ) THEN
-           vacf(dt) = vacf(dt) + v(t) * v0(k) ! increment correlation function
-           norm(dt) = norm(dt) + 1.0          ! increment normalizing factor
+           c(dt) = c(dt) + v(t) * v0(k) ! increment correlation function
+           n(dt) = n(dt) + 1.0          ! increment normalizing factor
         END IF
      END DO
 
   END DO  ! End main loop correlating data
-  vacf(:) = vacf(:) / norm(:) ! normalise correlation function
+  c(:) = c(:) / n(:) ! normalise
+
+  ! Prepare data for FFT
+  fft_len         = 2*nstep+1         ! actual length of data
+  fft_in          = CMPLX(0.0,0.0)    ! fill input array with zeros
+  fft_in(0:nstep) = CMPLX(v(0:nstep)) ! put data into first part (real only)
+
+  ! Forward FFT
+  fft_plan = fftw_plan_dft_1d ( fft_len, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE) ! set up plan
+  CALL fftw_execute_dft ( fft_plan, fft_in, fft_out )                                  ! execute FFT
+  CALL fftw_destroy_plan ( fft_plan )                                                  ! release plan
+  fft_out = fft_out / REAL(nstep) ! normalize
+
+  fft_out = fft_out * CONJG ( fft_out ) ! square modulus
+
+  ! Reverse FFT
+  fft_plan = fftw_plan_dft_1d ( fft_len, fft_out, fft_in, FFTW_BACKWARD, FFTW_ESTIMATE) ! set up plan
+  CALL fftw_execute_dft ( fft_plan, fft_out, fft_in )                                   ! execute FFT
+  CALL fftw_destroy_plan ( fft_plan )                                                   ! release plan
+
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Output to corfun.out'
+
+  OPEN ( newunit=unit, file='corfun.out', status='replace', iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening file', ioerr
+     STOP 'Error in corfun'
+  END IF
 
   DO t = 0, nt
-     WRITE ( unit=output_unit, fmt='(i10,f15.8)' ) t, vacf(t)
+     WRITE ( unit=unit, fmt='(i10,3f15.8)' ) t, c(t), REAL(fft_in(t)), c_exact(t*delta)
   END DO
 
-contains
+  CLOSE(unit=unit)
 
-  function vacf_exact ( t ) result ( vacf )
-    real, intent(in) :: t
-    real             :: vacf
+CONTAINS
+
+  FUNCTION c_exact ( t ) RESULT ( c )
+    REAL, INTENT(in) :: t
+    REAL             :: c
+
+    REAL :: del, omega, kp, km, cp, cm
 
     ! in general the exact correlation function may be obtained from the inverse Laplace transform
-    ! vacf(s) = temperature / ( s + memory(s) ) where
-    ! memory(s) = sum_k c_k / (s+tau_k) from the Laplace transform of a decaying exponential
-    ! and this is expressed as a 
-  end function vacf_exact
-  
+    ! C(s) = (kT/m) * 1 / ( s + M(s) ) where both C(t) and M(t) are sums of exponentials in t
+    ! M(s) = sum_p m_p*kappa_p / (s+kappa_p) p = 1..Np (note amplitude mp*kappa_p)
+    ! C(s) = sum_p c_p / (s+k_p) p = 1..Np+1
+    ! The coefficients c_p and k_p may be determined in terms of the m_p and kappa_p
+    ! by solving an equation of order Np+1 and using partial fractions
+    ! Here we just do this for the simplest case Np=1
+
+    IF ( np > 1 ) THEN
+       c = 0.0
+       RETURN
+    END IF
+
+    IF ( kappa(1) > 4.0 * m(1) ) THEN
+
+       ! Real roots
+       del = SQRT ( 0.25*kappa(1)**2 - m(1)*kappa(1) )
+       kp    = 0.5*kappa(1) + del
+       km    = 0.5*kappa(2) - del
+       cp    = -km/(kp-km)
+       cm    =  kp/(kp-km)
+       c     = cp*EXP(-kp*t) + cm*EXP(-km*t)
+    ELSE
+
+       ! Complex roots
+       omega = SQRT ( m(1)*kappa(1) - 0.25*kappa(1)**2 )
+       c     = EXP(-0.5*kappa(1)*t) * ( COS(omega*t) + (0.5*kappa(1)/omega)*SIN(omega*t) )
+    END IF
+
+  END FUNCTION c_exact
+
 END PROGRAM corfun
 
