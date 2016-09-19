@@ -4,13 +4,13 @@ PROGRAM corfun
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE, INTRINSIC :: iso_c_binding
 
-  USE maths_module, ONLY : random_normals
+  USE maths_module, ONLY : random_normal
 
   IMPLICIT NONE
   INCLUDE 'fftw3.f03'
 
   ! Define underlying process by generalized Langevin equation
-  ! with memory function expressed as sum of exponentials
+  ! with memory function expressed as a decaying exponential function
   ! see G Ciccotti and JP Ryckaert Mol Phys 40 141 (1980)
   ! and AD Baczewski and SD Bond J Chem Phys 139 044107 (2013)
 
@@ -23,15 +23,15 @@ PROGRAM corfun
   ! Advantage can be taken of the fact that the data is real, but for clarity
   ! we just use the complex FFT with imaginary parts of the data set to zero
 
-  INTEGER                            :: np    ! number of memory function terms
-  REAL,    DIMENSION(:), ALLOCATABLE :: m     ! memory function coefficients (np)
-  REAL,    DIMENSION(:), ALLOCATABLE :: kappa ! memory function decay rates (np)
-  REAL,    DIMENSION(:), ALLOCATABLE :: theta ! auxiliary coefficient (np)
-  REAL,    DIMENSION(:), ALLOCATABLE :: alpha ! auxiliary coefficient (np)
-  REAL,    DIMENSION(:), ALLOCATABLE :: zeta  ! random numbers
-  REAL,    DIMENSION(:), ALLOCATABLE :: s     ! GLE auxiliary variables
-  REAL                               :: delta ! time step
-  REAL                               :: vt    ! velocity at time t
+  REAL :: m     ! memory function coefficients
+  REAL :: kappa ! memory function decay rates
+  REAL :: theta ! auxiliary coefficient
+  REAL :: alpha ! auxiliary coefficient
+  REAL :: zeta  ! random numbers
+  REAL :: s     ! GLE auxiliary variables
+  REAL :: delta ! time step
+  REAL :: vt    ! velocity at time t
+
   REAL,    DIMENSION(:), ALLOCATABLE :: v     ! stored velocities (nstep)
   REAL,    DIMENSION(:), ALLOCATABLE :: v0    ! stored velocity origins (n0)
   INTEGER, DIMENSION(:), ALLOCATABLE :: t0    ! times of origins (n0)
@@ -41,6 +41,7 @@ PROGRAM corfun
 
   INTEGER :: nt              ! number of timesteps to correlate
   INTEGER :: nstep           ! number of timesteps in run
+  INTEGER :: nequil          ! number of equilibration timesteps
   INTEGER :: n0              ! number of time origins to store
   INTEGER :: origin_interval ! interval for time origins
   INTEGER :: dt              ! time difference
@@ -54,14 +55,14 @@ PROGRAM corfun
   COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_in, fft_out ! data to be transformed (0:fft_len-1)
   TYPE(C_PTR)                                          :: fft_plan        ! plan needed for FFTW
 
-  INTEGER, PARAMETER :: nequil = 10000 ! number of equilibration timesteps
-
-  NAMELIST /nml/ nt, origin_interval, nstep, delta
+  NAMELIST /nml/ nt, origin_interval, nstep, nequil, delta, temperature
 
   ! Example default values
+  ! Agreement (to numerical precision) of direct and FFT methods is expected if origin_interval=1
   nt              = 1000  ! max time for correlation function
-  origin_interval = 1     ! This could reasonably be increased to 10 or 20 
+  origin_interval = 1     ! This could reasonably be increased to 10 or 20 to improve efficiency
   nstep           = 2**20 ! number of steps, about a million for example
+  nequil          = 10000 ! number of equilibration timesteps
   delta           = 0.01  ! timestep for simulation
   temperature     = 1.0   ! temperature for simulation
 
@@ -76,6 +77,7 @@ PROGRAM corfun
 
   n0 = nt / origin_interval + 1
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'number of steps in run = ',    nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'equilibration steps = ',       nequil
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'max correlation time nt = ',   nt
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'origin interval = ',           origin_interval
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'number of time origins n0 = ', n0
@@ -89,23 +91,19 @@ PROGRAM corfun
   ALLOCATE ( fft_in(0:fft_len-1), fft_out(0:fft_len-1) )
 
   ! The memory function model is defined here
-  ! Values used by Baczewski and Bond in their Np=1 example are
+  ! Values used by Baczewski and Bond in their example are
   ! (m,kappa)
   ! (1.0,1.0)  (underdamped)
   ! (0.5,2.0)  (critically damped)
   ! (0.25,4.0) (overdamped)
-  np       = 1
-  ALLOCATE ( m(np), kappa(np), theta(np), alpha(np), zeta(np), s(np) )
-  m(1)     = 1.0
-  kappa(1) = 1.0
+  m     = 1.0
+  kappa = 1.0
   theta = EXP(-delta*kappa)
   alpha = SQRT( (1.0-theta**2)*kappa/2.0 )
-
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'      ) 'number of terms in mem func ', np
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'm(p)     coefficients ',       m
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'kappa(p) coefficients ',       kappa
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'theta(p) coefficients ',       theta
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'alpha(p) coefficients ',       alpha
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'm ',     m
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'kappa ', kappa
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'theta ', theta
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'alpha ', alpha
 
   ! Data generation
   CALL CPU_TIME ( cpu_1 )
@@ -115,10 +113,10 @@ PROGRAM corfun
   s  = 0.0
 
   DO t = -nequil, nstep ! include an equilibration period
-     vt = vt + 0.5*delta*SUM(s)
-     CALL random_normals ( 0.0, stddev, zeta )
+     vt = vt + 0.5*delta*s
+     zeta = random_normal ( 0.0, stddev )
      s    = theta*s - (1.0-theta)*m*vt + alpha*SQRT(m)*zeta
-     vt   = vt + 0.5*delta*SUM(s)
+     vt   = vt + 0.5*delta*s
      IF ( t >= 1 ) v(t) = vt ! store velocities
   END DO
 
@@ -205,17 +203,19 @@ PROGRAM corfun
 
   DEALLOCATE ( v, v0, t0, c, c_fft, n )
   DEALLOCATE ( fft_in, fft_out )
-  DEALLOCATE ( m, kappa, theta, alpha, zeta, s )
 
 CONTAINS
 
   FUNCTION c_exact ( t ) RESULT ( c )
-    REAL, INTENT(in) :: t
-    REAL             :: c
+    IMPLICIT NONE
+
+    REAL, INTENT(in) :: t ! time argument
+    REAL             :: c ! result
 
     REAL :: del, omega, kp, km, cp, cm
 
-    ! in general the exact correlation function may be obtained from the inverse Laplace transform
+    ! See AD Baczewski and SD Bond J Chem Phys 139 044107 (2013)
+    ! In general the exact correlation function may be obtained from the inverse Laplace transform
     ! C(s) = (kT/m) * 1 / ( s + M(s) ) where both C(t) and M(t) are sums of exponentials in t
     ! M(s) = sum_p m_p*kappa_p / (s+kappa_p) p = 1..Np (note amplitude mp*kappa_p)
     ! C(s) = sum_p c_p / (s+k_p) p = 1..Np+1
@@ -223,25 +223,20 @@ CONTAINS
     ! by solving an equation of order Np+1 and using partial fractions
     ! Here we just do this for the simplest case Np=1
 
-    IF ( np > 1 ) THEN
-       c = 0.0
-       RETURN
-    END IF
-
-    IF ( kappa(1) > 4.0 * m(1) ) THEN
+    IF ( kappa > 4.0 * m ) THEN
 
        ! Real roots
-       del = SQRT ( 0.25*kappa(1)**2 - m(1)*kappa(1) )
-       kp    = 0.5*kappa(1) + del
-       km    = 0.5*kappa(2) - del
-       cp    = -km/(kp-km)
-       cm    =  kp/(kp-km)
-       c     = cp*EXP(-kp*t) + cm*EXP(-km*t)
+       del = SQRT ( 0.25*kappa**2 - m*kappa )
+       kp  = 0.5*kappa + del
+       km  = 0.5*kappa - del
+       cp  = -km/(kp-km)
+       cm  =  kp/(kp-km)
+       c   = cp*EXP(-kp*t) + cm*EXP(-km*t)
     ELSE
 
        ! Complex roots
-       omega = SQRT ( m(1)*kappa(1) - 0.25*kappa(1)**2 )
-       c     = EXP(-0.5*kappa(1)*t) * ( COS(omega*t) + (0.5*kappa(1)/omega)*SIN(omega*t) )
+       omega = SQRT ( m*kappa - 0.25*kappa**2 )
+       c     = EXP(-0.5*kappa*t) * ( COS(omega*t) + (0.5*kappa/omega)*SIN(omega*t) )
     END IF
 
   END FUNCTION c_exact

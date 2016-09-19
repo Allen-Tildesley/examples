@@ -32,7 +32,7 @@ PROGRAM t_tensor
   WRITE ( unit=output_unit, fmt='(a)' ) 'using T-tensors and Euler angles'
 
   ! Initialize random number generator                          
-  CALL init_random_seed()
+  CALL init_random_seed
 
   ! Choose orientations at random
   CALL random_orientation_vector ( e1 )

@@ -30,6 +30,7 @@ variants['build_dpd']                  = (['dpd.f90','dpd_module.f90','config_io
 variants['build_cluster']              = (['cluster.f90','config_io_module.f90'],env_normal)
 variants['build_corfun']               = (['corfun.f90','maths_module.f90'],env_fftw)
 variants['build_diffusion']            = (['diffusion.f90','config_io_module.f90'],env_normal)
+variants['build_error']                = (['error.f90','maths_module.f90'],env_normal)
 variants['build_fft3dwrap']            = (['fft3dwrap.f90'],env_fftw)
 variants['build_hit_and_miss']         = (['hit_and_miss.f90'],env_normal)
 variants['build_initialize']           = (['initialize.f90','initialize_module.f90','config_io_module.f90','maths_module.f90'],env_normal)

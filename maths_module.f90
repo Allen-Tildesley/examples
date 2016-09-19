@@ -49,7 +49,7 @@ CONTAINS
   ! being generated every time. The routines below are intended to generate different
   ! sequences on different calls.
   ! YOU SHOULD INVESTIGATE THE BEHAVIOUR FOR YOUR OWN COMPILER AND MACHINE IMPLEMENTATION 
-  SUBROUTINE init_random_seed()
+  SUBROUTINE init_random_seed
     USE iso_fortran_env, ONLY: int64
     IMPLICIT NONE
     INTEGER, ALLOCATABLE :: seed(:)

@@ -22,7 +22,7 @@ PROGRAM test_pot_linear
   INTEGER, PARAMETER   :: ntry = 1000
 
   ! Initialize random number generator                          
-  CALL init_random_seed()
+  CALL init_random_seed
 
   ! Make a number of attempts to place the atoms
   ok = .FALSE.
