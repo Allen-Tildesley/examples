@@ -23,13 +23,12 @@ PROGRAM error
   REAL :: delta ! time step
   REAL :: vt    ! velocity at time t
 
-  REAL, DIMENSION(:), ALLOCATABLE :: v     ! stored velocities (nstep)
-  REAL, DIMENSION(:), ALLOCATABLE :: a     ! working copy of stored velocities (nstep)
+  REAL, DIMENSION(:), ALLOCATABLE :: a     ! stored data values (nstep)
 
   INTEGER :: nstep           ! number of timesteps in run
   INTEGER :: nequil          ! number of equilibration timesteps
   INTEGER :: t               ! time (equivalent to step number in file)
-  INTEGER :: ioerr, dt, n, i_repeat
+  INTEGER :: ioerr, tblock, i_repeat, nblock, blk, stp1, stp2
   REAL    :: average, variance, stddev, err, si, tcor, a_val, a_avg, a_var, a_var_1, a_err
 
   INTEGER, PARAMETER :: n_repeat = 50 ! number of simulation repeats for brute force empirical calculation
@@ -59,7 +58,7 @@ PROGRAM error
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'desired variance = ',       variance
   stddev = SQRT(2.0*variance) ! NB stddev of random forces, not data
 
-  ALLOCATE ( v(nstep), a(nstep) )
+  ALLOCATE ( a(nstep) )
 
   ! The memory function model is defined here
   ! Values used by Baczewski and Bond in their example are
@@ -77,10 +76,13 @@ PROGRAM error
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'theta ', theta
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'alpha ', alpha
 
-  ! Give exactly-known results for this process
+  ! For this process, the results of interest can be calculated exactly
+  ! The time correlation function is known, and hence the statistical inefficiency (SI)
+  ! From this, the error in the mean for a run of any length can be calculated
+
   tcor = 1.0/m        ! Correlation time is determined by memory function
   tcor = tcor / delta ! express in timesteps
-  si   = 2*tcor       ! Statistical inefficiency
+  si   = 2*tcor       ! Statistical inefficiency (SI)
   err  = SQRT(si*variance/REAL(nstep))
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Exact correlation time in steps = ', tcor
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Run length / correlation time = ',   REAL(nstep) / tcor
@@ -90,12 +92,12 @@ PROGRAM error
   ! Data generation
   CALL init_random_seed
 
-  ! For comparison, we do n_repeat independent runs and calculate
-  ! the variation in run averages directly from these
-  ! This is to give an idea of the distribution from which the run average is sampled
+  ! For comparison, we do n_repeat independent runs and estimate the error in run averages directly from these
+  ! This is to give an empirical idea of the distribution from which the run average is sampled
+  ! Of course, we expect the results to be similar to the exact values just calculated
   
-  a_avg = 0.0
-  a_var = 0.0
+  a_avg = 0.0 ! zero average accumulator
+  a_var = 0.0 ! zero mean-squared accumulator
 
   DO i_repeat = 1, n_repeat ! loop over repeats of simulation
 
@@ -108,57 +110,89 @@ PROGRAM error
         zeta = random_normal ( 0.0, stddev )
         s  = theta*s - (1.0-theta)*m*vt + alpha*SQRT(m)*zeta
         vt = vt + 0.5*delta*s
-        IF ( t >= 1 ) v(t) = average + vt ! store velocities (adding average)
+        IF ( t >= 1 ) a(t) = average + vt ! store values (adding average)
      END DO
 
-     a_val = SUM(v) / REAL(nstep) ! the run average
-     a_avg = a_avg + a_val
-     a_var = a_var + a_val**2
+     a_val = SUM(a) / REAL(nstep) ! the run average
+     a_avg = a_avg + a_val        ! average over runs
+     a_var = a_var + a_val**2     ! mean squared value over runs
 
   END DO ! end loop over repeats of simulation
 
-  a_avg = a_avg / REAL(n_repeat)
-  a_var = a_var / REAL(n_repeat)
-  a_var = a_var - a_avg**2
+  a_avg = a_avg / REAL(n_repeat)                  ! mean value
+  a_var = a_var / REAL(n_repeat)                  ! mean-squared value
+  a_var = a_var - a_avg**2                        ! mean-squared deviation
   a_var = a_var * REAL(n_repeat)/REAL(n_repeat-1) ! bias correction
-  err   = SQRT(a_var) ! empirical standard deviation in run average
+  err   = SQRT(a_var)                             ! empirical standard deviation in run average
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Empirical error estimate = ', err
-  WRITE ( unit=output_unit, fmt='(a)') 'this should be in reasonable agreement with exact error estimate'
+  WRITE ( unit=output_unit, fmt='(a)') 'This should be in reasonable agreement with exact error estimate'
 
   ! Now analyse the last run, as if it were the only one that had been carried out
+  ! This is what usually happens in a simulation; we rarely have the luxury of many independent runs
+  ! We must take account of the correlations between successive values in time
   
   ! Simple calculation of average and variance
-  a       = v                            ! copy of data
   a_avg   = SUM ( a ) / REAL(nstep)      ! sample average
   a       = a - a_avg                    ! centre the data
   a_var_1 = SUM ( a**2 ) / REAL(nstep-1) ! bias-corrected sample variance
   a_err   = SQRT(a_var_1 / REAL(nstep))  ! error estimate neglecting any correlations
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'sample average value = ',                   a_avg
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'deviation from exact average = ',           a_avg-average
-  WRITE ( unit=output_unit, fmt='(a)') 'deviation should (typically) be roughly within +/- exact error estimate'
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'sample variance = ',                        a_var_1
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'error estimate neglecting correlations = ', a_err
-  WRITE ( unit=output_unit, fmt='(a)') 'This should be very over-optimistic'
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Sample average value = ',                   a_avg
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Deviation from exact average = ',           a_avg-average
+  WRITE ( unit=output_unit, fmt='(a)') 'Deviation should (typically) lie within +/- exact error estimate'
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Sample variance = ',                        a_var_1
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Error estimate neglecting correlations = ', a_err
+  WRITE ( unit=output_unit, fmt='(a)') 'This should be very over-optimistic!'
+
+  ! The two common methods which follow are actually very similar; they differ in the choice of block lengths
+
+  ! Traditional block analysis
+  ! The rationale here is that 20 (say) independent block averages should be enough to get a reasonable
+  ! estimate of the desired quantities, and that there is not a lot to gain by looking at more/shorter blocks.
+  ! Indeed, some workers just assume that their run may be divided into 10 or 20 blocks, which they hope
+  ! will be independent, but we cannot recommend this, unless there is good reason to support the assumption.
+  ! Notwithstanding that warning, this is exactly what we do in our example programs, just for simplicity.
+  ! If the 20 blocks are not independent, then attention should be focused on fewer/longer blocks, rather than 
+  ! more/shorter ones, and a plot of squared error estimate, or SI, vs 1/tblock carried out to extrapolate to tblock=nstep.
+  ! The loop below provides the data for that plot.
+  ! Advocates of Flyvbjerg and Petersen might argue that the additional data points at low nblock / high tblock
+  ! do not actually provide much new (independent) information.
+  
+  WRITE ( unit=output_unit, fmt='(4a15)' ) 'tblock', 'nblock', 'error estimate', 'estimate of SI'
+  do nblock = 20, 4, -1 ! loop over number (and hence length) of blocks
+     tblock = nstep / nblock ! block length (rounded down)
+     a_avg = sum(a(1:nblock*tblock)) / real(nblock*tblock) ! average of data
+     a_var = 0.0
+     do blk = 1, nblock ! loop over blocks
+        stp1 = (blk-1)*tblock+1 ! start of block
+        stp2 = blk*tblock       ! end of block
+        a_val = sum ( a(stp1:stp2) - a_avg ) / real(tblock) ! block average
+        a_var = a_var + a_val**2
+     end do ! end loop over blocks
+     a_var = a_var / real(nblock-1)    ! bias-corrected variance of block averages
+     a_err = sqrt(a_var/real(nblock))  ! estimate of error from block-average variance
+     si     = tblock*a_var/a_var_1         ! statistical inefficiency
+     WRITE ( unit=output_unit, fmt='(2i15,3f15.6)' ) tblock, nblock, a_err, si
+  end do ! loop over number (and hence length) of blocks
 
   ! Method of Flyvbjerg and Petersen, J Chem Phys, 91, 461 (1989)
-  n = nstep
-  dt = 1
-  WRITE ( unit=output_unit, fmt='(4a15)'        ) 'dt', 'n', 'error estimate', 'SI'
-  WRITE ( unit=output_unit, fmt='(2i15,2f15.6)' ) dt, n, a_err, 1.0
+  ! Note that, in this implementation, we over-write the data array a
+  nblock = nstep
+  tblock = 1
+  WRITE ( unit=output_unit, fmt='(4a15)' ) 'tblock', 'nblock', 'error estimate', 'estimate of SI'
   DO
-     n = n / 2
-     dt = dt*2
-     IF ( n < 3 ) EXIT
-     a(1:n) = ( a(1:2*n-1:2) + a(2:2*n:2) ) / 2.0 ! blocking transformation, halving the data set
-     a_avg  = SUM(a(1:n))/REAL(n)      ! re-compute sample average
-     a(1:n) = a(1:n) - a_avg           ! re-centre in case of dropped points (odd n)
-     a_var  = SUM(a(1:n)**2)/REAL(n-1) ! bias-corrected variance of block averages
-     a_err  = SQRT(a_var/REAL(n))      ! estimate of error from block average variance
-     si     = dt*a_var/a_var_1         ! statistical inefficiency
-     WRITE ( unit=output_unit, fmt='(2i15,3f15.6)' ) dt, n, a_err, si
+     nblock = nblock / 2 ! halve the number of blocks, rounding down if nblock is odd
+     tblock = tblock*2   ! double the block length
+     IF ( nblock < 3 ) EXIT
+     a(1:nblock) = ( a(1:2*nblock-1:2) + a(2:2*nblock:2) ) / 2.0 ! blocking transformation, halving the data set
+     a_avg  = SUM(a(1:nblock))/REAL(nblock)      ! re-compute sample average
+     a(1:nblock) = a(1:nblock) - a_avg           ! re-centre in case of dropped points (odd nblock)
+     a_var  = SUM(a(1:nblock)**2)/REAL(nblock-1) ! bias-corrected variance of block averages
+     a_err  = SQRT(a_var/REAL(nblock))      ! estimate of error from block average variance
+     si     = tblock*a_var/a_var_1         ! statistical inefficiency
+     WRITE ( unit=output_unit, fmt='(2i15,3f15.6)' ) tblock, nblock, a_err, si
   END DO
-  WRITE ( unit=output_unit, fmt='(a)') 'Plateau at larger dt / smaller n should agree quite well with exact error estimate'
-  WRITE ( unit=output_unit, fmt='(a)') 'Can plot against 1/dt and extrapolate to dt=infinity'
+  WRITE ( unit=output_unit, fmt='(a)') 'Plateau at larger tblock / smaller nblock should agree quite well with exact error estimate'
+  WRITE ( unit=output_unit, fmt='(a)') 'Can plot against 1/tblock and extrapolate to tblock=infinity'
 
 END PROGRAM error
 
