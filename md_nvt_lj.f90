@@ -1,24 +1,10 @@
 ! md_nvt_lj.f90
 ! Molecular dynamics, NVT ensemble
 PROGRAM md_nvt_lj
-
-  ! TODO (MPA) convert this NVE program to NVT
-dt2 = dt / 2.0
-g = 3.0*(n-1.0)
-p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
-p     = p * exp(-(p_eta/Q)*dt2)                       ! U3
-eta   = eta + (p_eta/Q)*dt2                           ! U3
-p     = p + f * dt2                                   ! U2
-r     = r + (p/m) * dt                                ! U1
-call force
-p     = p + f * dt2                                   ! U2
-eta   = eta + (p_eta/Q)*dt2                           ! U3
-p     = p * exp(-(p_eta/Q)*dt2)                       ! U3
-p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
-
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
+  USE maths_module,     ONLY : random_normal
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
        &                       force, r, v, f, n, energy_lrc
@@ -46,20 +32,22 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   REAL :: density     ! density
   REAL :: dt          ! time step
   REAL :: r_cut       ! potential cutoff distance
+  REAL :: temperature ! specified temperature
+  REAL :: q           ! thermal inertia
+  REAL :: eta         ! thermal coordinate (needed only to calculate conserved quantity)
+  REAL :: p_eta       ! thermal momentum
+  REAL :: g           ! number of degrees of freedom
+  REAL :: conserved   ! conserved energy-like quantity
   REAL :: pot         ! total potential energy
   REAL :: pot_sh      ! total shifted potential energy
   REAL :: kin         ! total kinetic energy
   REAL :: vir         ! total virial
   REAL :: lap         ! total Laplacian
-  REAL :: pressure    ! pressure (to be averaged)
-  REAL :: temp_specif ! specified temperature
-  REAL :: temperature ! temperature (to be averaged)
+  REAL :: pres_virial ! virial pressure (to be averaged)
+  REAL :: temp_kinet  ! kinetic temperature (to be averaged)
   REAL :: temp_config ! configurational temperature (to be averaged)
   REAL :: energy      ! total energy per atom (to be averaged)
   REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
-  REAL :: q           ! thermal inertia
-  REAL :: eta         ! thermal coordinate (needed only for conserved quantity)
-  REAL :: p_eta       ! thermal momentum
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
   REAL    :: pot_lrc, vir_lrc
@@ -68,7 +56,7 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
 
-  NAMELIST /nml/ nblock, nstep, r_cut, dt, temp_specif, q
+  NAMELIST /nml/ nblock, nstep, r_cut, dt, temperature, q
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_nvt_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVT ensemble'
@@ -81,7 +69,7 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   nstep       = 1000
   r_cut       = 2.5
   dt          = 0.005
-  temp_specif = 0.7   ! specified temperature
+  temperature = 0.7   ! specified temperature
   q           = 300.0 ! should be of order 3N*kT*(physical timescale of system)**2
 
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
@@ -95,7 +83,7 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Specified temperature',     temp_specif
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Specified temperature',     temperature
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Thermal inertia Q',         q
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
@@ -112,8 +100,9 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   ! Initial values of thermal variables
-  eta = 0.0
-  p_eta = random_normal ( 0.0, sqrt(q*temp_specif) )
+  eta   = 0.0
+  p_eta = random_normal ( 0.0, SQRT(q*temperature) )
+  g     = REAL ( 3*(n-1) )
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
@@ -122,15 +111,19 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   kin         = 0.5*SUM(v**2)
   energy      = ( pot + kin ) / REAL ( n )
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  temperature = 2.0 * kin / REAL ( 3*(n-1) )
-  temp_config = sum(f**2) / lap
-  pressure    = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',   energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy', energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature',    temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',       pressure
+  conserved   = energy_sh + ( 0.5*p_eta**2/q + g*temperature*eta ) / REAL(n)
+  temp_kinet  = 2.0 * kin / g
+  temp_config = SUM(f**2) / lap
+  pres_virial = density * temperature + vir / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial conserved quantity', conserved
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',       energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy',     energy_sh
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',         temp_kinet
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-config',        temp_config
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure',    pres_virial
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temperature', 'Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Conserved', 'Energy', 'Shifted Energy', &
+       &                                  'Temp-Kinet', 'Temp-Config', 'Virial Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -138,24 +131,31 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        ! Velocity Verlet algorithm
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)         ! Kick half-step
-        r(:,:) = r(:,:) + dt * v(:,:) / box         ! Drift step (positions in box=1 units)
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )          ! Periodic boundaries
-        CALL force ( box, r_cut, pot, pot_sh, vir ) ! Force evaluation
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)         ! Kick half-step
+        p_eta  = p_eta + 0.5*dt * ( SUM(v**2) - g*temperature ) ! U4 half-step
+        v(:,:) = v(:,:) * EXP ( -0.5*dt * p_eta / q )           ! U3 half-step
+        eta    = eta + 0.5*dt * p_eta / q                       ! U3 half-step
+        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)                     ! U2 (kick) half-step
+        r(:,:) = r(:,:) + dt * v(:,:) / box                     ! U1 (drift) step (positions in box=1 units)
+        r(:,:) = r(:,:) - ANINT ( r(:,:) )                      ! Periodic boundaries
+        CALL force ( box, r_cut, pot, pot_sh, vir, lap )        ! Force evaluation
+        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)                     ! U2 (kick) half-step
+        eta    = eta + 0.5*dt * p_eta / q                       ! U3 half-step
+        v(:,:) = v(:,:) * EXP ( -0.5*dt * p_eta / q )           ! U3 half-step
+        p_eta  = p_eta + 0.5*dt * ( SUM(v**2) - g*temperature ) ! U4 half-step
 
-        CALL energy_lrc ( n, sigma, r_cut, pot_lrc, vir_lrc )
+        CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
         pot         = pot + pot_lrc
         vir         = vir + vir_lrc
         kin         = 0.5*SUM(v**2)
         energy      = ( pot + kin ) / REAL ( n )
         energy_sh   = ( pot_sh + kin ) / REAL ( n )
-        temperature = 2.0 * kin / REAL ( 3*(n-1) )
-        pressure    = density * temperature + vir / box**3
+        conserved   = energy_sh + ( 0.5*p_eta**2/q + g*temperature*eta ) / REAL(n)
+        temp_kinet  = 2.0 * kin / g
+        temp_config = SUM(f**2) / lap
+        pres_virial = density * temperature + vir / box**3
 
         ! Calculate all variables for this step
-        CALL blk_add ( [energy,energy_sh,temperature,pressure] )
+        CALL blk_add ( [conserved,energy,energy_sh,temp_kinet,temp_config,pres_virial] )
 
      END DO ! End loop over steps
 
@@ -167,19 +167,23 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, r_cut, pot, pot_sh, vir )
+  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot         = pot + pot_lrc
   vir         = vir + vir_lrc
   kin         = 0.5*SUM(v**2)
   energy      = ( pot + kin ) / REAL ( n )
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  temperature = 2.0 * kin / REAL ( 3*(n-1) )
-  pressure    = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',   energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy', energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temperature',    temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',       pressure
+  conserved   = energy_sh + ( 0.5*p_eta**2/q + g*temperature*eta ) / REAL(n)
+  temp_kinet  = 2.0 * kin / g
+  temp_config = SUM(f**2) / lap
+  pres_virial = density * temperature + vir / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final conserved quantity', conserved
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',       energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy',     energy_sh
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-kinet',         temp_kinet
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-config',        temp_config
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',    pres_virial
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
