@@ -45,7 +45,7 @@ PROGRAM mc_nvt_lj_re
   REAL :: vir         ! total virial
   REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
   REAL :: swap_ratio  ! acceptance ratio of swaps with higher neighbour (to be averaged)
-  REAL :: pressure    ! pressure (to be averaged)
+  REAL :: pres_virial ! virial pressure (to be averaged)
   REAL :: potential   ! potential energy per atom (to be averaged)
 
   REAL, DIMENSION(:), ALLOCATABLE :: every_temperature, every_beta, every_dr_max
@@ -110,8 +110,8 @@ PROGRAM mc_nvt_lj_re
   nstep             = 1000
   swap_interval     = 20
   r_cut             = 2.5
-  every_temperature = [ ( 0.7*(1.05)**i, i = 0, p-1 ) ]
-  every_dr_max      = [ ( 0.15*(1.05)**i, i = 0, p-1 ) ]
+  every_temperature = [ ( 0.7*(1.05)**i,  i = 0, p-1 ) ] ! just empirical settings for LJ
+  every_dr_max      = [ ( 0.15*(1.05)**i, i = 0, p-1 ) ] ! just empirical settings for LJ
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
@@ -150,14 +150,14 @@ PROGRAM mc_nvt_lj_re
      STOP 'Error in mc_nvt_lj_re'
   END IF
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot = pot + pot_lrc
-  vir = vir + vir_lrc
-  potential = pot / REAL ( n )
-  pressure  = density * temperature + vir / box**3
+  pot         = pot + pot_lrc
+  vir         = vir + vir_lrc
+  potential   = pot / REAL ( n )
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure',  pres_virial
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Swap ratio', 'Potential', 'Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Swap ratio', 'Potential', 'Virial Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -233,11 +233,11 @@ PROGRAM mc_nvt_lj_re
         END IF ! end test for swap interval
 
         ! Calculate all variables for this step
-        move_ratio = REAL(moves) / REAL(n)
-        swap_ratio = REAL(swapped*swap_interval) ! factor for only attempting at intervals
-        potential  = pot / REAL(n)
-        pressure   = density * temperature + vir / box**3
-        CALL blk_add ( [move_ratio,swap_ratio,potential,pressure] )
+        move_ratio  = REAL(moves) / REAL(n)
+        swap_ratio  = REAL(swapped*swap_interval) ! factor for only attempting at intervals
+        potential   = pot / REAL(n)
+        pres_virial = density * temperature + vir / box**3
+        CALL blk_add ( [move_ratio,swap_ratio,potential,pres_virial] )
 
      END DO ! End loop over steps
 
@@ -249,10 +249,10 @@ PROGRAM mc_nvt_lj_re
 
   CALL run_end ( output_unit )
 
-  potential = pot / REAL ( n )
-  pressure  = density * temperature + vir / box**3
+  potential   = pot / REAL ( n )
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
 
   CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN ! should never happen
@@ -262,11 +262,11 @@ PROGRAM mc_nvt_lj_re
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot = pot + pot_lrc
   vir = vir + vir_lrc
-  potential = pot / REAL ( n )
-  pressure  = density * temperature + vir / box**3
+  potential   = pot / REAL ( n )
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
   CALL time_stamp ( output_unit )

@@ -28,7 +28,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
   ! The model is defined in mc_module
 
   ! Most important variables
-  REAL    :: temperature ! temperature (in units of well depth)
+  REAL    :: temperature ! temperature (specified, in units of well depth)
   REAL    :: k_spring    ! strength of intramolecular bond springs
   REAL    :: spring_pot  ! bond spring potential energy (for averaging)
   REAL    :: pot         ! nonbonded potential energy

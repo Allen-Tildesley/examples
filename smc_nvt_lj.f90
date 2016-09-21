@@ -37,17 +37,17 @@ PROGRAM smc_nvt_lj
   ! Most important variables
   REAL    :: box         ! box length
   REAL    :: density     ! density
+  REAL    :: temperature ! temperature (specified)
+  INTEGER :: move_mode   ! selects single- or multi-atom moves
+  REAL    :: fraction    ! fraction of atoms to move in multi-atom move
   REAL    :: dt          ! time step
   REAL    :: r_cut       ! potential cutoff distance
   REAL    :: pot         ! total potential energy
   REAL    :: pot_sh      ! total shifted potential energy
   REAL    :: vir         ! total virial
-  REAL    :: pressure    ! pressure (to be averaged)
-  REAL    :: temperature ! temperature (specified)
+  REAL    :: pres_virial ! virial pressure (to be averaged)
   REAL    :: energy      ! total energy per atom (to be averaged)
   REAL    :: energy_sh   ! total shifted energy per atom (to be averaged)
-  INTEGER :: move_mode   ! selects single- or multi-atom moves
-  REAL    :: fraction    ! fraction of atoms to move in multi-atom move
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
   INTEGER :: i, n_move
@@ -120,13 +120,12 @@ PROGRAM smc_nvt_lj
   vir         = vir + vir_lrc
   energy      = 1.5*temperature + pot / REAL ( n )
   energy_sh   = 1.5*temperature + pot_sh / REAL ( n )
-  pressure    = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial energy',         energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy', energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature',    temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',       pressure
+  pres_virial = density * temperature + vir / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial energy',          energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy',  energy_sh
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure', pres_virial
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move Ratio', 'Energy', 'Shifted Energy', 'Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move Ratio', 'Energy', 'Shifted Energy', 'Virial Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -198,19 +197,19 @@ PROGRAM smc_nvt_lj
         END SELECT
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-        pot       = pot + pot_lrc
-        vir       = vir + vir_lrc
-        energy    = 1.5*temperature + pot / REAL ( n )
-        energy_sh = 1.5*temperature + pot_sh / REAL ( n )
-        pressure  = density * temperature + vir / box**3
+        pot         = pot + pot_lrc
+        vir         = vir + vir_lrc
+        energy      = 1.5*temperature + pot / REAL ( n )
+        energy_sh   = 1.5*temperature + pot_sh / REAL ( n )
+        pres_virial = density * temperature + vir / box**3
 
         ! Calculate all variables for this step
-        CALL blk_add ( [move_ratio,energy,energy_sh,pressure] )
+        CALL blk_add ( [move_ratio,energy,energy_sh,pres_virial] )
 
      END DO ! End loop over steps
 
      CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! number configuration by block
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk            ! number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box ) ! save configuration
 
   END DO ! End loop over blocks
@@ -223,10 +222,10 @@ PROGRAM smc_nvt_lj
   vir         = vir + vir_lrc
   energy      = 1.5*temperature + pot / REAL ( n )
   energy_sh   = 1.5*temperature + pot_sh / REAL ( n )
-  pressure    = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',         energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy', energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',       pressure
+  pres_virial = density * temperature + vir / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',          energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy',  energy_sh
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure', pres_virial
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )

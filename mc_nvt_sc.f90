@@ -30,12 +30,12 @@ PROGRAM mc_nvt_sc
   REAL :: length      ! cylinder length (in units where sigma=1)
   REAL :: box         ! box length (in units where sigma=1)
   REAL :: density     ! reduced density n*sigma**3/box**3
-  REAL :: pressure    ! measured pressure in units kT/sigma**3
   REAL :: order       ! orientational order parameter
   REAL :: dr_max      ! maximum MC displacement
   REAL :: de_max      ! maximum MC rotation
   REAL :: epsilon     ! pressure scaling parameter
   REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
+  REAL :: pres_virial ! virial pressure in units kT/sigma**3 (to be averaged)
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL, DIMENSION(3) :: ri, ei     ! position and orientation of atom i
@@ -94,7 +94,7 @@ PROGRAM mc_nvt_sc
      STOP 'Error in mc_nvt_sc'
   END IF
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Pressure', 'P2 Order' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Virial Pressure', 'P2 Order' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -122,12 +122,12 @@ PROGRAM mc_nvt_sc
         END DO ! End loop over atoms
 
         ! Calculate all variables for this step
-        move_ratio = REAL(moves) / REAL(n)
-        box_scaled = box / (1.0+epsilon) 
-        pressure   = REAL ( n_overlap ( box_scaled, length ) ) / (3.0*epsilon) ! virial part
-        pressure   = density + pressure / box**3 ! divide virial by volume and add ideal gas part
-        order      = orientational_order ( e )
-        CALL blk_add ( [move_ratio,pressure,order] )
+        move_ratio  = REAL(moves) / REAL(n)
+        box_scaled  = box / (1.0+epsilon) 
+        pres_virial = REAL ( n_overlap ( box_scaled, length ) ) / (3.0*epsilon) ! virial part
+        pres_virial = density + pres_virial / box**3 ! divide virial by volume and add ideal gas part
+        order       = orientational_order ( e )
+        CALL blk_add ( [move_ratio,pres_virial,order] )
 
      END DO ! End loop over steps
 

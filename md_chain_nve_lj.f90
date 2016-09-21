@@ -29,13 +29,13 @@ PROGRAM md_chain_nve_lj
   ! The model is defined in md_module
 
   ! Most important variables
-  REAL :: dt          ! time step
-  REAL :: bond        ! bond length
-  REAL :: pot         ! total potential energy
-  REAL :: kin         ! total kinetic energy
-  REAL :: temperature ! temperature (LJ sigma=1 units, to be averaged)
-  REAL :: energy      ! total energy per atom (LJ sigma=1 units, to be averaged)
-  REAL :: wc          ! constraint virial (not used in this example)
+  REAL :: dt         ! time step
+  REAL :: bond       ! bond length
+  REAL :: pot        ! total potential energy
+  REAL :: kin        ! total kinetic energy
+  REAL :: temp_kinet ! kinetic temperature (LJ sigma=1 units, to be averaged)
+  REAL :: energy     ! total energy per atom (LJ sigma=1 units, to be averaged)
+  REAL :: wc         ! constraint virial (not used in this example)
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
 
@@ -95,13 +95,13 @@ PROGRAM md_chain_nve_lj
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
 
   CALL force ( pot )
-  kin         = 0.5*SUM(v**2)
-  energy      = ( pot + kin ) / REAL ( n )
-  temperature = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy (sigma units)', energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature (sigma units)',  temperature
+  kin        = 0.5*SUM(v**2)
+  energy     = ( pot + kin ) / REAL ( n )
+  temp_kinet = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy', energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',   temp_kinet
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temperature' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temp-Kinet' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -114,12 +114,12 @@ PROGRAM md_chain_nve_lj
         CALL force ( pot )           ! Force evaluation
         CALL move_b ( dt, bond, wc ) ! RATTLE/MILCSHAKE part B
 
-        kin         = 0.5*SUM(v**2)
-        energy      = ( pot + kin ) / REAL ( n )
-        temperature = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
+        kin        = 0.5*SUM(v**2)
+        energy     = ( pot + kin ) / REAL ( n )
+        temp_kinet = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
 
         ! Calculate all variables for this step
-        CALL blk_add ( [energy,temperature] )
+        CALL blk_add ( [energy,temp_kinet] )
 
      END DO ! End loop over steps
 
@@ -132,12 +132,12 @@ PROGRAM md_chain_nve_lj
   CALL run_end ( output_unit )
 
   CALL force ( pot )
-  kin         = 0.5*SUM(v**2)
-  energy      = ( pot + kin ) / REAL ( n )
-  temperature = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Final total energy (sigma units)', energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Final temperature (sigma units)',  temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ',   worst_bond ( bond )
+  kin        = 0.5*SUM(v**2)
+  energy     = ( pot + kin ) / REAL ( n )
+  temp_kinet = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Final total energy',             energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Final temp-kinet',               temp_kinet
+  WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r, v )

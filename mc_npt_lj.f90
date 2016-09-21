@@ -40,14 +40,14 @@ PROGRAM mc_npt_lj
   REAL :: dr_max         ! maximum MC particle displacement
   REAL :: db_max         ! maximum MC box displacement
   REAL :: temperature    ! specified temperature
-  REAL :: pressure_inp   ! specified pressure
+  REAL :: pressure       ! specified pressure
   REAL :: r_cut          ! potential cutoff distance
   REAL :: pot            ! total potential energy
   REAL :: vir            ! total virial
   REAL :: move_ratio     ! acceptance ratio of moves (to be averaged)
   REAL :: box_move_ratio ! acceptance ratio of box moves (to be averaged)
   REAL :: density        ! density (to be averaged)
-  REAL :: pressure       ! pressure (to be averaged)
+  REAL :: pres_virial    ! virial pressure (to be averaged)
   REAL :: potential      ! potential energy per atom (to be averaged)
 
   LOGICAL            :: overlap
@@ -61,7 +61,7 @@ PROGRAM mc_npt_lj
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
 
-  NAMELIST /nml/ nblock, nstep, temperature, pressure_inp, r_cut, dr_max, db_max
+  NAMELIST /nml/ nblock, nstep, temperature, pressure, r_cut, dr_max, db_max
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'mc_npt_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NPT ensemble'
@@ -71,13 +71,13 @@ PROGRAM mc_npt_lj
   CALL RANDOM_SEED () ! Initialize random number generator
 
   ! Set sensible defaults for testing
-  nblock       = 10
-  nstep        = 1000
-  temperature  = 0.7
-  pressure_inp = 0.1
-  r_cut        = 2.5
-  dr_max       = 0.15
-  db_max       = 0.025
+  nblock      = 10
+  nstep       = 1000
+  temperature = 0.7
+  pressure    = 0.1
+  r_cut       = 2.5
+  dr_max      = 0.15
+  db_max      = 0.025
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
@@ -88,7 +88,7 @@ PROGRAM mc_npt_lj
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',               temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Pressure',                  pressure_inp
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Pressure',                  pressure
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum displacement',      dr_max
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum box displacement',  db_max
@@ -112,15 +112,15 @@ PROGRAM mc_npt_lj
      STOP 'Error in mc_npt_lj'
   END IF
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot = pot + pot_lrc
-  vir = vir + vir_lrc
-  potential = pot / REAL ( n )
-  pressure  = density * temperature + vir / box**3
+  pot         = pot + pot_lrc
+  vir         = vir + vir_lrc
+  potential   = pot / REAL ( n )
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure)',        pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure',  pres_virial
 
   CALL run_begin ( [ CHARACTER(len=15) :: &
-       &            'Move ratio', 'Box ratio', 'Density', 'Potential', 'Pressure' ] )
+       &            'Move ratio', 'Box ratio', 'Density', 'Potential', 'Virial Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -172,7 +172,7 @@ PROGRAM mc_npt_lj
 
         IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
 
-           delta = ( (pot_new-pot) + pressure_inp * ( box_new**3 - box**3 )  ) / temperature &
+           delta = ( (pot_new-pot) + pressure * ( box_new**3 - box**3 )  ) / temperature &
                 &   + REAL(n+1) * LOG(density_new/density) ! factor (n+1) consistent with box scaling
 
            IF ( metropolis ( delta ) ) THEN ! accept because Metropolis test
@@ -186,9 +186,9 @@ PROGRAM mc_npt_lj
         END IF ! reject overlapping configuration
 
         ! Calculate all variables for this step
-        potential = pot / REAL(n)
-        pressure  = density * temperature + vir / box**3
-        CALL blk_add ( [move_ratio,box_move_ratio,density,potential,pressure] )
+        potential   = pot / REAL(n)
+        pres_virial = density * temperature + vir / box**3
+        CALL blk_add ( [move_ratio,box_move_ratio,density,potential,pres_virial] )
 
      END DO ! End loop over steps
 
@@ -200,10 +200,10 @@ PROGRAM mc_npt_lj
 
   CALL run_end ( output_unit )
 
-  potential = pot / REAL ( n )
-  pressure  = density * temperature + vir / box**3
+  potential   = pot / REAL ( n )
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final density',          density
 
   CALL energy ( box, r_cut, overlap, pot, vir )
@@ -212,13 +212,13 @@ PROGRAM mc_npt_lj
      STOP 'Error in mc_npt_lj'
   END IF
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot       = pot + pot_lrc
-  vir       = vir + vir_lrc
-  potential = pot / REAL ( n )
-  pressure  = density * temperature + vir / box**3
+  pot         = pot + pot_lrc
+  vir         = vir + vir_lrc
+  potential   = pot / REAL ( n )
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final density',          REAL(n) / box**3
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )

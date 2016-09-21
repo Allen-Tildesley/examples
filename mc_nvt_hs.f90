@@ -28,7 +28,7 @@ PROGRAM mc_nvt_hs
   ! Most important variables
   REAL :: box         ! box length
   REAL :: density     ! density
-  REAL :: pressure    ! pressure (to be averaged)
+  REAL :: pres_virial ! pressure (to be averaged)
   REAL :: dr_max      ! maximum MC displacement
   REAL :: epsilon     ! pressure scaling parameter
   REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
@@ -86,7 +86,7 @@ PROGRAM mc_nvt_hs
      STOP 'Error in mc_nvt_hs'
   END IF
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Pres-virial' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -112,11 +112,11 @@ PROGRAM mc_nvt_hs
         END DO ! End loop over atoms
 
         ! Calculate all variables for this step
-        move_ratio = REAL(moves) / REAL(n)
-        box_scaled = box / (1.0+epsilon) 
-        pressure   = REAL ( n_overlap ( box_scaled ) ) / (3.0*epsilon) ! virial part
-        pressure   = density + pressure / box**3 ! divide virial by volume and add ideal gas part
-        CALL blk_add ( [move_ratio,pressure] )
+        move_ratio  = REAL(moves) / REAL(n)
+        box_scaled  = box / (1.0+epsilon) 
+        pres_virial = REAL ( n_overlap ( box_scaled ) ) / (3.0*epsilon) ! virial part
+        pres_virial = density + pres_virial / box**3 ! divide virial by volume and add ideal gas part
+        CALL blk_add ( [move_ratio,pres_virial] )
 
      END DO ! End loop over steps
 

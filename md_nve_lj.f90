@@ -37,8 +37,8 @@ PROGRAM md_nve_lj
   REAL :: kin         ! total kinetic energy
   REAL :: vir         ! total virial
   REAL :: lap         ! total Laplacian
-  REAL :: pressure    ! pressure (to be averaged)
-  REAL :: temperature ! temperature (to be averaged)
+  REAL :: pres_virial ! virial pressure (to be averaged)
+  REAL :: temp_kinet  ! kinetic temperature (to be averaged)
   REAL :: temp_config ! configurational temperature (to be averaged)
   REAL :: energy      ! total energy per atom (to be averaged)
   REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
@@ -96,18 +96,18 @@ PROGRAM md_nve_lj
   kin         = 0.5*SUM(v**2)
   energy      = ( pot + kin ) / REAL ( n )
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  temperature = 2.0 * kin / REAL ( 3*(n-1) )
+  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
   fsq         = SUM ( f**2 )
   beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
   temp_config = 1.0 / beta
-  pressure    = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',   energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy', energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature',    temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-config',    temp_config
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',       pressure
+  pres_virial = density * temp_kinet + vir / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',    energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy',  energy_sh
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',      temp_kinet
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-config',     temp_config
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure', pres_virial
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temperature', 'Temp-config', 'Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temp-kinet', 'Temp-config', 'Virial Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -128,14 +128,14 @@ PROGRAM md_nve_lj
         kin         = 0.5*SUM(v**2)
         energy      = ( pot + kin ) / REAL ( n )
         energy_sh   = ( pot_sh + kin ) / REAL ( n )
-        temperature = 2.0 * kin / REAL ( 3*(n-1) )
+        temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
         fsq         = SUM ( f**2 )
         beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
         temp_config = 1.0 / beta
-        pressure    = density * temperature + vir / box**3
+        pres_virial = density * temp_kinet + vir / box**3
 
         ! Calculate all variables for this step
-        CALL blk_add ( [energy,energy_sh,temperature,temp_config,pressure] )
+        CALL blk_add ( [energy,energy_sh,temp_kinet,temp_config,pres_virial] )
 
      END DO ! End loop over steps
 
@@ -154,16 +154,16 @@ PROGRAM md_nve_lj
   kin         = 0.5*SUM(v**2)
   energy      = ( pot + kin ) / REAL ( n )
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  temperature = 2.0 * kin / REAL ( 3*(n-1) )
+  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
   fsq         = SUM ( f**2 )
   beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
   temp_config = 1.0 / beta
-  pressure    = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',   energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy', energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temperature',    temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-config',    temp_config
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',       pressure
+  pres_virial = density * temp_kinet + vir / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',    energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy',  energy_sh
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-kinet',      temp_kinet
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-config',     temp_config
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure', pres_virial
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )

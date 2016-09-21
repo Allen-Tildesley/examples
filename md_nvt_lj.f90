@@ -27,7 +27,7 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
 
   ! Takes in a configuration of atoms (positions, velocities)
   ! Cubic periodic boundary conditions
-  ! Conducts molecular dynamics using velocity Verlet algorithm
+  ! Conducts molecular dynamics using a measure-preserving algorithm for the Nose-Hoover equations
   ! Uses no special neighbour lists
 
   ! Reads several variables and options from standard input using a namelist nml
@@ -50,10 +50,16 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   REAL :: pot_sh      ! total shifted potential energy
   REAL :: kin         ! total kinetic energy
   REAL :: vir         ! total virial
+  REAL :: lap         ! total Laplacian
   REAL :: pressure    ! pressure (to be averaged)
+  REAL :: temp_specif ! specified temperature
   REAL :: temperature ! temperature (to be averaged)
+  REAL :: temp_config ! configurational temperature (to be averaged)
   REAL :: energy      ! total energy per atom (to be averaged)
   REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
+  REAL :: q           ! thermal inertia
+  REAL :: eta         ! thermal coordinate (needed only for conserved quantity)
+  REAL :: p_eta       ! thermal momentum
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
   REAL    :: pot_lrc, vir_lrc
@@ -62,7 +68,7 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
 
-  NAMELIST /nml/ nblock, nstep, r_cut, dt
+  NAMELIST /nml/ nblock, nstep, r_cut, dt, temp_specif, q
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_nvt_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVT ensemble'
@@ -71,10 +77,12 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   CALL time_stamp ( output_unit )
 
   ! Set sensible default run parameters for testing
-  nblock = 10
-  nstep  = 1000
-  r_cut  = 2.5
-  dt     = 0.005
+  nblock      = 10
+  nstep       = 1000
+  r_cut       = 2.5
+  dt          = 0.005
+  temp_specif = 0.7   ! specified temperature
+  q           = 300.0 ! should be of order 3N*kT*(physical timescale of system)**2
 
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
@@ -87,6 +95,8 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Specified temperature',     temp_specif
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Thermal inertia Q',         q
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
@@ -101,7 +111,11 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  CALL force ( box, r_cut, pot, pot_sh, vir )
+  ! Initial values of thermal variables
+  eta = 0.0
+  p_eta = random_normal ( 0.0, sqrt(q*temp_specif) )
+
+  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot         = pot + pot_lrc
   vir         = vir + vir_lrc
@@ -109,6 +123,7 @@ p_eta = p_eta + ( sum(p**2/m) - g*temperature ) * dt2 ! U4
   energy      = ( pot + kin ) / REAL ( n )
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
   temperature = 2.0 * kin / REAL ( 3*(n-1) )
+  temp_config = sum(f**2) / lap
   pressure    = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',   energy
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy', energy_sh

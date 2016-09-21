@@ -29,7 +29,7 @@ PROGRAM mc_chain_nvt_sw
   ! only, i.e. weight=1 if no overlap, weight=0 if any overlap
 
   ! Most important variables
-  REAL    :: temperature    ! temperature (in units of well depth)
+  REAL    :: temperature    ! temperature (specified, in units of well depth)
   REAL    :: regrow_ratio   ! acceptance ratio for regrowth moves
   REAL    :: crank_ratio    ! acceptance ratio for crankshaft moves
   REAL    :: pivot_ratio    ! acceptance ratio for pivot moves

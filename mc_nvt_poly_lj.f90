@@ -40,7 +40,7 @@ PROGRAM mc_nvt_poly_lj
   REAL :: pot         ! total potential energy
   REAL :: vir         ! total virial
   REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
-  REAL :: pressure    ! pressure (to be averaged)
+  REAL :: pres_virial ! virial pressure (to be averaged)
   REAL :: potential   ! potential energy per molecule (to be averaged)
 
   LOGICAL            :: overlap
@@ -123,12 +123,12 @@ PROGRAM mc_nvt_poly_lj
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF
-  potential = pot / REAL ( n )
-  pressure  = density * temperature + vir / box**3
+  potential   = pot / REAL ( n )
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial pressure',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial virial pressure',  pres_virial
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Potential', 'Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Potential', 'Virial Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -172,10 +172,10 @@ PROGRAM mc_nvt_poly_lj
         END DO ! End loop over atoms
 
         ! Calculate all variables for this step
-        move_ratio = REAL(moves) / REAL(n)
-        potential  = pot / REAL(n)
-        pressure   = density * temperature + vir / box**3
-        CALL blk_add ( [move_ratio,potential,pressure] )
+        move_ratio  = REAL(moves) / REAL(n)
+        potential   = pot / REAL(n)
+        pres_virial = density * temperature + vir / box**3
+        CALL blk_add ( [move_ratio,potential,pres_virial] )
 
      END DO ! End loop over steps
 
@@ -188,20 +188,20 @@ PROGRAM mc_nvt_poly_lj
   CALL run_end ( output_unit )
 
   potential = pot / REAL ( n )
-  pressure  = density * temperature + vir / box**3
+  pres_virial  = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
 
   CALL energy ( box, r_cut, rm_cut, overlap, pot, vir )
   IF ( overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF
-  potential = pot / REAL ( n )
-  pressure  = density * temperature + vir / box**3
+  potential   = pot / REAL ( n )
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
 
   CALL write_cnf_mols ( cnf_prefix//out_tag, n, box, r*box, e )
   CALL time_stamp ( output_unit )

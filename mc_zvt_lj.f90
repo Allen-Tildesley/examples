@@ -41,7 +41,7 @@ PROGRAM mc_zvt_lj
   REAL :: m_ratio     ! acceptance ratio of moves (to be averaged)
   REAL :: c_ratio     ! acceptance ratio of creation attempts (to be averaged)
   REAL :: d_ratio     ! acceptance ratio of destruction attempts (to be averaged)
-  REAL :: pressure    ! pressure (to be averaged)
+  REAL :: pres_virial ! virial pressure (to be averaged)
   REAL :: potential   ! potential energy per atom (to be averaged)
 
   LOGICAL            :: overlap
@@ -114,17 +114,17 @@ PROGRAM mc_zvt_lj
      STOP 'Error in mc_zvt_lj'
   END IF
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot = pot + pot_lrc
-  vir = vir + vir_lrc
-  potential = pot / REAL ( n )
-  pressure  = density * temperature + vir / box**3
+  pot         = pot + pot_lrc
+  vir         = vir + vir_lrc
+  potential   = pot / REAL ( n )
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial density',          density
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure',  pres_virial
 
   CALL run_begin ( [ CHARACTER(len=15) :: &
        &            'Move ratio', 'Create ratio', 'Destroy ratio', &
-       &            'Potential', 'Pressure', 'Density' ] )
+       &            'Potential', 'Virial Pressure', 'Density' ] )
 
   ntry = n ! each step consists of ntry tries (during which n might vary)
 
@@ -228,13 +228,13 @@ PROGRAM mc_zvt_lj
         END DO ! End loop over tries of different kinds
 
         ! Calculate all variables for this step
-        m_ratio   = REAL(m_moves) / REAL(m_tries)
-        c_ratio   = REAL(c_moves) / REAL(c_tries)
-        d_ratio   = REAL(d_moves) / REAL(d_tries)
-        potential = pot / REAL(n)
-        density   = REAL(n) / box**3
-        pressure  = density * temperature + vir / box**3
-        CALL blk_add ( [m_ratio,c_ratio,d_ratio,potential,pressure,density] )
+        m_ratio     = REAL(m_moves) / REAL(m_tries)
+        c_ratio     = REAL(c_moves) / REAL(c_tries)
+        d_ratio     = REAL(d_moves) / REAL(d_tries)
+        potential   = pot / REAL(n)
+        density     = REAL(n) / box**3
+        pres_virial = density * temperature + vir / box**3
+        CALL blk_add ( [m_ratio,c_ratio,d_ratio,potential,pres_virial,density] )
 
      END DO ! End loop over steps
 
@@ -248,10 +248,10 @@ PROGRAM mc_zvt_lj
 
   potential = pot / REAL ( n )
   density   = REAL(n) / box**3
-  pressure  = density * temperature + vir / box**3
+  pres_virial  = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final density',          density
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
 
   CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN ! should never happen
@@ -259,14 +259,14 @@ PROGRAM mc_zvt_lj
      STOP 'Error in mc_zvt_lj'
   END IF
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot       = pot + pot_lrc
-  vir       = vir + vir_lrc
-  potential = pot / REAL ( n )
-  pressure  = density * temperature + vir / box**3
+  pot         = pot + pot_lrc
+  vir         = vir + vir_lrc
+  potential   = pot / REAL ( n )
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final density',          density
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',         pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )

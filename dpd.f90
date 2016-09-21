@@ -42,9 +42,9 @@ PROGRAM dpd
   REAL :: vir         ! total virial
   REAL :: lap         ! Laplacian
   REAL :: temperature ! temperature (specified)
-  REAL :: pressure    ! pressure (to be averaged)
-  REAL :: temper_kin  ! kinetic temperature (to be averaged)
-  REAL :: temper_con  ! configurational temperature (to be averaged)
+  REAL :: pres_virial ! virial pressure (to be averaged)
+  REAL :: temp_kinet  ! kinetic temperature (to be averaged)
+  REAL :: temp_config ! configurational temperature (to be averaged)
   REAL :: energy      ! total energy per atom (to be averaged)
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
@@ -117,17 +117,17 @@ PROGRAM dpd
 
   CALL make_ij ( box ) ! construct initial list of pairs within range
   CALL force ( box, alpha, pot, vir, lap )
-  kin        = 0.5*SUM(v**2)
-  energy     = ( pot + kin ) / REAL ( n )
-  temper_kin = 2.0 * kin / REAL ( 3*(n-1) )
-  temper_con = SUM(f**2) / lap
-  pressure   = density * temper_kin + vir / box**3
+  kin         = 0.5*SUM(v**2)
+  energy      = ( pot + kin ) / REAL ( n )
+  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
+  temp_config = SUM(f**2) / lap
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',    energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature-kin', temper_kin
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature-con', temper_con
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',        pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',      temp_kinet
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-config',     temp_config
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure', pres_virial
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temperature-kin', 'Temperature-con', 'Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temp-kinet', 'Temp-config', 'Virial Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -146,14 +146,14 @@ PROGRAM dpd
         CALL force ( box, alpha, pot, vir, lap ) ! Force evaluation
         v(:,:) = v(:,:) + 0.5 * dt * f(:,:)      ! Kick half-step
 
-        kin        = 0.5*SUM(v**2)
-        energy     = ( pot + kin ) / REAL ( n )
-        temper_kin = 2.0 * kin / REAL ( 3*(n-1) )
-        temper_con = SUM(f**2) / lap
-        pressure   = density * temper_kin + vir / box**3
+        kin         = 0.5*SUM(v**2)
+        energy      = ( pot + kin ) / REAL ( n )
+        temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
+        temp_config = SUM(f**2) / lap
+        pres_virial = density * temperature + vir / box**3
 
         ! Calculate all variables for this step
-        CALL blk_add ( [energy,temper_kin,temper_con,pressure] )
+        CALL blk_add ( [energy,temp_kinet,temp_config,pres_virial] )
 
      END DO ! End loop over steps
 
@@ -166,19 +166,18 @@ PROGRAM dpd
   CALL run_end ( output_unit )
 
   CALL force ( box, alpha, pot, vir, lap )
-  kin        = 0.5*SUM(v**2)
-  energy     = ( pot + kin ) / REAL ( n )
-  temper_kin = 2.0 * kin / REAL ( 3*(n-1) )
-  temper_con = SUM(f**2) / lap
-  pressure   = density * temper_kin + vir / box**3
+  kin         = 0.5*SUM(v**2)
+  energy      = ( pot + kin ) / REAL ( n )
+  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
+  temp_config = SUM(f**2) / lap
+  pres_virial = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',    energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temperature-kin', temper_kin
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temperature-con', temper_con
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',        pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-kinet',      temp_kinet
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-config',     temp_config
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure', pres_virial
   CALL time_stamp ( output_unit )
 
-  pressure = density * temperature +  0.101*alpha*density**2
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Approx EOS pressure', pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Approx EOS pressure', density*temperature+0.101*alpha*density**2
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
 

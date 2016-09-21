@@ -29,19 +29,19 @@ PROGRAM md_nve_hs
   ! are given in units sigma = 1, mass = 1
 
   ! Most important variables
-  REAL :: box         ! box length (in units where sigma=1)
-  REAL :: density     ! reduced density n*sigma**3/box**3
-  REAL :: vir         ! total collisional virial
-  REAL :: kin         ! kinetic energy
-  REAL :: temperature ! temperature
-  REAL :: t           ! time
+  REAL :: box        ! box length (in units where sigma=1)
+  REAL :: density    ! reduced density n*sigma**3/box**3
+  REAL :: vir        ! total collisional virial
+  REAL :: kin        ! kinetic energy
+  REAL :: temp_kinet ! temperature (conserved)
+  REAL :: t          ! time
+  REAL :: coll_rate  ! collision rate (to be averaged)
+  REAL :: pres_coll  ! collisional pressure (to be averaged)
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
 
-  REAL :: coll_rate, pressure ! quantities to be averaged
-  
   INTEGER            :: i, j, k, ncoll, coll, blk, nblock, ioerr
   REAL               :: tij, vir_sum
   REAL, DIMENSION(3) :: total_momentum
@@ -78,10 +78,10 @@ PROGRAM md_nve_hs
   total_momentum = SUM(v,dim=2)
   total_momentum = total_momentum / REAL(n)
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Net momentum/particle', total_momentum
-  v   = v - SPREAD(total_momentum,dim=1,ncopies=3)
-  kin = 0.5 * SUM ( v**2 )
-  temperature = 2.0 * kin / REAL ( 3*(n-1) )
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature (sigma units)', temperature
+  v          = v - SPREAD(total_momentum,dim=1,ncopies=3)
+  kin        = 0.5 * SUM ( v**2 )
+  temp_kinet = 2.0 * kin / REAL ( 3*(n-1) )
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature', temp_kinet
 
   r(:,:) = r(:,:) / box              ! Convert positions to box=1 units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
@@ -98,7 +98,7 @@ PROGRAM md_nve_hs
      CALL update ( i, gt, box ) ! initial search for collision partners >i
   END DO
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Collision Rate', 'Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Collision Rate', 'Coll Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -133,9 +133,9 @@ PROGRAM md_nve_hs
      END DO ! End loop over collisions
 
       ! Collisional time averages in sigma units
-     coll_rate = 2.0*REAL (ncoll) / t / REAL(n)             ! collision rate per particle
-     pressure  = density*temperature + vir_sum / t / box**3 ! ideal + collisional virial / volume
-     CALL blk_add ( [coll_rate, pressure] ) ! time averages
+     coll_rate = 2.0*REAL (ncoll) / t / REAL(n)            ! collision rate per particle
+     pres_coll = density*temp_kinet + vir_sum / t / box**3 ! ideal + collisional virial / volume
+     CALL blk_add ( [coll_rate, pres_coll] ) ! time averages
      CALL blk_end ( blk, output_unit )
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk ! number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! save configuration

@@ -37,8 +37,8 @@ PROGRAM md_lj_mts
   REAL :: density     ! density
   REAL :: dt          ! time step (smallest)
   REAL :: kin         ! total kinetic energy
-  REAL :: pressure    ! pressure (to be averaged)
-  REAL :: temperature ! temperature (to be averaged)
+  REAL :: pres_virial ! virial pressure (to be averaged)
+  REAL :: temp_kinet  ! kinetic temperature (to be averaged)
   REAL :: energy      ! total energy per atom (to be averaged)
   REAL :: lambda      ! healing length for switch function
 
@@ -133,13 +133,13 @@ PROGRAM md_lj_mts
   END DO
   kin         = 0.5*SUM(v**2)
   energy      = ( SUM(pot) + kin ) / REAL ( n )
-  temperature = 2.0 * kin / REAL ( 3*(n-1) )
-  pressure    = density * temperature + SUM(vir) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy', energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature',  temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',     pressure
+  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
+  pres_virial = density * temp_kinet + SUM(vir) / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',    energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',      temp_kinet
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure', pres_virial
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temperature', 'Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temp-Kinet', 'Virial Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -177,11 +177,11 @@ PROGRAM md_lj_mts
 
         kin         = 0.5*SUM(v**2)
         energy      = ( SUM(pot) + kin ) / REAL ( n )
-        temperature = 2.0 * kin / REAL ( 3*(n-1) )
-        pressure    = density * temperature + SUM(vir) / box**3
+        temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
+        pres_virial = density * temp_kinet + SUM(vir) / box**3
 
         ! Calculate all variables for this step
-        CALL blk_add ( [energy,temperature,pressure] )
+        CALL blk_add ( [energy,temp_kinet,pres_virial] )
 
      END DO ! End loop over steps
 
@@ -198,11 +198,11 @@ PROGRAM md_lj_mts
   END DO
   kin         = 0.5*SUM(v**2)
   energy      = ( SUM(pot) + kin ) / REAL ( n )
-  temperature = 2.0 * kin / REAL ( 3*(n-1) )
-  pressure    = density * temperature + SUM(vir) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy', energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temperature',  temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',     pressure
+  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
+  pres_virial = density * temp_kinet + SUM(vir) / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',    energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-kinet',      temp_kinet
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure', pres_virial
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r, v )
