@@ -9,7 +9,7 @@ MODULE md_module
 
   PUBLIC :: n, r, v, f
   PUBLIC :: model_description, allocate_arrays, deallocate_arrays
-  public :: force, energy_lrc
+  PUBLIC :: force, hessian, energy_lrc
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
@@ -30,7 +30,7 @@ CONTAINS
   END SUBROUTINE model_description
 
   SUBROUTINE allocate_arrays ( box, r_cut )
-    USE verlet_list_module, only : initialize_list
+    USE verlet_list_module, ONLY : initialize_list
     REAL, INTENT(in) :: box   ! simulation box length
     REAL, INTENT(in) :: r_cut ! potential cutoff distance
 
@@ -48,12 +48,12 @@ CONTAINS
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
-    USE verlet_list_module, only : finalize_list
+    USE verlet_list_module, ONLY : finalize_list
     DEALLOCATE ( r, v, f )
-    call finalize_list
+    CALL finalize_list
   END SUBROUTINE deallocate_arrays
   
-  SUBROUTINE force ( box, r_cut, pot, pot_sh, vir )
+  SUBROUTINE force ( box, r_cut, pot, pot_sh, vir, lap )
     USE verlet_list_module, ONLY : point, list, make_list
 
     REAL, INTENT(in)  :: box    ! simulation box length
@@ -61,12 +61,16 @@ CONTAINS
     REAL, INTENT(out) :: pot    ! total potential energy
     REAL, INTENT(out) :: pot_sh ! potential shifted to zero at cutoff
     REAL, INTENT(out) :: vir    ! virial
+    REAL, INTENT(out) :: lap    ! Laplacian
 
-    ! Calculates potential (unshifted and shifted), virial and forces
+    ! Calculates potential (unshifted and shifted), virial, Laplacian, and forces
     ! It is assumed that positions are in units where box = 1
+    ! Forces are calculated in units where sigma = 1 and epsilon = 1
+    ! Uses a Verlet list
 
     INTEGER            :: i, j, k, n_cut
-    REAL               :: r_cut_box, r_cut_box_sq, box_sq, rij_sq, sr2, sr6, sr12, potij, virij
+    REAL               :: r_cut_box, r_cut_box_sq, box_sq, rij_sq
+    REAL               :: sr2, sr6, sr12, potij, virij, lapij
     REAL, DIMENSION(3) :: rij, fij
 
     r_cut_box    = r_cut / box
@@ -78,6 +82,7 @@ CONTAINS
     f     = 0.0
     pot   = 0.0
     vir   = 0.0
+    lap   = 0.0
     n_cut = 0
 
     DO i = 1, n - 1 ! Begin outer loop over atoms
@@ -99,8 +104,10 @@ CONTAINS
              sr12   = sr6 ** 2
              potij  = sr12 - sr6
              virij  = potij + sr12
+             lapij  = ( 22.0*sr12 - 5.0*sr6 ) * sr2
              pot    = pot + potij
              vir    = vir + virij
+             lap    = lap + lapij
              fij    = rij * virij / rij_sq
              f(:,i) = f(:,i) + fij
              f(:,j) = f(:,j) - fij
@@ -125,6 +132,7 @@ CONTAINS
     pot    = pot    * 4.0
     pot_sh = pot_sh * 4.0
     vir    = vir    * 24.0 / 3.0
+    lap    = lap    * 24.0 * 2.0
 
   END SUBROUTINE force
   
@@ -149,5 +157,66 @@ CONTAINS
     vir     = vir * pi * density * REAL(n)
 
   END SUBROUTINE energy_lrc
+  
+  FUNCTION hessian ( box, r_cut ) RESULT ( hes )
+    USE verlet_list_module, ONLY : point, list, make_list
+
+    REAL, INTENT(in)  :: box    ! simulation box length
+    REAL, INTENT(in)  :: r_cut  ! potential cutoff distance
+    REAL              :: hes    ! result
+
+    ! Calculates Hessian function (for 1/N correction to config temp)
+    ! This routine is only needed in a constant-energy ensemble
+    ! It is assumed that positions are in units where box = 1
+    ! but the result is given in units where sigma = 1 and epsilon = 1
+    ! It is assumed that forces have already been calculated 
+    ! Uses a Verlet list
+
+    INTEGER            :: i, j, k
+    REAL               :: r_cut_box, r_cut_box_sq, box_sq, rij_sq
+    REAL               :: sr2, sr6, sr8, sr10, rf, ff, v1, v2
+    REAL, DIMENSION(3) :: rij, fij
+
+    r_cut_box    = r_cut / box
+    r_cut_box_sq = r_cut_box ** 2
+    box_sq       = box ** 2
+
+    CALL make_list ( n, r )
+    
+    hes = 0.0
+
+    DO i = 1, n - 1 ! Begin outer loop over atoms
+
+       DO k =  point(i), point(i+1) - 1 ! Begin inner loop over neighbour atoms (if any)
+
+          j = list(k)
+
+          rij(:) = r(:,i) - r(:,j)           ! separation vector
+          rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundary conditions in box=1 units
+          rij_sq = SUM ( rij**2 )            ! squared separation
+
+          IF ( rij_sq < r_cut_box_sq ) THEN
+
+             rij_sq = rij_sq * box_sq ! now in sigma=1 units
+             rij(:) = rij(:) * box    ! now in sigma=1 units
+             fij(:) = f(:,i) - f(:,j) ! difference in forces
+
+             ff   = DOT_PRODUCT(fij,fij)
+             rf   = DOT_PRODUCT(rij,fij)
+             sr2  = 1.0 / rij_sq
+             sr6  = sr2 ** 3
+             sr8  = sr6 * sr2
+             sr10 = sr8 * sr2
+             v1   = 24.0 * ( 1.0 - 2.0 * sr6 ) * sr8
+             v2   = 96.0 * ( 7.0 * sr6 - 2.0 ) * sr10
+             hes  = hes + v1 * ff + v2 * rf**2
+
+          END IF
+
+       END DO ! End inner loop over neighbour atoms (if any)
+
+    END DO ! End outer loop over atoms
+
+  END FUNCTION hessian
 
 END MODULE md_module

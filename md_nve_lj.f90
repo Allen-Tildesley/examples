@@ -7,7 +7,7 @@ PROGRAM md_nve_lj
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
-       &                       force, r, v, f, n, energy_lrc
+       &                       force, energy_lrc, hessian, r, v, f, n
 
   IMPLICIT NONE
 
@@ -36,13 +36,15 @@ PROGRAM md_nve_lj
   REAL :: pot_sh      ! total shifted potential energy
   REAL :: kin         ! total kinetic energy
   REAL :: vir         ! total virial
+  REAL :: lap         ! total Laplacian
   REAL :: pressure    ! pressure (to be averaged)
   REAL :: temperature ! temperature (to be averaged)
+  REAL :: temp_config ! configurational temperature (to be averaged)
   REAL :: energy      ! total energy per atom (to be averaged)
   REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
-  REAL    :: pot_lrc, vir_lrc
+  REAL    :: pot_lrc, vir_lrc, fsq, beta
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -87,7 +89,7 @@ PROGRAM md_nve_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  CALL force ( box, r_cut, pot, pot_sh, vir )
+  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot         = pot + pot_lrc
   vir         = vir + vir_lrc
@@ -95,13 +97,17 @@ PROGRAM md_nve_lj
   energy      = ( pot + kin ) / REAL ( n )
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
   temperature = 2.0 * kin / REAL ( 3*(n-1) )
+  fsq         = SUM ( f**2 )
+  beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
+  temp_config = 1.0 / beta
   pressure    = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',   energy
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy', energy_sh
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature',    temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-config',    temp_config
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',       pressure
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temperature', 'Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temperature', 'Temp-config', 'Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -110,11 +116,11 @@ PROGRAM md_nve_lj
      DO stp = 1, nstep ! Begin loop over steps
 
         ! Velocity Verlet algorithm
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)         ! Kick half-step
-        r(:,:) = r(:,:) + dt * v(:,:) / box         ! Drift step (positions in box=1 units)
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )          ! Periodic boundaries
-        CALL force ( box, r_cut, pot, pot_sh, vir ) ! Force evaluation
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)         ! Kick half-step
+        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)              ! Kick half-step
+        r(:,:) = r(:,:) + dt * v(:,:) / box              ! Drift step (positions in box=1 units)
+        r(:,:) = r(:,:) - ANINT ( r(:,:) )               ! Periodic boundaries
+        CALL force ( box, r_cut, pot, pot_sh, vir, lap ) ! Force evaluation
+        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)              ! Kick half-step
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
         pot         = pot + pot_lrc
@@ -123,10 +129,13 @@ PROGRAM md_nve_lj
         energy      = ( pot + kin ) / REAL ( n )
         energy_sh   = ( pot_sh + kin ) / REAL ( n )
         temperature = 2.0 * kin / REAL ( 3*(n-1) )
+        fsq         = SUM ( f**2 )
+        beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
+        temp_config = 1.0 / beta
         pressure    = density * temperature + vir / box**3
 
         ! Calculate all variables for this step
-        CALL blk_add ( [energy,energy_sh,temperature,pressure] )
+        CALL blk_add ( [energy,energy_sh,temperature,temp_config,pressure] )
 
      END DO ! End loop over steps
 
@@ -138,7 +147,7 @@ PROGRAM md_nve_lj
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, r_cut, pot, pot_sh, vir )
+  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot         = pot + pot_lrc
   vir         = vir + vir_lrc
@@ -146,10 +155,14 @@ PROGRAM md_nve_lj
   energy      = ( pot + kin ) / REAL ( n )
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
   temperature = 2.0 * kin / REAL ( 3*(n-1) )
+  fsq         = SUM ( f**2 )
+  beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
+  temp_config = 1.0 / beta
   pressure    = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',   energy
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy', energy_sh
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temperature',    temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-config',    temp_config
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',       pressure
   CALL time_stamp ( output_unit )
 

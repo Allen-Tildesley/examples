@@ -229,7 +229,7 @@ CONTAINS
     LOGICAL,            INTENT(out) :: overlap    ! shows if an overlap was detected
     REAL,               INTENT(out) :: pot        ! potential
 
-    ! Calculates potential energy and virial of atom in ri
+    ! Calculates potential energy of atom in ri
     ! with j/=i, j>i, or j<i depending on j_range
     ! Includes a check for overlap (potential too high) to avoid overflow
     ! If overlap==.true., the value of pot should not be used

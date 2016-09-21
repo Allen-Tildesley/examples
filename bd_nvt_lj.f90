@@ -38,8 +38,10 @@ PROGRAM bd_nvt_lj
   REAL :: pot_sh      ! total shifted potential energy
   REAL :: kin         ! total kinetic energy
   REAL :: vir         ! total virial
+  REAL :: lap         ! total Laplacian
   REAL :: pressure    ! pressure (to be averaged)
   REAL :: temperature ! temperature (specified)
+  REAL :: temp_config ! configurational temperature (to be averaged)
   REAL :: energy      ! total energy per atom (to be averaged)
   REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
   REAL :: gamma       ! friction coefficient
@@ -64,7 +66,7 @@ PROGRAM bd_nvt_lj
   nstep       = 1000
   r_cut       = 2.5
   dt          = 0.005
-  gamma       = 0.1
+  gamma       = 1.0
   temperature = 0.7
 
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
@@ -107,7 +109,7 @@ PROGRAM bd_nvt_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  CALL force ( box, r_cut, pot, pot_sh, vir )
+  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot         = pot + pot_lrc
   vir         = vir + vir_lrc
@@ -115,13 +117,15 @@ PROGRAM bd_nvt_lj
   energy      = ( pot + kin ) / REAL ( n )
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
   temperature = 2.0 * kin / REAL ( 3*(n-1) )
+  temp_config = SUM ( f**2 )/lap
   pressure    = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial energy',         energy
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy', energy_sh
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temperature',    temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-config',    temp_config
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial pressure',       pressure
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temperature', 'Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temperature', 'Temp-config', 'Pressure' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -136,7 +140,7 @@ PROGRAM bd_nvt_lj
         v(:,:) = c0 * v(:,:) + c1 * f                     ! Friction and random effects (O)
         r(:,:) = r(:,:) + 0.5 * dt * v(:,:) / box         ! Drift half-step (A) (positions in box=1 units)
         r(:,:) = r(:,:) - ANINT ( r(:,:) )                ! Periodic boundaries (box=1 units)
-        CALL force ( box, r_cut, pot, pot_sh, vir )       ! Force evaluation
+        CALL force ( box, r_cut, pot, pot_sh, vir, lap )  ! Force evaluation
         v(:,:) = v(:,:) + 0.5 * dt * f(:,:)               ! Kick half-step (B)
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
@@ -146,10 +150,11 @@ PROGRAM bd_nvt_lj
         energy      = ( pot + kin ) / REAL ( n )
         energy_sh   = ( pot_sh + kin ) / REAL ( n )
         temperature = 2.0 * kin / REAL ( 3*(n-1) )
+        temp_config = SUM ( f**2 )/lap
         pressure    = density * temperature + vir / box**3
 
         ! Calculate all variables for this step
-        CALL blk_add ( [energy,energy_sh,temperature,pressure] )
+        CALL blk_add ( [energy,energy_sh,temperature,temp_config,pressure] )
 
      END DO ! End loop over steps
 
@@ -161,7 +166,7 @@ PROGRAM bd_nvt_lj
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, r_cut, pot, pot_sh, vir )
+  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   pot         = pot + pot_lrc
   vir         = vir + vir_lrc
@@ -169,10 +174,12 @@ PROGRAM bd_nvt_lj
   energy      = ( pot + kin ) / REAL ( n )
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
   temperature = 2.0 * kin / REAL ( 3*(n-1) )
+  temp_config = SUM ( f**2 )/lap
   pressure    = density * temperature + vir / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',         energy
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy', energy_sh
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temperature',    temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-config',    temp_config
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final pressure',       pressure
   CALL time_stamp ( output_unit )
 
