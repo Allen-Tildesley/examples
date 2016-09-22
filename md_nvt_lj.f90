@@ -4,7 +4,7 @@ PROGRAM md_nvt_lj
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE maths_module,     ONLY : random_normal
+  USE maths_module,     ONLY : random_normals
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
        &                       force, r, v, f, n, energy_lrc
@@ -34,9 +34,6 @@ PROGRAM md_nvt_lj
   REAL :: dt          ! time step
   REAL :: r_cut       ! potential cutoff distance
   REAL :: temperature ! specified temperature
-  REAL :: q           ! thermal inertia
-  REAL :: eta         ! thermal coordinate (needed only to calculate conserved quantity)
-  REAL :: p_eta       ! thermal momentum
   REAL :: g           ! number of degrees of freedom
   REAL :: conserved   ! conserved energy-like quantity
   REAL :: pot         ! total potential energy
@@ -49,6 +46,11 @@ PROGRAM md_nvt_lj
   REAL :: temp_config ! configurational temperature (to be averaged)
   REAL :: energy      ! total energy per atom (to be averaged)
   REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
+
+  INTEGER, PARAMETER    :: m = 3 ! number of Nose-Hoover chain variables
+  REAL,    DIMENSION(m) :: q     ! thermal inertias
+  REAL,    DIMENSION(m) :: eta   ! thermal coordinates (needed only to calculate conserved quantity)
+  REAL,    DIMENSION(m) :: p_eta ! thermal momenta
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
   REAL    :: pot_lrc, vir_lrc
@@ -71,7 +73,10 @@ PROGRAM md_nvt_lj
   r_cut       = 2.5
   dt          = 0.005
   temperature = 0.7   ! specified temperature
-  q           = 300.0 ! should be of order 3N*kT*(physical timescale of system)**2
+  q           = 2.0   ! should be of order kT*(physical timescale of system)**2
+  q(1)        = 500.0 ! should be of order 3N*kT*(physical timescale of system)**2
+
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Nose-Hoover chains with m = ', m
 
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
@@ -80,12 +85,12 @@ PROGRAM md_nvt_lj
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in md_nvt_lj'
   END IF
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Specified temperature',     temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Thermal inertia Q',         q
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'      ) 'Number of blocks',          nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'      ) 'Number of steps per block', nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'    ) 'Potential cutoff distance', r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'    ) 'Time step',                 dt
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'    ) 'Specified temperature',     temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'Thermal inertias Q',         q
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
@@ -101,9 +106,10 @@ PROGRAM md_nvt_lj
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   ! Initial values of thermal variables
-  eta   = 0.0
-  p_eta = random_normal ( 0.0, SQRT(q*temperature) )
-  g     = REAL ( 3*(n-1) )
+  eta(:) = 0.0
+  CALL random_normals ( 0.0, SQRT(temperature), p_eta(:)  )
+  p_eta(:) = p_eta(:) * SQRT(q(:))
+  g  = REAL ( 3*(n-1) )
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
@@ -112,7 +118,7 @@ PROGRAM md_nvt_lj
   kin         = 0.5*SUM(v**2)
   energy      = ( pot + kin ) / REAL ( n )
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  conserved   = energy_sh + ( 0.5*p_eta**2/q + g*temperature*eta ) / REAL(n)
+  conserved   = energy_sh + ( SUM(0.5*p_eta**2/q) + temperature*(g*eta(1)+SUM(eta(2:m))) ) / REAL(n)
   temp_kinet  = 2.0 * kin / g
   temp_config = SUM(f**2) / lap
   pres_virial = density * temperature + vir / box**3
@@ -132,18 +138,18 @@ PROGRAM md_nvt_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        CALL u4 ( dt/4.0 )
+        CALL u4 ( dt/4.0, m, 1, -1 )
         CALL u3 ( dt/2.0 )
-        CALL u4 ( dt/4.0 )
+        CALL u4 ( dt/4.0, 1, m, 1 )
 
         CALL u2 ( dt/2.0 )
         CALL u1 ( dt )
         CALL force ( box, r_cut, pot, pot_sh, vir, lap )
         CALL u2 ( dt/2.0 )
 
-        CALL u4 ( dt/4.0 )
+        CALL u4 ( dt/4.0, m, 1, -1 )
         CALL u3 ( dt/2.0 )
-        CALL u4 ( dt/4.0 )
+        CALL u4 ( dt/4.0, 1, m, 1 )
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
         pot         = pot + pot_lrc
@@ -151,7 +157,7 @@ PROGRAM md_nvt_lj
         kin         = 0.5*SUM(v**2)
         energy      = ( pot + kin ) / REAL ( n )
         energy_sh   = ( pot_sh + kin ) / REAL ( n )
-        conserved   = energy_sh + ( 0.5*p_eta**2/q + g*temperature*eta ) / REAL(n)
+        conserved   = energy_sh + ( SUM(0.5*p_eta**2/q) + temperature*(g*eta(1)+SUM(eta(2:m))) ) / REAL(n)
         temp_kinet  = 2.0 * kin / g
         temp_config = SUM(f**2) / lap
         pres_virial = density * temperature + vir / box**3
@@ -176,7 +182,7 @@ PROGRAM md_nvt_lj
   kin         = 0.5*SUM(v**2)
   energy      = ( pot + kin ) / REAL ( n )
   energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  conserved   = energy_sh + ( 0.5*p_eta**2/q + g*temperature*eta ) / REAL(n)
+  conserved   = energy_sh + ( SUM(0.5*p_eta**2/q) + temperature*(g*eta(1)+SUM(eta(2:m))) ) / REAL(n)
   temp_kinet  = 2.0 * kin / g
   temp_config = SUM(f**2) / lap
   pres_virial = density * temperature + vir / box**3
@@ -212,17 +218,42 @@ CONTAINS
   SUBROUTINE u3 ( t ) ! U3: thermostat propagator
     REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
 
-    v(:,:) = v(:,:) * EXP ( -t * p_eta / q )
-    eta    = eta + t * p_eta / q
+    v(:,:) = v(:,:) * EXP ( -t * p_eta(1) / q(1) )
+    eta(:) = eta(:) + t * p_eta(:) / q(:)
 
   END SUBROUTINE u3
 
-  SUBROUTINE u4 ( t ) ! U4: thermostat propagator
-    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/4)
+  SUBROUTINE u4 ( t, j_start, j_stop, j_stride ) ! U4: thermostat propagator
+    REAL, INTENT(in)    :: t                         ! time over which to propagate (typically dt/4)
+    INTEGER, INTENT(in) :: j_start, j_stop, j_stride ! order in which to tackle variables
 
-    p_eta  = p_eta + t * ( SUM(v**2) - g*temperature )
+    INTEGER         :: j
+    REAL            :: gj, x, c
+    real, parameter :: c1 = -1.0/2.0, c2 = 1.0/6.0, c3 = -1.0/24.0
+
+    DO j = j_start, j_stop, j_stride ! loop over each momentum in turn
+
+       IF ( j == 1 ) THEN ! the driver Gj for p_eta(1) is different
+          gj = SUM(v**2) - g*temperature
+       ELSE
+          gj = ( p_eta(j-1)**2 / q(j-1) ) - temperature
+       END IF
+
+       IF ( j == m ) THEN ! the equation for p_eta(M) is different
+          p_eta(j)  = p_eta(j) + t * gj
+       ELSE
+          x = t * p_eta(j+1)/q(j+1)
+          IF ( x < 0.001 ) THEN ! guard against small values
+             c = 1.0 + x * ( c1 + x * ( c2 + x * c3 ) ) ! Taylor series to order 3
+          ELSE
+             c = (1.0-EXP(-x))/x
+          END IF ! end guard against small values
+          p_eta(j) = p_eta(j)*EXP(-x) + t * gj * c
+       END IF
+
+    END DO ! end loop over each momentum in turn
 
   END SUBROUTINE u4
 
-END PROGRAM
+END PROGRAM md_nvt_lj
 
