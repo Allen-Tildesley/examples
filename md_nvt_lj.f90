@@ -14,6 +14,7 @@ PROGRAM md_nvt_lj
   ! Takes in a configuration of atoms (positions, velocities)
   ! Cubic periodic boundary conditions
   ! Conducts molecular dynamics using a measure-preserving algorithm for the Nose-Hoover equations
+  ! Nose-Hoover chains are used, following Martyna et al, Molec Phys, 87, 1117 (1996)
   ! Uses no special neighbour lists
 
   ! Reads several variables and options from standard input using a namelist nml
@@ -131,17 +132,18 @@ PROGRAM md_nvt_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        p_eta  = p_eta + 0.5*dt * ( SUM(v**2) - g*temperature ) ! U4 half-step
-        v(:,:) = v(:,:) * EXP ( -0.5*dt * p_eta / q )           ! U3 half-step
-        eta    = eta + 0.5*dt * p_eta / q                       ! U3 half-step
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)                     ! U2 (kick) half-step
-        r(:,:) = r(:,:) + dt * v(:,:) / box                     ! U1 (drift) step (positions in box=1 units)
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )                      ! Periodic boundaries
-        CALL force ( box, r_cut, pot, pot_sh, vir, lap )        ! Force evaluation
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)                     ! U2 (kick) half-step
-        eta    = eta + 0.5*dt * p_eta / q                       ! U3 half-step
-        v(:,:) = v(:,:) * EXP ( -0.5*dt * p_eta / q )           ! U3 half-step
-        p_eta  = p_eta + 0.5*dt * ( SUM(v**2) - g*temperature ) ! U4 half-step
+        CALL u4 ( dt/4.0 )
+        CALL u3 ( dt/2.0 )
+        CALL u4 ( dt/4.0 )
+
+        CALL u2 ( dt/2.0 )
+        CALL u1 ( dt )
+        CALL force ( box, r_cut, pot, pot_sh, vir, lap )
+        CALL u2 ( dt/2.0 )
+
+        CALL u4 ( dt/4.0 )
+        CALL u3 ( dt/2.0 )
+        CALL u4 ( dt/4.0 )
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
         pot         = pot + pot_lrc
@@ -190,5 +192,37 @@ PROGRAM md_nvt_lj
 
   CALL deallocate_arrays
 
-END PROGRAM md_nvt_lj
+CONTAINS
+
+  SUBROUTINE u1 ( t ) ! U1: velocity Verlet drift step propagator
+    REAL, INTENT(in) :: t ! time over which to propagate (typically dt)
+
+    r(:,:) = r(:,:) + t * v(:,:) / box  ! positions in box=1 units
+    r(:,:) = r(:,:) - ANINT ( r(:,:) )  ! periodic boundaries
+
+  END SUBROUTINE u1
+
+  SUBROUTINE u2 ( t ) ! U2: velocity Verlet kick step propagator
+    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
+
+    v(:,:) = v(:,:) + t * f(:,:)
+
+  END SUBROUTINE u2
+
+  SUBROUTINE u3 ( t ) ! U3: thermostat propagator
+    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
+
+    v(:,:) = v(:,:) * EXP ( -t * p_eta / q )
+    eta    = eta + t * p_eta / q
+
+  END SUBROUTINE u3
+
+  SUBROUTINE u4 ( t ) ! U4: thermostat propagator
+    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/4)
+
+    p_eta  = p_eta + t * ( SUM(v**2) - g*temperature )
+
+  END SUBROUTINE u4
+
+END PROGRAM
 
