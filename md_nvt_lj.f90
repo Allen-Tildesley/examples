@@ -15,6 +15,9 @@ PROGRAM md_nvt_lj
   ! Cubic periodic boundary conditions
   ! Conducts molecular dynamics using a measure-preserving algorithm for the Nose-Hoover equations
   ! Nose-Hoover chains are used, following Martyna et al, Molec Phys, 87, 1117 (1996)
+  ! and Tuckerman et al J Phys A, 39, 5629 (2006)
+  ! To keep this example reasonably simple, we do not subdivide the timesteps with a
+  ! Suzuki-Yoshida decomposition, as described in those papers
   ! Uses no special neighbour lists
 
   ! Reads several variables and options from standard input using a namelist nml
@@ -36,6 +39,7 @@ PROGRAM md_nvt_lj
   REAL :: temperature ! specified temperature
   REAL :: g           ! number of degrees of freedom
   REAL :: conserved   ! conserved energy-like quantity
+  REAL :: tau         ! thermostat time scale
   REAL :: pot         ! total potential energy
   REAL :: pot_sh      ! total shifted potential energy
   REAL :: kin         ! total kinetic energy
@@ -59,7 +63,7 @@ PROGRAM md_nvt_lj
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
 
-  NAMELIST /nml/ nblock, nstep, r_cut, dt, temperature, q
+  NAMELIST /nml/ nblock, nstep, r_cut, dt, temperature, tau
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_nvt_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVT ensemble'
@@ -71,10 +75,9 @@ PROGRAM md_nvt_lj
   nblock      = 10
   nstep       = 1000
   r_cut       = 2.5
-  dt          = 0.005
-  temperature = 0.7   ! specified temperature
-  q           = 2.0   ! should be of order kT*(physical timescale of system)**2
-  q(1)        = 500.0 ! should be of order 3N*kT*(physical timescale of system)**2
+  dt          = 0.002
+  temperature = 0.7 ! specified temperature
+  tau         = 2.0 ! desired thermostat timescale
 
   WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Nose-Hoover chains with m = ', m
 
@@ -85,12 +88,12 @@ PROGRAM md_nvt_lj
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in md_nvt_lj'
   END IF
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'      ) 'Number of blocks',          nblock
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'      ) 'Number of steps per block', nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'    ) 'Potential cutoff distance', r_cut
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'    ) 'Time step',                 dt
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'    ) 'Specified temperature',     temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'Thermal inertias Q',         q
+
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Specified temperature',     temperature
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
@@ -106,28 +109,17 @@ PROGRAM md_nvt_lj
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   ! Initial values of thermal variables
+  g    = REAL ( 3*(n-1) )
+  q    = temperature * tau**2   
+  q(1) = g * temperature * tau**2
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'Thermal inertias Q', q
   eta(:) = 0.0
   CALL random_normals ( 0.0, SQRT(temperature), p_eta(:)  )
   p_eta(:) = p_eta(:) * SQRT(q(:))
-  g  = REAL ( 3*(n-1) )
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot         = pot + pot_lrc
-  vir         = vir + vir_lrc
-  kin         = 0.5*SUM(v**2)
-  energy      = ( pot + kin ) / REAL ( n )
-  energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  conserved   = energy_sh + ( SUM(0.5*p_eta**2/q) + temperature*(g*eta(1)+SUM(eta(2:m))) ) / REAL(n)
-  temp_kinet  = 2.0 * kin / g
-  temp_config = SUM(f**2) / lap
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial conserved quantity', conserved
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',       energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy',     energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',         temp_kinet
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-config',        temp_config
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure',    pres_virial
+  CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Conserved', 'Energy', 'Shifted Energy', &
        &                                  'Temp-Kinet', 'Temp-Config', 'Virial Pressure' ] )
@@ -138,29 +130,21 @@ PROGRAM md_nvt_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        CALL u4 ( dt/4.0, m, 1, -1 )
+        CALL u4 ( dt/4.0, m, 1 )
         CALL u3 ( dt/2.0 )
-        CALL u4 ( dt/4.0, 1, m, 1 )
+        CALL u4 ( dt/4.0, 1, m )
 
         CALL u2 ( dt/2.0 )
         CALL u1 ( dt )
         CALL force ( box, r_cut, pot, pot_sh, vir, lap )
         CALL u2 ( dt/2.0 )
 
-        CALL u4 ( dt/4.0, m, 1, -1 )
+        CALL u4 ( dt/4.0, m, 1 )
         CALL u3 ( dt/2.0 )
-        CALL u4 ( dt/4.0, 1, m, 1 )
+        CALL u4 ( dt/4.0, 1, m )
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-        pot         = pot + pot_lrc
-        vir         = vir + vir_lrc
-        kin         = 0.5*SUM(v**2)
-        energy      = ( pot + kin ) / REAL ( n )
-        energy_sh   = ( pot_sh + kin ) / REAL ( n )
-        conserved   = energy_sh + ( SUM(0.5*p_eta**2/q) + temperature*(g*eta(1)+SUM(eta(2:m))) ) / REAL(n)
-        temp_kinet  = 2.0 * kin / g
-        temp_config = SUM(f**2) / lap
-        pres_virial = density * temperature + vir / box**3
+        CALL calculate ( )
 
         ! Calculate all variables for this step
         CALL blk_add ( [conserved,energy,energy_sh,temp_kinet,temp_config,pres_virial] )
@@ -177,21 +161,7 @@ PROGRAM md_nvt_lj
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot         = pot + pot_lrc
-  vir         = vir + vir_lrc
-  kin         = 0.5*SUM(v**2)
-  energy      = ( pot + kin ) / REAL ( n )
-  energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  conserved   = energy_sh + ( SUM(0.5*p_eta**2/q) + temperature*(g*eta(1)+SUM(eta(2:m))) ) / REAL(n)
-  temp_kinet  = 2.0 * kin / g
-  temp_config = SUM(f**2) / lap
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final conserved quantity', conserved
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',       energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy',     energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-kinet',         temp_kinet
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-config',        temp_config
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',    pres_virial
+  CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
@@ -201,6 +171,7 @@ PROGRAM md_nvt_lj
 CONTAINS
 
   SUBROUTINE u1 ( t ) ! U1: velocity Verlet drift step propagator
+    IMPLICIT NONE
     REAL, INTENT(in) :: t ! time over which to propagate (typically dt)
 
     r(:,:) = r(:,:) + t * v(:,:) / box  ! positions in box=1 units
@@ -209,6 +180,7 @@ CONTAINS
   END SUBROUTINE u1
 
   SUBROUTINE u2 ( t ) ! U2: velocity Verlet kick step propagator
+    IMPLICIT NONE
     REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
 
     v(:,:) = v(:,:) + t * f(:,:)
@@ -216,6 +188,7 @@ CONTAINS
   END SUBROUTINE u2
 
   SUBROUTINE u3 ( t ) ! U3: thermostat propagator
+    IMPLICIT NONE
     REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
 
     v(:,:) = v(:,:) * EXP ( -t * p_eta(1) / q(1) )
@@ -223,13 +196,20 @@ CONTAINS
 
   END SUBROUTINE u3
 
-  SUBROUTINE u4 ( t, j_start, j_stop, j_stride ) ! U4: thermostat propagator
-    REAL, INTENT(in)    :: t                         ! time over which to propagate (typically dt/4)
-    INTEGER, INTENT(in) :: j_start, j_stop, j_stride ! order in which to tackle variables
+  SUBROUTINE u4 ( t, j_start, j_stop ) ! U4: thermostat propagator
+    IMPLICIT NONE
+    REAL,    INTENT(in) :: t               ! time over which to propagate (typically dt/4)
+    INTEGER, INTENT(in) :: j_start, j_stop ! order in which to tackle variables
 
-    INTEGER         :: j
+    INTEGER         :: j, j_stride
     REAL            :: gj, x, c
-    real, parameter :: c1 = -1.0/2.0, c2 = 1.0/6.0, c3 = -1.0/24.0
+    REAL, PARAMETER :: c1 = -1.0/2.0, c2 = 1.0/6.0, c3 = -1.0/24.0
+
+    IF ( j_start > j_stop ) THEN
+       j_stride = -1
+    ELSE
+       j_stride = 1
+    END IF
 
     DO j = j_start, j_stop, j_stride ! loop over each momentum in turn
 
@@ -254,6 +234,35 @@ CONTAINS
     END DO ! end loop over each momentum in turn
 
   END SUBROUTINE u4
+
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER (len=*), INTENT(in), OPTIONAL :: string
+
+    ! This routine calculates variables of interest and (optionally) writes them out
+
+    pot         = pot + pot_lrc
+    vir         = vir + vir_lrc
+    kin         = 0.5*SUM(v**2)
+    energy      = ( pot + kin ) / REAL ( n )
+    energy_sh   = ( pot_sh + kin ) / REAL ( n )
+    conserved   = pot_sh + kin + SUM(0.5*p_eta**2/q) + temperature*(g*eta(1)+SUM(eta(2:m)))
+    conserved   = conserved / REAL(n)
+    temp_kinet  = 2.0 * kin / g
+    temp_config = SUM(f**2) / lap
+    pres_virial = density * temperature + vir / box**3
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Conserved quantity', conserved
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Total energy',       energy
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Shifted energy',     energy_sh
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-kinet',         temp_kinet
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-config',        temp_config
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure',    pres_virial
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM md_nvt_lj
 
