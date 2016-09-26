@@ -117,15 +117,7 @@ PROGRAM dpd
 
   CALL make_ij ( box ) ! construct initial list of pairs within range
   CALL force ( box, alpha, pot, vir, lap )
-  kin         = 0.5*SUM(v**2)
-  energy      = ( pot + kin ) / REAL ( n )
-  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-  temp_config = SUM(f**2) / lap
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',    energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',      temp_kinet
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-config',     temp_config
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure', pres_virial
+  CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temp-kinet', 'Temp-config', 'Virial Pressure' ] )
 
@@ -146,13 +138,8 @@ PROGRAM dpd
         CALL force ( box, alpha, pot, vir, lap ) ! Force evaluation
         v(:,:) = v(:,:) + 0.5 * dt * f(:,:)      ! Kick half-step
 
-        kin         = 0.5*SUM(v**2)
-        energy      = ( pot + kin ) / REAL ( n )
-        temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-        temp_config = SUM(f**2) / lap
-        pres_virial = density * temperature + vir / box**3
-
-        ! Calculate all variables for this step
+        CALL calculate ( )
+        
         CALL blk_add ( [energy,temp_kinet,temp_config,pres_virial] )
 
      END DO ! End loop over steps
@@ -166,15 +153,7 @@ PROGRAM dpd
   CALL run_end ( output_unit )
 
   CALL force ( box, alpha, pot, vir, lap )
-  kin         = 0.5*SUM(v**2)
-  energy      = ( pot + kin ) / REAL ( n )
-  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-  temp_config = SUM(f**2) / lap
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',    energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-kinet',      temp_kinet
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-config',     temp_config
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure', pres_virial
+  CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Approx EOS pressure', density*temperature+0.101*alpha*density**2
@@ -183,5 +162,27 @@ PROGRAM dpd
 
   CALL deallocate_arrays
 
+CONTAINS
+
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+
+    kin         = 0.5*SUM(v**2)
+    energy      = ( pot + kin ) / REAL ( n )
+    temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
+    temp_config = SUM(f**2) / lap
+    pres_virial = density * temperature + vir / box**3
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Total energy',    energy
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-kinet',      temp_kinet
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-config',     temp_config
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure', pres_virial
+    END IF
+
+  END SUBROUTINE calculate
+  
 END PROGRAM dpd
 

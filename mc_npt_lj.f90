@@ -52,7 +52,7 @@ PROGRAM mc_npt_lj
 
   LOGICAL            :: overlap
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
-  REAL               :: box_scale, box_new, density_new, delta, zeta1
+  REAL               :: box_scale, box_new, den_scale, delta, zeta1
   REAL               :: pot_old, pot_new, pot_lrc, vir_old, vir_new, vir_lrc
   REAL, DIMENSION(3) :: ri   ! position of atom i
   REAL, DIMENSION(3) :: zeta ! random numbers
@@ -96,8 +96,6 @@ PROGRAM mc_npt_lj
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'  ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Simulation box length', box
-  density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Density', density
 
   CALL allocate_arrays ( box, r_cut ) ! Allocate r
 
@@ -112,12 +110,7 @@ PROGRAM mc_npt_lj
      STOP 'Error in mc_npt_lj'
   END IF
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot         = pot + pot_lrc
-  vir         = vir + vir_lrc
-  potential   = pot / REAL ( n )
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure',  pres_virial
+  CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: &
        &            'Move ratio', 'Box ratio', 'Density', 'Potential', 'Virial Pressure' ] )
@@ -163,31 +156,28 @@ PROGRAM mc_npt_lj
         move_ratio = REAL(moves) / REAL(n)
 
         box_move_ratio = 0.0
-        CALL RANDOM_NUMBER ( zeta1 )         ! uniform random number in range (0,1)
-        zeta(1)     = 2.0*zeta1 - 1.0        ! now in range (-1,+1)
-        box_scale   = EXP ( zeta1*db_max )   ! sampling log(box) and log(vol) uniformly
-        box_new     = box * box_scale        ! new box (in sigma units)
-        density_new = density / box_scale**3 ! new reduced density
+        CALL RANDOM_NUMBER ( zeta1 )     ! uniform random number in range (0,1)
+        zeta1     = 2.0*zeta1 - 1.0      ! now in range (-1,+1)
+        box_scale = EXP ( zeta1*db_max ) ! sampling log(box) and log(vol) uniformly
+        box_new   = box * box_scale      ! new box (in sigma units)
+        den_scale = 1.0 / box_scale**3   ! density scaling factor
         CALL energy ( box_new, r_cut, overlap, pot_new, vir_new )
 
         IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
 
            delta = ( (pot_new-pot) + pressure * ( box_new**3 - box**3 )  ) / temperature &
-                &   + REAL(n+1) * LOG(density_new/density) ! factor (n+1) consistent with box scaling
+                &   + REAL(n+1) * LOG(den_scale) ! factor (n+1) consistent with box scaling
 
            IF ( metropolis ( delta ) ) THEN ! accept because Metropolis test
               pot     = pot_new     ! update both parts of potential
               vir     = vir_new     ! update both parts of virial
               box     = box_new     ! update box
-              density = density_new ! update density
               box_move_ratio = 1.0  ! increment move counter
            END IF ! reject Metropolis test
 
         END IF ! reject overlapping configuration
 
-        ! Calculate all variables for this step
-        potential   = pot / REAL(n)
-        pres_virial = density * temperature + vir / box**3
+        CALL calculate ( )
         CALL blk_add ( [move_ratio,box_move_ratio,density,potential,pres_virial] )
 
      END DO ! End loop over steps
@@ -200,11 +190,7 @@ PROGRAM mc_npt_lj
 
   CALL run_end ( output_unit )
 
-  potential   = pot / REAL ( n )
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final density',          density
+  CALL calculate ( 'Final values' )
 
   CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN ! should never happen
@@ -212,19 +198,31 @@ PROGRAM mc_npt_lj
      STOP 'Error in mc_npt_lj'
   END IF
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot         = pot + pot_lrc
-  vir         = vir + vir_lrc
-  potential   = pot / REAL ( n )
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final density',          REAL(n) / box**3
+  CALL calculate ( 'Final check' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
+
+CONTAINS
+
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+
+    density     = REAL(n) / box**3
+    potential   = ( pot + pot_lrc ) / REAL ( n )
+    pres_virial = density * temperature + ( vir + vir_lrc ) / box**3
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential energy', potential
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure',  pres_virial
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',          density
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM mc_npt_lj
 

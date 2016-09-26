@@ -97,12 +97,7 @@ PROGRAM mc_nvt_lj
      STOP 'Error in mc_nvt_lj'
   END IF
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot = pot + pot_lrc
-  vir = vir + vir_lrc
-  potential   = pot / REAL ( n )
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial virial pressure',  pres_virial
+  CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Potential', 'Virial Pressure' ] )
 
@@ -143,8 +138,7 @@ PROGRAM mc_nvt_lj
 
         ! Calculate all variables for this step
         move_ratio  = REAL(moves) / REAL(n)
-        potential   = pot / REAL(n)
-        pres_virial = density * temperature + vir / box**3
+        CALL calculate ( )
         CALL blk_add ( [move_ratio,potential,pres_virial] )
 
      END DO ! End loop over steps
@@ -157,10 +151,7 @@ PROGRAM mc_nvt_lj
 
   CALL run_end ( output_unit )
 
-  potential   = pot / REAL ( n )
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
+  CALL calculate ( 'Final values' )
 
   CALL energy ( box, r_cut, overlap, pot, vir )
   IF ( overlap ) THEN ! should never happen
@@ -168,18 +159,29 @@ PROGRAM mc_nvt_lj
      STOP 'Error in mc_nvt_lj'
   END IF
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot        = pot + pot_lrc
-  vir        = vir + vir_lrc
-  potential  = pot / REAL ( n )
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
+  CALL calculate ( 'Final check' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
+
+CONTAINS
+
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+
+    potential   = ( pot + pot_lrc ) / REAL ( n )
+    pres_virial = density * temperature + ( vir + vir_lrc ) / box**3
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential energy', potential
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure',  pres_virial
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM mc_nvt_lj
 

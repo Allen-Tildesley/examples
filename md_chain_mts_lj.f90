@@ -82,11 +82,7 @@ PROGRAM md_chain_mts_lj
 
   CALL force ( pot )
   CALL spring ( k_spring, bond, pot_spring )
-  kin        = 0.5*SUM(v**2)
-  energy     = ( pot + pot_spring + kin ) / REAL ( n )
-  temp_kinet = 2.0 * kin / REAL ( 3*(n-1) ) 
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy', energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',   temp_kinet
+  CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temp-Kinet' ] )
 
@@ -110,11 +106,8 @@ PROGRAM md_chain_mts_lj
         v = v + 0.5 * REAL(n_mts) * dt * f ! Kick half-step
         ! End single time step of length n_mts*dt
 
-        kin        = 0.5*SUM(v**2)
-        energy     = ( pot + pot_spring + kin ) / REAL ( n )
-        temp_kinet = 2.0 * kin / REAL ( 3*(n-1) )
-
         ! Calculate all variables for this step
+        CALL calculate ( )
         CALL blk_add ( [energy,temp_kinet] )
 
      END DO ! End loop over steps
@@ -129,17 +122,31 @@ PROGRAM md_chain_mts_lj
 
   CALL force ( pot )
   CALL spring ( k_spring, bond, pot_spring )
-  kin         = 0.5*SUM(v**2)
-  energy      = ( pot + pot_spring + kin ) / REAL ( n )
-  temp_kinet = 2.0 * kin / REAL ( 3*(n-1) )
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Final total energy',             energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Final temp-kinet',               temp_kinet
+  CALL calculate ( 'Final values' )
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r, v )
 
   CALL deallocate_arrays
+
+CONTAINS
+
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+
+    kin         = 0.5*SUM(v**2)
+    energy      = ( pot + pot_spring + kin ) / REAL ( n )
+    temp_kinet = 2.0 * kin / REAL ( 3*(n-1) )
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Total energy', energy
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Temp-kinet',   temp_kinet
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM md_chain_mts_lj
 
