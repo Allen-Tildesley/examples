@@ -95,11 +95,7 @@ PROGRAM md_chain_nve_lj
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
 
   CALL force ( pot )
-  kin        = 0.5*SUM(v**2)
-  energy     = ( pot + kin ) / REAL ( n )
-  temp_kinet = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy', energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',   temp_kinet
+  call calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temp-Kinet' ] )
 
@@ -114,11 +110,8 @@ PROGRAM md_chain_nve_lj
         CALL force ( pot )           ! Force evaluation
         CALL move_b ( dt, bond, wc ) ! RATTLE/MILCSHAKE part B
 
-        kin        = 0.5*SUM(v**2)
-        energy     = ( pot + kin ) / REAL ( n )
-        temp_kinet = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
-
         ! Calculate all variables for this step
+        call calculate ( )
         CALL blk_add ( [energy,temp_kinet] )
 
      END DO ! End loop over steps
@@ -132,17 +125,32 @@ PROGRAM md_chain_nve_lj
   CALL run_end ( output_unit )
 
   CALL force ( pot )
-  kin        = 0.5*SUM(v**2)
-  energy     = ( pot + kin ) / REAL ( n )
-  temp_kinet = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Final total energy',             energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Final temp-kinet',               temp_kinet
+  call calculate ( 'Final values' )
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r, v )
 
   CALL deallocate_arrays
+
+CONTAINS
+
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+
+    kin        = 0.5*SUM(v**2)
+    energy     = ( pot + kin ) / REAL ( n )
+    temp_kinet = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Total energy', energy
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Temp-kinet',   temp_kinet
+    END IF
+
+  END SUBROUTINE calculate
+
 
 END PROGRAM md_chain_nve_lj
 

@@ -8,6 +8,7 @@ env_normal=Environment(ENV=os.environ)
 env_lapack=Environment(ENV=os.environ)
 env_fftw=Environment(ENV=os.environ)
 env_mpi=Environment(ENV=os.environ,F90='mpif90',LINK='mpif90')
+env_omp=Environment(ENV=os.environ)
 
 # Assume that gfortran will be used. 
 #Tool('gfortran')(env_normal)
@@ -15,14 +16,17 @@ env_mpi=Environment(ENV=os.environ,F90='mpif90',LINK='mpif90')
 #MY_F90FLAGS='-O2 -finline-functions -funswitch-loops -fwhole-file'
 MY_F90FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2008 -Wall'
 FFTW_F90FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2008 -Wall -I/opt/local/include'
+OMP_F90FLAGS='-fdefault-real-8 -fall-intrinsics -fopenmp -std=f2008 -Wall'
 MY_LINKFLAGS=''
 LAPACK_LINKFLAGS='-L/opt/local/lib/lapack -llapack'
 FFTW_LINKFLAGS='-L/opt/local/lib -lfftw3'
+OMP_LINKFLAGS='-fopenmp'
 
 env_normal.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
 env_lapack.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=LAPACK_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
 env_fftw.Append(F90FLAGS=FFTW_F90FLAGS,LINKFLAGS=FFTW_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
 env_mpi.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
+env_omp.Append(F90FLAGS=OMP_F90FLAGS,LINKFLAGS=OMP_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
 
 variants={}
 variants['build_bd_nvt_lj']            = (['bd_nvt_lj.f90','md_lj_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
@@ -55,6 +59,7 @@ variants['build_md_nve_hs']            = (['md_nve_hs.f90','md_nve_hs_module.f90
 variants['build_md_nve_lj']            = (['md_nve_lj.f90','md_lj_module.f90','config_io_module.f90','averages_module.f90'],env_normal)
 variants['build_md_nve_lj_vl']         = (['md_nve_lj.f90','md_lj_vl_module.f90','verlet_list_module.f90','config_io_module.f90','averages_module.f90'],env_normal)
 variants['build_md_nve_lj_ll']         = (['md_nve_lj.f90','md_lj_ll_module.f90','link_list_module.f90','config_io_module.f90','averages_module.f90'],env_normal)
+variants['build_md_nve_lj_omp']        = (['md_nve_lj.f90','md_lj_omp_module.f90','config_io_module.f90','averages_module.f90'],env_omp)
 variants['build_md_nvt_lj']            = (['md_nvt_lj.f90','md_lj_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
 variants['build_md_nvt_lj_le']         = (['md_nvt_lj_le.f90','md_lj_le_module.f90','config_io_module.f90','averages_module.f90'],env_normal)
 variants['build_md_nvt_lj_llle']       = (['md_nvt_lj_le.f90','md_lj_llle_module.f90','link_list_module.f90','config_io_module.f90','averages_module.f90'],env_normal)

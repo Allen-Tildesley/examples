@@ -101,17 +101,8 @@ PROGRAM md_nvt_lj_le
 
   CALL force ( box, r_cut, strain, pot, pot_sh, vir )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot         = pot + pot_lrc
-  vir         = vir + vir_lrc
-  kin         = 0.5*SUM(v**2)
-  energy      = ( pot + kin ) / REAL ( n )
-  energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-  pres_virial = density * temp_kinet + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',    energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy',  energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',      temp_kinet
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure', pres_virial
+
+  CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temp-Kinet', 'Virial Pressure' ] )
 
@@ -167,15 +158,9 @@ PROGRAM md_nvt_lj_le
         r(:,:) = r(:,:) - ANINT ( r(:,:) )            ! Periodic boundaries (box=1 units)
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-        pot         = pot + pot_lrc
-        vir         = vir + vir_lrc
-        kin         = 0.5*SUM(v**2)
-        energy      = ( pot + kin ) / REAL ( n )
-        energy_sh   = ( pot_sh + kin ) / REAL ( n )
-        temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-        pres_virial = density * temp_kinet + vir / box**3
 
         ! Calculate all variables for this step
+        CALL calculate ( )
         CALL blk_add ( [energy,energy_sh,temp_kinet,pres_virial] )
 
      END DO ! End loop over steps
@@ -190,22 +175,36 @@ PROGRAM md_nvt_lj_le
 
   CALL force ( box, r_cut, strain, pot, pot_sh, vir )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot         = pot + pot_lrc
-  vir         = vir + vir_lrc
-  kin         = 0.5*SUM(v**2)
-  energy      = ( pot + kin ) / REAL ( n )
-  energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  temp_kinet = 2.0 * kin / REAL ( 3*(n-1) )
-  pres_virial = density * temp_kinet + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',    energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy',  energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-kinet',      temp_kinet
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure', pres_virial
+  CALL calculate ( 'Final values' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
+
+CONTAINS
+
+  SUBROUTINE calculate ( string ) 
+    IMPLICIT NONE
+    CHARACTER (len=*), INTENT(in), OPTIONAL :: string
+
+    ! This routine calculates variables of interest and (optionally) writes them out
+
+    kin         = 0.5*SUM(v**2)
+    energy      = ( pot + pot_lrc + kin ) / REAL ( n )
+    energy_sh   = ( pot_sh + kin ) / REAL ( n )
+    temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
+    pres_virial = density * temp_kinet + ( vir + vir_lrc ) / box**3
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Total energy',    energy
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Shifted energy',  energy_sh
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-kinet',      temp_kinet
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure', pres_virial
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM md_nvt_lj_le
 

@@ -91,21 +91,7 @@ PROGRAM md_nve_lj
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot         = pot + pot_lrc
-  vir         = vir + vir_lrc
-  kin         = 0.5*SUM(v**2)
-  energy      = ( pot + kin ) / REAL ( n )
-  energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-  fsq         = SUM ( f**2 )
-  beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
-  temp_config = 1.0 / beta
-  pres_virial = density * temp_kinet + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',    energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy',  energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',      temp_kinet
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-config',     temp_config
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure', pres_virial
+  CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temp-kinet', 'Temp-config', 'Virial Pressure' ] )
 
@@ -123,18 +109,9 @@ PROGRAM md_nve_lj
         v(:,:) = v(:,:) + 0.5 * dt * f(:,:)              ! Kick half-step
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-        pot         = pot + pot_lrc
-        vir         = vir + vir_lrc
-        kin         = 0.5*SUM(v**2)
-        energy      = ( pot + kin ) / REAL ( n )
-        energy_sh   = ( pot_sh + kin ) / REAL ( n )
-        temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-        fsq         = SUM ( f**2 )
-        beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
-        temp_config = 1.0 / beta
-        pres_virial = density * temp_kinet + vir / box**3
 
         ! Calculate all variables for this step
+        CALL calculate ( )
         CALL blk_add ( [energy,energy_sh,temp_kinet,temp_config,pres_virial] )
 
      END DO ! End loop over steps
@@ -149,26 +126,40 @@ PROGRAM md_nve_lj
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot         = pot + pot_lrc
-  vir         = vir + vir_lrc
-  kin         = 0.5*SUM(v**2)
-  energy      = ( pot + kin ) / REAL ( n )
-  energy_sh   = ( pot_sh + kin ) / REAL ( n )
-  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-  fsq         = SUM ( f**2 )
-  beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
-  temp_config = 1.0 / beta
-  pres_virial = density * temp_kinet + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',    energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy',  energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-kinet',      temp_kinet
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-config',     temp_config
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure', pres_virial
+  CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
 
   CALL deallocate_arrays
+
+CONTAINS
+
+  SUBROUTINE calculate ( string ) 
+    IMPLICIT NONE
+    CHARACTER (len=*), INTENT(in), OPTIONAL :: string
+
+    ! This routine calculates variables of interest and (optionally) writes them out
+
+    kin         = 0.5*SUM(v**2)
+    energy      = ( pot + pot_lrc + kin ) / REAL ( n )
+    energy_sh   = ( pot_sh + kin ) / REAL ( n )
+    temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
+    fsq         = SUM ( f**2 )
+    beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
+    temp_config = 1.0 / beta
+    pres_virial = density * temp_kinet + ( vir + vir_lrc ) / box**3
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Total energy',    energy
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Shifted energy',  energy_sh
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-kinet',      temp_kinet
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-config',     temp_config
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure', pres_virial
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM md_nve_lj
 

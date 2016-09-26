@@ -130,13 +130,7 @@ PROGRAM qmc_pi_lj
   CALL energy_qu ( box, k_spring, pot_qu )
 
   ! Calculate derived energies
-  kin          = 1.5 * n * p * temperature     ! Kinetic energy
-  potential_cl = pot_cl / REAL(n)              ! Classical potential per atom
-  potential_qu = pot_qu / REAL(n)              ! Quantum potential per atom
-  energy = ( kin + pot_cl - pot_qu ) / REAL(n) ! Total energy per atom
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial classical potential energy', potential_cl
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial quantum potential energy',   potential_qu
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial energy',                     energy
+  CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Pot-classical', 'Pot-quantum', 'Energy' ] )
 
@@ -185,9 +179,7 @@ PROGRAM qmc_pi_lj
 
         ! Calculate all variables for this step
         move_ratio   = REAL(moves) / REAL(n)
-        potential_cl = pot_cl / REAL(n)
-        potential_qu = pot_qu / REAL(n)
-        energy       = ( kin + pot_cl - pot_qu ) / REAL(n)
+        CALL calculate ( )
         CALL blk_add ( [move_ratio,potential_cl,potential_qu,energy] )
 
      END DO ! End loop over steps
@@ -206,25 +198,15 @@ PROGRAM qmc_pi_lj
 
   CALL run_end ( output_unit )
 
-  potential_cl = pot_cl / REAL(n)
-  potential_qu = pot_qu / REAL(n)
-  energy       = ( kin + pot_cl - pot_qu ) / REAL(n)
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final classical potential energy', potential_cl
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final quantum potential energy',   potential_qu
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',                     energy
+  CALL calculate ( 'Final values' )
+
   CALL energy_cl ( box, r_cut, overlap, pot_cl )
   IF ( overlap ) THEN ! this should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
   CALL energy_qu ( box, k_spring, pot_qu )
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Final check'
-  potential_cl = pot_cl / REAL(n)
-  potential_qu = pot_qu / REAL(n)
-  energy       = ( kin + pot_cl - pot_qu ) / REAL(n)
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final classical potential energy', potential_cl
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final quantum potential energy',   potential_qu
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',                     energy
+  CALL calculate ( 'Final check' )
 
   ! Write each ring polymer to a unique file
   DO k = 1, p
@@ -235,6 +217,28 @@ PROGRAM qmc_pi_lj
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
+
+CONTAINS
+  
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER (len=*), INTENT(in), OPTIONAL :: string
+
+    ! This routine calculates variables of interest and (optionally) writes them out
+
+    kin          = 1.5 * n * p * temperature           ! Kinetic energy
+    potential_cl = pot_cl / REAL(n)                    ! Classical potential per atom
+    potential_qu = pot_qu / REAL(n)                    ! Quantum potential per atom
+    energy       = ( kin + pot_cl - pot_qu ) / REAL(n) ! Total energy per atom
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Classical potential energy', potential_cl
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Quantum potential energy',   potential_qu
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Energy',                     energy
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM qmc_pi_lj
 

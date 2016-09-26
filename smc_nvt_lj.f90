@@ -116,14 +116,7 @@ PROGRAM smc_nvt_lj
 
   CALL force ( box, r_cut, pot, pot_sh, vir )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot         = pot + pot_lrc
-  vir         = vir + vir_lrc
-  energy      = 1.5*temperature + pot / REAL ( n )
-  energy_sh   = 1.5*temperature + pot_sh / REAL ( n )
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial energy',          energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial shifted energy',  energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure', pres_virial
+  call calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move Ratio', 'Energy', 'Shifted Energy', 'Virial Pressure' ] )
 
@@ -197,13 +190,9 @@ PROGRAM smc_nvt_lj
         END SELECT
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-        pot         = pot + pot_lrc
-        vir         = vir + vir_lrc
-        energy      = 1.5*temperature + pot / REAL ( n )
-        energy_sh   = 1.5*temperature + pot_sh / REAL ( n )
-        pres_virial = density * temperature + vir / box**3
 
         ! Calculate all variables for this step
+        call calculate ( )
         CALL blk_add ( [move_ratio,energy,energy_sh,pres_virial] )
 
      END DO ! End loop over steps
@@ -218,19 +207,31 @@ PROGRAM smc_nvt_lj
 
   CALL force ( box, r_cut, pot, pot_sh, vir )
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-  pot         = pot + pot_lrc
-  vir         = vir + vir_lrc
-  energy      = 1.5*temperature + pot / REAL ( n )
-  energy_sh   = 1.5*temperature + pot_sh / REAL ( n )
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',          energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final shifted energy',  energy_sh
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure', pres_virial
+  call calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
 
   CALL deallocate_arrays
+CONTAINS
+  
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER (len=*), INTENT(in), OPTIONAL :: string
+
+    ! This routine calculates variables of interest and (optionally) writes them out
+  energy      = 1.5*temperature + ( pot + pot_lrc ) / REAL ( n )
+  energy_sh   = 1.5*temperature + pot_sh / REAL ( n )
+  pres_virial = density * temperature + ( vir + vir_lrc ) / box**3
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Energy',          energy
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Shifted energy',  energy_sh
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure', pres_virial
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM smc_nvt_lj
 
