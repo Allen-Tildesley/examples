@@ -7,7 +7,7 @@ PROGRAM mc_npt_lj
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis
-  USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       energy_1, energy, energy_lrc, move, n, r, ne
   IMPLICIT NONE
 
@@ -65,7 +65,7 @@ PROGRAM mc_npt_lj
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'mc_npt_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NPT ensemble'
-  CALL model_description ( output_unit )
+  CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! Initialize random number generator
@@ -204,6 +204,7 @@ PROGRAM mc_npt_lj
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
+  CALL conclusion ( output_unit )
 
 CONTAINS
 

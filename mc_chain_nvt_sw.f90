@@ -5,7 +5,7 @@ PROGRAM mc_chain_nvt_sw
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       regrow, cranks, pivots, write_histogram, verbose, qcount, weight, &
        &                       n, nq, range, bond, r, h, s, wl
 
@@ -54,7 +54,7 @@ PROGRAM mc_chain_nvt_sw
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'mc_chain_nvt_sw'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, chain molecule, square wells'
-  CALL model_description ( output_unit )
+  CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
   wl = .FALSE. ! not using the Wang-Landau method
 
@@ -157,6 +157,7 @@ PROGRAM mc_chain_nvt_sw
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
+  CALL conclusion ( output_unit )
 
 END PROGRAM mc_chain_nvt_sw
 

@@ -10,7 +10,7 @@ MODULE mc_module
   PRIVATE
 
   PUBLIC :: n, r, lt, ne, gt
-  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   public :: resize, energy_1, energy, energy_lrc
   PUBLIC :: move, create, destroy
 
@@ -23,13 +23,13 @@ MODULE mc_module
 
 CONTAINS
 
-  SUBROUTINE model_description ( output_unit )
+  SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',   sigma    
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epslj = ', epslj    
-  END SUBROUTINE model_description
+  END SUBROUTINE introduction
 
   SUBROUTINE allocate_arrays ( box, r_cut )
     REAL, INTENT(in) :: box   ! simulation box length

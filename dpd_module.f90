@@ -8,7 +8,7 @@ MODULE dpd_module
   PRIVATE
 
   PUBLIC :: n, r, v, f, ij
-  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: force, make_ij, lowe, shardlow
 
   INTEGER                              :: n  ! number of atoms
@@ -22,12 +22,17 @@ MODULE dpd_module
 
 CONTAINS
 
-  SUBROUTINE model_description ( output_unit )
+  SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'DPD soft potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, r_cut = ', r_cut    
-  END SUBROUTINE model_description
+  END SUBROUTINE introduction
+
+  SUBROUTINE conclusion ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
+  END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays
     ALLOCATE ( r(3,n), v(3,n), f(3,n), ij(2,n*(n-1)/2) )

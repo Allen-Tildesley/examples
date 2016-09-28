@@ -6,7 +6,7 @@ PROGRAM md_nvt_lj_le
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE md_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+  USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       force, r, v, f, n, energy_lrc
 
   IMPLICIT NONE
@@ -59,7 +59,7 @@ PROGRAM md_nvt_lj_le
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_nvt_lj_le'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVT ensemble, Lees-Edwards'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
-  CALL model_description ( output_unit )
+  CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
 
   ! Set sensible default run parameters for testing
@@ -181,6 +181,7 @@ PROGRAM md_nvt_lj_le
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
+  CALL conclusion ( output_unit )
 
 CONTAINS
 

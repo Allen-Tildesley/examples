@@ -5,7 +5,7 @@ MODULE mc_module
 
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: regrow, cranks, pivots, weight, qcount, write_histogram, histogram_flat
   PUBLIC :: range, bond, n, nq, verbose, h, s, hit, r, ds, wl
 
@@ -28,13 +28,18 @@ MODULE mc_module
 
 CONTAINS
 
-  SUBROUTINE model_description ( output_unit )
+  SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Hard-sphere chain with fixed bond length'
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Square-well attractive potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ', sigma    
-  END SUBROUTINE model_description
+  END SUBROUTINE introduction
+
+  SUBROUTINE conclusion ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
+  END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays
     nq = 6*n ! anticipated maximum possible pair interactions

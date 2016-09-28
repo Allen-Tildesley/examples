@@ -8,7 +8,7 @@ MODULE smc_module
   PRIVATE
 
   PUBLIC :: n, r, r_old, v, f, f1, move, lt, ne, gt
-  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   public :: force, force1, energy_lrc
 
   INTEGER                              :: n     ! number of atoms
@@ -25,13 +25,18 @@ MODULE smc_module
 
 CONTAINS
 
-  SUBROUTINE model_description ( output_unit )
+  SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',     sigma    
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epsilon = ', epslj    
-  END SUBROUTINE model_description
+  END SUBROUTINE introduction
+
+  SUBROUTINE conclusion ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
+  END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays ( box, r_cut )
     REAL, INTENT(in) :: box   ! simulation box length

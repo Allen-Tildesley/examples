@@ -5,7 +5,7 @@ PROGRAM mc_chain_wl_sw
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       regrow, cranks, pivots, write_histogram, verbose, qcount, weight, histogram_flat, &
        &                       n, nq, range, bond, r, h, s, hit, ds, wl
 
@@ -41,7 +41,7 @@ PROGRAM mc_chain_wl_sw
   REAL    :: pivot_fraction ! fraction of atoms to try in pivot
   INTEGER :: n_pivot        ! number of atoms to try in pivot
   INTEGER :: q              ! total attractive interaction (negative of energy)
-  real    :: flatness       ! flatness criterion
+  REAL    :: flatness       ! flatness criterion
 
   INTEGER :: blk, stp, nblock, ioerr
 
@@ -54,9 +54,9 @@ PROGRAM mc_chain_wl_sw
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'mc_chain_wl_sw'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, Wang-Landau method, chain molecule, square wells'
-  CALL model_description ( output_unit )
+  CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
-  wl = .true. ! using the Wang-Landau method
+  wl = .TRUE. ! using the Wang-Landau method
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -103,7 +103,7 @@ PROGRAM mc_chain_wl_sw
 
   ! Initialize entropy
   s(0:nq) = 0.0
-  
+
   verbose = .TRUE.
   IF ( weight() == 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
@@ -119,7 +119,7 @@ PROGRAM mc_chain_wl_sw
 
      CALL blk_begin
      h = 0.0
-     hit = .false.
+     hit = .FALSE.
      ds = 2.0 / REAL(2**blk) ! entropy change, starting at 1.0 for blk=1
 
      stp = 0
@@ -134,7 +134,7 @@ PROGRAM mc_chain_wl_sw
         CALL blk_add ( [regrow_ratio,crank_ratio,pivot_ratio] )
 
         IF ( histogram_flat ( flatness ) ) EXIT steps
-        
+
      END DO steps ! End loop over steps
 
      CALL blk_end ( blk, output_unit )
@@ -143,6 +143,9 @@ PROGRAM mc_chain_wl_sw
      CALL write_histogram ( his_prefix//sav_tag )             ! save histogram
 
   END DO ! End loop over blocks
+
+  CALL deallocate_arrays
+  CALL conclusion ( output_unit )
 
 END PROGRAM mc_chain_wl_sw
 

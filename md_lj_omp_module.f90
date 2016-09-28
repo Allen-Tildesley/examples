@@ -2,15 +2,13 @@
 ! Force routine for MD simulation, Lennard-Jones atoms, OpenMP
 MODULE md_module
 
-  ! TODO MPA complete this code
-  
-    USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
-    USE omp_lib
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+  USE omp_lib
 
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: n, r, v, f
-  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: force, hessian, energy_lrc
 
   INTEGER                              :: n ! number of atoms
@@ -21,16 +19,25 @@ MODULE md_module
   REAL, PARAMETER :: sigma = 1.0 ! LJ diameter (unit of length)
   REAL, PARAMETER :: epslj = 1.0 ! LJ well depth (unit of energy)
 
+  REAL, SAVE :: wall_time
+
 CONTAINS
 
-  SUBROUTINE model_description ( output_unit )
+  SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',         sigma    
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epsilon = ',     epslj    
-    WRITE ( unit=output_unit, fmt='(a,t40,i15  )' ) 'Max # of OpenMP threads = ', omp_get_max_threads()  
-  END SUBROUTINE model_description
+    WRITE ( unit=output_unit, fmt='(a,t40,i15  )' ) 'Max # of OpenMP threads = ', omp_get_max_threads()
+    wall_time = omp_get_wtime()
+  END SUBROUTINE introduction
+
+  SUBROUTINE conclusion ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'OpenMP walltime = ', omp_get_wtime()-wall_time
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Program ends'
+  END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays ( box, r_cut )
     REAL, INTENT(in) :: box   ! simulation box length
@@ -79,9 +86,18 @@ CONTAINS
     lap   = 0.0
     n_cut = 0
 
+    ! Each thread must use its own private copies of most of the variables
+    ! The shared variables, n, r_cut_box_sq, box, box_sq, are never changed
+    ! The reduction variables are private, separately accumulated in each thread,
+    ! and then added together to give global totals at the end
+    ! The schedule(static,1) attempts to share the i-loop iterations between threads
+    ! fairly evenly, given the i-dependence of the work in the inner j-loop
+    ! Feel free to experiment with this
+
     !$omp parallel do &
     !$omp& default(shared), private(i,j,rij,rij_sq,sr2,sr6,sr12,potij,virij,lapij,fij) &
-    !$omp& reduction(+:pot,vir,lap,n_cut,f)
+    !$omp& reduction(+:pot,vir,lap,n_cut,f) &
+    !$omp& schedule(static,1)
     DO i = 1, n - 1 ! Begin outer loop over atoms
 
        DO j = i + 1, n ! Begin inner loop over atoms
@@ -175,6 +191,12 @@ CONTAINS
 
     hes = 0.0
 
+    ! Similar comments apply here as for the double loop in the force routine
+
+    !$omp parallel do &
+    !$omp& default(shared), private(i,j,rij,fij,rij_sq,ff,rf,sr2,sr6,sr8,sr10,v1,v2) &
+    !$omp& reduction(+:hes) &
+    !$omp& schedule(static,1)
     DO i = 1, n - 1 ! Begin outer loop over atoms
 
        DO j = i + 1, n ! Begin inner loop over atoms

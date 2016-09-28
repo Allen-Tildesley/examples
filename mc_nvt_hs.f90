@@ -6,7 +6,7 @@ PROGRAM mc_nvt_hs
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       overlap_1, overlap, n_overlap, n, r, ne
 
   IMPLICIT NONE
@@ -46,7 +46,7 @@ PROGRAM mc_nvt_hs
 
   WRITE( unit=output_unit, fmt='(a)' ) 'mc_nvt_hs'
   WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT'
-  CALL model_description ( output_unit )
+  CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! Initialize random number generator
@@ -137,5 +137,6 @@ PROGRAM mc_nvt_hs
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays ! Deallocates r
+  CALL conclusion ( output_unit )
 
 END PROGRAM mc_nvt_hs

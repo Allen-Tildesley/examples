@@ -8,7 +8,7 @@ MODULE md_module
   PRIVATE
 
   PUBLIC :: n, r, v, f
-  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: force, hessian, energy_lrc
 
   INTEGER                              :: n ! number of atoms
@@ -21,13 +21,18 @@ MODULE md_module
 
 CONTAINS
 
-  SUBROUTINE model_description ( output_unit )
+  SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',     sigma    
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epsilon = ', epslj    
-  END SUBROUTINE model_description
+  END SUBROUTINE introduction
+
+  SUBROUTINE conclusion ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
+  END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays ( box, r_cut )
     USE link_list_module, ONLY : initialize_list

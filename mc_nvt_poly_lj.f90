@@ -7,7 +7,7 @@ PROGRAM mc_nvt_poly_lj
   USE config_io_module, ONLY : read_cnf_mols, write_cnf_mols
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis, random_rotate_quaternion
-  USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       energy_1, energy, q_to_d, n, na, r, e, d, ne
 
   IMPLICIT NONE
@@ -62,7 +62,7 @@ PROGRAM mc_nvt_poly_lj
 
   WRITE( unit=output_unit, fmt='(a)' ) 'mc_nvt_poly_lj'
   WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, polyatomic molecule'
-  CALL model_description ( output_unit )
+  CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! Initialize random number generator
@@ -207,6 +207,7 @@ PROGRAM mc_nvt_poly_lj
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
+  CALL conclusion ( output_unit )
 
 END PROGRAM mc_nvt_poly_lj
 

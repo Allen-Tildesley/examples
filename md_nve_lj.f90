@@ -6,7 +6,7 @@ PROGRAM md_nve_lj
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE md_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+  USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       force, energy_lrc, hessian, r, v, f, n
 
   IMPLICIT NONE
@@ -55,7 +55,7 @@ PROGRAM md_nve_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_nve_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE ensemble'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
-  CALL model_description ( output_unit )
+  CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
 
   ! Set sensible default run parameters for testing
@@ -132,6 +132,7 @@ PROGRAM md_nve_lj
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
 
   CALL deallocate_arrays
+  CALL conclusion ( output_unit )
 
 CONTAINS
 

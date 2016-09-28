@@ -8,7 +8,7 @@ MODULE qmc_module
   PRIVATE
 
   PUBLIC :: n, p, r, lt, ne, gt
-  PUBLIC :: model_description, allocate_arrays, deallocate_arrays
+  PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   public :: energy_cl_1, energy_cl, energy_qu_1, energy_qu
   PUBLIC :: move
 
@@ -22,13 +22,18 @@ MODULE qmc_module
 
 CONTAINS
 
-  SUBROUTINE model_description ( output_unit )
+  SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',   sigma    
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epslj = ', epslj    
-  END SUBROUTINE model_description
+  END SUBROUTINE introduction
+
+  SUBROUTINE conclusion ( output_unit )
+    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
+  END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays ( box, r_cut )
     REAL, INTENT(in) :: box   ! simulation box length

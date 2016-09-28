@@ -7,7 +7,7 @@ PROGRAM mc_nvt_lj_re
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis
-  USE mc_module,        ONLY : model_description, allocate_arrays, deallocate_arrays, &
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       energy_1, energy, energy_lrc, move, n, r, ne
   USE mpi
 
@@ -93,7 +93,7 @@ PROGRAM mc_nvt_lj_re
 
   WRITE( unit=output_unit, fmt='(a)'        ) 'mc_nvt_lj_re'
   WRITE( unit=output_unit, fmt='(a)'        ) 'Monte Carlo, constant-NVT, replica exchange'
-  CALL model_description ( output_unit )
+  CALL introduction ( output_unit )
   WRITE( unit=output_unit, fmt='(a,t40,i15)') 'This is process rank',   m
   WRITE( unit=output_unit, fmt='(a,t40,i15)') 'Number of processes is', p
   CALL time_stamp ( output_unit )
@@ -258,6 +258,7 @@ PROGRAM mc_nvt_lj_re
 
   CALL deallocate_arrays
   DEALLOCATE ( every_temperature, every_beta, every_dr_max )
+  CALL conclusion ( output_unit )
 
   CLOSE ( unit=output_unit )
   CALL MPI_Finalize(error)
