@@ -82,7 +82,7 @@ PROGRAM cluster
 
   END DO ! End outer loop
 
-  ! for diagnostic purposes, print out the cluster membership
+  ! For diagnostic purposes, print out the cluster membership
   ! no particular sorting (e.g. by size)
 
   done(:)    = 0
@@ -90,10 +90,12 @@ PROGRAM cluster
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'Cluster Members .....'
   DO ! Begin loop over remaining clusters
+
      IF ( ALL ( done > 0 ) ) EXIT
-     i = MINLOC ( done, dim = 1 ) ! find first zero
+
+     i = MINLOC ( done, dim = 1 ) ! find first zero (FINDLOC is not implemented in gfortran at the time of writing)
      cluster_id = cluster_id + 1
-     WRITE ( unit=output_unit, fmt='(i5,2x)' ) cluster_id
+     WRITE ( unit=output_unit, fmt='(a,i5,a)', advance='no' ) 'Cluster ', cluster_id, ' = '
      j = i
      done(j) = cluster_id
      WRITE ( unit=output_unit, fmt='(i5)', advance='no') j
@@ -104,13 +106,14 @@ PROGRAM cluster
         done(j) = cluster_id
         WRITE ( unit=output_unit, fmt='(i5)', advance='no') j
      END DO ! End loop to find other members of cluster
+     WRITE ( unit=output_unit, fmt='(1x)' )
 
   END DO ! End loop over remaining clusters
 
   ! Count cluster members
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Cluster Total'
+  WRITE ( unit=output_unit, fmt='(/,a)' ) 'Cluster Count'
   DO i = 1, cluster_id
-     WRITE ( unit=output_unit, fmt='(i5,3x,i5)' ) i, COUNT ( done == i )
+     WRITE ( unit=output_unit, fmt='(i7,1x,i5)' ) i, COUNT ( done == i )
   END DO
 
   DEALLOCATE ( r, list, done )

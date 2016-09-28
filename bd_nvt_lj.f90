@@ -48,7 +48,7 @@ PROGRAM bd_nvt_lj
   REAL :: gamma       ! friction coefficient
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
-  REAL    :: pot_lrc, vir_lrc, c0, c1
+  REAL    :: pot_lrc, vir_lrc
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -85,18 +85,6 @@ PROGRAM bd_nvt_lj
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',               temperature
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Ideal diffusion coefft',    temperature / gamma
 
-  ! Dimensionless coefficients for random momentum term
-  gamma = gamma * dt ! incorporate timestep into friction
-  c0 = EXP(-gamma)
-  IF ( gamma > 1.e-5 ) THEN
-     c1 = 1-c0**2
-  ELSE
-     c1 = gamma * ( 2.0 - gamma * ( 2.0 - 4.0 * gamma / 3.0 ) ) ! Taylor expansion for low gamma
-  END IF
-  c1 = SQRT ( c1 )
-  WRITE ( unit=output_unit, fmt='(a,t40,es15.4)' ) 'Algorithm coefficient c0', c0
-  WRITE ( unit=output_unit, fmt='(a,t40,es15.4)' ) 'Algorithm coefficient c1', c1
-
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
@@ -123,19 +111,17 @@ PROGRAM bd_nvt_lj
      DO stp = 1, nstep ! Begin loop over steps
 
         ! BAOAB algorithm
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)               ! Kick half-step (B)
-        r(:,:) = r(:,:) + 0.5 * dt * v(:,:) / box         ! Drift half-step (A) (positions in box=1 units)
-        CALL random_normals ( 0.0, SQRT(temperature), f ) ! Use f to hold random momenta
-        v(:,:) = c0 * v(:,:) + c1 * f                     ! Friction and random effects (O)
-        r(:,:) = r(:,:) + 0.5 * dt * v(:,:) / box         ! Drift half-step (A) (positions in box=1 units)
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )                ! Periodic boundaries (box=1 units)
+        CALL b ( dt/2.0 )                                 ! B kick half-step
+        CALL a ( dt/2.0 )                                 ! A drift half-step
+        CALL o ( dt )                                     ! O random velocities and friction step
+        CALL a ( dt/2.0 )                                 ! A drift half-step
         CALL force ( box, r_cut, pot, pot_sh, vir, lap )  ! Force evaluation
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)               ! Kick half-step (B)
+        CALL b ( dt/2.0 )                                 ! B kick half-step
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-        CALL calculate ( )
 
         ! Calculate all variables for this step
+        CALL calculate ( )
         CALL blk_add ( [energy,energy_sh,temp_kinet,temp_config,pres_virial] )
 
      END DO ! End loop over steps
@@ -160,20 +146,53 @@ PROGRAM bd_nvt_lj
 
 CONTAINS
 
+  SUBROUTINE a ( t ) ! A propagator (drift)
+    IMPLICIT NONE
+    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
+    r(:,:) = r(:,:) + t * v(:,:) / box ! positions in box=1 units
+    r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! periodic boundaries (box=1 units)
+  END SUBROUTINE a
+
+  SUBROUTINE b ( t ) ! B propagator (kick)
+    IMPLICIT NONE
+    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
+    v(:,:) = v(:,:) + t * f(:,:)
+  END SUBROUTINE b
+
+  SUBROUTINE o ( t ) ! O propagator (friction and random contributions)
+    IMPLICIT NONE
+    REAL, INTENT(in) :: t ! time over which to propagate (typically dt)
+
+    REAL                 :: x, c
+    REAL, DIMENSION(3,n) :: zeta
+
+    REAL, PARAMETER :: c1 = 2.0, c2 = -2.0, c3 = 4.0/3.0, c4 = -2.0/3.0
+
+    x = gamma * t
+    IF ( x > 0.0001 ) THEN
+       c = 1-EXP(-2.0*x)
+    ELSE
+       c = x * ( c1 + x * ( c2 + x * ( c3 + x * c4 )) ) ! Taylor expansion for low x
+    END IF
+    c = SQRT ( c )
+
+    CALL random_normals ( 0.0, SQRT(temperature), zeta ) ! random momenta
+    v = EXP(-x) * v + c * zeta
+
+  END SUBROUTINE o
+
   SUBROUTINE calculate ( string )
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    pot         = pot + pot_lrc
-    vir         = vir + vir_lrc
     kin         = 0.5*SUM(v**2)
-    energy      = ( pot + kin ) / REAL ( n )
+    energy      = ( pot + pot_lrc + kin ) / REAL ( n )
     energy_sh   = ( pot_sh + kin ) / REAL ( n )
     temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-    temp_config = SUM ( f**2 )/lap
-    pres_virial = density * temperature + vir / box**3
+    temp_config = SUM ( f**2 ) / lap
+    pres_virial = density * temperature + ( vir + vir_lrc ) / box**3
 
-    IF ( PRESENT ( string ) ) THEN
+    IF ( PRESENT ( string ) ) THEN ! output required
        WRITE ( unit=output_unit, fmt='(a)' ) string
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Energy',          energy
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Shifted energy',  energy_sh

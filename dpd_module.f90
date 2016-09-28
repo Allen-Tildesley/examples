@@ -183,29 +183,29 @@ CONTAINS
 
        zeta  = random_normal ( 0.0, SQRT(2.0*temperature) ) ! normal with desired standard deviation
 
-       rij(:) = r(:,i) - r(:,j)
-       rij(:) = rij(:) - ANINT ( rij(:) )
-       rij(:) = rij(:) * box ! now in r_cut=1 units
-       rij_sq = SUM ( rij(:)**2 )
-       rij_mag = SQRT ( rij_sq )
-       rij_hat = rij / rij_mag
-       wij     = 1.0-rij_mag              ! weight function
+       rij(:)    = r(:,i) - r(:,j)
+       rij(:)    = rij(:) - ANINT ( rij(:) )
+       rij(:)    = rij(:) * box ! now in r_cut=1 units
+       rij_sq    = SUM ( rij(:)**2 )
+       rij_mag   = SQRT ( rij_sq )
+       rij_hat   = rij / rij_mag
+       wij       = 1.0-rij_mag              ! weight function
        sqrt_prob = sqrt_gamma_step * wij  ! sqrt of p-factor
-       prob = sqrt_prob**2                ! p-factor
+       prob      = sqrt_prob**2                ! p-factor
 
        ! First half step
-       vij = v(:,i) - v(:,j)
-       v_par = DOT_PRODUCT ( vij, rij_hat )
-       vij = 0.5 * ( sqrt_prob*zeta - prob*v_par ) * rij_hat(:) ! change in velocity
-       v(:,i) = v(:,i) + vij
-       v(:,j) = v(:,j) - vij
+       vij(:) = v(:,i) - v(:,j)
+       v_par  = DOT_PRODUCT ( vij(:), rij_hat(:) )
+       vij(:) = 0.5 * ( sqrt_prob*zeta - prob*v_par ) * rij_hat(:) ! change in velocity
+       v(:,i) = v(:,i) + vij(:)
+       v(:,j) = v(:,j) - vij(:)
 
        ! Second half step
-       vij = v(:,i) - v(:,j)
-       v_par = DOT_PRODUCT ( vij, rij_hat )
-       vij = 0.5 * ( sqrt_prob*zeta - prob*v_par ) * rij_hat(:) / (1.0+prob) ! change in velocity
-       v(:,i) = v(:,i) + vij
-       v(:,j) = v(:,j) - vij
+       vij(:) = v(:,i) - v(:,j)
+       v_par  = DOT_PRODUCT ( vij, rij_hat )
+       vij(:) = 0.5 * ( sqrt_prob*zeta - prob*v_par ) * rij_hat(:) / (1.0+prob) ! change in velocity
+       v(:,i) = v(:,i) + vij(:)
+       v(:,j) = v(:,j) - vij(:)
 
     END DO ! end loop over all pairs within range
 

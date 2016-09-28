@@ -130,7 +130,7 @@ PROGRAM corfun
   mk   = 0 ! storage location of time origin
   full = .FALSE.
 
-  DO t = 1, nstep ! main loop correlating data
+  DO t = 1, nstep ! Main loop correlating data
 
      IF ( MOD(t-1,origin_interval) == 0 ) THEN
         mk = mk + 1
@@ -138,8 +138,8 @@ PROGRAM corfun
            full = .TRUE.
            mk = mk - n0 ! overwrite older values
         END IF
-        t0(mk) = t    ! store time origin
-        v0(mk) = v(t) ! store velocity origins
+        t0(mk) = t    ! store time origins
+        v0(mk) = v(t) ! store velocity at time origins
      END IF
 
      IF ( full ) THEN
@@ -148,16 +148,16 @@ PROGRAM corfun
         nk = mk ! correlate with those stored so far
      END IF
 
-     DO k = 1, nk
+     DO k = 1, nk ! Loop over time origins
         dt = t - t0(k)
         IF ( dt >= 0 .AND. dt <= nt ) THEN
            c(dt) = c(dt) + v(t) * v0(k) ! increment correlation function
            n(dt) = n(dt) + 1.0          ! increment normalizing factor
         END IF
-     END DO
+     END DO ! End loop over time origins
 
-  END DO  ! End main loop correlating data
-  c(:) = c(:) / n(:) ! normalise
+  END DO ! End main loop correlating data
+  c(:) = c(:) / n(:) ! Normalise by number of increments
 
   CALL CPU_TIME ( cpu_3 )
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'CPU time for direct method = ', cpu_3-cpu_2
@@ -223,20 +223,20 @@ CONTAINS
     ! by solving an equation of order Np+1 and using partial fractions
     ! Here we just do this for the simplest case Np=1
 
-    IF ( kappa > 4.0 * m ) THEN
+    IF ( kappa > 4.0 * m ) THEN  ! Real roots
 
-       ! Real roots
        del = SQRT ( 0.25*kappa**2 - m*kappa )
        kp  = 0.5*kappa + del
        km  = 0.5*kappa - del
        cp  = -km/(kp-km)
        cm  =  kp/(kp-km)
        c   = cp*EXP(-kp*t) + cm*EXP(-km*t)
-    ELSE
 
-       ! Complex roots
+    ELSE ! Complex roots
+
        omega = SQRT ( m*kappa - 0.25*kappa**2 )
        c     = EXP(-0.5*kappa*t) * ( COS(omega*t) + (0.5*kappa/omega)*SIN(omega*t) )
+
     END IF
 
   END FUNCTION c_exact

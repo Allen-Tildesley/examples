@@ -44,7 +44,8 @@ CONTAINS
     INTEGER          :: i
     CHARACTER(len=2) :: ch_col_width
 
-    nvariables = SIZE ( names )
+    nvariables = SIZE ( names ) ! This is how we set the number of variables to average
+    
     col_width = MAX ( 10, LEN(names) ) ! We don't allow columns to be too narrow
     IF ( col_width > 99 ) THEN         ! or too large
        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'col_width too large', col_width
@@ -82,10 +83,10 @@ CONTAINS
   SUBROUTINE blk_add ( variables ) ! Increment block-average variables
     REAL, DIMENSION(:), INTENT(in) :: variables
 
-    IF ( SIZE(variables) /= nvariables ) THEN
+    IF ( SIZE(variables) /= nvariables ) THEN ! Check for inconsistency in calling program
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Mismatched variable arrays', nvariables, SIZE(variables)
        STOP 'Error in blk_add'
-    END IF
+    END IF ! End check for inconsistency in calling program
 
     blk_averages = blk_averages + variables ! Increment block averages
     blk_norm     = blk_norm + 1.0           ! Increment block normalizer
@@ -101,13 +102,13 @@ CONTAINS
     run_errors   = run_errors   + blk_averages**2 ! Increment error accumulators
     run_norm     = run_norm + 1.0                 ! Increment run normalizer
 
-    IF ( first_call ) THEN  ! Write headings
+    IF ( first_call ) THEN ! Write headings on first call
        WRITE ( unit=output_unit, fmt='(a)'                 ) REPEAT ( '=', line_width ) 
        WRITE ( unit=output_unit, fmt='(a15)', advance='no' ) 'Block'
        WRITE ( unit=output_unit, fmt='(*(1x,a))'           ) variable_names
        WRITE ( unit=output_unit, fmt='(a)'                 ) REPEAT ( '=', line_width )
        first_call = .FALSE.
-    END IF
+    END IF ! End write headings on first call
 
     ! Write out block averages
     WRITE ( unit=output_unit, fmt='(i15)', advance='no' ) blk
@@ -121,9 +122,9 @@ CONTAINS
     run_averages = run_averages / run_norm          ! Normalize run averages
     run_errors       = run_errors / run_norm        ! Normalize error estimates
     run_errors       = run_errors - run_averages**2 ! Compute fluctuations
-    WHERE ( run_errors > 0.0 )
+    WHERE ( run_errors > 0.0 ) ! Guard against roundoff
        run_errors = SQRT ( run_errors / run_norm )  ! Normalize and get estimated errors
-    END WHERE
+    END WHERE ! End guard against roundoff
 
     WRITE ( unit=output_unit, fmt='(a)'                  ) REPEAT('-', line_width )
     WRITE ( unit=output_unit, fmt='(a15)', advance='no'  ) 'Run averages'
