@@ -1,5 +1,5 @@
 ! qmc_walk_sho.f90
-! Quantum Monte Carlo, random walk, simple harmonic oscillator
+! Quantum MC, random walk, simple harmonic oscillator
 PROGRAM qmc_walk_sho
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor

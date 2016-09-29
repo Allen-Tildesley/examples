@@ -1,6 +1,6 @@
-! error.f90
+! error_calc.f90
 ! Estimated error in correlated data
-PROGRAM error
+PROGRAM error_calc
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE maths_module, ONLY : random_normal, init_random_seed
@@ -46,7 +46,7 @@ PROGRAM error
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
      IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
-     STOP 'Error in error'
+     STOP 'Error in error_calc'
   END IF
 
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'number of steps in run = ', nstep
@@ -206,5 +206,5 @@ PROGRAM error
   WRITE ( unit=output_unit, fmt='(a)' ) 'should agree quite well with exact error estimate'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Can plot SI or error**2 against 1/tblock'
 
-END PROGRAM error
+END PROGRAM error_calc
 
