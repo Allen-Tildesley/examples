@@ -7,19 +7,17 @@ PROGRAM error_calc
 
   IMPLICIT NONE
 
-  ! Define underlying process by generalized Langevin equation
+  ! Define underlying process by generalized Langevin equation (GLE)
   ! with memory function expressed as a decaying exponential
   ! see G Ciccotti and JP Ryckaert Mol Phys 40 141 (1980)
   ! and AD Baczewski and SD Bond J Chem Phys 139 044107 (2013)
 
-  REAL    :: m      ! memory function coefficients
-  REAL    :: kappa  ! memory function decay rates
-  REAL    :: theta  ! auxiliary coefficient
-  REAL    :: alpha  ! auxiliary coefficient
-  REAL    :: zeta   ! random number
+  REAL    :: m      ! GLE memory function coefficients
+  REAL    :: kappa  ! GLE memory function decay rates
   REAL    :: s      ! GLE auxiliary variable
   REAL    :: delta  ! time step
   REAL    :: at     ! dynamical variable at time t
+  REAL    :: zeta   ! random number
   INTEGER :: nstep  ! number of timesteps in run
   INTEGER :: nequil ! number of equilibration timesteps
   INTEGER :: t      ! time (equivalent to step number in file)
@@ -27,9 +25,12 @@ PROGRAM error_calc
   REAL, DIMENSION(:), ALLOCATABLE :: a ! stored data values (nstep)
 
   INTEGER :: ioerr, tblock, i_repeat, nblock, blk, stp1, stp2, trun
-  REAL    :: average, variance, stddev, err, si, tcor, a_val, a_avg, a_var, a_var_1, a_err
+  REAL    :: average, variance, stddev, err, si, tcor, x, e, b, d
+  REAL    :: a_blk, a_run, a_avg, a_var, a_var_1, a_err
 
   INTEGER, PARAMETER :: n_repeat = 50 ! number of simulation repeats for brute force empirical calculation
+  REAL,    PARAMETER :: b1 = 2.0, b2 = -2.0,     b3 = 4.0/3.0, b4 = -2.0/3.0
+  REAL,    PARAMETER :: d1 = 1.0, d2 = -1.0/2.0, d3 = 1.0/6.0, d4 = -1.0/24.0
 
   NAMELIST /nml/ nstep, nequil, delta, variance, average
 
@@ -49,12 +50,11 @@ PROGRAM error_calc
      STOP 'Error in error_calc'
   END IF
 
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'number of steps in run = ', nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'equilibration steps = ',    nequil
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'time step delta = ',        delta
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'desired average value = ',  average
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'desired variance = ',       variance
-  stddev = SQRT(2.0*variance) ! NB stddev of random forces, not data
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps in run = ', nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Equilibration steps = ',    nequil
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step delta = ',        delta
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Desired average value = ',  average
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Desired variance = ',       variance
 
   ALLOCATE ( a(nstep) )
 
@@ -66,20 +66,29 @@ PROGRAM error_calc
   ! (0.25,4.0) (overdamped)
   m     = 0.25
   kappa = 4.0
-  theta = EXP(-delta*kappa)
-  alpha = SQRT( (1.0-theta**2)*kappa/2.0 )
-
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'm ',     m
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'kappa ', kappa
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'theta ', theta
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'alpha ', alpha
+
+  ! Coefficients used in algorithm
+  x = delta*kappa
+  e = EXP(-x) ! theta in B&B paper
+  IF ( x > 0.0001 ) THEN
+     b = 1.0 - EXP(-2.0*x)
+     d = 1.0 - EXP(-x)
+  ELSE ! Taylor expansions for low x
+     b = x * ( b1 + x * ( b2 + x * ( b3 + x * b4 )) ) 
+     d = x * ( d1 + x * ( d2 + x * ( d3 + x * d4 )) )
+  END IF
+  b      = SQRT ( b )
+  b      = b * sqrt ( kappa/2.0 ) ! alpha in B&B paper  
+  stddev = SQRT(2.0*variance)     ! NB stddev of random forces, not data
 
   ! For this process, the results of interest can be calculated exactly
   ! The time correlation function is known, and hence the statistical inefficiency (SI)
   ! From this, the error in the mean for a run of any length can be calculated
 
   tcor = 1.0 / m      ! Correlation time is determined by memory function
-  tcor = tcor / delta ! express in timesteps
+  tcor = tcor / delta ! express this in timesteps
   si   = 2*tcor       ! Statistical inefficiency (SI)
   err  = SQRT(si*variance/REAL(nstep))
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Exact correlation time in steps = ', tcor
@@ -88,6 +97,7 @@ PROGRAM error_calc
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Exact error estimate = ',            err
 
   ! Data generation
+
   CALL init_random_seed
 
   ! For comparison, we do n_repeat independent runs and estimate the error in run averages directly from these
@@ -97,25 +107,25 @@ PROGRAM error_calc
   a_avg = 0.0 ! zero average accumulator
   a_var = 0.0 ! zero mean-squared accumulator
 
-  DO i_repeat = 1, n_repeat ! loop over repeats of simulation
+  DO i_repeat = 1, n_repeat ! Loop over repeats of simulation
 
      ! Initial values
      at = 0.0
      s  = 0.0
 
      DO t = -nequil, nstep ! include an equilibration period
-        at   = at + 0.5*delta*s
+        at   = at + 0.5 * delta * s
         zeta = random_normal ( 0.0, stddev )
-        s    = theta*s - (1.0-theta)*m*at + alpha*SQRT(m)*zeta
-        at   = at + 0.5*delta*s
-        IF ( t >= 1 ) a(t) = average + at ! store values (adding average)
+        s    = e*s - d*m*at + b*SQRT(m)*zeta
+        at   = at + 0.5 * delta * s
+        IF ( t > 0 ) a(t) = average + at ! store values (adding average)
      END DO
 
-     a_val = SUM(a) / REAL(nstep) ! the run average
-     a_avg = a_avg + a_val        ! average over runs
-     a_var = a_var + a_val**2     ! mean squared value over runs
+     a_run = SUM(a) / REAL(nstep) ! the run average
+     a_avg = a_avg + a_run        ! average over runs
+     a_var = a_var + a_run**2     ! mean squared value over runs
 
-  END DO ! end loop over repeats of simulation
+  END DO ! End loop over repeats of simulation
 
   a_avg = a_avg / REAL(n_repeat)                  ! mean value
   a_var = a_var / REAL(n_repeat)                  ! mean-squared value
@@ -155,22 +165,22 @@ PROGRAM error_calc
   ! vs 1/tblock carried out to extrapolate to tblock=nstep. The loop below provides the data for that plot.
 
   WRITE ( unit=output_unit, fmt='(4a15)' ) 'tblock', 'nblock', 'error estimate', 'estimate of SI'
-  DO nblock = 20, 4, -1 ! loop over number, and hence length, of blocks
+  DO nblock = 20, 4, -1 ! Loop over number, and hence length, of blocks
      tblock = nstep / nblock              ! block length in steps (rounded down)
      trun   = nblock*tblock               ! run length in steps, accounting for rounding
-     a_avg  = SUM(a(1:trun)) / REAL(trun) ! average of data
+     a_run  = SUM(a(1:trun)) / REAL(trun) ! average of data
      a_var  = 0.0                         ! zero mean-square block average accumulator
-     DO blk = 1, nblock ! loop over blocks
+     DO blk = 1, nblock ! Loop over blocks
         stp1  = (blk-1)*tblock+1                            ! start of block
         stp2  = blk*tblock                                  ! end of block
-        a_val = SUM ( a(stp1:stp2) - a_avg ) / REAL(tblock) ! block average
-        a_var = a_var + a_val**2                            ! mean-square block average
-     END DO ! end loop over blocks
+        a_blk = SUM ( a(stp1:stp2) - a_run ) / REAL(tblock) ! block average of deviation
+        a_var = a_var + a_blk**2                            ! mean-square block average
+     END DO ! End loop over blocks
      a_var = a_var / REAL(nblock-1)    ! bias-corrected variance of block averages
      a_err = SQRT(a_var/REAL(nblock))  ! estimate of error from block-average variance
      si    = tblock * a_var / a_var_1  ! statistical inefficiency
      WRITE ( unit=output_unit, fmt='(2i15,3f15.6)' ) tblock, nblock, a_err, si
-  END DO ! end loop over number, and hence length, of blocks
+  END DO ! End loop over number, and hence length, of blocks
   WRITE ( unit=output_unit, fmt='(a)' ) 'Plateau at large tblock (small nblock)'
   WRITE ( unit=output_unit, fmt='(a)' ) 'should agree quite well with exact error estimate'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Can plot SI or error**2 against 1/tblock'

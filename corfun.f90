@@ -25,8 +25,6 @@ PROGRAM corfun
 
   REAL :: m     ! memory function coefficients
   REAL :: kappa ! memory function decay rates
-  REAL :: theta ! auxiliary coefficient
-  REAL :: alpha ! auxiliary coefficient
   REAL :: zeta  ! random numbers
   REAL :: s     ! GLE auxiliary variables
   REAL :: delta ! time step
@@ -49,11 +47,14 @@ PROGRAM corfun
   LOGICAL :: full
   INTEGER :: k, mk, nk
   INTEGER :: unit, ioerr
-  REAL    :: temperature, stddev, cpu_1, cpu_2, cpu_3, cpu_4
+  REAL    :: temperature, stddev, cpu_1, cpu_2, cpu_3, cpu_4, x, e, b, d
 
   INTEGER(C_INT)                                       :: fft_len         ! the number of points for FFT
   COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_in, fft_out ! data to be transformed (0:fft_len-1)
   TYPE(C_PTR)                                          :: fft_plan        ! plan needed for FFTW
+
+  REAL,    PARAMETER :: b1 = 2.0, b2 = -2.0,     b3 = 4.0/3.0, b4 = -2.0/3.0
+  REAL,    PARAMETER :: d1 = 1.0, d2 = -1.0/2.0, d3 = 1.0/6.0, d4 = -1.0/24.0
 
   NAMELIST /nml/ nt, origin_interval, nstep, nequil, delta, temperature
 
@@ -83,7 +84,6 @@ PROGRAM corfun
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'number of time origins n0 = ', n0
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'time step delta = ',           delta
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'temperature = ',               temperature
-  stddev = SQRT(2.0*temperature)
 
   ALLOCATE ( v(nstep), v0(n0), t0(n0) )
   ALLOCATE ( c(0:nt), c_fft(0:nt), n(0:nt) )
@@ -98,12 +98,22 @@ PROGRAM corfun
   ! (0.25,4.0) (overdamped)
   m     = 1.0
   kappa = 1.0
-  theta = EXP(-delta*kappa)
-  alpha = SQRT( (1.0-theta**2)*kappa/2.0 )
   WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'm ',     m
   WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'kappa ', kappa
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'theta ', theta
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'alpha ', alpha
+
+  ! Coefficients used in algorithm
+  x = delta*kappa
+  e = EXP(-x) ! theta in B&B paper
+  IF ( x > 0.0001 ) THEN
+     b = 1.0 - EXP(-2.0*x)
+     d = 1.0 - EXP(-x)
+  ELSE  ! Taylor expansions for low x
+     b = x * ( b1 + x * ( b2 + x * ( b3 + x * b4 )) )
+     d = x * ( d1 + x * ( d2 + x * ( d3 + x * d4 )) )
+  END IF
+  b      = SQRT ( b )
+  b      = b * SQRT ( kappa/2.0 ) ! alpha in B&B paper
+  stddev = SQRT(2.0*temperature)
 
   ! Data generation
   CALL CPU_TIME ( cpu_1 )
@@ -115,9 +125,9 @@ PROGRAM corfun
   DO t = -nequil, nstep ! include an equilibration period
      vt = vt + 0.5*delta*s
      zeta = random_normal ( 0.0, stddev )
-     s    = theta*s - (1.0-theta)*m*vt + alpha*SQRT(m)*zeta
+     s    = e*s - d*m*vt + b*SQRT(m)*zeta
      vt   = vt + 0.5*delta*s
-     IF ( t >= 1 ) v(t) = vt ! store velocities
+     IF ( t > 0 ) v(t) = vt ! store velocities
   END DO
 
   CALL CPU_TIME ( cpu_2 )

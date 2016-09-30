@@ -77,12 +77,12 @@ CONTAINS
 
   END SUBROUTINE make_ij
 
-  SUBROUTINE force ( box, alpha, pot, vir, lap )
-    REAL, INTENT(in)  :: box    ! simulation box length
-    REAL, INTENT(in)  :: alpha  ! force strength parameter
-    REAL, INTENT(out) :: pot    ! total potential energy
-    REAL, INTENT(out) :: vir    ! virial
-    REAL, INTENT(out) :: lap    ! Laplacian
+  SUBROUTINE force ( box, a, pot, vir, lap )
+    REAL, INTENT(in)  :: box ! simulation box length
+    REAL, INTENT(in)  :: a   ! force strength parameter
+    REAL, INTENT(out) :: pot ! total potential energy
+    REAL, INTENT(out) :: vir ! virial
+    REAL, INTENT(out) :: lap ! Laplacian
 
     ! Calculates potential, virial and forces
     ! It is assumed that positions are in units where box = 1
@@ -106,22 +106,24 @@ CONTAINS
        rij(:)  = rij(:) - ANINT ( rij(:) ) ! periodic boundary conditions in box=1 units
        rij(:)  = rij(:) * box              ! now in r_cut=1 units
        rij_sq  = SUM ( rij**2 )            ! squared separation
+       if ( rij_sq > 1.0 ) cycle           ! this should never happen
        rij_mag = SQRT ( rij_sq )           ! separation distance
-       wij     = 1.0-rij_mag               ! weight function
+       wij     = 1.0 - rij_mag             ! weight function
        rij_hat = rij / rij_mag             ! unit separation vector
        pot     = pot + 0.5 * wij**2        ! potential
        vir     = vir + wij * rij_mag       ! virial
-       lap     = lap + (6.0-4.0/rij_mag)   ! Laplacian
+       lap     = lap + (3.0-2.0/rij_mag)   ! Laplacian
        fij     = wij * rij_hat(:)
        f(:,i)  = f(:,i) + fij
        f(:,j)  = f(:,j) - fij
 
     END DO ! End loop over all pairs within range
 
-    pot = pot * alpha
-    vir = vir * alpha
-    lap = lap * alpha
-    f   = f   * alpha
+    ! Multiply results by numerical factors
+    pot = pot * a
+    vir = vir * a / 3.0
+    lap = lap * a * 2.0
+    f   = f   * a
 
   END SUBROUTINE force
 

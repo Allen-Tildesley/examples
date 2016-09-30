@@ -20,7 +20,7 @@ PROGRAM diffusion
   ! box is assumed to be unchanged throughout
 
   ! Values of basic parameters nt, origin_interval are read from standard input using a namelist nml
-  ! Leave namelist empty to accept supplied defaults
+  ! The user must at least supply the time interval between successive configurations
 
   ! Results are written to a file 'diffusion.out' with diagnostics to standard output
 
@@ -28,8 +28,9 @@ PROGRAM diffusion
   INTEGER :: nt              ! number of timesteps to correlate
   INTEGER :: n0              ! number of time origins to store
   INTEGER :: origin_interval ! interval for time origins
-  INTEGER :: dt              ! time difference
-  INTEGER :: t               ! time (equivalent to number of file)
+  INTEGER :: dt              ! time difference (in timesteps)
+  INTEGER :: t               ! time (in timesteps, equivalent to number of file)
+  REAL    :: delta           ! time interval (simulation units: only used in output file)
 
   REAL,    DIMENSION(:,:),   ALLOCATABLE :: r, r1 ! positions (3,n)
   REAL,    DIMENSION(:,:),   ALLOCATABLE :: v     ! velocities (3,n)
@@ -48,11 +49,12 @@ PROGRAM diffusion
   INTEGER                     :: k, mk, nk
   REAL                        :: box
 
-  NAMELIST /nml/ nt, origin_interval
+  NAMELIST /nml/ nt, origin_interval, delta
 
   ! Example default values
   nt              = 500
-  origin_interval = 10 
+  origin_interval = 10
+  delta           = -1.0 ! must be set by user
 
   ! Namelist from standard input
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
@@ -60,6 +62,11 @@ PROGRAM diffusion
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
      IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in diffusion'
+  END IF
+
+  IF ( delta < 0.0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'Error: user must supply positive delta (time interval)', delta
      STOP 'Error in diffusion'
   END IF
 
@@ -145,7 +152,7 @@ PROGRAM diffusion
   END IF
 
   DO t = 0, nt
-     WRITE ( unit=unit, fmt='(i10,3f15.8)' ) t, vacf(t), rvcf(t), msd(t)
+     WRITE ( unit=unit, fmt='(f15.5,3f15.8)' ) t*delta, vacf(t), rvcf(t), msd(t)
   END DO
   CLOSE(unit=unit)
 

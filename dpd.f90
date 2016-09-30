@@ -23,18 +23,19 @@ PROGRAM dpd
   ! Positions r are divided by box length after reading in and we assume mass=1 throughout
   ! However, input configuration, output configuration, most calculations, and all results 
   ! are given in simulation units defined by the model
-  ! The range parameter, and cutoff distance, is taken as unity
+  ! The range parameter (cutoff distance) is taken as unity
 
   ! The model is defined in dpd_module
   ! The typical DPD model described by Groot and Warren, J Chem Phys 107, 4423 (1997)
-  ! has temperature kT=1, density rho=3, noise level sigma=3, gamma=sigma**2/2kT=4.5
-  ! and force strength parameter alpha=25. They recommend timestep=0.04.
-  ! They also give the approximate excess pressure as 0.101*alpha*rho**2
+  ! has temperature kT=1, density rho=3, noise level sigma=3, gamma=sigma**2/(2*kT)=4.5
+  ! and force strength parameter a=25 (more generally 75*kT/rho).
+  ! They recommend timestep=0.04, but we recommend a somewhat smaller value.
+  ! They also give the approximate pressure as rho*kT + alpha*a*rho**2 where alpha=0.101
 
   ! Most important variables
   REAL :: box         ! box length
   REAL :: density     ! density
-  REAL :: alpha       ! force strength parameter
+  REAL :: a           ! force strength parameter
   REAL :: dt          ! time step
   REAL :: gamma       ! thermalization rate (inverse time)
   REAL :: pot         ! total potential energy
@@ -47,6 +48,8 @@ PROGRAM dpd
   REAL :: temp_config ! configurational temperature (to be averaged)
   REAL :: energy      ! total energy per atom (to be averaged)
 
+  REAL, PARAMETER :: alpha = 0.101 ! constant in approximate equation of state
+
   INTEGER :: blk, stp, nstep, nblock, ioerr
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
@@ -57,7 +60,7 @@ PROGRAM dpd
   ! Define a procedure pointer with an interface like that of lowe
   PROCEDURE(lowe), POINTER :: thermalize => NULL()
 
-  NAMELIST /nml/ nblock, nstep, dt, temperature, alpha
+  NAMELIST /nml/ nblock, nstep, dt, temperature, a, gamma, method
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'dpd'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Dissipative particle dynamics, constant-NVT ensemble'
@@ -70,9 +73,9 @@ PROGRAM dpd
   nstep       = 1000
   dt          = 0.02
   temperature = 1.0
-  alpha       = 25.0
+  a           = 75.0 ! (actually =a*rho/kT) so to be multiplied by kT/rho
   gamma       = 4.5
-  method      = 'lowe'
+  method      = 'Lowe'
 
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
@@ -84,12 +87,14 @@ PROGRAM dpd
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',              nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',     nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                     dt
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Friction / thermal rate gamma', gamma
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Specified temperature',         temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Force strength alpha',          alpha
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Force strength a*rho/kT',       a
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Friction / thermal rate gamma', gamma
+
   IF ( INDEX( lowercase(method), 'shardlow' ) /= 0 ) THEN
      thermalize => shardlow
      WRITE ( unit=output_unit, fmt='(a)' ) 'Shardlow integration method'
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'DPD sigma parameter', SQRT ( 2.0 * gamma * temperature )
   ELSE IF ( INDEX( lowercase(method), 'lowe' ) /= 0 ) THEN
      thermalize => lowe
      WRITE ( unit=output_unit, fmt='(a)' ) 'Lowe thermalization method'
@@ -106,7 +111,9 @@ PROGRAM dpd
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
   density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
+  a       = a * temperature / density ! scale force strength accordingly
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',          density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Force strength a', a
 
   CALL allocate_arrays
 
@@ -116,7 +123,7 @@ PROGRAM dpd
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   CALL make_ij ( box ) ! construct initial list of pairs within range
-  CALL force ( box, alpha, pot, vir, lap )
+  CALL force ( box, a, pot, vir, lap )
   CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temp-kinet', 'Temp-config', 'Virial Pressure' ] )
@@ -131,15 +138,14 @@ PROGRAM dpd
         CALL thermalize ( box, temperature, gamma*dt )
 
         ! Velocity Verlet step
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)      ! Kick half-step
-        r(:,:) = r(:,:) + dt * v(:,:) / box      ! Drift step (positions in box=1 units)
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )       ! Periodic boundaries
-        CALL make_ij ( box )                     ! Construct list of pairs within range
-        CALL force ( box, alpha, pot, vir, lap ) ! Force evaluation
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)      ! Kick half-step
+        CALL kick    ( dt/2.0 )                ! Kick half-step
+        CALL drift   ( dt )                    ! Drift step 
+        CALL make_ij ( box )                   ! Construct list of pairs within range
+        CALL force   ( box, a, pot, vir, lap ) ! Force evaluation
+        CALL kick    ( dt/2.0 )                ! Kick half-step
 
+        ! Calculate all variables for this step
         CALL calculate ( )
-        
         CALL blk_add ( [energy,temp_kinet,temp_config,pres_virial] )
 
      END DO ! End loop over steps
@@ -152,11 +158,11 @@ PROGRAM dpd
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, alpha, pot, vir, lap )
+  CALL force ( box, a, pot, vir, lap )
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Approx EOS pressure', density*temperature+0.101*alpha*density**2
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Approx EOS pressure', density*temperature+alpha*a*density**2
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
 
@@ -164,6 +170,23 @@ PROGRAM dpd
   CALL conclusion ( output_unit )
 
 CONTAINS
+
+  SUBROUTINE kick ( t ) ! Kick propagator
+    IMPLICIT NONE
+    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
+
+    v(:,:) = v(:,:) + t * f(:,:)
+
+  END SUBROUTINE kick
+
+  SUBROUTINE drift ( t ) ! Drift propagator
+    IMPLICIT NONE
+    REAL, INTENT(in) :: t ! time over which to propagate (typically dt)
+
+    r(:,:) = r(:,:) + t * v(:,:) / box  ! (positions in box=1 units)
+    r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
+
+  END SUBROUTINE drift
 
   SUBROUTINE calculate ( string )
     IMPLICIT NONE
@@ -184,6 +207,6 @@ CONTAINS
     END IF
 
   END SUBROUTINE calculate
-  
+
 END PROGRAM dpd
 
