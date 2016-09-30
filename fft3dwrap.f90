@@ -19,16 +19,17 @@ PROGRAM fft3dwrap
   REAL    :: dr  ! grid spacing in real space
   REAL    :: dk  ! grid spacing in reciprocal space
 
-  INTEGER :: ix, iy, iz, nup, ioerr
-  REAL    :: rx, ry, rz, g
-  REAL    :: kx, ky, kz, k_sq, k_mag, ghat
+  INTEGER            :: ix, iy, iz, wx, wy, wz, ioerr
+  REAL, DIMENSION(3) :: r, k
+  REAL               :: r_sq, k_sq, k_mag, g, ghat
 
   INTEGER(C_INT)                                           :: sc      ! number of points for FFT
   COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:,:,:), ALLOCATABLE :: fft_inp ! Data to be transformed (0:sc-1,0:sc-1,0:sc-1)
   COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:,:,:), ALLOCATABLE :: fft_out ! Output data (0:sc-1,0:sc-1,0:sc-1)
   TYPE(C_PTR)                                              :: fft_plan! Plan needed for FFTW
 
-  REAL, PARAMETER :: pi = 4.0 * ATAN( 1.0 ) ! decay parameter of Gaussian is set to pi
+  REAL,    PARAMETER :: pi = 4.0 * ATAN( 1.0 ) ! decay parameter of Gaussian is set to pi
+  integer, parameter :: out_max = 15
 
   NAMELIST /nml/ sc2, box
 
@@ -56,20 +57,23 @@ PROGRAM fft3dwrap
   ALLOCATE ( fft_inp(0:sc-1,0:sc-1,0:sc-1), fft_out(0:sc-1,0:sc-1,0:sc-1) )
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'Initial Gaussian'
-  DO ix = 0, sc-1
-     rx = REAL ( wraparound(ix) ) * dr
-     DO iy = 0, sc-1
-        ry = REAL ( wraparound(iy) ) * dr
-        DO iz = 0, sc-1
-           rz = REAL ( wraparound(iz) ) * dr
 
-           g                 = EXP ( - pi * ( rx**2 + ry**2 + rz**2 ) ) ! Setup 3d Gaussian
-           fft_inp(ix,iy,iz) = CMPLX ( g, 0.0 )                         ! Feed into complex array for FFT
+  DO ix = 0, sc-1
+     DO iy = 0, sc-1
+        DO iz = 0, sc-1
+
+           wx   = wraparound ( ix )
+           wy   = wraparound ( iy )
+           wz   = wraparound ( iz )
+           r    = REAL ( [ wx, wy, wz ] ) * dr
+           r_sq = SUM ( r**2 )
+           g    = EXP ( - pi * r_sq ) ! Setup 3d Gaussian
+
+           fft_inp(ix,iy,iz) = CMPLX ( g, 0.0 ) ! Feed into complex array for FFT
 
            ! Write some elements of data
-           nup = FLOOR ( SQRT ( REAL( ix**2 + iy**2 + iz**2 ) ) )
-           IF ( nup <= 3 ) THEN
-              WRITE ( unit=output_unit, fmt='(3i4,2f10.4)' ) ix, iy, iz, fft_inp(ix,iy,iz)
+           IF ( ix**2 + iy**2 + iz**2 <= out_max ) THEN
+              WRITE ( unit=output_unit, fmt='(3i5,2f15.5)' ) ix, iy, iz, fft_inp(ix,iy,iz)
            END IF
 
         END DO
@@ -87,22 +91,22 @@ PROGRAM fft3dwrap
   WRITE ( unit=output_unit, fmt='(a)' ) 'Reciprocal-space transform'
 
   DO ix = 0, sc-1
-     kx = REAL ( wraparound(ix) ) * dk
      DO iy = 0, sc-1
-        ky = REAL ( wraparound(iy) ) * dk
         DO iz = 0, sc-1
-           kz = REAL ( wraparound(iz) ) * dk
 
-           k_sq  = kx**2 + ky**2 + kz**2   ! square of wave vector
+           wx    = wraparound ( ix )
+           wy    = wraparound ( iy )
+           wz    = wraparound ( iz )
+           k     = REAL ( [ wx, wy, wz ] ) * dk
+           k_sq  = SUM ( k**2 )
            k_mag = SQRT( k_sq )            ! modulus of wave vector
            ghat  = EXP(- k_sq / 4.0 / pi ) ! analytical transform of the Gaussian
 
            ! Write some elements of data in reciprocal space including factor of dr**3
            ! Compare with the analytical expression for the transform of the Gaussian test function
 
-           nup  = FLOOR ( SQRT ( REAL ( ix**2 + iy**2 + iz**2 ) ) )
-           IF ( nup <= 3 ) THEN
-              WRITE ( unit=output_unit, fmt='(3i4,4f10.4)') ix, iy, iz, k_mag, fft_out(ix,iy,iz)*dr**3, ghat
+           IF ( ix**2 + iy**2 + iz**2 <= out_max ) THEN
+              WRITE ( unit=output_unit, fmt='(3i5,4f15.5)') ix, iy, iz, k_mag, fft_out(ix,iy,iz)*dr**3, ghat
            END IF
 
         END DO
@@ -125,8 +129,7 @@ PROGRAM fft3dwrap
   DO ix = 0, sc-1
      DO iy = 0, sc-1
         DO iz = 0, sc-1
-           nup = FLOOR ( SQRT ( REAL ( ix**2 + iy**2 + iz**2 ) ) )
-           IF( nup <= 3) THEN
+           IF ( ix**2 + iy**2 + iz**2 <= out_max ) THEN
               WRITE ( unit=output_unit, fmt='(3i4,2f10.4)' ) ix, iy, iz, fft_inp(ix,iy,iz)/REAL(sc**3)
            END IF
         END DO
