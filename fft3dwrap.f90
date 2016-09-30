@@ -2,7 +2,7 @@
 ! 3D fast Fourier transform applied to a Gaussian function
 PROGRAM fft3dwrap
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE, INTRINSIC :: iso_c_binding
 
   IMPLICIT NONE
@@ -13,130 +13,143 @@ PROGRAM fft3dwrap
   ! We assume that compiler flags are set such that real and integer fortran variables
   ! have the appropriate precision to match their C counterparts
 
-  INTEGER(C_INT), PARAMETER :: sc   = 128   ! the number of points in real space in each dimension
-  INTEGER,        PARAMETER :: sc2  = sc/2  ! In this example sc is the same in each dimension
-  REAL,           PARAMETER :: lper = 6.0   ! The periodic repeat distance in each dimension
+  ! In this example the box lengths and numbers of grid points are the same in each dimension
+  INTEGER :: sc2 ! half number of grid points
+  REAL    :: box ! periodic repeat distance
+  REAL    :: dr  ! grid spacing in real space
+  REAL    :: dk  ! grid spacing in reciprocal space
 
-  COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(sc,sc,sc) :: fin, fout ! Contains the data to be transformed and the output matrix
+  INTEGER :: ix, iy, iz, nup, ioerr
+  REAL    :: rx, ry, rz, g
+  REAL    :: kx, ky, kz, k_sq, k_mag, ghat
 
-  TYPE(C_PTR)      :: plan
-  INTEGER          :: i, j, k, nup
-  REAL             :: delta, delta3, x, y, z, g
-  REAL             :: dk, kx, ky, kz, ksq, kmag, ghat
-  REAL, PARAMETER  :: pi = 4.0 * ATAN( 1.0 ) ! decay parameter of Gaussian is set to pi
+  INTEGER(C_INT)                                           :: sc      ! number of points for FFT
+  COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:,:,:), ALLOCATABLE :: fft_inp ! Data to be transformed (0:sc-1,0:sc-1,0:sc-1)
+  COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:,:,:), ALLOCATABLE :: fft_out ! Output data (0:sc-1,0:sc-1,0:sc-1)
+  TYPE(C_PTR)                                              :: fft_plan! Plan needed for FFTW
 
-  delta      = lper / REAL (sc)     ! periodic repeat distance in x, y and z
-  delta3     = delta ** 3           ! factor for forward transform
+  REAL, PARAMETER :: pi = 4.0 * ATAN( 1.0 ) ! decay parameter of Gaussian is set to pi
+
+  NAMELIST /nml/ sc2, box
+
+  ! Typical default values
+  sc2 = 2**6 ! Not essential to be a power of 2, but usually more efficient
+  box = 6.0  ! Large enough to accommodate the chosen 3D Gaussian
+
+  ! Namelist from standard input
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in fft3dwrap'
+  END IF
+
+  sc = sc2 * 2
+  dr = box / REAL (sc)
+  dk = (2.0 * pi) / dr / REAL(sc) ! interval in reciprocal space
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of grid points in each dimension, sc = ', sc
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Periodic repeat length (box) = ',                box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Grid spacing in real space (dr) = ',             dr
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Grid spacing in reciprocal space (dk) = ',       dk
+
+  ALLOCATE ( fft_inp(0:sc-1,0:sc-1,0:sc-1), fft_out(0:sc-1,0:sc-1,0:sc-1) )
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'Initial Gaussian'
-  DO i = 1, sc
+  DO ix = 0, sc-1
+     rx = REAL ( wraparound(ix) ) * dr
+     DO iy = 0, sc-1
+        ry = REAL ( wraparound(iy) ) * dr
+        DO iz = 0, sc-1
+           rz = REAL ( wraparound(iz) ) * dr
 
-     IF ( i  <= sc2 ) THEN
-        x  = REAL( i - 1 ) * delta
-     ELSE
-        x  = REAL( i - sc - 1 ) * delta
-     END IF
+           g                 = EXP ( - pi * ( rx**2 + ry**2 + rz**2 ) ) ! Setup 3d Gaussian
+           fft_inp(ix,iy,iz) = CMPLX ( g, 0.0 )                         ! Feed into complex array for FFT
 
-     DO j = 1, sc
-
-        IF ( j <= sc2 ) THEN
-           y  = REAL( j - 1 ) * delta
-        ELSE
-           y  = REAL( j - sc - 1 ) * delta
-        END IF
-
-        DO k = 1, sc
-
-           IF ( k <= sc2 ) THEN
-              z = REAL( k - 1 ) * delta
-           ELSE
-              z = REAL( k - sc - 1 ) * delta
-           END IF
-
-           g          = EXP ( - pi * (x * x + y * y + z * z )) ! setup 3d Gaussian
-           fin(i,j,k) = CMPLX ( g, 0.0 )                       ! feed into complex array for FFT
-
-           !write some elements of data
-           nup = FLOOR( SQRT (REAL( i*i +j*j + k*k ) ) )
-           IF( nup <= 3 ) THEN
-              WRITE ( unit=output_unit, fmt='(3i4,2f10.4)') i, j, k, fin(i,j,k)
+           ! Write some elements of data
+           nup = FLOOR ( SQRT ( REAL( ix**2 + iy**2 + iz**2 ) ) )
+           IF ( nup <= 3 ) THEN
+              WRITE ( unit=output_unit, fmt='(3i4,2f10.4)' ) ix, iy, iz, fft_inp(ix,iy,iz)
            END IF
 
         END DO
      END DO
   END DO
+
   WRITE(*,'(/)')
 
   ! Forward FFT
 
-  plan = fftw_plan_dft_3d ( sc, sc, sc, fin, fout, FFTW_FORWARD, FFTW_ESTIMATE) ! set up plan for the Fourier transform
-  CALL fftw_execute_dft ( plan, fin, fout )                                     ! execute FFT
-  CALL fftw_destroy_plan ( plan )                                               ! release plan
-
-  dk = (2.0 * pi) / delta / REAL(sc) ! interval in reciprocal space
+  fft_plan = fftw_plan_dft_3d ( sc, sc, sc, fft_inp, fft_out, FFTW_FORWARD, FFTW_ESTIMATE) ! Set up plan for the Fourier transform
+  CALL fftw_execute_dft ( fft_plan, fft_inp, fft_out )                                     ! Execute FFT
+  CALL fftw_destroy_plan ( fft_plan )                                                      ! Release plan
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'Reciprocal-space transform'
 
-  DO i = 1, sc
+  DO ix = 0, sc-1
+     kx = REAL ( wraparound(ix) ) * dk
+     DO iy = 0, sc-1
+        ky = REAL ( wraparound(iy) ) * dk
+        DO iz = 0, sc-1
+           kz = REAL ( wraparound(iz) ) * dk
 
-     IF ( i <= sc2 ) THEN
-        kx  = REAL( i - 1 ) * dk
-     ELSE
-        kx  = REAL( i - sc - 1 ) * dk
-     END IF
+           k_sq  = kx**2 + ky**2 + kz**2   ! square of wave vector
+           k_mag = SQRT( k_sq )            ! modulus of wave vector
+           ghat  = EXP(- k_sq / 4.0 / pi ) ! analytical transform of the Gaussian
 
-     DO j = 1, sc
-
-        IF ( j <= sc2 ) THEN
-           ky = REAL( j - 1 ) * dk
-        ELSE
-           ky = REAL( j - sc - 1 ) * dk
-        END IF
-
-        DO k = 1, sc
-
-           IF( k <= sc2 ) THEN
-              kz = REAL( k - 1 ) * dk
-           ELSE
-              kz = REAL( k - sc - 1 )  * dk
-           END IF
-
-           ksq  = kx * kx + ky * ky + kz * kz  ! square of wave vector
-           kmag = SQRT( ksq )                  ! modulus of wave vector
-           ghat = EXP(- ksq / 4 / pi )         ! analytical transform of the Gaussian
-
-           ! Write some elements of data in reciprocal space including factor of delta**3
+           ! Write some elements of data in reciprocal space including factor of dr**3
            ! Compare with the analytical expression for the transform of the Gaussian test function
 
-           nup  = FLOOR( SQRT (REAL( i*i +j*j + k*k ) ) )
+           nup  = FLOOR ( SQRT ( REAL ( ix**2 + iy**2 + iz**2 ) ) )
            IF ( nup <= 3 ) THEN
-              WRITE ( unit=output_unit, fmt='(3i4,4f10.4)') i, j, k, kmag, delta3 * fout(i,j,k), ghat
+              WRITE ( unit=output_unit, fmt='(3i4,4f10.4)') ix, iy, iz, k_mag, fft_out(ix,iy,iz)*dr**3, ghat
            END IF
+
         END DO
      END DO
   END DO
+
   WRITE ( unit=output_unit, fmt='(/)')
 
-  ! backward Fourier transform
+  ! Backward Fourier transform
 
-  plan = fftw_plan_dft_3d ( sc, sc, sc, fout, fin, FFTW_BACKWARD, FFTW_ESTIMATE) ! set up plan for the Fourier transform
-  CALL fftw_execute_dft ( plan, fout, fin )                                      ! execute FFT
-  CALL fftw_destroy_plan ( plan )                                                ! release plan
+  fft_plan = fftw_plan_dft_3d ( sc, sc, sc, fft_out, fft_inp, FFTW_BACKWARD, FFTW_ESTIMATE) ! set up plan for the Fourier transform
+  CALL fftw_execute_dft ( fft_plan, fft_out, fft_inp )                                      ! execute FFT
+  CALL fftw_destroy_plan ( fft_plan )                                                       ! release plan
 
-  ! Write some elements of data in real space after the back transform including the normalising
-  ! factor 1/n**3. These should be compared with the input data
+  ! Write some elements of data in real space after the back transform
+  ! including the normalising factor 1/sc**3
+  ! These should be compared with the input data
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'Back Transform to real space'
-  DO i = 1, sc
-     DO j = 1, sc
-        DO k = 1, sc
-           nup = FLOOR( SQRT (REAL( i*i +j*j + k*k ) ) )
+  DO ix = 0, sc-1
+     DO iy = 0, sc-1
+        DO iz = 0, sc-1
+           nup = FLOOR ( SQRT ( REAL ( ix**2 + iy**2 + iz**2 ) ) )
            IF( nup <= 3) THEN
-              WRITE ( unit=output_unit, fmt='(3i4,2f10.4)') i, j, k, fin(i,j,k)/REAL( sc*sc*sc  )
+              WRITE ( unit=output_unit, fmt='(3i4,2f10.4)' ) ix, iy, iz, fft_inp(ix,iy,iz)/REAL(sc**3)
            END IF
         END DO
      END DO
   END DO
+
+  DEALLOCATE ( fft_inp, fft_out )
+
+CONTAINS
+
+  FUNCTION wraparound ( m ) RESULT ( w ) ! implements wrapping of indices
+    INTEGER, INTENT(in) :: m ! index to be wrapped
+    INTEGER             :: w ! result
+
+    IF ( m < 0 .OR. m >= sc ) STOP 'This should never happen'
+
+    IF ( m < sc2 ) THEN
+       w = m
+    ELSE
+       w = m - sc
+    END IF
+
+  END FUNCTION wraparound
 
 END PROGRAM fft3dwrap
 

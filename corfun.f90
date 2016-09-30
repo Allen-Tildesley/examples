@@ -49,9 +49,10 @@ PROGRAM corfun
   INTEGER :: unit, ioerr
   REAL    :: temperature, stddev, cpu_1, cpu_2, cpu_3, cpu_4, x, e, b, d
 
-  INTEGER(C_INT)                                       :: fft_len         ! the number of points for FFT
-  COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_in, fft_out ! data to be transformed (0:fft_len-1)
-  TYPE(C_PTR)                                          :: fft_plan        ! plan needed for FFTW
+  INTEGER(C_INT)                                       :: fft_len  ! the number of points for FFT
+  COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_inp  ! data to be transformed (0:fft_len-1)
+  COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_out  ! data to be transformed (0:fft_len-1)
+  TYPE(C_PTR)                                          :: fft_plan ! plan needed for FFTW
 
   REAL,    PARAMETER :: b1 = 2.0, b2 = -2.0,     b3 = 4.0/3.0, b4 = -2.0/3.0
   REAL,    PARAMETER :: d1 = 1.0, d2 = -1.0/2.0, d3 = 1.0/6.0, d4 = -1.0/24.0
@@ -88,7 +89,7 @@ PROGRAM corfun
   ALLOCATE ( v(nstep), v0(n0), t0(n0) )
   ALLOCATE ( c(0:nt), c_fft(0:nt), n(0:nt) )
   fft_len = 2*nstep ! actual length of data
-  ALLOCATE ( fft_in(0:fft_len-1), fft_out(0:fft_len-1) )
+  ALLOCATE ( fft_inp(0:fft_len-1), fft_out(0:fft_len-1) )
 
   ! The memory function model is defined here
   ! Values used by Baczewski and Bond in their example are
@@ -175,24 +176,24 @@ PROGRAM corfun
   ! Data analysis (FFT method)
 
   ! Prepare data for FFT
-  fft_in            = CMPLX(0.0,0.0) ! fill input array with zeros
-  fft_in(0:nstep-1) = CMPLX(v)       ! put data into first part (real only)
+  fft_inp            = CMPLX(0.0,0.0) ! fill input array with zeros
+  fft_inp(0:nstep-1) = CMPLX(v)       ! put data into first part (real only)
 
   ! Forward FFT
-  fft_plan = fftw_plan_dft_1d ( fft_len, fft_in, fft_out, FFTW_FORWARD, FFTW_ESTIMATE) ! set up plan
-  CALL fftw_execute_dft ( fft_plan, fft_in, fft_out )                                  ! execute FFT
-  CALL fftw_destroy_plan ( fft_plan )                                                  ! release plan
+  fft_plan = fftw_plan_dft_1d ( fft_len, fft_inp, fft_out, FFTW_FORWARD, FFTW_ESTIMATE) ! set up plan
+  CALL fftw_execute_dft ( fft_plan, fft_inp, fft_out )                                  ! execute FFT
+  CALL fftw_destroy_plan ( fft_plan )                                                   ! release plan
 
   fft_out = fft_out * CONJG ( fft_out ) ! square modulus
 
   ! Reverse FFT
-  fft_plan = fftw_plan_dft_1d ( fft_len, fft_out, fft_in, FFTW_BACKWARD, FFTW_ESTIMATE) ! set up plan
-  CALL fftw_execute_dft ( fft_plan, fft_out, fft_in )                                   ! execute FFT
-  CALL fftw_destroy_plan ( fft_plan )                                                   ! release plan
+  fft_plan = fftw_plan_dft_1d ( fft_len, fft_out, fft_inp, FFTW_BACKWARD, FFTW_ESTIMATE) ! set up plan
+  CALL fftw_execute_dft ( fft_plan, fft_out, fft_inp )                                   ! execute FFT
+  CALL fftw_destroy_plan ( fft_plan )                                                    ! release plan
 
-  fft_in = fft_in / REAL ( fft_len ) ! normalization factor associated with FFT itself
-  n(:)   = [ ( nstep-t, t = 0, nt ) ]
-  c_fft  = REAL ( fft_in(0:nt) ) / n(:) ! normalization associated with time origins
+  fft_inp = fft_inp / REAL ( fft_len ) ! normalization factor associated with FFT itself
+  n(:)    = [ ( nstep-t, t = 0, nt ) ]
+  c_fft   = REAL ( fft_inp(0:nt) ) / n(:) ! normalization associated with time origins
 
   CALL CPU_TIME ( cpu_4 )
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'CPU time for FFT method = ', cpu_4-cpu_3
@@ -212,7 +213,7 @@ PROGRAM corfun
   CLOSE(unit=unit)
 
   DEALLOCATE ( v, v0, t0, c, c_fft, n )
-  DEALLOCATE ( fft_in, fft_out )
+  DEALLOCATE ( fft_inp, fft_out )
 
 CONTAINS
 
