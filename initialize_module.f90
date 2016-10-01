@@ -45,7 +45,7 @@ CONTAINS
     REAL, DIMENSION(3,4), PARAMETER :: r0 = RESHAPE ( [ &
          & 0.25, 0.25, 0.25,  0.75, 0.75, 0.25,  &
          & 0.25, 0.75, 0.75,  0.75, 0.25, 0.75 ],[3,4] ) ! positions in unit cell
-    REAL, DIMENSION(3) :: rcm ! centre of mass
+    REAL, DIMENSION(3) :: r_cm ! centre of mass
     INTEGER            :: nc, ix, iy, iz, a, i
 
     nc = NINT ( REAL(n/4) ** (1.0/3.0) )
@@ -79,15 +79,16 @@ CONTAINS
     END DO
     ! End triple loop over unit cell indices
 
-    r(:,:) = r(:,:)  / REAL ( nc ) ! Scale positions into unit cell
-    rcm = SUM ( r, dim=2 ) / REAL(n)
-    r(:,:) = r(:,:) - SPREAD ( rcm(:), dim=2, ncopies=n ) ! shift centre of mass to the origin
+    r(:,:)  = r(:,:)  / REAL ( nc )                         ! Scale positions into unit cell
+    r_cm(:) = SUM ( r, dim=2 ) / REAL(n)                    ! Compute centre of mass position
+    r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of mass to the origin
+
   END SUBROUTINE initialize_positions_lattice
  
   SUBROUTINE initialize_positions_random
     ! simulation box is a unit cube centred at the origin
 
-    REAL, DIMENSION(3) :: rcm ! centre of mass
+    REAL, DIMENSION(3) :: r_cm ! centre of mass
 
     IF ( .NOT. ALLOCATED ( r ) ) THEN
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
@@ -99,8 +100,8 @@ CONTAINS
     END IF
 
     CALL RANDOM_NUMBER ( r )
-    rcm = SUM ( r, dim=2 ) / REAL(n)
-    r(:,:) = r(:,:) - SPREAD ( rcm(:), dim=2, ncopies=n ) ! shift centre of mass to the origin
+    r_cm(:) = SUM ( r, dim=2 ) / REAL(n)                    ! Compute centre of mass position
+    r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of mass to the origin
     
   END SUBROUTINE initialize_positions_random
  
@@ -109,9 +110,7 @@ CONTAINS
     ! Sets up the alpha-fcc lattice for linear molecules
     ! Four molecules per unit cell
 
-    REAL, PARAMETER :: rroot3 = 1.0 / SQRT ( 3.0 )
-
-    REAL, DIMENSION(3,4), PARAMETER :: e0 = RESHAPE (  rroot3*[ &
+    REAL, DIMENSION(3,4), PARAMETER :: e0 = RESHAPE (  sqrt(1.0/3.0) * [ &
          &  1.0,  1.0,  1.0,    1.0, -1.0, -1.0,  &
          & -1.0,  1.0, -1.0,   -1.0, -1.0,  1.0 ],[3,4] ) ! orientations in unit cell
 
@@ -192,12 +191,12 @@ CONTAINS
   END SUBROUTINE initialize_orientations_random
 
   SUBROUTINE initialize_velocities ( temperature )
-    USE maths_module, ONLY : random_normal
+    USE maths_module, ONLY : random_normals
     REAL, INTENT(in) :: temperature ! reduced temperature
 
     ! Chooses velocities from Maxwell-Boltzmann (Gaussian) distribution
     ! We set the total momentum to zero afterwards
-    ! we assume unit molecular mass and employ Lennard-Jones units
+    ! we assume unit molecular mass and employ simulation (e.g. Lennard-Jones) units
     ! property                  units
     ! energy                    epsilon ( = 1 )
     ! molecular mass            m ( = 1 )
@@ -205,9 +204,8 @@ CONTAINS
     ! angular velocity w        sqrt(epsilon/m*sigma**2)
     ! moment of inertia         m*sigma**2
 
-    REAL               :: v_rms ! root-mean-square velocity component
-    REAL, DIMENSION(3) :: v_sum ! total momentum
-    INTEGER            :: i, k
+    REAL               :: v_rms ! Root-mean-square velocity component
+    REAL, DIMENSION(3) :: v_cm  ! Centre of mass velocity
 
     IF ( .NOT. ALLOCATED ( v ) ) THEN
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array v is not allocated'
@@ -219,24 +217,15 @@ CONTAINS
     END IF
 
     v_rms = SQRT ( temperature )
+    CALL random_normals ( 0.0, v_rms, v )
 
-    DO i = 1, n
-       DO k = 1, 3
-          v(k,i) = random_normal ( 0.0, v_rms )
-       END DO
-    END DO
-
-    ! Compute and remove total momentum
-    v_sum(:) = SUM ( v(:,:), dim=2 )
-    v_sum(:) = v_sum(:) / REAL ( n )
-    DO k = 1, 3
-       v(k,:) = v(k,:) - v_sum(k)
-    END DO
+    v_cm(:) = SUM ( v(:,:), dim=2 ) / REAL ( n )            ! Compute centre of mass velocity
+    v(:,:)  = v(:,:) - SPREAD ( v_cm(:), dim=2, ncopies=n ) ! Set net momentum to zero
 
   END SUBROUTINE initialize_velocities
 
   SUBROUTINE initialize_angular_velocities ( temperature, inertia )
-    USE maths_module, ONLY : random_perpendicular_vector, random_normal
+    USE maths_module, ONLY : random_perpendicular_vector, random_normals
     REAL, INTENT(in) :: temperature ! reduced temperature
     REAL, INTENT(in) :: inertia     ! reduced moment of inertia
 
@@ -248,7 +237,7 @@ CONTAINS
     ! there is no attempt to set the total angular momentum to zero
 
     REAL    ::  w_sq, w_sq_mean, w_std_dev,  zeta
-    INTEGER ::  i, k
+    INTEGER ::  i
 
     IF ( .NOT. ALLOCATED ( w ) ) THEN
        WRITE ( unit=error_unit, fmt='(a)' ) 'array w is not allocated'
@@ -269,11 +258,7 @@ CONTAINS
 
     IF ( LBOUND(e,dim=1) == 0 ) THEN ! nonlinear molecule, treat as spherical top
        w_std_dev = SQRT(temperature/inertia)
-       DO i = 1, n
-          DO k = 1, 3
-             w(k,i) = random_normal ( 0.0, w_std_dev )
-          END DO
-       END DO
+       call random_normals ( 0.0, w_std_dev, w )
 
     ELSE ! linear molecule
        w_sq_mean = 2.0 * temperature / inertia
@@ -294,6 +279,10 @@ CONTAINS
     ! unit cell is a unit cube, nearest neighbour distance is sqrt(0.5)
     ! results are then scaled to give unit bond length
 
+    ! The aim of the slightly complicated triple loop over unit cells
+    ! with various options for atom positions within the unit cell
+    ! is to ensure that successive atoms are exactly one bond length apart
+
     REAL, DIMENSION(3,4), PARAMETER :: r0 = RESHAPE ( [ &
          & 0.25, 0.25, 0.25, &
          & 0.25, 0.75, 0.75, &
@@ -302,8 +291,8 @@ CONTAINS
 
     INTEGER, DIMENSION(4,2,2) :: atoms_mid, atoms_inp, atoms_out
     INTEGER, DIMENSION(4)     :: atoms
-    REAL                      :: rsq
-    REAL,    DIMENSION(3)     :: rcm ! centre of mass
+    REAL                      :: r_sq
+    REAL,    DIMENSION(3)     :: r_cm ! centre of mass position
     INTEGER                   :: nc, ix, iy, iz ! unit cell indices
     INTEGER                   :: a, i, j, x_direction, y_direction, plane_count
     INTEGER, DIMENSION(2)     :: istart, istop, istep
@@ -323,7 +312,7 @@ CONTAINS
        STOP 'Error in initialize_chain_lattice'
     END IF
 
-    ! define sequences of atoms through unit cells
+    ! Define sequences of atoms through unit cells
     atoms_inp(:,1,1) = [1,4,2,3]
     atoms_mid(:,1,1) = [1,4,2,3]
     atoms_out(:,1,1) = [1,2,3,4]
@@ -337,7 +326,7 @@ CONTAINS
     atoms_mid(:,2,2) = [3,2,4,1]
     atoms_out(:,2,2) = [3,4,1,2]
 
-    ! forward and reverse options to traverse cells in xy plane
+    ! Forward and reverse options to traverse cells in xy plane
     istart = [ 1, nc ]
     istop  = [ nc, 1 ]
     istep  = [ 1, -1 ]
@@ -369,21 +358,24 @@ CONTAINS
     END DO
     ! End triple loop over unit cell indices
 
-    rcm = SUM ( r, dim=2 ) / REAL(n)
-    r(:,:) = r(:,:) - SPREAD ( rcm, dim=2, ncopies = n )  ! shift centre of box to the origin
-    r(:,:) = r(:,:) / SQRT(0.5)     ! scale to give unit bond length
+    r_cm(:) = SUM ( r, dim=2 ) / REAL(n)                 ! Compute centre of mass position
+    r(:,:)  = r(:,:) - SPREAD ( r_cm, dim=2, ncopies=n ) ! Shift centre of box to the origin
+    r(:,:)  = r(:,:) / SQRT(0.5)                         ! Scale to give unit bond length
 
-    ! Double loop to confirm unit bond lengths and no overlaps
-    DO i = 1, n-1
-       DO j = i+1, n
-          rsq =  SUM((r(:,i)-r(:,j))**2)
-          IF ( j == i+1 ) THEN
-             IF ( ABS(rsq-1.0) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, i+1, rsq
-          ELSE
-             IF ( ABS(rsq) < 1.0 - tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Overlap warning ', i, i+1, rsq
-          END IF
+
+    DO i = 1, n-1 ! Loop to confirm unit bond lengths
+       r_sq = SUM((r(:,i)-r(:,i+1))**2)
+       IF ( ABS(r_sq-1.0) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, i+1, r_sq
+    END DO ! End loop to confirm unit bond lengths
+
+    ! Double loop to confirm no overlaps
+    DO i = 1, n-2
+       DO j = i+2, n
+          r_sq = SUM((r(:,i)-r(:,j))**2)
+          IF ( ABS(r_sq) < 1.0 - tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Overlap warning ', i, j, r_sq
        END DO
     END DO
+    ! End double loop to confirm no overlaps
 
   END SUBROUTINE initialize_chain_lattice
 
@@ -392,8 +384,8 @@ CONTAINS
 
     ! Chooses chain positions randomly, at unit bond length, avoiding overlap
 
-    REAL               :: rsq
-    REAL, DIMENSION(3) :: d, rcm
+    REAL               :: r_sq
+    REAL, DIMENSION(3) :: d, r_cm
     INTEGER            :: i, j, iter
     REAL, PARAMETER    :: tol = 1.0e-9
     INTEGER, PARAMETER :: iter_max = 1000
@@ -440,17 +432,17 @@ CONTAINS
 
     END DO ! End loop over atom indices
 
-    rcm = SUM ( r, dim=2 ) / REAL(n)
-    r(:,:) = r(:,:) - SPREAD ( rcm, dim=2, ncopies = n )  ! shift centre of box to the origin
+    r_cm = SUM ( r, dim=2 ) / REAL(n)
+    r(:,:) = r(:,:) - SPREAD ( r_cm, dim=2, ncopies = n )  ! shift centre of box to the origin
 
     ! Double loop to confirm unit bond lengths and no overlaps
     DO i = 1, n-1
        DO j = i+1, n
-          rsq =  SUM((r(:,i)-r(:,j))**2)
+          r_sq =  SUM((r(:,i)-r(:,j))**2)
           IF ( j == i+1 ) THEN
-             IF ( ABS(rsq-1.0) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, j, rsq
+             IF ( ABS(r_sq-1.0) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, j, r_sq
           ELSE
-             IF ( ABS(rsq) < 1.0 - tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Overlap warning ', i, j, rsq
+             IF ( ABS(r_sq) < 1.0 - tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Overlap warning ', i, j, r_sq
           END IF
        END DO
     END DO
