@@ -114,8 +114,10 @@ CONTAINS
     k_lo = MIN(k1,k2)
     k_hi = MAX(k1,k2)
     k =  k_lo + FLOOR((k_hi-k_lo+1)*zeta)
-    IF ( k < k_lo ) k = k_lo ! guard against small danger of roundoff
-    IF ( k > k_hi ) k = k_hi ! guard against small danger of roundoff
+
+    ! Guard against small danger of roundoff
+    IF ( k < k_lo ) k = k_lo 
+    IF ( k > k_hi ) k = k_hi
 
   END FUNCTION random_integer
 
@@ -168,8 +170,8 @@ CONTAINS
 
   END SUBROUTINE random_normals_2
 
-  SUBROUTINE random_orientation_vector ( e )
-    REAL, DIMENSION(3), INTENT(out) :: e ! Uniformly sampled orientation
+  FUNCTION random_orientation_vector ( ) RESULT ( e )
+    REAL, DIMENSION(3) :: e ! Returns uniformly sampled unit orientation vector
 
     ! Firstly, the vector is chosen uniformly within the unit cube
     ! Vectors lying outside the unit sphere are rejected
@@ -187,10 +189,10 @@ CONTAINS
 
     e = e / SQRT ( e_sq )
 
-  END SUBROUTINE random_orientation_vector
+  END FUNCTION random_orientation_vector
 
-  SUBROUTINE random_orientation_vector_alt1 ( e )
-    REAL, DIMENSION(3), INTENT(out) :: e ! Uniformly sampled orientation vector
+  function random_orientation_vector_alt1 () result ( e )
+    REAL, DIMENSION(3) :: e ! Returns uniformly sampled orientation vector
 
     ! First alternative routine for choosing a random orientation in 3D
 
@@ -203,27 +205,27 @@ CONTAINS
     phi = zeta(2) * 2.0*pi             ! Random angle uniform sampled in range (0,2*pi)
     e  = [ s*COS(phi), s*SIN(phi), c ] ! Random unit vector
 
-  END SUBROUTINE random_orientation_vector_alt1
+  END function random_orientation_vector_alt1
 
-  SUBROUTINE random_orientation_vector_alt2 ( e )
-    REAL, DIMENSION(3), INTENT(out) :: e ! Uniformly sampled orientation vector
+  function random_orientation_vector_alt2 () result  ( e )
+    REAL, DIMENSION(3) :: e ! Returns uniformly sampled orientation vector
 
     ! Second alternative routine for choosing a random orientation in 3D
 
     REAL, DIMENSION(2) :: zeta
     REAL               :: zeta_sq, f
 
-    DO
+    DO ! Loop until within unit disk
        CALL RANDOM_NUMBER ( zeta ) ! Two uniform random numbers between 0 and 1
        zeta = 2.0 * zeta - 1.0     ! now each between -1 and 1
        zeta_sq = SUM ( zeta**2 )   ! squared magnitude
-       IF ( zeta_sq < 1.0 ) EXIT   ! now inside unit disk
-    END DO
+       IF ( zeta_sq < 1.0 ) EXIT   ! test whether inside unit disk
+    END DO ! End loop until within unit disk
 
     f = 2.0 * SQRT ( 1.0 - zeta_sq )
     e = [ zeta(1) * f, zeta(2) * f, 1.0 - 2.0 * zeta_sq ] ! on surface of unit sphere
 
-  END SUBROUTINE random_orientation_vector_alt2
+  END function random_orientation_vector_alt2
 
   FUNCTION random_rotate_vector ( delta_max, e_old ) RESULT ( e )
     REAL, DIMENSION(3)             :: e         ! orientation vector result
@@ -235,33 +237,35 @@ CONTAINS
     ! Provided delta_max is << 1, it is approximately the maximum rotation angle (in radians)
     ! The magnitude of the rotation is not uniformly sampled, but this should not matter
 
-    REAL, DIMENSION(3) :: de   ! random vector
-    REAL               :: e_sq
+    REAL :: e_sq
 
-    CALL random_orientation_vector ( de ) ! Random unit vector
-    de  = delta_max * de                  ! Random small vector
-
-    e    = e_old + de     ! Choose new orientation by adding random small vector
+    ! Choose new orientation by adding random small vector
+    e    = e_old + delta_max * random_orientation_vector ( )
     e_sq = SUM ( e**2 )
     e    = e / SQRT(e_sq) ! Normalize
 
   END FUNCTION random_rotate_vector
 
   FUNCTION random_perpendicular_vector ( e_old ) RESULT ( e )
-    REAL, DIMENSION(3)             :: e         ! result is an orientation vector
-    REAL, DIMENSION(3), INTENT(in) :: e_old     ! perpendicular to this vector 
+    REAL, DIMENSION(3)             :: e     ! Result is an orientation vector
+    REAL, DIMENSION(3), INTENT(in) :: e_old ! perpendicular to this vector 
 
-    REAL            :: factor, e_sq
+    REAL            :: proj, e_sq, e_old_sq
     REAL, PARAMETER :: tol = 1.e-6
 
+    e_old_sq = SUM ( e_old**2 )
+    IF ( e_old_sq < tol ) STOP 'Error in random_perpendicular_vector' ! This should never happen
+    
     DO
-       CALL random_orientation_vector ( e )                 ! Random unit vector
-       factor = dot_PRODUCT ( e, e_old ) / SUM ( e_old**2 ) ! Projection along e_old
-       e      = e - factor * e_old                          ! Make e perpendicular to e_old
-       e_sq   = SUM ( e**2 )
-       IF ( e_sq > tol ) EXIT ! Start again if e is too small
+       e    = random_orientation_vector ( )       ! Randomly oriented unit vector
+       proj = DOT_PRODUCT ( e, e_old ) / e_old_sq ! Projection along e_old
+       e    = e - proj * e_old                    ! Make e perpendicular to e_old
+       e_sq = SUM ( e**2 )                        ! Prepare to normalize
+       IF ( e_sq > tol ) EXIT                     ! Accept, unless e is too small
     END DO
+
     e = e / SQRT ( e_sq ) ! Random unit direction perpendicular to e_old
+
   END FUNCTION random_perpendicular_vector
 
   FUNCTION random_rotate_vector_alt1 ( delta_max, e_old ) RESULT ( e )
@@ -331,56 +335,57 @@ CONTAINS
 
     cos_min = COS ( delta_max )
 
-    DO
-       CALL random_orientation_vector_alt2 ( e )
+    DO ! Loop until close enough
+       e = random_orientation_vector_alt2 ( ) ! choose completely random vector
        IF ( DOT_PRODUCT ( e, e_old ) > cos_min ) EXIT ! close enough
-    END DO
+    END DO ! End loop until close enough
 
   END FUNCTION random_rotate_vector_alt3
 
-  SUBROUTINE random_quaternion ( e )
-    REAL, DIMENSION(0:3), INTENT(out) :: e ! Uniformly sampled orientation quaternion
+  function random_quaternion () result ( e )
+    REAL, DIMENSION(0:3) :: e ! Returns uniformly sampled orientation quaternion
 
     REAL, DIMENSION(2) :: zeta
     REAL               :: s1, s2, f
 
-    DO
+    DO ! Loop until within unit disk
        CALL RANDOM_NUMBER ( zeta ) ! Two uniform random numbers between 0 and 1
        zeta = 2.0 * zeta - 1.0     ! now each between -1 and 1
        s1 = SUM ( zeta**2 )        ! squared magnitude
        IF ( s1 < 1.0 ) EXIT        ! now inside unit disk
-    END DO
+    END DO ! End loop until within unit disk
+    
     e(0) = zeta(1)
     e(1) = zeta(2)
 
-    DO
+    DO ! Loop until within unit disk
        CALL RANDOM_NUMBER ( zeta ) ! Two uniform random numbers between 0 and 1
        zeta = 2.0 * zeta - 1.0     ! now each between -1 and 1
        s2 = SUM ( zeta**2 )        ! squared magnitude
        IF ( s2 < 1.0 ) EXIT        ! now inside unit disk
-    END DO
+    END DO ! End loop until within unit disk
+    
     f = SQRT ( (1.0 - s1 ) / s2 )
     e(2) = zeta(1)*f
     e(3) = zeta(2)*f
 
-  END SUBROUTINE random_quaternion
+  END function random_quaternion
 
   FUNCTION random_rotate_quaternion ( delta_max, q_old ) RESULT ( q )
-    REAL,                 INTENT(in) :: delta_max ! maximum rotation angle
+    REAL, DIMENSION(0:3)             :: q         ! Result is quaternion, rotated by
+    REAL,                 INTENT(in) :: delta_max ! maximum rotation angle relative to
     REAL, DIMENSION(0:3), INTENT(in) :: q_old     ! old quaternion
-    REAL, DIMENSION(0:3)             :: q         ! result
 
-    REAL, DIMENSION(3)   :: axis        ! rotation axis
-    REAL                 :: delta, s, c ! rotation angle, sin, cos
-    REAL, DIMENSION(0:3) :: q_rot       ! rotation quaternion
+    REAL, DIMENSION(3)   :: axis  ! rotation axis
+    REAL                 :: delta ! rotation half-angle
+    REAL, DIMENSION(0:3) :: q_rot ! rotation quaternion
 
-    CALL random_orientation_vector ( axis )
-    CALL random_NUMBER ( delta )
-    delta = ( 2.0*delta - 1.0 ) * delta_max
-    s = SIN(0.5*delta)
-    c = COS(0.5*delta)
-    q_rot = [ c, s*axis(1), s*axis(2), s*axis(3) ]
-    q = quatmul ( q_rot, q_old )
+    axis = random_orientation_vector ( )  ! Choose randomly oriented rotation axis
+    CALL RANDOM_NUMBER ( delta )          ! Random rotation half-angle
+    delta = ( delta - 0.5 ) * delta_max   ! Now between -0.5*delta_max and +0.5*delta_max
+    q_rot(0)   = COS(delta)               ! Rotation quaternion(0)
+    q_rot(1:3) = SIN(delta)*axis          ! Rotation quaternion(1,2,3)
+    q          = quatmul ( q_rot, q_old ) ! Apply small rotation to old quaternion
 
   END FUNCTION random_rotate_quaternion
 
@@ -532,7 +537,7 @@ CONTAINS
     rho = ( 0.0, 0.0 )
 
     DO i = 1, n
-       kr  = dot_PRODUCT ( k_real, r(:,i) )
+       kr  = DOT_PRODUCT ( k_real, r(:,i) )
        rho = rho + CMPLX ( COS(kr), SIN(kr) )
     END DO
 
@@ -574,7 +579,7 @@ CONTAINS
     order = 0.0
     DO i = 1, n
        i0 = MODULO ( i, 4 ) + 1             ! select appropriate original orientation
-       c = dot_PRODUCT ( e(:,i), e0(:,i0) ) ! cosine of angle
+       c = DOT_PRODUCT ( e(:,i), e0(:,i0) ) ! cosine of angle
        order = order + 1.5*c**2 - 0.5       ! Second Legendre polynomial
     END DO
     order = order / REAL ( n )

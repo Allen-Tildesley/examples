@@ -66,7 +66,6 @@ CONTAINS
     INTEGER                      :: k            ! try index
     INTEGER, DIMENSION(k_max)    :: w            ! Rosenbluth weights (here integers, 0 or 1)
     REAL,    DIMENSION(3,k_max)  :: r_try        ! coordinates of trial atoms
-    REAL,    DIMENSION(3)        :: u            ! vector
     INTEGER                      :: i            ! atom index
     REAL,              PARAMETER :: w_tol = 0.5  ! min weight tolerance (w takes integer values)
 
@@ -99,9 +98,8 @@ CONTAINS
     DO i = n-m+1, n ! Loop to regrow last m atoms, computing new weight
 
        DO k = 1, k_max ! loop over k_max tries
-          CALL random_orientation_vector ( u )
-          r_try(:,k) = r(:,i-1) + bond*u ! generate trial position
-          w(k)       = weight1 ( r_try(:,k), i, lt ) ! store overlap weight for this try
+          r_try(:,k) = r(:,i-1) + bond * random_orientation_vector ( ) ! generate trial position
+          w(k)       = weight1 ( r_try(:,k), i, lt )                   ! store overlap weight for this try
        END DO ! end loop over k_max tries
 
        IF ( SUM(w) == 0 ) THEN ! early exit
@@ -147,9 +145,8 @@ CONTAINS
        w(1) = 1            ! store overlap weight in try 1 (must be 1)
 
        DO k = 2, k_max ! loop over k_max-1 other tries
-          CALL random_orientation_vector ( u )
-          r_try(:,k) = r(:,i-1) + bond*u ! generate trial position
-          w(k)   = weight1 ( r_try(:,k), i, lt ) ! store overlap weight
+          r_try(:,k) = r(:,i-1) + bond * random_orientation_vector ( ) ! generate trial position
+          w(k)       = weight1 ( r_try(:,k), i, lt )                   ! store overlap weight
        END DO ! end loop over k_max-1 other tries
 
        r(:,i) = r_try(:,1)           ! restore winning position (always the original one)
@@ -203,7 +200,7 @@ CONTAINS
        j = 1 + random_integer ( 1, n-2 ) ! pivot position (not at either end)
        k = random_integer ( 1, 2 )       ! which part to pivot (actually redundant here)
 
-       CALL random_orientation_vector ( u ) ! rotation axis
+       u = random_orientation_vector ( ) ! rotation axis
        CALL RANDOM_NUMBER ( phi )
        phi = phi_max * ( 2.0*phi - 1.0 ) ! rotation angle
 

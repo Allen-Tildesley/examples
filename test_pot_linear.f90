@@ -91,7 +91,7 @@ CONTAINS
     INTEGER :: i
 
     DO i = 1, n
-       CALL random_orientation_vector ( e(:,i) )
+       e(:,i) = random_orientation_vector ( )
     END DO
 
   END SUBROUTINE random_orientations
@@ -102,7 +102,7 @@ CONTAINS
     REAL, DIMENSION (3,n), INTENT(out) :: r
 
     INTEGER :: i, j
-    REAL    :: d, ran
+    REAL    :: d, zeta
     LOGICAL :: ok
 
     ! This routine places n molecules at positions which are all within
@@ -111,21 +111,22 @@ CONTAINS
     ! and the supplied distances.
     r(:,1) = [0.0,0.0,0.0] ! first one at origin
 
-    ! Choose r vector randomly in appropriate range
-    DO i = 2, n
-       DO ! loop until successfully 
-          CALL random_orientation_vector ( r(:,i) ) ! direction of r
-          CALL RANDOM_NUMBER ( ran )
-          d      = d_min + (d_max-d_min)*ran ! magnitude of r
-          r(:,i) = r(:,i) * d ! within desired range of origin
+    DO i = 2, n ! Loop over remaining molecules
+
+       DO ! Loop until successful 
+          r(:,i) = random_orientation_vector ( ) ! direction of r
+          CALL RANDOM_NUMBER ( zeta )
+          d      = d_min + (d_max-d_min)*zeta ! magnitude of r
+          r(:,i) = r(:,i) * d                 ! within desired range of origin
           ok = .TRUE.
           DO j = 2, i-1 ! check intermediate atoms if any
              d = SQRT ( SUM((r(:,i)-r(:,j))**2) )
              ok = ok .AND. ( d >= d_min ) .AND. ( d <= d_max )
           END DO ! end check intermediate atoms if any
           IF ( ok ) EXIT
-       END DO
-    END DO
+       END DO ! End loop until successful
+
+    END DO ! End loop over remaining molecules
 
   END SUBROUTINE random_positions
 

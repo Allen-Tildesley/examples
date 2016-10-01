@@ -99,8 +99,8 @@ CONTAINS
        STOP 'Error in initialize_positions_random'
     END IF
 
-    CALL RANDOM_NUMBER ( r )
-    r_cm(:) = SUM ( r, dim=2 ) / REAL(n)                    ! Compute centre of mass position
+    CALL RANDOM_NUMBER ( r(:,:) )
+    r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL(n)               ! Compute centre of mass position
     r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of mass to the origin
     
   END SUBROUTINE initialize_positions_random
@@ -110,7 +110,7 @@ CONTAINS
     ! Sets up the alpha-fcc lattice for linear molecules
     ! Four molecules per unit cell
 
-    REAL, DIMENSION(3,4), PARAMETER :: e0 = RESHAPE (  sqrt(1.0/3.0) * [ &
+    REAL, DIMENSION(3,4), PARAMETER :: e0 = RESHAPE (  SQRT(1.0/3.0) * [ &
          &  1.0,  1.0,  1.0,    1.0, -1.0, -1.0,  &
          & -1.0,  1.0, -1.0,   -1.0, -1.0,  1.0 ],[3,4] ) ! orientations in unit cell
 
@@ -156,8 +156,6 @@ CONTAINS
     ! Sets up random orientations for linear or nonlinear molecules
 
     INTEGER              :: i
-    REAL, DIMENSION(0:3) :: eq
-    REAL, DIMENSION(3)   :: ev
 
     IF ( .NOT. ALLOCATED ( e ) ) THEN
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array e is not allocated'
@@ -178,13 +176,11 @@ CONTAINS
 
     IF ( LBOUND(e,dim=1) == 0 ) THEN
        DO i = 1, n
-          CALL random_quaternion ( eq )
-          e(:,i) = eq
+          e(:,i) = random_quaternion ( )
        END DO
     ELSE
        DO i = 1, n
-          CALL random_orientation_vector ( ev )
-          e(:,i) = ev
+          e(:,i) = random_orientation_vector ( )
        END DO
     END IF
 
@@ -258,7 +254,7 @@ CONTAINS
 
     IF ( LBOUND(e,dim=1) == 0 ) THEN ! nonlinear molecule, treat as spherical top
        w_std_dev = SQRT(temperature/inertia)
-       call random_normals ( 0.0, w_std_dev, w )
+       CALL random_normals ( 0.0, w_std_dev, w )
 
     ELSE ! linear molecule
        w_sq_mean = 2.0 * temperature / inertia
@@ -339,6 +335,7 @@ CONTAINS
        DO iy = istart(y_direction), istop(y_direction), istep(y_direction)
           x_direction = MOD(iz+iy,2) + 1 ! alternate scans across x rows
           DO ix = istart(x_direction), istop(x_direction), istep(x_direction)
+
              plane_count = plane_count + 1
              IF ( plane_count == 1 ) THEN
                 atoms = atoms_inp(:,x_direction,y_direction) ! first corner of plane
@@ -358,13 +355,12 @@ CONTAINS
     END DO
     ! End triple loop over unit cell indices
 
-    r_cm(:) = SUM ( r, dim=2 ) / REAL(n)                 ! Compute centre of mass position
-    r(:,:)  = r(:,:) - SPREAD ( r_cm, dim=2, ncopies=n ) ! Shift centre of box to the origin
-    r(:,:)  = r(:,:) / SQRT(0.5)                         ! Scale to give unit bond length
-
+    r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL(n)               ! Compute centre of mass position
+    r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of box to the origin
+    r(:,:)  = r(:,:) / SQRT(0.5)                            ! Scale to give unit bond length
 
     DO i = 1, n-1 ! Loop to confirm unit bond lengths
-       r_sq = SUM((r(:,i)-r(:,i+1))**2)
+       r_sq = SUM ( (r(:,i)-r(:,i+1))**2 )
        IF ( ABS(r_sq-1.0) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, i+1, r_sq
     END DO ! End loop to confirm unit bond lengths
 
@@ -385,7 +381,7 @@ CONTAINS
     ! Chooses chain positions randomly, at unit bond length, avoiding overlap
 
     REAL               :: r_sq
-    REAL, DIMENSION(3) :: d, r_cm
+    REAL, DIMENSION(3) :: r_cm
     INTEGER            :: i, j, iter
     REAL, PARAMETER    :: tol = 1.0e-9
     INTEGER, PARAMETER :: iter_max = 1000
@@ -400,19 +396,14 @@ CONTAINS
        STOP 'Error in initialize_chain_random'
     END IF
 
-    ! First atom at origin
-    r(:,1) = [0.0,0.0,0.0]
-
-    ! Second atom at random position
-    CALL random_bond ( d )
-    r(:,2) = r(:,1) + d
+    r(:,1) = [0.0,0.0,0.0]   ! First atom at origin
+    r(:,2) = random_bond ( ) ! Second atom at random position (unit bond length away)
 
     DO i = 3, n ! Begin loop over atom indices
 
        iter = 0
        DO ! Loop until non-overlapping position found (n must not be too large!)
-          CALL random_bond ( d )
-          r(:,i) = r(:,i-1) + d
+          r(:,i) = r(:,i-1) + random_bond ( ) ! subsequent atoms randomly placed (unit bond length)
           overlap = .FALSE.
 
           DO j = 1, i-2 ! Loop to check for overlap
@@ -432,20 +423,22 @@ CONTAINS
 
     END DO ! End loop over atom indices
 
-    r_cm = SUM ( r, dim=2 ) / REAL(n)
-    r(:,:) = r(:,:) - SPREAD ( r_cm, dim=2, ncopies = n )  ! shift centre of box to the origin
+    r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL(n)               ! Compute centre of mass positions
+    r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of box to the origin
 
-    ! Double loop to confirm unit bond lengths and no overlaps
-    DO i = 1, n-1
-       DO j = i+1, n
-          r_sq =  SUM((r(:,i)-r(:,j))**2)
-          IF ( j == i+1 ) THEN
-             IF ( ABS(r_sq-1.0) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, j, r_sq
-          ELSE
-             IF ( ABS(r_sq) < 1.0 - tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Overlap warning ', i, j, r_sq
-          END IF
+    DO i = 1, n-1 ! Loop to confirm unit bond lengths
+       r_sq = SUM ( (r(:,i)-r(:,i+1))**2 )
+       IF ( ABS(r_sq-1.0) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, i+1, r_sq
+    END DO ! End loop to confirm unit bond lengths
+
+    ! Double loop to confirm no overlaps
+    DO i = 1, n-2
+       DO j = i+2, n
+          r_sq = SUM((r(:,i)-r(:,j))**2)
+          IF ( ABS(r_sq) < 1.0 - tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Overlap warning ', i, j, r_sq
        END DO
     END DO
+    ! End double loop to confirm no overlaps
 
   END SUBROUTINE initialize_chain_random
 
@@ -465,8 +458,8 @@ CONTAINS
     ! velocity v                sqrt(epsilon/m)
 
     REAL               :: temp, v1, v2
-    REAL, DIMENSION(3) :: v_vec ! total momentum
-    INTEGER            :: i, k
+    REAL, DIMENSION(3) :: v_cm ! centre of mass velocity
+    INTEGER            :: i
 
     IF ( .NOT. ALLOCATED ( v ) ) THEN
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array v is not allocated'
@@ -479,33 +472,30 @@ CONTAINS
 
     DO i = 1, n
        IF ( i == 1 ) THEN
-          v_vec = random_perpendicular_vector ( r(:,1)-r(:,2) )
-          v1 = random_normal ( 0.0, 1.0 )
-          v2 = random_normal ( 0.0, 1.0 )
-          v(:,i) = v_vec * SQRT ( v1**2 + v2**2 )
+          v(:,i) = random_perpendicular_vector ( r(:,1)-r(:,2) )
+          v1     = random_normal ( 0.0, 1.0 )
+          v2     = random_normal ( 0.0, 1.0 )
+          v(:,i) = v(:,i) * SQRT ( v1**2 + v2**2 )
        ELSE IF ( i == n ) THEN
-          v_vec = random_perpendicular_vector ( r(:,n)-r(:,n-1) )
-          v1 = random_normal ( 0.0, 1.0 )
-          v2 = random_normal ( 0.0, 1.0 )
-          v(:,i) = v_vec * SQRT ( v1**2 + v2**2 )
+          v(:,i) = random_perpendicular_vector ( r(:,n)-r(:,n-1) )
+          v1     = random_normal ( 0.0, 1.0 )
+          v2     = random_normal ( 0.0, 1.0 )
+          v(:,i) = v(:,i) * SQRT ( v1**2 + v2**2 )
        ELSE
-          v_vec = cross_product ( r(:,i)-r(:,i-1), r(:,i)-r(:,i+1) )
-          temp = SQRT ( SUM ( v_vec**2) )
-          v_vec = v_vec / temp ! unit vector
-          v(:,i) = v_vec * random_normal ( 0.0, 1.0 )
+          v(:,i) = cross_product ( r(:,i)-r(:,i-1), r(:,i)-r(:,i+1) )
+          temp   = SQRT ( SUM ( v(:,i)**2) )
+          v(:,i) = v(:,i) / temp ! unit vector
+          v(:,i) = v(:,i) * random_normal ( 0.0, 1.0 )
        END IF
     END DO
 
     ! Compute and remove total momentum
-    v_vec(:) = SUM ( v(:,:), dim=2 )
-    v_vec(:) = v_vec(:) / REAL ( n )
-    DO k = 1, 3
-       v(k,:) = v(k,:) - v_vec(k)
-    END DO
+    v_cm(:) = SUM ( v(:,:), dim=2 ) / REAL ( n )            ! Compute centre of mass velocity
+    v(:,:)  = v(:,:) - SPREAD ( v_cm(:), dim=2, ncopies=n ) ! Set net momentum to zero
 
-    ! number of degrees of freedom is 3*(n-1) - (n-1) constraints
-    temp = SUM(v**2) / REAL ( 2*(n-1) )
-    v = v * SQRT ( temperature / temp )
+    ! Number of degrees of freedom is 3*(n-1) - (n-1) constraints
+    temp   = SUM(v(:,:)**2) / REAL ( 2*(n-1) )
+    v(:,:) = v(:,:) * SQRT ( temperature / temp )
 
   END SUBROUTINE initialize_chain_velocities
 

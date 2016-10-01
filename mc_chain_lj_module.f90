@@ -65,7 +65,6 @@ CONTAINS
     INTEGER              :: i
     LOGICAL              :: overlap
     REAL                 :: d, d_max, stddev, zeta
-    REAL,   DIMENSION(3) :: u
 
     stddev = SQRT(temperature / k_spring) ! spring bond standard deviation
     d_max  = 3.0*stddev                   ! impose a limit on variation, say 3*stddev
@@ -104,10 +103,9 @@ CONTAINS
     DO i = n-m+1, n ! Loop to regrow last m atoms, computing new weight
 
        DO k = 1, k_max ! loop over k_max tries
-          CALL random_orientation_vector ( u )
-          d = random_bond ( bond, stddev, d_max )         ! generate random bond length around d=bond
-          r_try(:,k) = r(:,i-1) + d * u                     ! generate trial position
-          CALL energy_1 ( r_try(:,k), i, lt, overlap, pot ) ! non-bonded interactions with earlier atoms
+          d          = random_bond ( bond, stddev, d_max )          ! generate random bond length around d=bond
+          r_try(:,k) = r(:,i-1) + d * random_orientation_vector ( ) ! generate trial position
+          CALL energy_1 ( r_try(:,k), i, lt, overlap, pot )         ! non-bonded interactions with earlier atoms
           IF ( overlap ) THEN
              w(k) = 0.0
           ELSE
@@ -149,10 +147,9 @@ CONTAINS
        END IF
 
        DO k = 2, k_max ! loop over k_max-1 other tries
-          CALL random_orientation_vector ( u )
-          d = random_bond ( bond, stddev, d_max )         ! generate random bond length around d=bond
-          r_try(:,k) = r(:,i-1) + d * u                     ! generate trial position
-          CALL energy_1 ( r_try(:,k), i, lt, overlap, pot ) ! nonbonded energy with earlier atoms
+          d          = random_bond ( bond, stddev, d_max )          ! generate random bond length around d=bond
+          r_try(:,k) = r(:,i-1) + d * random_orientation_vector ( ) ! generate trial position
+          CALL energy_1 ( r_try(:,k), i, lt, overlap, pot )         ! nonbonded energy with earlier atoms
           IF ( overlap ) THEN
              w(k) = 0.0
           ELSE

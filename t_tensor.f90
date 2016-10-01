@@ -35,11 +35,11 @@ PROGRAM t_tensor
   CALL init_random_seed
 
   ! Choose orientations at random
-  CALL random_orientation_vector ( e1 )
-  CALL random_orientation_vector ( e2 )
+  e1 = random_orientation_vector ( )
+  e2 = random_orientation_vector ( )
 
   ! Place atom 2 at origin and atom 1 in a random direction within desired distance range
-  CALL random_orientation_vector ( r12_hat ) ! unit vector
+  r12_hat = random_orientation_vector ( ) ! unit vector
   CALL RANDOM_NUMBER ( r12_mag )
   r12_mag = d_min + (d_max-d_min)*r12_mag ! magnitude of r12
   r12     = r12_hat * r12_mag             ! within desired range of origin
