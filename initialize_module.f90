@@ -40,11 +40,14 @@ CONTAINS
 
     ! Sets up the fcc lattice
     ! Four molecules per unit cell
-    ! simulation box is a unit cube centred at the origin
+    ! Simulation box is a unit cube centred at the origin
 
-    REAL, DIMENSION(3,4), PARAMETER :: r0 = RESHAPE ( [ &
-         & 0.25, 0.25, 0.25,  0.75, 0.75, 0.25,  &
-         & 0.25, 0.75, 0.75,  0.75, 0.25, 0.75 ],[3,4] ) ! positions in unit cell
+    REAL, DIMENSION(3,4), PARAMETER :: r_fcc = RESHAPE ( [ &
+         & 0.25, 0.25, 0.25, &
+         & 0.25, 0.75, 0.75, &
+         & 0.75, 0.75, 0.25, &
+         & 0.75, 0.25, 0.75 ], [3,4] ) ! positions in unit cell
+
     REAL, DIMENSION(3) :: r_cm ! centre of mass
     INTEGER            :: nc, ix, iy, iz, a, i
 
@@ -71,7 +74,7 @@ CONTAINS
 
              DO a = 1, 4 ! Begin loop over atoms in unit cell
                 i = i + 1
-                r(:,i) = r0(:,a) + REAL ( [ ix, iy, iz ] )
+                r(:,i) = r_fcc(:,a) + REAL ( [ ix, iy, iz ] )
              END DO ! End loop over atoms in unit cell
 
           END DO
@@ -86,7 +89,9 @@ CONTAINS
   END SUBROUTINE initialize_positions_lattice
  
   SUBROUTINE initialize_positions_random
-    ! simulation box is a unit cube centred at the origin
+
+    ! Places atoms at random positions
+    ! Simulation box is a unit cube centred at the origin
 
     REAL, DIMENSION(3) :: r_cm ! centre of mass
 
@@ -110,9 +115,11 @@ CONTAINS
     ! Sets up the alpha-fcc lattice for linear molecules
     ! Four molecules per unit cell
 
-    REAL, DIMENSION(3,4), PARAMETER :: e0 = RESHAPE (  SQRT(1.0/3.0) * [ &
-         &  1.0,  1.0,  1.0,    1.0, -1.0, -1.0,  &
-         & -1.0,  1.0, -1.0,   -1.0, -1.0,  1.0 ],[3,4] ) ! orientations in unit cell
+    REAL, DIMENSION(3,4), PARAMETER :: e_fcc = RESHAPE ( SQRT(1.0/3.0) * [ &
+         &  1.0,  1.0,  1.0,  &
+         &  1.0, -1.0, -1.0,  &
+         & -1.0,  1.0, -1.0,  &
+         & -1.0, -1.0,  1.0  ], [3,4] ) ! orientations in unit cell
 
     INTEGER :: nc, k
 
@@ -140,11 +147,11 @@ CONTAINS
 
     IF ( LBOUND(e,dim=1) == 0 ) THEN
        DO k = 1, n
-          e(:,k) = [1.0,0.0,0.0,0.0]
+          e(:,k) = [1.0,0.0,0.0,0.0] ! for nonlinear molecules make no special alignment
        END DO
     ELSE
        DO k = 0, n-4, 4 ! Loop over unit cells (4 molecules per unit cell)
-          e(:,k+1:k+4) = e0(:,1:4) ! copy unit cell orientations
+          e(:,k+1:k+4) = e_fcc(:,1:4) ! copy unit cell orientations
        END DO ! End loop over unit cells
     END IF
 
@@ -155,7 +162,7 @@ CONTAINS
 
     ! Sets up random orientations for linear or nonlinear molecules
 
-    INTEGER              :: i
+    INTEGER :: i
 
     IF ( .NOT. ALLOCATED ( e ) ) THEN
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array e is not allocated'
@@ -279,7 +286,7 @@ CONTAINS
     ! with various options for atom positions within the unit cell
     ! is to ensure that successive atoms are exactly one bond length apart
 
-    REAL, DIMENSION(3,4), PARAMETER :: r0 = RESHAPE ( [ &
+    REAL, DIMENSION(3,4), PARAMETER :: r_fcc = RESHAPE ( [ &
          & 0.25, 0.25, 0.25, &
          & 0.25, 0.75, 0.75, &
          & 0.75, 0.75, 0.25, &
@@ -347,7 +354,7 @@ CONTAINS
 
              DO a = 1, 4 ! Begin loop over atoms in unit cell
                 i = i+1
-                r(:,i) = r0(:,atoms(a)) + REAL ( [ ix-1, iy-1, iz-1 ] )
+                r(:,i) = r_fcc(:,atoms(a)) + REAL ( [ ix-1, iy-1, iz-1 ] )
              END DO ! End loop over atoms in unit cell
 
           END DO
@@ -383,9 +390,10 @@ CONTAINS
     REAL               :: r_sq
     REAL, DIMENSION(3) :: r_cm
     INTEGER            :: i, j, iter
-    REAL, PARAMETER    :: tol = 1.0e-9
-    INTEGER, PARAMETER :: iter_max = 1000
     LOGICAL            :: overlap
+
+    REAL,    PARAMETER :: tol = 1.0e-9
+    INTEGER, PARAMETER :: iter_max = 1000
 
     IF ( .NOT. ALLOCATED ( r ) ) THEN
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
@@ -397,13 +405,13 @@ CONTAINS
     END IF
 
     r(:,1) = [0.0,0.0,0.0]   ! First atom at origin
-    r(:,2) = random_vector ( ) ! Second atom at random position (unit bond length away)
+    r(:,2) = random_vector() ! Second atom at random position (unit bond length away)
 
     DO i = 3, n ! Begin loop over atom indices
 
        iter = 0
        DO ! Loop until non-overlapping position found (n must not be too large!)
-          r(:,i) = r(:,i-1) + random_vector ( ) ! subsequent atoms randomly placed (unit bond length)
+          r(:,i) = r(:,i-1) + random_vector() ! subsequent atoms randomly placed (unit bond length)
           overlap = .FALSE.
 
           DO j = 1, i-2 ! Loop to check for overlap
