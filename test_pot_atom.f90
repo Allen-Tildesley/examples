@@ -70,7 +70,7 @@ PROGRAM test_pot_atom
 CONTAINS
 
   SUBROUTINE random_positions ( d_min, d_max, r )
-    USE maths_module, ONLY : random_orientation_vector
+    USE maths_module, ONLY : random_vector
     REAL,                  INTENT(in)  :: d_min, d_max
     REAL, DIMENSION (3,n), INTENT(out) :: r
 
@@ -87,7 +87,7 @@ CONTAINS
     DO i = 2, n ! Loop over remaining atoms
 
        DO ! loop until successful
-          r(:,i) = random_orientation_vector ( ) ! direction of r
+          r(:,i) = random_vector ( ) ! direction of r
           CALL RANDOM_NUMBER ( zeta )
           d      = d_min + (d_max-d_min)*zeta ! magnitude of r
           r(:,i) = r(:,i) * d                 ! within desired range of origin

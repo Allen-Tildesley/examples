@@ -10,7 +10,7 @@ PROGRAM t_tensor
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
 
-  USE maths_module, ONLY : init_random_seed, random_orientation_vector, outer_product
+  USE maths_module, ONLY : init_random_seed, random_vector, outer_product
 
   IMPLICIT NONE
 
@@ -35,11 +35,11 @@ PROGRAM t_tensor
   CALL init_random_seed
 
   ! Choose orientations at random
-  e1 = random_orientation_vector ( )
-  e2 = random_orientation_vector ( )
+  e1 = random_vector ( )
+  e2 = random_vector ( )
 
   ! Place atom 2 at origin and atom 1 in a random direction within desired distance range
-  r12_hat = random_orientation_vector ( ) ! unit vector
+  r12_hat = random_vector ( ) ! unit vector
   CALL RANDOM_NUMBER ( r12_mag )
   r12_mag = d_min + (d_max-d_min)*r12_mag ! magnitude of r12
   r12     = r12_hat * r12_mag             ! within desired range of origin

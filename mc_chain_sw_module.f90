@@ -52,7 +52,7 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   SUBROUTINE regrow ( m_max, k_max, q, ratio ) ! regrow polymer
-    USE maths_module, ONLY : random_integer, random_orientation_vector
+    USE maths_module, ONLY : random_integer, random_vector
 
     INTEGER, INTENT(in)    :: m_max  ! max atoms to regrow
     INTEGER, INTENT(in)    :: k_max  ! number of random tries per atom in regrow
@@ -98,7 +98,7 @@ CONTAINS
     DO i = n-m+1, n ! Loop to regrow last m atoms, computing new weight
 
        DO k = 1, k_max ! loop over k_max tries
-          r_try(:,k) = r(:,i-1) + bond * random_orientation_vector ( ) ! generate trial position
+          r_try(:,k) = r(:,i-1) + bond * random_vector ( ) ! generate trial position
           w(k)       = weight1 ( r_try(:,k), i, lt )                   ! store overlap weight for this try
        END DO ! end loop over k_max tries
 
@@ -145,7 +145,7 @@ CONTAINS
        w(1) = 1            ! store overlap weight in try 1 (must be 1)
 
        DO k = 2, k_max ! loop over k_max-1 other tries
-          r_try(:,k) = r(:,i-1) + bond * random_orientation_vector ( ) ! generate trial position
+          r_try(:,k) = r(:,i-1) + bond * random_vector ( ) ! generate trial position
           w(k)       = weight1 ( r_try(:,k), i, lt )                   ! store overlap weight
        END DO ! end loop over k_max-1 other tries
 
@@ -175,7 +175,7 @@ CONTAINS
   END SUBROUTINE regrow
 
   SUBROUTINE pivots ( n_try, phi_max, q, ratio )
-    USE maths_module, ONLY : random_integer, random_orientation_vector, rotate_vector
+    USE maths_module, ONLY : random_integer, random_vector, rotate_vector
 
     INTEGER, INTENT(in)    :: n_try   ! number of pivots to try
     REAL,    INTENT(in)    :: phi_max ! maximum angle of pivot
@@ -200,7 +200,7 @@ CONTAINS
        j = 1 + random_integer ( 1, n-2 ) ! pivot position (not at either end)
        k = random_integer ( 1, 2 )       ! which part to pivot (actually redundant here)
 
-       u = random_orientation_vector ( ) ! rotation axis
+       u = random_vector ( ) ! rotation axis
        CALL RANDOM_NUMBER ( phi )
        phi = phi_max * ( 2.0*phi - 1.0 ) ! rotation angle
 

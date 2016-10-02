@@ -10,32 +10,45 @@ MODULE maths_module
 
   ! Random number routines
   PUBLIC :: init_random_seed, random_integer, random_normal, random_normals
-  PUBLIC :: random_orientation_vector, random_perpendicular_vector
-  PUBLIC :: random_orientation_vector_alt1, random_orientation_vector_alt2
-  PUBLIC :: random_rotate_vector, random_rotate_vector_alt1, random_rotate_vector_alt2, random_rotate_vector_alt3
+  PUBLIC :: random_vector
+  PUBLIC :: random_vector_1, random_vector_2, random_vector_3
+  PUBLIC :: random_perpendicular_vector
+  PUBLIC :: random_rotate_vector
+  PUBLIC :: random_rotate_vector_1, random_rotate_vector_2, random_rotate_vector_3, random_rotate_vector_4
   PUBLIC :: random_quaternion, random_rotate_quaternion
   PUBLIC :: metropolis
 
   ! Low-level mathematical routines and string operations
-  PUBLIC :: rotate_vector, cross_product, outer_product, q_to_a, lowercase
+  PUBLIC :: rotate_vector, rotate_quaternion, cross_product, outer_product, q_to_a, lowercase
 
   ! Order parameter calculations
   PUBLIC :: orientational_order, translational_order, nematic_order
 
   ! Constants used throughout the module
   REAL, PARAMETER :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
+  REAL, PARAMETER :: tol = 1.e-6
 
   ! Define a generic interface for the outer_product functions
   INTERFACE outer_product
-     MODULE PROCEDURE outer_product_2
-     MODULE PROCEDURE outer_product_3
+     MODULE PROCEDURE outer_product_2 ! for 2 vectors giving a rank-2 output
+     MODULE PROCEDURE outer_product_3 ! for 3 vectors giving a rank-3 output
   END INTERFACE outer_product
 
   ! Define a generic interface for the random_normals functions
   INTERFACE random_normals
-     MODULE PROCEDURE random_normals_1
-     MODULE PROCEDURE random_normals_2
+     MODULE PROCEDURE random_normals_1 ! for rank 1 vector of normals
+     MODULE PROCEDURE random_normals_2 ! for rank 2 vector of normals
   END INTERFACE random_normals
+
+  ! Define an interface to one of the random_vector algorithms
+  INTERFACE random_vector
+     MODULE PROCEDURE random_vector_1 ! choose an alternative one instead if you prefer
+  END INTERFACE random_vector
+
+  ! Define an interface to one of the random_rotate_vector algorithms
+  INTERFACE random_rotate_vector
+     MODULE PROCEDURE random_rotate_vector_1 ! choose an alternative one instead if you prefer
+  END INTERFACE random_rotate_vector
 
 CONTAINS
 
@@ -49,6 +62,7 @@ CONTAINS
   ! being generated every time. The routines below are intended to generate different
   ! sequences on different calls.
   ! YOU SHOULD INVESTIGATE THE BEHAVIOUR FOR YOUR OWN COMPILER AND MACHINE IMPLEMENTATION 
+
   SUBROUTINE init_random_seed
     USE iso_fortran_env, ONLY: int64
     IMPLICIT NONE
@@ -104,49 +118,56 @@ CONTAINS
   END FUNCTION lcg
 
   FUNCTION random_integer ( k1, k2 ) RESULT ( k )
-    INTEGER             :: k      ! returns uniformly distributed random integer
+    INTEGER             :: k      ! Returns a uniformly distributed random integer
     INTEGER, INTENT(in) :: k1, k2 ! in range [k1,k2] inclusive
 
-    INTEGER :: k_lo, k_hi
+    INTEGER :: k_min, k_max
     REAL    :: zeta
 
     CALL RANDOM_NUMBER ( zeta )
-    k_lo = MIN(k1,k2)
-    k_hi = MAX(k1,k2)
-    k =  k_lo + FLOOR((k_hi-k_lo+1)*zeta)
+    k_min = MIN ( k1, k2 )
+    k_max = MAX ( k1, k2 )
+    k     = k_min + FLOOR ( (k_max-k_min+1)*zeta )
 
     ! Guard against small danger of roundoff
-    IF ( k < k_lo ) k = k_lo 
-    IF ( k > k_hi ) k = k_hi
+    IF ( k < k_min ) k = k_min 
+    IF ( k > k_max ) k = k_max
 
   END FUNCTION random_integer
 
   FUNCTION random_normal ( mean, std ) RESULT ( r )
-    REAL             :: r         ! returns normal random number
-    REAL, INTENT(in) :: mean, std ! with required mean and standard deviation
+    REAL             :: r    ! Returns a normally-distributed random number with
+    REAL, INTENT(in) :: mean ! specified mean and
+    REAL, INTENT(in) :: std  ! specified standard deviation
 
-    ! Box-Muller transform produces numbers in pairs, we save one for next time
+    ! Box-Muller transform produces numbers in pairs
+    ! We alternate between generating them, saving one for next time,
+    ! and using the saved one from last time
 
     REAL, DIMENSION(2)      :: zeta
-    REAL,              SAVE :: r_save
+    REAL,              SAVE :: s
     LOGICAL,           SAVE :: saved = .FALSE.
 
-    IF ( saved ) THEN
-       r = r_save
-       r = mean + std * r
-       saved = .FALSE.
-    ELSE
-       CALL RANDOM_NUMBER (zeta)
-       r      = SQRT(-2*LOG(zeta(1)))*COS(2*pi*zeta(2))
-       r_save = SQRT(-2*LOG(zeta(1)))*SIN(2*pi*zeta(2))
-       r      = mean + std * r
-       saved = .TRUE.
+    IF ( saved ) THEN     ! Saved number is available
+       r = s              ! normal, with mean=0, std=1
+       r = mean + std * r ! normal, with desired mean, std
+       saved = .FALSE.    ! flag to generate fresh numbers next time
+
+    ELSE                                              ! Saved number is not available
+       CALL RANDOM_NUMBER (zeta)                      ! two uniformly distributed random numbers
+       r = SQRT(-2.0*LOG(zeta(1)))*COS(twopi*zeta(2)) ! normal, with mean=0, std=1
+       s = SQRT(-2.0*LOG(zeta(1)))*SIN(twopi*zeta(2)) ! also normal, with mean=0, std=1
+       r = mean + std * r                             ! normal, with desired mean, std
+       saved = .TRUE.                                 ! flag to use saved number next time
+
     END IF
+
   END FUNCTION random_normal
 
-  SUBROUTINE random_normals_1 ( mean, std, r )   ! returns vector of normal random numbers
-    REAL,               INTENT(in)  :: mean, std ! required mean and standard deviation
-    REAL, DIMENSION(:), INTENT(out) :: r         ! output argument
+  SUBROUTINE random_normals_1 ( mean, std, r ) ! Returns vector of normal random numbers, all with
+    REAL,               INTENT(in)  :: mean    ! specified mean and 
+    REAL,               INTENT(in)  :: std     ! specified standard deviation
+    REAL, DIMENSION(:), INTENT(out) :: r       ! Output argument
 
     INTEGER :: i
 
@@ -156,9 +177,10 @@ CONTAINS
 
   END SUBROUTINE random_normals_1
 
-  SUBROUTINE random_normals_2 ( mean, std, r )     ! returns array of normal random numbers
-    REAL,                 INTENT(in)  :: mean, std ! required mean and standard deviation
-    REAL, DIMENSION(:,:), INTENT(out) :: r         ! output argument
+  SUBROUTINE random_normals_2 ( mean, std, r ) ! Returns array of normal random numbers, all with
+    REAL,                 INTENT(in)  :: mean  ! specified mean and 
+    REAL,                 INTENT(in)  :: std   ! specified standard deviation
+    REAL, DIMENSION(:,:), INTENT(out) :: r     ! Output argument
 
     INTEGER :: i, j
 
@@ -170,189 +192,212 @@ CONTAINS
 
   END SUBROUTINE random_normals_2
 
-  FUNCTION random_orientation_vector ( ) RESULT ( e )
-    REAL, DIMENSION(3) :: e ! Returns uniformly sampled unit orientation vector
+  FUNCTION random_vector_1 () RESULT ( e ) ! 1st alternative algorithm
+    REAL, DIMENSION(3) :: e ! Returns a uniformly sampled unit vector
 
-    ! Firstly, the vector is chosen uniformly within the unit cube
+    ! The vector is chosen uniformly within the cube surrounding the unit sphere
     ! Vectors lying outside the unit sphere are rejected
     ! Having found a vector within the unit sphere, it is normalized
     ! Essentially the same routine will work in 2d, or for quaternions in 4d
 
-    REAL :: e_sq
+    REAL :: norm
 
-    DO
-       CALL RANDOM_NUMBER ( e ) ! Random numbers uniformly sampled in range (0,1)
-       e    = 2.0 * e - 1.0     ! Now in range (-1,+1)
-       e_sq = SUM ( e**2 )
-       IF ( e_sq <= 1.0 ) EXIT
-    END DO
+    DO ! Loop until within unit sphere
+       CALL RANDOM_NUMBER ( e ) ! 3 random numbers uniformly sampled in range (0,1)
+       e    = 2.0 * e - 1.0     ! Now in range (-1,+1) i.e. within containing cube
+       norm = SUM ( e**2 )      ! Square modulus
+       IF ( norm < 1.0 ) EXIT   ! Within unit sphere
+    END DO ! End loop until within unit sphere
 
-    e = e / SQRT ( e_sq )
+    e = e / SQRT ( norm ) ! Normalize
 
-  END FUNCTION random_orientation_vector
+  END FUNCTION random_vector_1
 
-  function random_orientation_vector_alt1 () result ( e )
-    REAL, DIMENSION(3) :: e ! Returns uniformly sampled orientation vector
+  FUNCTION random_vector_2 () RESULT ( e ) ! 2nd alternative algorithm
+    REAL, DIMENSION(3) :: e ! Returns a uniformly sampled unit vector
 
-    ! First alternative routine for choosing a random orientation in 3D
+    ! The polar angles are chosen from the correct distribution
+    ! sampling phi and cos(theta) uniformly
+    ! Then these are used to compute components of e
 
     REAL               :: c, s, phi
-    REAL, DIMENSION(2) :: zeta ! random numbers
+    REAL, DIMENSION(2) :: zeta
 
-    CALL RANDOM_NUMBER ( zeta )        ! Two uniformly sampled random numbers in range (0,1)
-    c   = 2.0*zeta(1) - 1.0            ! Random cosine uniformly sampled in range (-1,+1)
-    s   = SQRT(1.0-c**2)               ! Sine
-    phi = zeta(2) * 2.0*pi             ! Random angle uniform sampled in range (0,2*pi)
-    e  = [ s*COS(phi), s*SIN(phi), c ] ! Random unit vector
+    CALL RANDOM_NUMBER ( zeta ) ! Two uniformly sampled random numbers in range (0,1)
+    c   = 2.0 * zeta(1) - 1.0   ! Random cos(theta) uniformly sampled in range (-1,+1)
 
-  END function random_orientation_vector_alt1
+    IF ( c >= 1.0 ) THEN         ! Guard against very small chance of roundoff error
+       s = 0.0                   ! Set sin(theta) to zero
+    ELSE
+       s   = SQRT ( 1.0 - c**2 ) ! Calculate sin(theta) from cos(theta), always positive
+    END IF
 
-  function random_orientation_vector_alt2 () result  ( e )
-    REAL, DIMENSION(3) :: e ! Returns uniformly sampled orientation vector
+    phi = zeta(2) * twopi               ! Random angle uniformly sampled in range (0,2*pi)
+    e   = [ s*COS(phi), s*SIN(phi), c ] ! Random unit vector
 
-    ! Second alternative routine for choosing a random orientation in 3D
+  END FUNCTION random_vector_2
+
+  FUNCTION random_vector_3 () RESULT ( e ) ! 3rd alternative algorithm
+    REAL, DIMENSION(3) :: e ! Returns a uniformly sampled unit vector
 
     REAL, DIMENSION(2) :: zeta
-    REAL               :: zeta_sq, f
+    REAL               :: norm, f
 
     DO ! Loop until within unit disk
        CALL RANDOM_NUMBER ( zeta ) ! Two uniform random numbers between 0 and 1
-       zeta = 2.0 * zeta - 1.0     ! now each between -1 and 1
-       zeta_sq = SUM ( zeta**2 )   ! squared magnitude
-       IF ( zeta_sq < 1.0 ) EXIT   ! test whether inside unit disk
+       zeta = 2.0 * zeta - 1.0     ! Now each between -1 and 1
+       norm = SUM ( zeta**2 )      ! Squared magnitude
+       IF ( norm < 1.0 ) EXIT      ! Test whether inside unit disk
     END DO ! End loop until within unit disk
 
-    f = 2.0 * SQRT ( 1.0 - zeta_sq )
-    e = [ zeta(1) * f, zeta(2) * f, 1.0 - 2.0 * zeta_sq ] ! on surface of unit sphere
+    f = 2.0 * SQRT ( 1.0 - norm )
+    e = [ zeta(1) * f, zeta(2) * f, 1.0 - 2.0 * norm ] ! On surface of unit sphere
 
-  END function random_orientation_vector_alt2
+  END FUNCTION random_vector_3
 
-  FUNCTION random_rotate_vector ( delta_max, e_old ) RESULT ( e )
-    REAL, DIMENSION(3)             :: e         ! orientation vector result
-    REAL, INTENT(in)               :: delta_max ! maximum magnitude of rotation
-    REAL, DIMENSION(3), INTENT(in) :: e_old     ! original orientation
+  FUNCTION random_perpendicular_vector ( old ) RESULT ( e )
+    REAL, DIMENSION(3)             :: e   ! Returns a uniformly sampled unit vector perpendicular to
+    REAL, DIMENSION(3), INTENT(in) :: old ! the old vector 
 
-    ! Function to generate random orientation for linear molecule in 3D
-    ! by rotation through a small angle from a given orientation
-    ! Provided delta_max is << 1, it is approximately the maximum rotation angle (in radians)
-    ! The magnitude of the rotation is not uniformly sampled, but this should not matter
+    ! Note that we do not require the reference vector to be of unit length
+    ! However we do require its length to be greater than a small tolerance!
 
-    REAL :: e_sq
+    REAL, DIMENSION(3) :: n
+    REAL               :: proj, norm
 
-    ! Choose new orientation by adding random small vector
-    e    = e_old + delta_max * random_orientation_vector ( )
-    e_sq = SUM ( e**2 )
-    e    = e / SQRT(e_sq) ! Normalize
-
-  END FUNCTION random_rotate_vector
-
-  FUNCTION random_perpendicular_vector ( e_old ) RESULT ( e )
-    REAL, DIMENSION(3)             :: e     ! Result is an orientation vector
-    REAL, DIMENSION(3), INTENT(in) :: e_old ! perpendicular to this vector 
-
-    REAL            :: proj, e_sq, e_old_sq
-    REAL, PARAMETER :: tol = 1.e-6
-
-    e_old_sq = SUM ( e_old**2 )
-    IF ( e_old_sq < tol ) STOP 'Error in random_perpendicular_vector' ! This should never happen
+    norm = SUM ( old**2 ) ! Old squared length
+    IF ( norm < tol ) STOP 'Error in random_perpendicular_vector' ! This should never happen
+    n = old / SQRT(norm) ! Normalized old vector
     
-    DO
-       e    = random_orientation_vector ( )       ! Randomly oriented unit vector
-       proj = DOT_PRODUCT ( e, e_old ) / e_old_sq ! Projection along e_old
-       e    = e - proj * e_old                    ! Make e perpendicular to e_old
-       e_sq = SUM ( e**2 )                        ! Prepare to normalize
-       IF ( e_sq > tol ) EXIT                     ! Accept, unless e is too small
-    END DO
+    DO ! Loop until generated vector is not too small
+       e    = random_vector ()     ! Randomly oriented unit vector
+       proj = DOT_PRODUCT ( e, n ) ! Projection along old
+       e    = e - proj * n         ! Make e perpendicular to old
+       norm = SUM ( e**2 )         ! Squared length
+       IF ( norm > tol ) EXIT      ! Accept, unless e is too small (which is unlikely)
+    END DO ! End loop until generated vector is not too small
 
-    e = e / SQRT ( e_sq ) ! Random unit direction perpendicular to e_old
+    e = e / SQRT ( norm ) ! Normalize
 
   END FUNCTION random_perpendicular_vector
 
-  FUNCTION random_rotate_vector_alt1 ( delta_max, e_old ) RESULT ( e )
-    REAL, DIMENSION(3)             :: e         ! orientation vector result
-    REAL, INTENT(in)               :: delta_max ! maximum angle of rotation
-    REAL, DIMENSION(3), INTENT(in) :: e_old     ! original orientation
+  FUNCTION random_rotate_vector_1 ( angle_max, old ) RESULT ( e ) ! 1st alternative algorithm
+    REAL, DIMENSION(3)             :: e         ! Returns a unit vector rotated by a
+    REAL,               INTENT(in) :: angle_max ! maximum angle (in radians) relative to
+    REAL, DIMENSION(3), INTENT(in) :: old       ! the old vector
 
-    ! First alternative function to generate random orientation for linear molecule in 3D
-    ! by rotation through a small angle from a given orientation
-    ! delta_max is the maximum rotation angle (in radians)
+    ! A small randomly chosen vector is added to the old one, and the result renormalized
+    ! Provided angle_max is << 1, it is approximately the maximum rotation angle (in radians)
+    ! The magnitude of the rotation is not uniformly sampled, but this should not matter
+
+    ! Note that the old vector should be normalized and we test for this
+    
+    REAL :: norm
+
+    norm = SUM ( old**2 ) ! Old squared length
+    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in random_rotate_vector_1' ! Should never happen
+
+    ! Choose new orientation by adding random small vector
+    e    = old + angle_max * random_vector ()
+    norm = SUM ( e**2 )
+    e    = e / SQRT(norm) ! Normalize
+
+  END FUNCTION random_rotate_vector_1
+
+  FUNCTION random_rotate_vector_2 ( angle_max, old ) RESULT ( e ) ! 2nd alternative algorithm
+    REAL, DIMENSION(3)             :: e         ! Returns a unit vector rotated by a
+    REAL,               INTENT(in) :: angle_max ! maximum angle (in radians) relative to
+    REAL, DIMENSION(3), INTENT(in) :: old       ! the old vector
+
     ! The magnitude of the rotation is uniformly sampled
+    ! The rotation axis is chosen randomly, perpendicular to the old orientation
 
-    REAL, DIMENSION(3) :: e_perp
-    REAL               :: e_sq, delta, zeta
+    ! Note that the old vector should be normalized and we test for this
 
-    e_perp = random_perpendicular_vector ( e_old ) ! Choose unit vector perpendicular to e_old
+    REAL, DIMENSION(3) :: perp
+    REAL               :: norm, angle, zeta
 
-    CALL RANDOM_NUMBER ( zeta ) ! Random number uniformly sampled in range (0,1)
-    zeta  = 2.0 * zeta - 1.0    ! Now in range (-1,+1)
-    delta = zeta * delta_max    ! Random rotation angle
+    norm = SUM ( old**2 ) ! Old squared length
+    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in random_rotate_vector_2' ! Should never happen
 
-    e    = e_old * COS ( delta ) + e_perp * SIN ( delta )
-    e_sq = SUM ( e**2 )
-    e    = e / SQRT(e_sq) ! Normalize
+    perp = random_perpendicular_vector ( old ) ! Choose unit vector perpendicular to old
 
-  END FUNCTION random_rotate_vector_alt1
+    CALL RANDOM_NUMBER ( zeta )              ! Uniform random number between 0 and 1
+    angle = ( 2.0 * zeta - 1.0 ) * angle_max ! Uniform random angle in desired range
 
-  FUNCTION random_rotate_vector_alt2 ( delta_max, e_old ) RESULT ( e )
-    REAL, DIMENSION(3)             :: e         ! orientation vector result
-    REAL, INTENT(in)               :: delta_max ! maximum magnitude of rotation
-    REAL, DIMENSION(3), INTENT(in) :: e_old     ! original orientation
+    e    = old * COS ( angle ) + perp * SIN ( angle ) ! Rotation in the (old,perp) plane
+    norm = SUM ( e**2 )
+    e    = e / SQRT(norm) ! Normalize (should be redundant)
 
-    ! Second alternative function to generate random orientation in 3D without any angular bias
-    ! by rotation through a small angle from a given orientation
-    ! delta_max is the maximum rotation angle (in radians)
+  END FUNCTION random_rotate_vector_2
+
+  FUNCTION random_rotate_vector_3 ( angle_max, old ) RESULT ( e ) ! 3rd alternative algorithm
+    REAL, DIMENSION(3)             :: e         ! Returns a unit vector rotated by a
+    REAL,               INTENT(in) :: angle_max ! maximum angle (in radians) relative to
+    REAL, DIMENSION(3), INTENT(in) :: old       ! the old vector
+
     ! The magnitude of the rotation is uniformly sampled
     ! The rotation axis is a Cartesian axis selected at random
     ! Ref: Barker and Watts, Chem Phys Lett 3, 144 (1969)
 
-    INTEGER            :: k
-    REAL, DIMENSION(3) :: axis  ! axis of rotation
-    REAL               :: delta ! rotation angle
-    REAL               :: zeta  ! random number
+    ! Note that the old vector should be normalized and we test for this
 
-    k       = random_integer (1,3)! random axis choice 1 = x, 2 = y, 3 = z
+    INTEGER            :: k
+    REAL, DIMENSION(3) :: axis
+    REAL               :: angle, norm, zeta
+
+    norm = SUM ( old**2 ) ! Old squared length
+    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in random_rotate_vector_3' ! Should never happen
+
     axis    = 0.0
+    k       = random_integer (1,3) ! random axis choice x=1, y=2, z=3
     axis(k) = 1.0
 
-    CALL RANDOM_NUMBER ( zeta )              ! uniform random number between 0 and 1
-    delta = ( 2.0 * zeta - 1.0 ) * delta_max ! uniform random angle
+    CALL RANDOM_NUMBER ( zeta )              ! Uniform random number between 0 and 1
+    angle = ( 2.0 * zeta - 1.0 ) * angle_max ! Uniform random angle in desired range
 
-    e = rotate_vector ( delta, axis, e_old )
+    e = rotate_vector ( angle, axis, old ) ! General rotation formula
 
-  END FUNCTION random_rotate_vector_alt2
+  END FUNCTION random_rotate_vector_3
 
-  FUNCTION random_rotate_vector_alt3 ( delta_max, e_old ) RESULT ( e )
-    REAL, DIMENSION(3)             :: e         ! orientation vector result
-    REAL, INTENT(in)               :: delta_max ! maximum magnitude of rotation
-    REAL, DIMENSION(3), INTENT(in) :: e_old     ! original orientation
+  FUNCTION random_rotate_vector_4 ( angle_max, old ) RESULT ( e ) ! 4th alternative algorithm
+    REAL, DIMENSION(3)             :: e         ! Returns a unit vector rotated by a
+    REAL, INTENT(in)               :: angle_max ! maximum angle (in radians) relative to
+    REAL, DIMENSION(3), INTENT(in) :: old       ! the old vector
 
     ! Ref: Marsaglia, Ann Maths Stat 43, 645 (1972)
     ! Uses a rejection technique to create a trial orientation
     ! subject to the constraint that the cosine of the angle
-    ! turned through is greater than cos(delta_max)
+    ! turned through is greater than cos(angle_max)
+    ! Not very efficient if angle_max is small
 
-    REAL :: cos_min
+    ! Note that the old vector should be normalized and we test for this
 
-    cos_min = COS ( delta_max )
+    REAL :: cos_min, norm
+
+    norm = SUM ( old**2 ) ! Old squared length
+    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in random_rotate_vector_4' ! Should never happen
+
+    cos_min = COS ( angle_max )
 
     DO ! Loop until close enough
-       e = random_orientation_vector_alt2 ( ) ! choose completely random vector
-       IF ( DOT_PRODUCT ( e, e_old ) > cos_min ) EXIT ! close enough
+       e = random_vector ( )                        ! Choose completely random unit vector
+       IF ( DOT_PRODUCT ( e, old ) > cos_min ) EXIT ! Close enough
     END DO ! End loop until close enough
 
-  END FUNCTION random_rotate_vector_alt3
+  END FUNCTION random_rotate_vector_4
 
-  function random_quaternion () result ( e )
-    REAL, DIMENSION(0:3) :: e ! Returns uniformly sampled orientation quaternion
+  FUNCTION random_quaternion () RESULT ( e )
+    REAL, DIMENSION(0:3) :: e ! Returns a uniformly sampled unit quaternion
 
     REAL, DIMENSION(2) :: zeta
-    REAL               :: s1, s2, f
+    REAL               :: norm1, norm2, f
 
     DO ! Loop until within unit disk
        CALL RANDOM_NUMBER ( zeta ) ! Two uniform random numbers between 0 and 1
-       zeta = 2.0 * zeta - 1.0     ! now each between -1 and 1
-       s1 = SUM ( zeta**2 )        ! squared magnitude
-       IF ( s1 < 1.0 ) EXIT        ! now inside unit disk
+       zeta = 2.0 * zeta - 1.0     ! Now each between -1 and 1
+       norm1 = SUM ( zeta**2 )     ! Squared magnitude
+       IF ( norm1 < 1.0 ) EXIT     ! Test for within unit disk
     END DO ! End loop until within unit disk
     
     e(0) = zeta(1)
@@ -360,32 +405,35 @@ CONTAINS
 
     DO ! Loop until within unit disk
        CALL RANDOM_NUMBER ( zeta ) ! Two uniform random numbers between 0 and 1
-       zeta = 2.0 * zeta - 1.0     ! now each between -1 and 1
-       s2 = SUM ( zeta**2 )        ! squared magnitude
-       IF ( s2 < 1.0 ) EXIT        ! now inside unit disk
+       zeta = 2.0 * zeta - 1.0     ! Now each between -1 and 1
+       norm2 = SUM ( zeta**2 )     ! Squared magnitude
+       IF ( norm2 < 1.0 ) EXIT     ! Test for within unit disk
     END DO ! End loop until within unit disk
     
-    f = SQRT ( (1.0 - s1 ) / s2 )
+    f = SQRT ( ( 1.0 - norm1 ) / norm2 )
     e(2) = zeta(1)*f
     e(3) = zeta(2)*f
 
-  END function random_quaternion
+  END FUNCTION random_quaternion
 
-  FUNCTION random_rotate_quaternion ( delta_max, q_old ) RESULT ( q )
-    REAL, DIMENSION(0:3)             :: q         ! Result is quaternion, rotated by
-    REAL,                 INTENT(in) :: delta_max ! maximum rotation angle relative to
-    REAL, DIMENSION(0:3), INTENT(in) :: q_old     ! old quaternion
+  FUNCTION random_rotate_quaternion ( angle_max, old ) RESULT ( e )
+    REAL, DIMENSION(0:3)             :: e         ! Returns a unit quaternion rotated by a
+    REAL,                 INTENT(in) :: angle_max ! maximum angle (in radians) relative to
+    REAL, DIMENSION(0:3), INTENT(in) :: old       ! the old quaternion
 
-    REAL, DIMENSION(3)   :: axis  ! rotation axis
-    REAL                 :: delta ! rotation half-angle
-    REAL, DIMENSION(0:3) :: q_rot ! rotation quaternion
+    ! Note that the reference quaternion should be normalized and we test for this
 
-    axis = random_orientation_vector ( )  ! Choose randomly oriented rotation axis
-    CALL RANDOM_NUMBER ( delta )          ! Random rotation half-angle
-    delta = ( delta - 0.5 ) * delta_max   ! Now between -0.5*delta_max and +0.5*delta_max
-    q_rot(0)   = COS(delta)               ! Rotation quaternion(0)
-    q_rot(1:3) = SIN(delta)*axis          ! Rotation quaternion(1,2,3)
-    q          = quatmul ( q_rot, q_old ) ! Apply small rotation to old quaternion
+    REAL, DIMENSION(3) :: axis
+    REAL               :: zeta, angle, norm
+
+    norm = SUM ( old**2 ) ! Old squared length
+    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in random_rotate_quaternion' ! Should never happen
+
+    axis = random_vector ( )                ! Choose random unit vector
+    CALL RANDOM_NUMBER ( zeta )             ! Random number between 0 and 1
+    angle = ( 2.0*angle - 1.0 ) * angle_max ! Uniform random angle in desired range
+
+    e = rotate_quaternion ( angle, axis, old )
 
   END FUNCTION random_rotate_quaternion
 
@@ -409,24 +457,57 @@ CONTAINS
 
   ! Low level mathematical operations and string manipulation
 
-  FUNCTION rotate_vector ( delta, axis, e_old ) RESULT ( e )
-    REAL, DIMENSION(3)             :: e           ! orientation vector result
-    REAL, INTENT(in)               :: delta       ! rotation angle
-    REAL, DIMENSION(3), INTENT(in) :: axis, e_old ! rotation axis and original orientation
+  FUNCTION rotate_vector ( angle, axis, old ) RESULT ( e )
+    REAL, DIMENSION(3)             :: e     ! Returns a vector rotated by a
+    REAL,               INTENT(in) :: angle ! specified rotation angle (in radians) about a
+    REAL, DIMENSION(3), INTENT(in) :: axis  ! specified rotation axis relative to
+    REAL, DIMENSION(3), INTENT(in) :: old   ! the old vector
 
-    REAL :: dot, c, s
+    ! Note that the axis vector should be normalized and we test for this
+    ! In general, the old vector need not be normalized, and the same goes for the result
+    ! although quite often in our applications they will be
 
-    c   = COS ( delta )
-    s   = SIN ( delta )
-    dot = DOT_PRODUCT ( axis, e_old )
+    REAL :: proj, c, s, norm
 
-    e = c * e_old + (1.0-c)*dot*axis + s * cross_product ( axis, e_old )
+    norm = SUM ( axis**2 ) ! Axis squared length
+    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in rotate_vector' ! Should never happen
+
+    c    = COS ( angle )
+    s    = SIN ( angle )
+    proj = DOT_PRODUCT ( axis, old ) ! The two vectors need not be perpendicular
+
+    ! Standard (Goldstein) rotation formula
+    e = c * old + ( 1.0 - c ) * proj * axis + s * cross_product ( axis, old )
 
   END FUNCTION rotate_vector
 
-  FUNCTION quatmul ( a, b ) RESULT ( c ) ! multiply two quaternions
-    REAL, DIMENSION(0:3), INTENT(in) :: a, b ! arguments
-    REAL, DIMENSION(0:3)             :: c    ! result
+  FUNCTION rotate_quaternion ( angle, axis, old ) RESULT ( e )
+    REAL, DIMENSION(0:3)             :: e     ! Returns a quaternion rotated by a
+    REAL,                 INTENT(in) :: angle ! specified rotation angle (in radians) about a
+    REAL, DIMENSION(3),   INTENT(in) :: axis  ! specified rotation axis relative to
+    REAL, DIMENSION(0:3), INTENT(in) :: old   ! the old quaternion
+
+    ! Note that the axis vector should be normalized and we test for this
+    ! In general, the old quaternion need not be normalized, and the same goes for the result
+    ! although in our applications we only ever use unit quaternions (to represent orientations)
+
+    REAL                 :: norm
+    REAL, DIMENSION(0:3) :: rot
+
+    norm = SUM ( axis**2 ) ! Axis squared length
+    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in rotate_quaternion' ! Should never happen
+
+    ! Standard formula for rotation quaternion, using half angles
+    rot(0)   = COS(0.5*angle)
+    rot(1:3) = SIN(0.5*angle)*axis
+
+    e = quatmul ( rot, old ) ! Apply rotation to old quaternion
+
+  END FUNCTION rotate_quaternion
+
+  FUNCTION quatmul ( a, b ) RESULT ( c )
+    REAL, DIMENSION(0:3)             :: c    ! Returns quaternion product of
+    REAL, DIMENSION(0:3), INTENT(in) :: a, b ! two supplied quaternions
 
     c(0) = a(0)*b(0) - a(1)*b(1) - a(2)*b(2) - a(3)*b(3)
     c(1) = a(1)*b(0) + a(0)*b(1) - a(3)*b(2) + a(2)*b(3)
@@ -436,17 +517,16 @@ CONTAINS
   END FUNCTION quatmul
 
   FUNCTION cross_product ( a, b ) RESULT ( c )
-    IMPLICIT NONE
-    REAL, DIMENSION(3)             :: c    ! result cross product
-    REAL, DIMENSION(3), INTENT(in) :: a, b ! arguments
+    REAL, DIMENSION(3)             :: c    ! Returns vector cross product of
+    REAL, DIMENSION(3), INTENT(in) :: a, b ! two supplied vectors
     c(1) = a(2)*b(3) - a(3)*b(2)
     c(2) = a(3)*b(1) - a(1)*b(3)
     c(3) = a(1)*b(2) - a(2)*b(1)
   END FUNCTION cross_product
 
   FUNCTION outer_product_2 ( a, b ) RESULT (c)
-    REAL, DIMENSION(:), INTENT(IN)   :: a, b
-    REAL, DIMENSION(SIZE(a),SIZE(b)) :: c ! function result
+    REAL, DIMENSION(:),              INTENT(IN)   :: a, b ! Given two supplied vectors,
+    REAL, DIMENSION(SIZE(a),SIZE(b))              :: c    ! returns their rank-2 outer product
 
     INTEGER :: i, j
 
@@ -462,8 +542,8 @@ CONTAINS
   END FUNCTION outer_product_2
 
   FUNCTION outer_product_3 ( a, b, c ) RESULT (d)
-    REAL, DIMENSION(:), INTENT(IN)           :: a, b, c
-    REAL, DIMENSION(SIZE(a),SIZE(b),SIZE(c)) :: d ! function result
+    REAL, DIMENSION(:),                      INTENT(IN) :: a, b, c ! Given three supplied vectors,
+    REAL, DIMENSION(SIZE(a),SIZE(b),SIZE(c))            :: d       ! returns their rank-3 outer product
 
     INTEGER :: i, j, k
 
@@ -478,12 +558,13 @@ CONTAINS
   END FUNCTION outer_product_3
 
   FUNCTION lowercase ( oldstring ) RESULT ( newstring )
-    IMPLICIT NONE
-    CHARACTER(len=*),             INTENT(in)    :: oldstring 
-    CHARACTER(len=LEN(oldstring))               :: newstring 
+    CHARACTER(len=*),             INTENT(in)    :: oldstring ! Given a supplied string,
+    CHARACTER(len=LEN(oldstring))               :: newstring ! returns a copy converted to lowercase
 
     INTEGER :: i, k 
 
+    ! Leaves non-alphabetic characters unchanged
+    
     DO i = 1, LEN(oldstring) 
        k = IACHAR(oldstring(i:i)) 
        IF ( k >= IACHAR('A') .AND. k <= IACHAR('Z') ) THEN 
@@ -498,17 +579,17 @@ CONTAINS
   ! Order parameter routines
 
   FUNCTION translational_order ( r, k ) RESULT ( order )
-    REAL                                          :: order ! result order parameter
-    REAL,    DIMENSION(:,:), INTENT(in)           :: r     ! set of molecular position vectors (3,n)
-    INTEGER, DIMENSION(3),   INTENT(in), OPTIONAL :: k     ! Lattice reciprocal vector (integer)
+    REAL                                          :: order ! Returns a translational order parameter from
+    REAL,    DIMENSION(:,:), INTENT(in)           :: r     ! a set of molecular position vectors (3,n), and a
+    INTEGER, DIMENSION(3),   INTENT(in), OPTIONAL :: k     ! lattice reciprocal vector (integer)
 
     ! Calculate the "melting factor" for translational order 
     ! based on a single k-vector characterizing the original lattice
     ! and commensurate with the periodic box
     ! It is assumed that both r and k are in box=1 units
-    ! k = (l,m,n) where l,m,n are integers
+    ! k = (l,m,n) where l,m,n are integers, must be multiplied by 2*pi to get real k
     ! If optional argument k is omitted, we default to a choice
-    ! based on the fcc lattice, if this makes sense
+    ! based on the FCC lattice, if this makes sense based on the number of atoms
     ! order = 1 when all atoms are on their lattice positions
     ! order = 1/sqrt(n), approximately, for disordered positions
 
@@ -525,9 +606,9 @@ CONTAINS
 
     IF ( PRESENT ( k ) ) THEN
        k_real = twopi * REAL ( k )
-    ELSE                                          ! Make arbitrary choice assuming fcc
-       nc = NINT ( ( REAL(n)/4.0 ) ** (1.0/3.0) ) ! number of fcc unit cells
-       IF ( 4*nc**3 /= n ) THEN
+    ELSE                                          ! Make arbitrary choice assuming FCC
+       nc = NINT ( ( REAL(n)/4.0 ) ** (1.0/3.0) ) ! number of FCC unit cells
+       IF ( 4*nc**3 /= n ) THEN ! Check that n does indeed correspond to FCC lattice
           WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Error in value of n ', 4*nc**3, n
           STOP 'Error in translational_order'
        END IF
@@ -541,14 +622,14 @@ CONTAINS
        rho = rho + CMPLX ( COS(kr), SIN(kr) )
     END DO
 
-    rho = rho / REAL(n)
+    rho   = rho / REAL(n)
     order = REAL ( CONJG(rho)*rho )
 
   END FUNCTION translational_order
 
   FUNCTION orientational_order ( e ) RESULT ( order )
-    REAL                             :: order ! result order parameter
-    REAL, DIMENSION(:,:), INTENT(in) :: e     ! set of molecular orientation vectors (3,n)
+    REAL                             :: order ! Returns a crystal orientational order parameter from
+    REAL, DIMENSION(:,:), INTENT(in) :: e     ! a set of molecular orientation vectors (3,n)
 
     ! Calculates an orientational order parameter to monitor "melting"
     ! The parameter depends completely on knowing the orientations of the molecules
@@ -557,12 +638,12 @@ CONTAINS
     ! Four molecules per unit cell, each pointing along a body-diagonal
     ! Order parameter can be a low-ranking (e.g. 1st or 2nd) Legendre polynomial
 
+    ! Note that this is not the same as the order parameter characterizing a nematic liquid crystal
+
     INTEGER :: n, nc, i, i0
     REAL    :: c
 
-    REAL, PARAMETER :: rroot3 = 1.0 / SQRT ( 3.0 )
-
-    REAL, DIMENSION(3,4), PARAMETER :: e0 = RESHAPE (  rroot3*[ &
+    REAL, DIMENSION(3,4), PARAMETER :: e0 = RESHAPE (  SQRT(1.0/3.0)*[ &
          &  1.0,  1.0,  1.0,    1.0, -1.0, -1.0,  &
          & -1.0,  1.0, -1.0,   -1.0, -1.0,  1.0 ],[3,4] ) ! orientations in unit cell
 
@@ -570,31 +651,36 @@ CONTAINS
        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Error in e dimension ', SIZE(e,dim=1)
        STOP 'Error in orientational_order'
     END IF
-    n = SIZE(e,dim=2)
+    n  = SIZE(e,dim=2)
     nc = NINT ( ( REAL(n)/4.0 ) ** (1.0/3.0) )
     IF ( 4*nc**3 /= n ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Error in value of n ', 4*nc**3, n
        STOP 'Error in orientational_order'
     END IF
+
     order = 0.0
+
     DO i = 1, n
-       i0 = MODULO ( i, 4 ) + 1             ! select appropriate original orientation
-       c = DOT_PRODUCT ( e(:,i), e0(:,i0) ) ! cosine of angle
-       order = order + 1.5*c**2 - 0.5       ! Second Legendre polynomial
+       i0    = MODULO ( i, 4 ) + 1              ! Select appropriate original orientation
+       c     = DOT_PRODUCT ( e(:,i), e0(:,i0) ) ! Cosine of angle
+       order = order + 1.5*c**2 - 0.5           ! Second Legendre polynomial
     END DO
+
     order = order / REAL ( n )
 
   END FUNCTION orientational_order
 
   FUNCTION nematic_order ( e ) RESULT ( order )
-    REAL                             :: order
-    REAL, DIMENSION(:,:), INTENT(in) :: e     ! set of molecular orientation vectors (3,n)
+    REAL                             :: order ! Returns a nematic orientational order parameter from
+    REAL, DIMENSION(:,:), INTENT(in) :: e     ! a set of molecular orientation vectors (3,n)
 
     ! Calculate the nematic order parameter <P2(cos(theta))>
     ! where theta is the angle between a molecular axis and the director
     ! which is the direction that maximises the order parameter
     ! This is obtained by finding the largest eigenvalue of
     ! the 3x3 second-rank traceless order tensor
+
+    ! Note that this is not the same as the order parameter characterizing a crystal
 
     INTEGER              :: i, n
     REAL, DIMENSION(3,3) :: q         ! order tensor
@@ -606,10 +692,10 @@ CONTAINS
     END IF
     n = SIZE(e,dim=2)
 
-    ! Order tensor: outer product of each orientation vector, summed over molecules
+    ! Order tensor: outer product of each orientation vector, summed over n molecules
     q = SUM ( SPREAD ( e, dim=2, ncopies=3) * SPREAD ( e, dim=1, ncopies=3 ), dim = 3 )
-    q = 1.5 * q / REAL(n)                ! normalize
-    FORALL (i=1:3) q(i,i) = q(i,i) - 0.5 ! make traceless
+    q = 1.5 * q / REAL(n)                ! Normalize
+    FORALL (i=1:3) q(i,i) = q(i,i) - 0.5 ! Make traceless
 
     ! Trigonometric solution of characteristic cubic equation, assuming real roots
 
@@ -628,23 +714,30 @@ CONTAINS
     IF ( psi >  1.0 ) psi =  1.0
     psi = ACOS(psi)
     h = -2.0*h
+
     ! Select largest root
     order = MAXVAL ( [ h*COS(psi/3.0), h*COS((psi+2.0*pi)/3.0), h*COS((psi+4.0*pi)/3.0) ] ) 
 
   END FUNCTION nematic_order
 
-  FUNCTION q_to_a ( q ) RESULT ( a ) ! converts quaternion to rotation matrix
-    IMPLICIT NONE
-
-    ! Arguments
-    REAL, DIMENSION(0:3), INTENT(in) :: q ! quaternion
-    REAL, DIMENSION(3,3)             :: a ! rotation matrix
+  FUNCTION q_to_a ( q ) RESULT ( a )
+    REAL, DIMENSION(3,3)             :: a ! Returns a 3x3 rotation matrix calculated from
+    REAL, DIMENSION(0:3), INTENT(in) :: q ! a supplied quaternion
 
     ! The rows of the rotation matrix correspond to unit vectors of the molecule in the space-fixed frame
     ! The third row  a(3,:) is [2*(q(1)*q(3)+q(0)*q(2)),2*(q(2)*q(3)-q(0)*q(1)),q(0)**2-q(1)**2-q(2)**2+q(3)**2]
     ! which is "the" axis of the molecule, for uniaxial molecules
     ! use a to convert space-fixed to body-fixed axes thus: db = matmul(a,ds)
     ! use transpose of a to convert body-fixed to space-fixed axes thus: ds = matmul(db,a)
+
+    ! The supplied quaternion should be normalized and we check for this
+
+    REAL :: norm
+
+    norm = SUM ( q**2 ) ! Axis squared length
+    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in q_to_a' ! Should never happen
+
+    ! Write out row by row, for clarity
 
     a(1,:) = [ q(0)**2+q(1)**2-q(2)**2-q(3)**2,   2*(q(1)*q(2)+q(0)*q(3)),       2*(q(1)*q(3)-q(0)*q(2))     ] ! 1st row
     a(2,:) = [     2*(q(1)*q(2)-q(0)*q(3)),   q(0)**2-q(1)**2+q(2)**2-q(3)**2,   2*(q(2)*q(3)+q(0)*q(1))     ] ! 2nd row

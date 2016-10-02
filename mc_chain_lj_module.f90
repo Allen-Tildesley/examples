@@ -43,7 +43,7 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   SUBROUTINE regrow ( temperature, m_max, k_max, k_spring, pot, ratio ) ! regrow polymer
-    USE maths_module, ONLY : random_integer, random_orientation_vector
+    USE maths_module, ONLY : random_integer, random_vector
 
     REAL,    INTENT(in)    :: temperature ! temperature
     INTEGER, INTENT(in)    :: m_max       ! max atoms to regrow
@@ -104,7 +104,7 @@ CONTAINS
 
        DO k = 1, k_max ! loop over k_max tries
           d          = random_bond ( bond, stddev, d_max )          ! generate random bond length around d=bond
-          r_try(:,k) = r(:,i-1) + d * random_orientation_vector ( ) ! generate trial position
+          r_try(:,k) = r(:,i-1) + d * random_vector ( ) ! generate trial position
           CALL energy_1 ( r_try(:,k), i, lt, overlap, pot )         ! non-bonded interactions with earlier atoms
           IF ( overlap ) THEN
              w(k) = 0.0
@@ -148,7 +148,7 @@ CONTAINS
 
        DO k = 2, k_max ! loop over k_max-1 other tries
           d          = random_bond ( bond, stddev, d_max )          ! generate random bond length around d=bond
-          r_try(:,k) = r(:,i-1) + d * random_orientation_vector ( ) ! generate trial position
+          r_try(:,k) = r(:,i-1) + d * random_vector ( ) ! generate trial position
           CALL energy_1 ( r_try(:,k), i, lt, overlap, pot )         ! nonbonded energy with earlier atoms
           IF ( overlap ) THEN
              w(k) = 0.0

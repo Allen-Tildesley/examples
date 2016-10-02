@@ -151,7 +151,7 @@ CONTAINS
   END SUBROUTINE initialize_orientations_lattice
 
   SUBROUTINE initialize_orientations_random
-    USE maths_module, ONLY : random_quaternion, random_orientation_vector
+    USE maths_module, ONLY : random_quaternion, random_vector
 
     ! Sets up random orientations for linear or nonlinear molecules
 
@@ -180,7 +180,7 @@ CONTAINS
        END DO
     ELSE
        DO i = 1, n
-          e(:,i) = random_orientation_vector ( )
+          e(:,i) = random_vector ( )
        END DO
     END IF
 
@@ -376,7 +376,7 @@ CONTAINS
   END SUBROUTINE initialize_chain_lattice
 
   SUBROUTINE initialize_chain_random
-    USE maths_module, ONLY : random_bond => random_orientation_vector_alt1
+    USE maths_module, ONLY : random_vector
 
     ! Chooses chain positions randomly, at unit bond length, avoiding overlap
 
@@ -397,13 +397,13 @@ CONTAINS
     END IF
 
     r(:,1) = [0.0,0.0,0.0]   ! First atom at origin
-    r(:,2) = random_bond ( ) ! Second atom at random position (unit bond length away)
+    r(:,2) = random_vector ( ) ! Second atom at random position (unit bond length away)
 
     DO i = 3, n ! Begin loop over atom indices
 
        iter = 0
        DO ! Loop until non-overlapping position found (n must not be too large!)
-          r(:,i) = r(:,i-1) + random_bond ( ) ! subsequent atoms randomly placed (unit bond length)
+          r(:,i) = r(:,i-1) + random_vector ( ) ! subsequent atoms randomly placed (unit bond length)
           overlap = .FALSE.
 
           DO j = 1, i-2 ! Loop to check for overlap
