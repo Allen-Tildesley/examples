@@ -193,7 +193,7 @@ CONTAINS
     pres_virial = density * temperature + ( vir + vir_lrc ) / box**3
 
     IF ( PRESENT ( string ) ) THEN ! output required
-       WRITE ( unit=output_unit, fmt='(a)' ) string
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Energy',          energy
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Shifted energy',  energy_sh
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-kinet',      temp_kinet
