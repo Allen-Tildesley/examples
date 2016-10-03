@@ -9,7 +9,7 @@ MODULE maths_module
   PRIVATE
 
   ! Random number routines
-  PUBLIC :: init_random_seed, random_integer, random_normal, random_normals
+  PUBLIC :: init_random_seed, random_integer, random_normal, random_normals, pick
   PUBLIC :: random_vector
   PUBLIC :: random_vector_1, random_vector_2, random_vector_3
   PUBLIC :: random_perpendicular_vector
@@ -27,6 +27,12 @@ MODULE maths_module
   ! Constants used throughout the module
   REAL, PARAMETER :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
   REAL, PARAMETER :: tol = 1.e-6
+
+  ! Define a generic interface for the pick functions
+  INTERFACE pick
+     MODULE PROCEDURE pick_i ! for integer weights
+     MODULE PROCEDURE pick_r ! for real weights
+  END INTERFACE pick
 
   ! Define a generic interface for the outer_product functions
   INTERFACE outer_product
@@ -191,6 +197,45 @@ CONTAINS
     END DO
 
   END SUBROUTINE random_normals_2
+
+  FUNCTION pick_r ( w ) RESULT ( k )
+    INTEGER                        :: k ! Returns one of the options with probability proportional to
+    REAL, DIMENSION(:), INTENT(in) :: w ! the supplied weights
+
+    REAL :: cumw, zeta
+
+    CALL RANDOM_NUMBER ( zeta ) ! Random number between 0 and 1
+    zeta = zeta*SUM(w)          ! Scale up to total weight
+    k    = 1
+    cumw = w(1)
+    DO ! Loop over possible outcomes
+       IF ( zeta <= cumw ) EXIT ! Random number less than cumulative weight up to k
+       k = k + 1
+       IF ( k > SIZE(w) ) STOP 'Error in pick_r' ! Should never happen
+       cumw = cumw+w(k)
+    END DO ! End loop over possible outcomes
+
+  END FUNCTION pick_r
+
+  FUNCTION pick_i ( w ) RESULT ( k )
+    INTEGER                           :: k ! Returns one of the options with probability proportional to
+    INTEGER, DIMENSION(:), INTENT(in) :: w ! the supplied weights
+
+    INTEGER :: cumw
+    REAL    :: zeta
+
+    CALL RANDOM_NUMBER ( zeta ) ! Random number between 0 and 1
+    zeta = zeta*REAL(SUM(w))    ! Scale up to total weight
+    k    = 1
+    cumw = w(1)
+    DO ! Loop over possible outcomes
+       IF ( zeta <= REAL(cumw) ) EXIT ! Random number less than cumulative weight up to k
+       k = k + 1
+       IF ( k > SIZE(w) ) STOP 'Error in pick_i' ! Should never happen
+       cumw = cumw+w(k)
+    END DO ! End loop over possible outcomes
+
+  END FUNCTION pick_i
 
   FUNCTION random_vector_1 () RESULT ( e ) ! 1st alternative algorithm
     REAL, DIMENSION(3) :: e ! Returns a uniformly sampled unit vector

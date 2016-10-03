@@ -42,7 +42,7 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   SUBROUTINE regrow ( temperature, m_max, k_max, bond, k_spring, pot, ratio ) ! Routine to regrow polymer
-    USE maths_module, ONLY : random_integer, random_vector
+    USE maths_module, ONLY : random_integer, random_vector, pick
 
     REAL,    INTENT(in)    :: temperature ! Specified temperature
     INTEGER, INTENT(in)    :: m_max       ! Max atoms to regrow
@@ -52,6 +52,7 @@ CONTAINS
     REAL,    INTENT(inout) :: pot         ! Total nonbonded potential energy (to be updated)
     REAL,    INTENT(out)   :: ratio       ! Acceptance ratio of moves
 
+    ! This routine carries out a single regrowth move
     ! A short sequence of m atoms (m<=m_max) is deleted and regrown in the CBMC manner
     ! We randomly select which end of the chain to apply each of these operations to
     ! At each stage, k_max different atom positions are tried
@@ -114,9 +115,9 @@ CONTAINS
           r_try(:,k) = r(:,i-1) + d * random_vector()       ! Trial position in random direction from i-1
           CALL energy_1 ( r_try(:,k), i, lt, overlap, pot ) ! Nonbonded interactions with earlier atoms
           IF ( overlap ) THEN
-             w(k) = 0.0 ! Weight for this try is zero
+             w(k) = 0.0 ! Store weight for this try (zero)
           ELSE
-             w(k) = EXP(-pot/temperature) ! Weight for this try given by Boltzmann factor
+             w(k) = EXP(-pot/temperature) ! Store weight for this try (Boltzmann factor)
           END IF
        END DO ! End loop over k_max tries
 
@@ -163,9 +164,9 @@ CONTAINS
           r_try(:,k) = r(:,i-1) + d * random_vector ( )     ! Trial position in random direction from i-1
           CALL energy_1 ( r_try(:,k), i, lt, overlap, pot ) ! Nonbonded interactions with earlier atoms
           IF ( overlap ) THEN
-             w(k) = 0.0 ! Weight for this try is zero
+             w(k) = 0.0 ! Store weight for this try (zero)
           ELSE
-             w(k) = EXP(-pot/temperature) ! Weight for this try given by Boltzmann factor
+             w(k) = EXP(-pot/temperature) ! Store weight for this try (Boltzmann factor)
           END IF
        END DO ! End loop over k_max-1 other tries
 
@@ -178,35 +179,16 @@ CONTAINS
 
     ! Choose either old or new configuration
     CALL RANDOM_NUMBER(zeta)
-    IF ( zeta < ( w_new / w_old ) ) THEN ! accept
+    IF ( zeta < ( w_new / w_old ) ) THEN ! Accept
        ratio = 1.0
        r     = r_new
        pot   = pot_new
-    ELSE ! reject
+    ELSE ! Reject
        r   = r_old
        pot = pot_old
     END IF
 
   END SUBROUTINE regrow
-
-  FUNCTION pick ( w ) RESULT ( k )
-    INTEGER                        :: k ! Returns one of the options with probability proportional to
-    REAL, DIMENSION(:), INTENT(in) :: w ! the supplied weights
-
-    REAL :: cumw, zeta
-
-    CALL RANDOM_NUMBER ( zeta ) ! Random number between 0 and 1
-    zeta = zeta*SUM(w)          ! Scale up to total weight
-    k    = 1
-    cumw = w(1)
-    DO ! Loop over possible outcomes
-       IF ( zeta <= cumw ) EXIT ! Random number less than cumulative weight up to k
-       k = k+1
-       IF ( k > SIZE(w) ) STOP 'Error in pick' ! Should never happen
-       cumw = cumw+w(k)
-    END DO ! End loop over possible outcomes
-
-  END FUNCTION pick
 
   SUBROUTINE energy ( overlap, pot )
     LOGICAL, INTENT(out) :: overlap ! Shows if an overlap was detected
@@ -274,6 +256,9 @@ CONTAINS
     CASE ( ne ) ! j /= i
        j1 = 1
        j2 = n
+    CASE default
+       WRITE ( unit = error_unit, fmt='(a,i10)') 'j_range error should never happen ', j_range
+       STOP 'Impossible error in energy_1'
     END SELECT
 
     DO j = j1, j2 ! Loop over selected range of partners

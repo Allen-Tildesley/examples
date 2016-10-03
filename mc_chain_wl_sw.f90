@@ -6,8 +6,9 @@ PROGRAM mc_chain_wl_sw
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       regrow, cranks, pivots, write_histogram, verbose, qcount, weight, histogram_flat, &
-       &                       n, nq, range, bond, r, h, s, hit, ds, wl
+       &                       regrow, cranks, pivots, qcount, weight, &
+       &                       zero_histogram, write_histogram, histogram_flat, &
+       &                       n, nq, r, s, ds, wl
 
   IMPLICIT NONE
 
@@ -29,6 +30,8 @@ PROGRAM mc_chain_wl_sw
   ! only, i.e. weight=1 if no overlap, weight=0 if any overlap
 
   ! Most important variables
+  REAL    :: bond           ! bond length (in units of core diameter)
+  REAL    :: range          ! range of attractive well (specified, same units)
   REAL    :: regrow_ratio   ! acceptance ratio for regrowth moves
   REAL    :: crank_ratio    ! acceptance ratio for crankshaft moves
   REAL    :: pivot_ratio    ! acceptance ratio for pivot moves
@@ -69,7 +72,7 @@ PROGRAM mc_chain_wl_sw
   crank_fraction = 0.5   ! fraction of atoms to try in crank moves
   pivot_max      = 0.5   ! maximum move angle in pivot
   pivot_fraction = 0.2   ! fraction of atoms to try in pivot moves
-  range          = 0.5   ! range of attractive well
+  range          = 1.5   ! range of attractive well
   flatness       = 0.8   ! histogram flatness criterion
 
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
@@ -80,6 +83,7 @@ PROGRAM mc_chain_wl_sw
      STOP 'Error in mc_chain_wl_sw'
   END IF
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',                nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Flatness criterion',              flatness
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Max atoms in regrow',             m_max
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Random tries per atom in regrow', k_max
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Max move angle in crankshaft',    crank_max
@@ -87,7 +91,10 @@ PROGRAM mc_chain_wl_sw
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Max move angle in pivot',         pivot_max
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Pivot fraction',                  pivot_fraction
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Attractive well range',           range
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Flatness criterion',              flatness
+
+  IF ( range < 1.0 ) THEN
+     WRITE ( unit=output_unit, fmt='(a)' ) 'Warning, range < core diameter (1.0)'
+  END IF
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond ) ! First call is just to get n and bond
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',          n
@@ -104,31 +111,28 @@ PROGRAM mc_chain_wl_sw
   ! Initialize entropy
   s(0:nq) = 0.0
 
-  verbose = .TRUE.
   IF ( weight() == 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_chain_wl_sw'
   END IF
-  q = qcount()
+  q = qcount ( range )
   WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Initial energy', q
-  verbose = .FALSE.
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'Crank ratio', 'Pivot ratio' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
      CALL blk_begin
-     h = 0.0
-     hit = .FALSE.
+     CALL zero_histogram
      ds = 2.0 / REAL(2**blk) ! entropy change, starting at 1.0 for blk=1
 
      stp = 0
      steps: DO ! Begin loop over steps
 
         stp = stp + 1
-        CALL regrow ( m_max, k_max, q, regrow_ratio )
-        CALL pivots ( n_pivot, pivot_max, q, pivot_ratio )
-        CALL cranks ( n_crank, crank_max, q, crank_ratio )
+        CALL regrow ( m_max, k_max, bond, range, q, regrow_ratio )
+        CALL pivots ( n_pivot, pivot_max, range, q, pivot_ratio )
+        CALL cranks ( n_crank, crank_max, range, q, crank_ratio )
 
         ! Calculate all variables for this step
         CALL blk_add ( [regrow_ratio,crank_ratio,pivot_ratio] )

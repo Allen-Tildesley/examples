@@ -6,8 +6,8 @@ PROGRAM mc_chain_nvt_sw
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       regrow, cranks, pivots, write_histogram, verbose, qcount, weight, &
-       &                       n, nq, range, bond, r, h, s, wl
+       &                       regrow, cranks, pivots, qcount, weight, zero_histogram, write_histogram, &
+       &                       n, nq, r, s, wl
 
   IMPLICIT NONE
 
@@ -30,6 +30,8 @@ PROGRAM mc_chain_nvt_sw
 
   ! Most important variables
   REAL    :: temperature    ! temperature (specified, in units of well depth)
+  REAL    :: bond           ! bond length (in units of core diameter)
+  REAL    :: range          ! range of attractive well (specified, same units)
   REAL    :: regrow_ratio   ! acceptance ratio for regrowth moves
   REAL    :: crank_ratio    ! acceptance ratio for crankshaft moves
   REAL    :: pivot_ratio    ! acceptance ratio for pivot moves
@@ -42,6 +44,8 @@ PROGRAM mc_chain_nvt_sw
   REAL    :: pivot_fraction ! fraction of atoms to try in pivot
   INTEGER :: n_pivot        ! number of atoms to try in pivot
   INTEGER :: q              ! total attractive interaction (negative of energy)
+  REAL    :: potential      ! potential energy per atom (for averaging)
+  REAL    :: r_gyration     ! Radius of gyration (for averaging)
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
 
@@ -62,7 +66,7 @@ PROGRAM mc_chain_nvt_sw
 
   ! Set sensible default run parameters for testing
 
-  nblock         = 50    ! number of blocks
+  nblock         = 10    ! number of blocks
   nstep          = 10000 ! number of sweeps per block
   m_max          = 3     ! maximum atoms in regrow
   k_max          = 32    ! number of random tries per atom in regrow
@@ -71,7 +75,7 @@ PROGRAM mc_chain_nvt_sw
   pivot_max      = 0.5   ! maximum move angle in pivot
   pivot_fraction = 0.2   ! fraction of atoms to try in pivot moves
   temperature    = 1.0   ! temperature (in units of well depth)
-  range          = 0.5   ! range of attractive well
+  range          = 1.5   ! range of attractive well
 
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
@@ -91,6 +95,10 @@ PROGRAM mc_chain_nvt_sw
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature/well depth',          temperature
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Attractive well range',           range
 
+  IF ( range < 1.0 ) THEN
+     WRITE ( unit=output_unit, fmt='(a)' ) 'Warning, range < core diameter (1.0)'
+  END IF
+
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond ) ! First call is just to get n and bond
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',          n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length (in sigma units)', bond
@@ -106,30 +114,30 @@ PROGRAM mc_chain_nvt_sw
   ! initialize Boltzmann exponents, s(q), which are just values of E/kT
   s = [ (-REAL(q)/temperature, q = 0, nq) ]
 
-  verbose = .TRUE.
   IF ( weight() == 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_chain_nvt_sw'
   END IF
-  q = qcount()
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Initial energy', q
-  verbose = .FALSE.
+  q = qcount ( range )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'Crank ratio', 'Pivot ratio', 'Energy' ] )
+  CALL calculate ( 'Initial values' )
+
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'Crank ratio', 'Pivot ratio', 'Potential', 'Rad Gyration' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
      CALL blk_begin
-     h = 0.0
+     CALL zero_histogram
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        CALL regrow ( m_max, k_max, q, regrow_ratio )
-        CALL pivots ( n_pivot, pivot_max, q, pivot_ratio )
-        CALL cranks ( n_crank, crank_max, q, crank_ratio )
+        CALL regrow ( m_max, k_max, bond, range, q, regrow_ratio )
+        CALL pivots ( n_pivot, pivot_max, range, q, pivot_ratio )
+        CALL cranks ( n_crank, crank_max, range, q, crank_ratio )
 
         ! Calculate all variables for this step
-        CALL blk_add ( [regrow_ratio,crank_ratio,pivot_ratio,REAL(q)] )
+        CALL calculate()
+        CALL blk_add ( [regrow_ratio,crank_ratio,pivot_ratio,potential,r_gyration] )
 
      END DO ! End loop over steps
 
@@ -142,22 +150,41 @@ PROGRAM mc_chain_nvt_sw
 
   CALL run_end ( output_unit )
 
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Final pair interactions', q
+  CALL calculate ( 'Final values' )
 
-  verbose = .TRUE.
   IF ( weight() == 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_chain_nvt_sw'
   END IF
-  q = qcount() ! count all non-bonded interactions
-  verbose = .FALSE.
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Check final pair interactions', q
+  q = qcount ( range ) ! count all non-bonded interactions
+
+  CALL calculate ( 'Final check' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r )
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
   CALL conclusion ( output_unit )
+
+CONTAINS
+
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+
+    REAL, DIMENSION(3) :: r_cm
+
+    r_cm       = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
+    r_gyration = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
+    potential  = -REAL(q) / REAL(n)
+
+    IF ( PRESENT ( string ) ) THEN ! output required
+       WRITE ( unit=output_unit, fmt='(a)'          ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Potential',    potential
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Rad Gyration', r_gyration
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM mc_chain_nvt_sw
 
