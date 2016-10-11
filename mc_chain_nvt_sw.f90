@@ -6,8 +6,8 @@ PROGRAM mc_chain_nvt_sw
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       regrow, cranks, pivots, qcount, weight, zero_histogram, write_histogram, &
-       &                       n, nq, r, s, wl
+       &                       regrow, crank, pivot, qcount, weight, &
+       &                       n, r
 
   IMPLICIT NONE
 
@@ -46,8 +46,13 @@ PROGRAM mc_chain_nvt_sw
   INTEGER :: q              ! total attractive interaction (negative of energy)
   REAL    :: potential      ! potential energy per atom (for averaging)
   REAL    :: r_gyration     ! Radius of gyration (for averaging)
+  INTEGER :: nq             ! Maximum anticipated energy
 
-  INTEGER :: blk, stp, nstep, nblock, ioerr
+  REAL, DIMENSION(:), ALLOCATABLE :: h ! Histogram of q values (0:nq)
+  REAL, DIMENSION(:), ALLOCATABLE :: s ! Entropy histogram used in acceptance (0:nq)
+
+  INTEGER :: blk, stp, nstep, nblock, ioerr, try, n_acc, q_max
+  LOGICAL :: accepted
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.', his_prefix = 'his.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -60,7 +65,6 @@ PROGRAM mc_chain_nvt_sw
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, chain molecule, square wells'
   CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
-  wl = .FALSE. ! not using the Wang-Landau method
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -108,17 +112,21 @@ PROGRAM mc_chain_nvt_sw
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of atoms in pivot',       n_pivot
 
   CALL allocate_arrays
+  nq = 6*n ! Anticipated maximum number of pair interactions within range
+  ALLOCATE ( h(0:nq), s(0:nq) )
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r ) ! Second call gets r
 
-  ! initialize Boltzmann exponents, s(q), which are just values of E/kT
-  s = [ (-REAL(q)/temperature, q = 0, nq) ]
+  ! Initialize Boltzmann exponents, s(q), which are just values of E/kT
+  s = [ ( -REAL(q)/temperature, q = 0, nq ) ]
 
   IF ( weight() == 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_chain_nvt_sw'
   END IF
   q = qcount ( range )
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Initial energy', q
+  q_max = q ! Max q seen so far
 
   CALL calculate ( 'Initial values' )
 
@@ -127,13 +135,41 @@ PROGRAM mc_chain_nvt_sw
   DO blk = 1, nblock ! Begin loop over blocks
 
      CALL blk_begin
-     CALL zero_histogram
+     h(:) = 0.0
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        CALL regrow ( m_max, k_max, bond, range, q, regrow_ratio )
-        CALL pivots ( n_pivot, pivot_max, range, q, pivot_ratio )
-        CALL cranks ( n_crank, crank_max, range, q, crank_ratio )
+        CALL regrow ( s, m_max, k_max, bond, range, q, accepted )
+        IF ( accepted ) THEN
+           regrow_ratio = 1.0
+        ELSE
+           regrow_ratio = 0.0
+        END IF
+        CALL update_histogram
+
+        n_acc = 0
+        DO try = 1, n_pivot
+           CALL pivot ( s, pivot_max, range, q, accepted )
+           IF ( accepted ) n_acc = n_acc + 1
+           CALL update_histogram
+        END DO
+        IF ( n_pivot > 0 ) THEN
+           pivot_ratio = REAL(n_acc) / REAL(n_pivot)
+        ELSE
+           pivot_ratio = 0.0
+        END IF
+
+        n_acc = 0
+        DO try = 1, n_crank
+           CALL crank ( s, crank_max, range, q, accepted )
+           IF ( accepted ) n_acc = n_acc + 1
+           CALL update_histogram
+        END DO
+        IF ( n_crank > 0 ) THEN
+           crank_ratio = REAL(n_acc) / REAL(n_crank)
+        ELSE
+           crank_ratio = 0.0
+        END IF
 
         ! Calculate all variables for this step
         CALL calculate()
@@ -164,6 +200,7 @@ PROGRAM mc_chain_nvt_sw
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
+  DEALLOCATE ( h, s )
   CALL conclusion ( output_unit )
 
 CONTAINS
@@ -185,6 +222,39 @@ CONTAINS
     END IF
 
   END SUBROUTINE calculate
+
+  SUBROUTINE update_histogram
+
+    IF ( q > nq .OR. q < 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'q out of range ', q, nq
+       STOP 'Error in update_histogram'
+    END IF
+
+    h(q) = h(q) + 1.0
+    q_max = MAX ( q, q_max )
+
+  END SUBROUTINE update_histogram
+
+  SUBROUTINE write_histogram ( filename )
+    USE, INTRINSIC :: iso_fortran_env, ONLY : iostat_end, iostat_eor
+
+    CHARACTER(len=*), INTENT(in) :: filename
+
+    INTEGER :: q, ioerr, his_unit
+
+    OPEN ( newunit=his_unit, file=filename, status='replace', action='write', iostat=ioerr )
+    IF ( ioerr /= 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,a,i15)' ) 'Error opening ', filename, ioerr
+       STOP 'Error in write_histogram'
+    END IF
+
+    DO q = 0, q_max
+       WRITE ( unit=his_unit, fmt='(i10,es20.8)') q, h(q)
+    END DO
+
+    CLOSE ( unit=his_unit )
+
+  END SUBROUTINE write_histogram
 
 END PROGRAM mc_chain_nvt_sw
 

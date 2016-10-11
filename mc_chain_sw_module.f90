@@ -6,19 +6,13 @@ MODULE mc_module
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: regrow, cranks, pivots, weight, qcount, write_histogram, histogram_flat, zero_histogram
-  PUBLIC :: n, nq, s, r, ds, wl
+  PUBLIC :: regrow, crank, pivot, weight, qcount
+  PUBLIC :: n, r
 
-  INTEGER                              :: n       ! Number of atoms
-  INTEGER                              :: nq      ! Maximum anticipated energy
-  LOGICAL                              :: wl      ! Flag for Wang-Landau method
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: r       ! Atomic positions (3,n)
-  REAL,    DIMENSION(:),   ALLOCATABLE :: h       ! Histogram of q values (0:nq)
-  REAL,    DIMENSION(:),   ALLOCATABLE :: s       ! "Entropy" histogram used in acceptance (0:nq)
-  LOGICAL, DIMENSION(:),   ALLOCATABLE :: hit     ! Identifies q-values that have been visited (0:nq)
-  REAL                                 :: ds      ! Entropy increment for Wang-Landau method
-
-  REAL, DIMENSION(:,:), ALLOCATABLE :: r_old, r_new ! Working arrays (3,n)
+  INTEGER                             :: n     ! Number of atoms
+  REAL,   DIMENSION(:,:), ALLOCATABLE :: r     ! Atomic positions (3,n)
+  REAL,   DIMENSION(:,:), ALLOCATABLE :: r_old ! Working array (3,n)
+  REAL,   DIMENSION(:,:), ALLOCATABLE :: r_new ! Working array (3,n)
 
   REAL,    PARAMETER :: sigma = 1.0             ! core diameter
   INTEGER, PARAMETER :: lt = -1, gt = 1, ne = 0 ! options for j-range
@@ -30,7 +24,8 @@ CONTAINS
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Hard-sphere chain with fixed bond length'
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Square-well attractive potential'
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ', sigma    
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ', sigma
+
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion ( output_unit )
@@ -39,24 +34,23 @@ CONTAINS
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays
-    nq = 6*n ! Anticipated maximum number of pair interactions within range
-    ALLOCATE ( r(3,n), r_old(3,n), r_new(3,n) ) 
-    ALLOCATE ( h(0:nq), s(0:nq), hit(0:nq) )
+    ALLOCATE ( r(3,n), r_old(3,n), r_new(3,n) )
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
-    DEALLOCATE ( r, r_old, r_new, h, s, hit )
+    DEALLOCATE ( r, r_old, r_new )
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE regrow ( m_max, k_max, bond, range, q, ratio ) ! Routine to regrow polymer
+  SUBROUTINE regrow ( s, m_max, k_max, bond, range, q, accepted ) ! Routine to regrow polymer
     USE maths_module, ONLY : random_integer, random_vector, pick
 
-    INTEGER, INTENT(in)    :: m_max  ! Max atoms to regrow
-    INTEGER, INTENT(in)    :: k_max  ! Number of random tries per atom in regrow
-    REAL,    INTENT(in)    :: bond   ! Bond length
-    REAL,    INTENT(in)    :: range  ! Range of attractive well
-    INTEGER, INTENT(inout) :: q      ! Energy, negative of (to be updated)
-    REAL,    INTENT(out)   :: ratio  ! Acceptance ratio of moves
+    REAL,    DIMENSION(0:), INTENT(in)    :: s        ! Entropy table used in accept function
+    INTEGER,                INTENT(in)    :: m_max    ! Max atoms to regrow
+    INTEGER,                INTENT(in)    :: k_max    ! Number of random tries per atom in regrow
+    REAL,                   INTENT(in)    :: bond     ! Bond length
+    REAL,                   INTENT(in)    :: range    ! Range of attractive well
+    INTEGER,                INTENT(inout) :: q        ! Energy, negative of (to be updated)
+    LOGICAL,                INTENT(out)   :: accepted ! Indicates success or failure of move
 
     ! This routine carries out a single regrowth move
     ! A short sequence of m atoms (m<=m_max) is deleted and regrown in the CBMC manner
@@ -66,7 +60,7 @@ CONTAINS
     ! Weights used in the regrowth are athermal, computed only on the basis of the
     ! hard-core overlap part of the non-bonded interactions: essentially they count non-overlaps
     ! Hence they are suitable for use in both NVT and Wang-Landau simulations
-    
+
     INTEGER                      :: q_old, q_new ! Old and new energies
     REAL                         :: w_old, w_new ! Old and new weights
     INTEGER                      :: m            ! Number of atoms to regrow
@@ -78,9 +72,9 @@ CONTAINS
 
     REAL, PARAMETER :: w_tol = 0.5 ! Min weight tolerance (w takes integer values)
 
-    ratio = 0.0
-    r_old = r ! Store old configuration
-    q_old = q ! Store old q
+    accepted = .FALSE.
+    r_old    = r ! Store old configuration
+    q_old    = q ! Store old q
 
     m = random_integer ( 1, m_max ) ! Number of atoms to regrow
     c = random_integer ( 1, 4 )     ! Growth option
@@ -112,10 +106,9 @@ CONTAINS
        END DO ! End loop over k_max tries
 
        IF ( SUM(w) == 0 ) THEN ! Early exit if this happens at any stage
-          r = r_old                   ! Restore original configuration
-          q = q_old                   ! Redundant, but for clarity
-          CALL update_histogram ( q ) ! Always do this
-          RETURN                      ! No possible move: reject
+          r = r_old ! Restore original configuration
+          q = q_old ! Redundant, but for clarity
+          RETURN    ! No possible move: reject
        END IF
 
        k      = pick ( w )           ! Pick winning try according to weights
@@ -125,10 +118,9 @@ CONTAINS
     END DO ! End loop to regrow last m atoms, computing new weight
 
     IF ( w_new < w_tol ) THEN ! This should be a redundant test
-       r = r_old                   ! Restore original configuration
-       q = q_old                   ! Redundant, but for clarity
-       CALL update_histogram ( q ) ! Always do this
-       RETURN                      ! No possible move: reject
+       r = r_old ! Restore original configuration
+       q = q_old ! Redundant, but for clarity
+       RETURN    ! No possible move: reject
     END IF
 
     q_new = qcount ( range ) ! Compute full new nonbonded energy
@@ -171,114 +163,102 @@ CONTAINS
     ! END OF PART 2: OLD CONFIGURATION AND WEIGHT ARE COMPLETE
 
     ! Choose either old or new configuration
-    IF ( accept ( q_old, q_new, w_old, w_new ) ) THEN ! Accept
-       ratio = 1.0
-       r     = r_new
-       q     = q_new
+    IF ( accept ( s, q_old, q_new, w_old, w_new ) ) THEN ! Accept
+       accepted = .TRUE.
+       r        = r_new
+       q        = q_new
     ELSE ! Reject
        r = r_old
        q = q_old
     END IF
 
-    CALL update_histogram ( q ) ! Always do this
-
   END SUBROUTINE regrow
 
-  SUBROUTINE pivots ( n_try, phi_max, range, q, ratio )
+  SUBROUTINE pivot ( s, phi_max, range, q, accepted )
     USE maths_module, ONLY : random_integer, random_vector, rotate_vector
 
-    INTEGER, INTENT(in)    :: n_try   ! Number of pivots to try
-    REAL,    INTENT(in)    :: phi_max ! Maximum angle of pivot
-    REAL,    INTENT(in)    :: range   ! Range of attractive well
-    INTEGER, INTENT(inout) :: q       ! Energy, negative of (to be updated)
-    REAL,    INTENT(out)   :: ratio   ! Move acceptance ratio
+    REAL,    DIMENSION(0:), INTENT(in)    :: s        ! Entropy table used in accept function
+    REAL,                   INTENT(in)    :: phi_max  ! Maximum angle of pivot
+    REAL,                   INTENT(in)    :: range    ! Range of attractive well
+    INTEGER,                INTENT(inout) :: q        ! Energy, negative of (to be updated)
+    LOGICAL,                INTENT(out)   :: accepted ! Indicates success or failure of move
 
-    ! This routine carries out a specified number of pivot moves
+    ! This routine carries out a pivot move
     ! An atom is picked at random, and the part of the chain lying to one side of it
     ! is rotated as a whole, by a random angle, about a randomly oriented axis
     ! There are no weights to take into account in the acceptance/rejection decision
     ! (the function weight_1 is used simply to indicate overlap / no overlap)
-    
+
     INTEGER            :: q_old, q_new ! Old and new energies
     INTEGER            :: j            ! Pivot position
     INTEGER            :: k            ! Which part to pivot
     INTEGER            :: i            ! Atom index
-    INTEGER            :: try, n_acc   ! Trial and acceptance counters
     REAL, DIMENSION(3) :: rj, rij      ! Local position vectors
     REAL, DIMENSION(3) :: axis         ! Pivot axis
     REAL               :: phi          ! Pivot angle
     REAL               :: zeta         ! Random number
 
-    n_acc = 0 ! Zero acceptance counter
+    accepted = .FALSE.
 
-    tries: DO try = 1, n_try ! Loop over pivot move attempts
+    r_old = r ! Store old configuration
+    q_old = q ! Store old q
 
-       r_old = r ! Store old configuration
-       q_old = q ! Store old q
+    j = random_integer ( 2, n-1 ) ! Pivot position (not at either end)
+    k = random_integer ( 1, 2 )   ! Which part to pivot (actually redundant here)
 
-       j = random_integer ( 2, n-1 ) ! Pivot position (not at either end)
-       k = random_integer ( 1, 2 )   ! Which part to pivot (actually redundant here)
+    axis = random_vector ()            ! Pivot rotation axis
+    CALL RANDOM_NUMBER ( zeta )        ! Uniform random number in range (0,1)
+    phi = phi_max * ( 2.0*zeta - 1.0 ) ! Pivot rotation angle in desired range
 
-       axis = random_vector ()            ! Pivot rotation axis
-       CALL RANDOM_NUMBER ( zeta )        ! Uniform random number in range (0,1)
-       phi = phi_max * ( 2.0*zeta - 1.0 ) ! Pivot rotation angle in desired range
+    SELECT CASE ( k )
+    CASE ( 1 )
+       r = r_old ! Copy atoms
+    CASE ( 2 )
+       r = r_old(:,n:1:-1) ! Copy and reverse atoms
+    END SELECT
 
-       SELECT CASE ( k )
-       CASE ( 1 )
-          r = r_old ! Copy atoms
-       CASE ( 2 )
-          r = r_old(:,n:1:-1) ! Copy and reverse atoms
-       END SELECT
+    ! Pivot, and check for overlap in new configuration
+    ! NB include overlap checks within rotated segment, because of roundoff
 
-       ! Pivot, and check for overlap in new configuration
-       ! NB include overlap checks within rotated segment, because of roundoff
+    rj = r(:,j) ! Pivot point
 
-       rj = r(:,j) ! Pivot point
+    DO i = j+1, n ! Loop over moving atoms
+       rij = r(:,i) - rj                      ! Relative vector of atom
+       rij = rotate_vector ( phi, axis, rij ) ! Rotate relative vector
+       r(:,i) = rj + rij                      ! New absolute position
 
-       DO i = j+1, n ! Loop over moving atoms
-          rij = r(:,i) - rj                      ! Relative vector of atom
-          rij = rotate_vector ( phi, axis, rij ) ! Rotate relative vector
-          r(:,i) = rj + rij                      ! New absolute position
+       IF ( weight_1 ( r(:,i), i, lt ) == 0 ) THEN ! Check for overlaps
+          r = r_old ! Restore original configuration
+          q = q_old ! Redundant but for clarity
+          RETURN    ! This move is rejected
+       END IF ! End check for overlaps
 
-          IF ( weight_1 ( r(:,i), i, lt ) == 0 ) THEN ! Check for overlaps
-             r = r_old                    ! Restore original configuration
-             q = q_old                    ! Redundant but for clarity
-             CALL update_histogram ( q )  ! Always do this
-             CYCLE tries                  ! This move is rejected
-          END IF ! End check for overlaps
+    END DO ! End loop over moving atoms
 
-       END DO ! End loop over moving atoms
+    q_new = qcount ( range ) ! Compute full new nonbonded energy
+    r_new = r                ! Store new configuration
 
-       q_new = qcount ( range ) ! Compute full new nonbonded energy
-       r_new = r                ! Store new configuration
+    IF ( accept ( s, q_old, q_new ) ) THEN ! Accept
+       accepted = .TRUE.
+       r        = r_new
+       q        = q_new
+    ELSE ! Reject
+       r = r_old
+       q = q_old
+    END IF
 
-       IF ( accept ( q_old, q_new ) ) THEN ! Accept
-          n_acc = n_acc + 1
-          r     = r_new
-          q     = q_new
-       ELSE ! Reject
-          r = r_old
-          q = q_old
-       END IF
+  END SUBROUTINE pivot
 
-       CALL update_histogram ( q ) ! Always do this
-
-    END DO tries ! End loop over pivot move attempts
-
-    ratio = REAL(n_acc) / REAL(n_try)
-
-  END SUBROUTINE pivots
-
-  SUBROUTINE cranks ( n_try, phi_max, range, q, ratio )
+  SUBROUTINE crank ( s, phi_max, range, q, accepted )
     USE maths_module, ONLY : random_integer, rotate_vector
 
-    INTEGER, INTENT(in)    :: n_try   ! Number of crankshaft moves to try
-    REAL,    INTENT(in)    :: phi_max ! Maximum crank angle
-    REAL,    INTENT(in)    :: range   ! Range of attractive well
-    INTEGER, INTENT(inout) :: q       ! Energy, negative of (to be updated)
-    REAL,    INTENT(out)   :: ratio   ! Move acceptance ratio
+    REAL,    DIMENSION(0:), INTENT(in)    :: s        ! Entropy table used in accept function
+    REAL,                   INTENT(in)    :: phi_max  ! Maximum crank angle
+    REAL,                   INTENT(in)    :: range    ! Range of attractive well
+    INTEGER,                INTENT(inout) :: q        ! Energy, negative of (to be updated)
+    LOGICAL,                INTENT(out)   :: accepted ! Indicates success or failure of move
 
-    ! This routine carries out a specified number of crankshaft moves
+    ! This routine carries out a crankshaft move
     ! An atom is picked at random. Unless it is an end-atom, a rotation axis
     ! is defined as the line joining the two atoms on either side, and the
     ! chosen atom is rotated about that axis by a random angle.
@@ -289,79 +269,69 @@ CONTAINS
 
     INTEGER            :: q_old, q_new ! Old and new energies
     INTEGER            :: i            ! Atom index
-    INTEGER            :: try, n_acc   ! Trial and acceptance counters
     REAL, DIMENSION(3) :: rj, rij      ! Local position vectors
     REAL, DIMENSION(3) :: axis         ! Crankshaft axis
     REAL               :: phi          ! Crankshaft angle
     REAL               :: zeta         ! Random number
     REAL               :: norm
 
-    n_acc = 0 ! Zero acceptance counter
+    accepted = .FALSE.
 
-    tries: DO try = 1, n_try ! Loop over crankshaft move attempts
+    r_old = r ! Store old configuration
+    q_old = q ! Store old q
 
-       r_old = r ! Store old configuration
-       q_old = q ! Store old q
+    r = r_old
 
+    i     = random_integer ( 1, n )                   ! Pick random atom to move
+    q_new = q_old - qcount_1 ( r(:,i), i, ne, range ) ! Subtract old energies for moving atom
+
+    CALL RANDOM_NUMBER ( zeta )        ! Uniform random number in range (0,1)
+    phi = ( 2.0*zeta - 1.0 ) * phi_max ! Rotation angle in desired range
+
+    IF ( i == 1 ) THEN            ! Rotate about 2--3 bond
+       rj   = r(:,2)              !   reference position
+       axis = r(:,2) - r(:,3)     !   axis of rotation
+    ELSE IF ( i == n ) THEN       ! Rotate about (n-1)--(n-2) bond
+       rj   = r(:,n-1)            !   reference position
+       axis = r(:,n-1) - r(:,n-2) !   axis of rotation
+    ELSE                          ! Rotate about (i-1)--(i+1) bond
+       rj   = r(:,i-1)            !   reference position
+       axis = r(:,i+1) - r(:,i-1) !   axis of rotation
+    END IF
+
+    norm = SQRT(SUM(axis**2)) ! Squared length of rotation axis
+    axis = axis / norm        ! Unit vector along rotation axis
+
+    rij = r(:,i) - rj                      ! Relative vector of atom
+    rij = rotate_vector ( phi, axis, rij ) ! Rotate relative vector
+    r(:,i) = rj + rij                      ! New absolute position
+
+    IF ( weight_1 ( r(:,i), i, ne ) == 0 ) THEN ! Check for overlaps
+       r = r_old ! Restore original configuration
+       q = q_old ! Redundant but for clarity
+       RETURN    ! This move is rejected
+    END IF ! End check for overlaps
+
+    q_new = q_new + qcount_1 ( r(:,i), i, ne, range ) ! Add new energies for moving atom
+    r_new = r
+
+    IF ( accept ( s, q_old, q_new ) ) THEN ! Accept
+       accepted = .TRUE.
+       r        = r_new
+       q        = q_new
+    ELSE ! Reject
        r = r_old
+       q = q_old
+    END IF
 
-       i     = random_integer ( 1, n )                   ! Pick random atom to move
-       q_new = q_old - qcount_1 ( r(:,i), i, ne, range ) ! Subtract old energies for moving atom
-
-       CALL RANDOM_NUMBER ( zeta )        ! Uniform random number in range (0,1)
-       phi = ( 2.0*zeta - 1.0 ) * phi_max ! Rotation angle in desired range
-
-       IF ( i == 1 ) THEN            ! Rotate about 2--3 bond
-          rj   = r(:,2)              !   reference position
-          axis = r(:,2) - r(:,3)     !   axis of rotation
-       ELSE IF ( i == n ) THEN       ! Rotate about (n-1)--(n-2) bond
-          rj   = r(:,n-1)            !   reference position
-          axis = r(:,n-1) - r(:,n-2) !   axis of rotation
-       ELSE                          ! Rotate about (i-1)--(i+1) bond
-          rj   = r(:,i-1)            !   reference position
-          axis = r(:,i+1) - r(:,i-1) !   axis of rotation
-       END IF
-
-       norm = SQRT(SUM(axis**2)) ! Squared length of rotation axis
-       axis = axis / norm        ! Unit vector along rotation axis
-
-       rij = r(:,i) - rj                      ! Relative vector of atom
-       rij = rotate_vector ( phi, axis, rij ) ! Rotate relative vector
-       r(:,i) = rj + rij                      ! New absolute position
-
-       IF ( weight_1 ( r(:,i), i, ne ) == 0 ) THEN ! Check for overlaps
-          r = r_old                   ! Restore original configuration
-          q = q_old                   ! Redundant but for clarity
-          CALL update_histogram ( q ) ! Always do this
-          CYCLE tries                 ! This move is rejected
-       END IF ! End check for overlaps
-
-       q_new = q_new + qcount_1 ( r(:,i), i, ne, range ) ! Add new energies for moving atom
-       r_new = r
-
-       IF ( accept ( q_old, q_new ) ) THEN ! Accept
-          n_acc = n_acc + 1
-          r     = r_new
-          q     = q_new
-       ELSE ! Reject
-          r = r_old
-          q = q_old
-       END IF
-
-       CALL update_histogram ( q ) ! Always do this
-
-    END DO tries ! End loop over crankshaft move attempts
-
-    ratio = REAL(n_acc) / REAL(n_try)
-
-  END SUBROUTINE cranks
+  END SUBROUTINE crank
 
   FUNCTION weight () RESULT ( w )
     INTEGER :: w ! Returns configuration weight = 0 (overlap) or 1 (no overlap)
 
     ! Arithmetically w is the product of all the pair Boltzmann factors
     ! Here, each is 0 or 1, but in the more general case we would multiply them
-    
+
     INTEGER :: i
 
     w = 0 ! Weight is zero unless we get through the following loop
@@ -469,116 +439,43 @@ CONTAINS
 
        IF ( ABS(j-i) <= 1 ) CYCLE ! Skip self and bonded neighbours
 
-          rij    = ri(:) - r(:,j)            ! Separation vector
-          rij_sq = SUM(rij**2)               ! Squared separation
-          IF ( rij_sq < range_sq ) q = q + 1 ! Accumulate if within range
+       rij    = ri(:) - r(:,j)            ! Separation vector
+       rij_sq = SUM(rij**2)               ! Squared separation
+       IF ( rij_sq < range_sq ) q = q + 1 ! Accumulate if within range
 
-       END DO ! End loop over selected range of partners
+    END DO ! End loop over selected range of partners
 
   END FUNCTION qcount_1
 
-  FUNCTION accept ( q_old, q_new, w_old, w_new )
-    LOGICAL                       :: accept       ! Returns accept/reject decision based on
-    INTEGER, INTENT(in)           :: q_old, q_new ! old & new energies, and if present,
-    REAL,    INTENT(in), OPTIONAL :: w_old, w_new ! old & new weights
+  FUNCTION accept ( s, q_old, q_new, w_old, w_new )
+    LOGICAL                                      :: accept       ! Returns accept/reject decision based on
+    REAL,    DIMENSION(0:), INTENT(in)           :: s            ! Entropy table
+    INTEGER,                INTENT(in)           :: q_old, q_new ! old & new energies, and if present,
+    REAL,                   INTENT(in), OPTIONAL :: w_old, w_new ! old & new weights
 
     ! This routine is essentially the Metropolis-Hastings formula, generalized
     ! to use a specified function of the energy in the exponent
     ! For NVT MC, s(q) is just E(q)/kT = -q/kT since energy is -q
     ! For Wang-Landau, s(q) is the entropy function, which is updated through the run
     ! In either case, weights may appear from the regrowth moves
-    
+
     REAL :: zeta, delta
 
-    delta = s(q_new) - s(q_old)
+    IF ( (q_new < 0) .OR. (q_old < 0) .OR. (q_new > UBOUND(s,1)) .OR. (q_old > UBOUND(s,1)) ) THEN
+       WRITE ( unit = error_unit, fmt='(a,3i10)') 'q out of bounds ', q_new, q_old, UBOUND(s,1)
+       STOP 'nq error in accept'
+    END IF
+
+    delta = s(q_new) - s(q_old) ! Change in entropy function
 
     CALL RANDOM_NUMBER(zeta)
 
     IF ( PRESENT ( w_new ) ) THEN ! include weights
-       accept = (w_new/w_old)*EXP(-delta) > zeta
+       accept = zeta < (w_new/w_old)*EXP(-delta)
     ELSE ! do not include weights
-       accept = EXP(-delta) > zeta
+       accept = zeta < EXP(-delta)
     END IF
 
   END FUNCTION accept
 
-  SUBROUTINE zero_histogram
-    h(:)   = 0.0
-    hit(:) = .FALSE.
-  END SUBROUTINE zero_histogram
-  
-  SUBROUTINE update_histogram ( q )
-    INTEGER, INTENT(in) :: q ! Histogram bin to be updated
-
-    ! This routine simply updates the probability histogram of (negative) energies
-    ! In the case of Wang-Landau, it also updates the entropy histogram by ds
-    ! and records a hit to show that this energy has been visited at least once
-    ! The value of ds is stored in this module, and updated in the main program
-    ! at the start of each block
-    
-    IF ( q <= nq .AND. q >= 0 ) THEN
-
-       h(q) = h(q) + 1.0
-
-       IF ( wl ) THEN ! only for Wang-Landau method
-          s(q)   = s(q) + ds
-          hit(q) = .TRUE.
-       END IF
-
-    ELSE
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'q out of range ', q, nq
-       STOP 'Error in update_histogram'
-    END IF
-
-  END SUBROUTINE update_histogram
-
-  FUNCTION histogram_flat ( flatness ) RESULT ( flat )
-    LOGICAL            :: flat     ! Returns a signal that the histogram is "sufficiently flat"
-    REAL,   INTENT(in) :: flatness ! Specified degree of flatness to pass the test 
-
-    ! This routine is part of the Wang-Landau algorithm
-    ! We only look at parts of the histogram that have been visited ("hit")
-    ! The flatness should be in (0,1), higher values corresponding to flatter histograms
-
-    REAL :: norm, avg
-
-    IF ( flatness <= 0.0 .OR. flatness >= 1.0 ) THEN ! Ensure sensible value
-       WRITE ( unit=error_unit, fmt='(a,f15.5)' ) 'Flatness error ', flatness
-       STOP 'Error in histogram_flat'
-    END IF
-
-    norm = REAL(COUNT(hit))     ! How many entries
-    avg  = SUM(h/norm,mask=hit) ! Average over just those entries
-
-    IF ( avg < 0.0 ) THEN ! This should never happen, unless h somehow overflows
-       WRITE ( unit=error_unit, fmt='(a,2es20.8)' ) 'Error in h ', norm, avg
-       STOP 'Error in histogram_flat'
-    END IF
-
-    flat = REAL(MINVAL(h,mask=hit)) > flatness*avg
-
-  END FUNCTION histogram_flat
-
-  SUBROUTINE write_histogram ( filename )
-    USE, INTRINSIC :: iso_fortran_env, ONLY : iostat_end, iostat_eor
-
-    CHARACTER(len=*), INTENT(in) :: filename
-
-    INTEGER :: q, ioerr, his_unit
-
-    OPEN ( newunit=his_unit, file=filename, status='replace', action='write', iostat=ioerr )
-    IF ( ioerr /= 0 ) THEN
-       WRITE ( unit=error_unit, fmt='(a,a,i15)' ) 'Error opening ', filename, ioerr
-       STOP 'Error in write_histogram'
-    END IF
-
-    DO q = 0, nq
-       WRITE ( unit=his_unit, fmt='(i10,2es20.8)') q, h(q), s(q)
-    END DO
-
-    CLOSE ( unit=his_unit )
-
-  END SUBROUTINE write_histogram
-
 END MODULE mc_module
-
