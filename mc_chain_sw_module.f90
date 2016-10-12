@@ -72,7 +72,6 @@ CONTAINS
 
     REAL, PARAMETER :: w_tol = 0.5 ! Min weight tolerance (w takes integer values)
 
-    accepted = .FALSE.
     r_old    = r ! Store old configuration
     q_old    = q ! Store old q
 
@@ -106,9 +105,10 @@ CONTAINS
        END DO ! End loop over k_max tries
 
        IF ( SUM(w) == 0 ) THEN ! Early exit if this happens at any stage
-          r = r_old ! Restore original configuration
-          q = q_old ! Redundant, but for clarity
-          RETURN    ! No possible move: reject
+          r        = r_old   ! Restore original configuration
+          q        = q_old   ! Redundant, but for clarity
+          accepted = .FALSE. ! No possible move: reject
+          RETURN
        END IF
 
        k      = pick ( w )           ! Pick winning try according to weights
@@ -118,9 +118,10 @@ CONTAINS
     END DO ! End loop to regrow last m atoms, computing new weight
 
     IF ( w_new < w_tol ) THEN ! This should be a redundant test
-       r = r_old ! Restore original configuration
-       q = q_old ! Redundant, but for clarity
-       RETURN    ! No possible move: reject
+       r        = r_old   ! Restore original configuration
+       q        = q_old   ! Redundant, but for clarity
+       accepted = .FALSE. ! No possible move: reject
+       RETURN
     END IF
 
     q_new = qcount ( range ) ! Compute full new nonbonded energy
@@ -163,13 +164,14 @@ CONTAINS
     ! END OF PART 2: OLD CONFIGURATION AND WEIGHT ARE COMPLETE
 
     ! Choose either old or new configuration
-    IF ( accept ( s, q_old, q_new, w_old, w_new ) ) THEN ! Accept
-       accepted = .TRUE.
+    IF ( accept ( s, q_old, q_new, w_old, w_new ) ) THEN
        r        = r_new
        q        = q_new
-    ELSE ! Reject
-       r = r_old
-       q = q_old
+       accepted = .TRUE.
+    ELSE
+       r        = r_old
+       q        = q_old
+       accepted = .FALSE.
     END IF
 
   END SUBROUTINE regrow
@@ -197,8 +199,6 @@ CONTAINS
     REAL, DIMENSION(3) :: axis         ! Pivot axis
     REAL               :: phi          ! Pivot angle
     REAL               :: zeta         ! Random number
-
-    accepted = .FALSE.
 
     r_old = r ! Store old configuration
     q_old = q ! Store old q
@@ -228,9 +228,10 @@ CONTAINS
        r(:,i) = rj + rij                      ! New absolute position
 
        IF ( weight_1 ( r(:,i), i, lt ) == 0 ) THEN ! Check for overlaps
-          r = r_old ! Restore original configuration
-          q = q_old ! Redundant but for clarity
-          RETURN    ! This move is rejected
+          r        = r_old   ! Restore original configuration
+          q        = q_old   ! Redundant but for clarity
+          accepted = .FALSE. ! This move is rejected
+          RETURN
        END IF ! End check for overlaps
 
     END DO ! End loop over moving atoms
@@ -238,13 +239,14 @@ CONTAINS
     q_new = qcount ( range ) ! Compute full new nonbonded energy
     r_new = r                ! Store new configuration
 
-    IF ( accept ( s, q_old, q_new ) ) THEN ! Accept
-       accepted = .TRUE.
+    IF ( accept ( s, q_old, q_new ) ) THEN
        r        = r_new
        q        = q_new
-    ELSE ! Reject
-       r = r_old
-       q = q_old
+       accepted = .TRUE.
+    ELSE
+       r        = r_old
+       q        = q_old
+       accepted = .FALSE.
     END IF
 
   END SUBROUTINE pivot
@@ -275,12 +277,10 @@ CONTAINS
     REAL               :: zeta         ! Random number
     REAL               :: norm
 
-    accepted = .FALSE.
-
     r_old = r ! Store old configuration
     q_old = q ! Store old q
 
-    r = r_old
+    r = r_old ! Copy old position (somewhat redundant here)
 
     i     = random_integer ( 1, n )                   ! Pick random atom to move
     q_new = q_old - qcount_1 ( r(:,i), i, ne, range ) ! Subtract old energies for moving atom
@@ -307,21 +307,23 @@ CONTAINS
     r(:,i) = rj + rij                      ! New absolute position
 
     IF ( weight_1 ( r(:,i), i, ne ) == 0 ) THEN ! Check for overlaps
-       r = r_old ! Restore original configuration
-       q = q_old ! Redundant but for clarity
-       RETURN    ! This move is rejected
+       r        = r_old   ! Restore original configuration
+       q        = q_old   ! Redundant but for clarity
+       accepted = .FALSE. ! This move is rejected
+       RETURN
     END IF ! End check for overlaps
 
     q_new = q_new + qcount_1 ( r(:,i), i, ne, range ) ! Add new energies for moving atom
     r_new = r
 
-    IF ( accept ( s, q_old, q_new ) ) THEN ! Accept
-       accepted = .TRUE.
+    IF ( accept ( s, q_old, q_new ) ) THEN
        r        = r_new
        q        = q_new
-    ELSE ! Reject
-       r = r_old
-       q = q_old
+       accepted = .TRUE.
+    ELSE
+       r        = r_old
+       q        = q_old
+       accepted = .FALSE.
     END IF
 
   END SUBROUTINE crank
@@ -454,26 +456,51 @@ CONTAINS
     REAL,                   INTENT(in), OPTIONAL :: w_old, w_new ! old & new weights
 
     ! This routine is essentially the Metropolis-Hastings formula, generalized
-    ! to use a specified function of the energy in the exponent
+    ! to use a specified tabulated function of the energy in the exponent
     ! For NVT MC, s(q) is just E(q)/kT = -q/kT since energy is -q
     ! For Wang-Landau, s(q) is the entropy function, which is updated through the run
-    ! In either case, weights may appear from the regrowth moves
+    ! In either case, weights (positive integer values) may appear from the regrowth moves
 
-    REAL :: zeta, delta
+    INTEGER         :: nq
+    REAL            :: zeta, delta
+    REAL, PARAMETER :: exponent_guard = 75.0
 
-    IF ( (q_new < 0) .OR. (q_old < 0) .OR. (q_new > UBOUND(s,1)) .OR. (q_old > UBOUND(s,1)) ) THEN
-       WRITE ( unit = error_unit, fmt='(a,3i10)') 'q out of bounds ', q_new, q_old, UBOUND(s,1)
+    ! Check that we are within bounds for the entropy table
+    nq = UBOUND(s,1)
+    IF ( q_new < 0 .OR. q_old < 0 .OR. q_new > nq .OR. q_old > nq ) THEN
+       WRITE ( unit = error_unit, fmt='(a,3i10)') 'q out of bounds ', q_new, q_old, nq
        STOP 'nq error in accept'
     END IF
 
     delta = s(q_new) - s(q_old) ! Change in entropy function
 
-    CALL RANDOM_NUMBER(zeta)
+    IF ( PRESENT ( w_new ) ) THEN ! Inclusion of weights
 
-    IF ( PRESENT ( w_new ) ) THEN ! include weights
-       accept = zeta < (w_new/w_old)*EXP(-delta)
-    ELSE ! do not include weights
-       accept = zeta < EXP(-delta)
+       ! Weights should have positive integer values, so we can check against 0.5
+       ! Otherwise we should compare with a very small value
+
+       IF ( w_old < 0.5 ) THEN ! Should never happen
+          WRITE ( unit = error_unit, fmt='(a,es15.8)') 'w_old error ', w_old
+          STOP 'Impossible error in accept'
+       END IF
+
+       IF ( w_new < 0.5 ) THEN ! Should really have been detected before
+          accept = .FALSE. ! This move is rejected
+          RETURN
+       END IF
+
+       ! Equivalent to exp(-delta) -> (w_new/w_old)*exp(-delta)
+       delta = delta - LOG(w_new/w_old)
+
+    END IF ! End inclusion of weights
+
+    IF ( delta > exponent_guard ) THEN ! too high, reject without evaluating
+       accept = .FALSE.
+    ELSE IF ( delta < 0.0 ) THEN ! downhill, accept without evaluating
+       accept = .TRUE.
+    ELSE
+       CALL RANDOM_NUMBER ( zeta ) ! Uniform random number in range (0,1)
+       accept = EXP(-delta) > zeta ! Metropolis test
     END IF
 
   END FUNCTION accept

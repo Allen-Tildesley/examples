@@ -34,12 +34,12 @@ PROGRAM mc_chain_nvt_cbmc_lj
   REAL    :: pot         ! Nonbonded potential energy
   REAL    :: potential   ! Nonbonded potential energy per atom (for averaging)
   REAL    :: move_ratio  ! Acceptance ratio for regrowth moves (for averaging)
-  REAL    :: r_gyration  ! Radius of gyration (for averaging)
+  REAL    :: r_g         ! Radius of gyration (for averaging)
   INTEGER :: m_max       ! Maximum atoms in regrow
   INTEGER :: k_max       ! Number of random tries per atom in regrow
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
-  LOGICAL :: overlap
+  LOGICAL :: overlap, accepted
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -101,11 +101,16 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        CALL regrow ( temperature, m_max, k_max, bond, k_spring, pot, move_ratio )
+        CALL regrow ( temperature, m_max, k_max, bond, k_spring, pot, accepted )
+        IF ( accepted ) THEN
+           move_ratio = 1.0
+        ELSE
+           move_ratio = 0.0
+        END IF
 
         ! Calculate all variables for this step
         CALL calculate()
-        CALL blk_add ( [move_ratio,potential,pot_bonds,r_gyration] )
+        CALL blk_add ( [move_ratio,potential,pot_bonds,r_g] )
 
      END DO ! End loop over steps
 
@@ -133,16 +138,16 @@ CONTAINS
 
     REAL, DIMENSION(3) :: r_cm
 
-    potential  = pot / REAL ( n )
-    pot_bonds  = spring_pot ( bond, k_spring ) / REAL(n)
-    r_cm       = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
-    r_gyration = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
+    potential = pot / REAL ( n )
+    pot_bonds = spring_pot ( bond, k_spring ) / REAL(n)
+    r_cm      = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
+    r_g       = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
 
     IF ( PRESENT ( string ) ) THEN ! output required
        WRITE ( unit=output_unit, fmt='(a)'          ) string
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Nonbonded Pot', potential
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Spring Pot',    pot_bonds
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Rad Gyration',  r_gyration
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Rad Gyration',  r_g
     END IF
 
   END SUBROUTINE calculate

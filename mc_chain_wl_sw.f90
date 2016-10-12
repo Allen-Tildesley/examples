@@ -28,6 +28,11 @@ PROGRAM mc_chain_wl_sw
   ! Configurational weights are calculated on the basis of the athermal interactions
   ! only, i.e. weight=1 if no overlap, weight=0 if any overlap
 
+  ! In this program, the flatness of the h(q) histogram is checked at the end of every block
+  ! A stage consists of many blocks, during which the entropy is adjusted by a value ds
+  ! The stage is deemed to be finished when h(q) is sufficiently flat
+  ! At the end of each stage, the histograms are printed and reset, and ds is divided by 2
+  
   ! The model is the same one studied by
   ! MP Taylor, W Paul, K Binder, J Chem Phys, 131, 114907 (2009)
 
@@ -55,10 +60,11 @@ PROGRAM mc_chain_wl_sw
   INTEGER :: nq             ! Maximum anticipated energy
 
   REAL, DIMENSION(:), ALLOCATABLE :: h ! Histogram of q values (0:nq)
+  REAL, DIMENSION(:), ALLOCATABLE :: g ! Histogram of radius of gyration (0:nq)
   REAL, DIMENSION(:), ALLOCATABLE :: s ! Entropy histogram used in acceptance (0:nq)
 
   INTEGER :: blk, stp, ioerr, try, n_acc, q_max
-  logical :: accepted
+  LOGICAL :: accepted
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.', his_prefix = 'his.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -76,7 +82,7 @@ PROGRAM mc_chain_wl_sw
 
   ! Set sensible default run parameters for testing
 
-  nstage         = 20    ! 2**(-20) approx 10**(-6) for smallest modification factor
+  nstage         = 20    ! 2**(-20) = approx 10**(-6) for smallest modification factor
   nstep          = 10000 ! number of steps per block
   m_max          = 3     ! maximum atoms in regrow
   k_max          = 32    ! number of random tries per atom in regrow
@@ -119,7 +125,7 @@ PROGRAM mc_chain_wl_sw
 
   CALL allocate_arrays
   nq = 6*n ! Anticipated maximum number of pair interactions within range
-  ALLOCATE ( h(0:nq), s(0:nq) )
+  ALLOCATE ( h(0:nq), g(0:nq), s(0:nq) )
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r ) ! Second call gets r
 
@@ -139,6 +145,7 @@ PROGRAM mc_chain_wl_sw
   flat  = .FALSE.
   s(:)  = 0.0
   h(:)  = 0.0
+  g(:)  = 0.0
 
   DO ! Begin loop over blocks
 
@@ -146,7 +153,7 @@ PROGRAM mc_chain_wl_sw
 
      IF  ( flat ) THEN ! Start of next stage
         h(:) = 0.0
-        s(1:q_max) = s(1:q_max) - MINVAL ( s(1:q_max) ) ! Reset baseline for entropy
+        g(:) = 0.0
         flat = .FALSE.
      END IF
 
@@ -170,7 +177,7 @@ PROGRAM mc_chain_wl_sw
            CALL update_histogram
         END DO
         IF ( n_pivot > 0 ) THEN
-           pivot_ratio = REAL(n_acc) / real(n_pivot)
+           pivot_ratio = REAL(n_acc) / REAL(n_pivot)
         ELSE
            pivot_ratio = 0.0
         END IF
@@ -197,10 +204,10 @@ PROGRAM mc_chain_wl_sw
      flat = histogram_flat ( flatness ) ! Check for flatness
 
      IF ( flat ) THEN ! End of this stage
+        WRITE ( unit=output_unit, fmt='(t70,3(a,i0))' ) 'stage ', stage, ' q_max ', q_max, ' count ', COUNT(h(:)>0.5)
         IF ( nstage < 1000 ) WRITE(sav_tag,'(i3.3)') stage       ! number configuration by stage
         CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, bond, r ) ! save configuration
         CALL write_histogram ( his_prefix//sav_tag )             ! save histogram
-        WRITE ( unit=output_unit, fmt='(a,i2,a,2i5)' ) 'End of stage ', stage, ' q diagnostics ', q_max, COUNT(h(:)>0.5)
         stage = stage + 1 ! Ready for next stage
         ds    = ds / 2.0  ! Entropy change reduction
      END IF
@@ -208,23 +215,32 @@ PROGRAM mc_chain_wl_sw
   END DO ! End loop over blocks
 
   CALL deallocate_arrays
-  DEALLOCATE ( h, s )
+  DEALLOCATE ( h, g, s )
   CALL conclusion ( output_unit )
 
 CONTAINS
 
   SUBROUTINE update_histogram
 
-    ! This routine simply updates the probability histogram of (negative) energies
+    ! This routine updates the probability histogram of (negative) energies
     ! It also updates the entropy histogram by ds
+    ! and a histogram of values of radius of gyration
+
+    REAL, DIMENSION(3) :: r_cm
+    REAL               :: r_g
 
     IF ( q > nq .OR. q < 0 ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'q out of range ', q, nq
        STOP 'Error in update_histogram'
     END IF
 
+    r_cm = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
+    r_g  = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
+
     h(q) = h(q) + 1.0
     s(q) = s(q) + ds
+    g(q) = g(q) + r_g
+    
     q_max = MAX ( q, q_max )
 
   END SUBROUTINE update_histogram
@@ -243,7 +259,7 @@ CONTAINS
        STOP 'Error in histogram_flat'
     END IF
 
-    avg  = SUM ( h(1:q_max) ) / REAL(q_max)
+    avg = SUM ( h(1:q_max) ) / REAL(q_max)
 
     IF ( avg < 0.0 ) THEN ! This should never happen, unless h somehow overflows
        WRITE ( unit=error_unit, fmt='(a,*(es20.8))' ) 'Error in h ', h(1:q_max)
@@ -259,7 +275,14 @@ CONTAINS
 
     CHARACTER(len=*), INTENT(in) :: filename
 
+    ! This routine writes out the histograms at the end of each stage
+    ! Note that h and g will be reset to zero at the start of the next stage
+    ! so it is OK to normalize them here
+    ! Also we reset the baseline for entropy to avoid the numbers getting too large
+    ! Recall that the potential energy is -q
+
     INTEGER :: q, ioerr, his_unit
+    REAL    :: norm
 
     OPEN ( newunit=his_unit, file=filename, status='replace', action='write', iostat=ioerr )
     IF ( ioerr /= 0 ) THEN
@@ -267,8 +290,19 @@ CONTAINS
        STOP 'Error in write_histogram'
     END IF
 
+    ! Normalize radius of gyration entries
+    WHERE ( h > 0.5 ) g = g / h
+
+    ! Normalize h, converting it to a set of probabilities
+    norm = SUM(h)
+    h    = h / norm
+
+    ! Reset baseline for entropy
+    norm       = MINVAL ( s(0:q_max) )
+    s(0:q_max) = s(0:q_max) - norm
+
     DO q = 0, q_max
-       WRITE ( unit=his_unit, fmt='(i10,2es20.8)') q, h(q), s(q)
+       WRITE ( unit=his_unit, fmt='(i5,2f15.5,es20.8)') -q, h(q), g(q), s(q)
     END DO
 
     CLOSE ( unit=his_unit )

@@ -41,7 +41,7 @@ CONTAINS
     DEALLOCATE ( r, r_old, r_new )
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE regrow ( temperature, m_max, k_max, bond, k_spring, pot, ratio ) ! Routine to regrow polymer
+  SUBROUTINE regrow ( temperature, m_max, k_max, bond, k_spring, pot, accepted ) ! Routine to regrow polymer
     USE maths_module, ONLY : random_integer, random_vector, pick
 
     REAL,    INTENT(in)    :: temperature ! Specified temperature
@@ -50,7 +50,7 @@ CONTAINS
     REAL,    INTENT(in)    :: bond        ! Bond length
     REAL,    INTENT(in)    :: k_spring    ! Harmonic bond spring constant
     REAL,    INTENT(inout) :: pot         ! Total nonbonded potential energy (to be updated)
-    REAL,    INTENT(out)   :: ratio       ! Acceptance ratio of moves
+    LOGICAL, INTENT(out)   :: accepted    ! Indicates acceptance or rejection of moves
 
     ! This routine carries out a single regrowth move
     ! A short sequence of m atoms (m<=m_max) is deleted and regrown in the CBMC manner
@@ -59,7 +59,7 @@ CONTAINS
     ! Function random_bond selects bond lengths according to the internal (harmonic) potential
     ! Rosenbluth weights are computed using the external (nonbonded) potential
     ! Acceptance/rejection is determined using these weights
-    
+
     REAL                       :: w_old   ! Old weight
     REAL                       :: w_new   ! New weight
     REAL                       :: pot_old ! Old potential energy
@@ -70,9 +70,10 @@ CONTAINS
     REAL,   DIMENSION(k_max)   :: w       ! Rosenbluth weights (involving nonbonded interactions)
     REAL,   DIMENSION(3,k_max) :: r_try   ! Coordinates of trial atoms
 
-    INTEGER :: i
-    LOGICAL :: overlap
-    REAL    :: d, d_max, std, zeta
+    INTEGER         :: i
+    LOGICAL         :: overlap
+    REAL            :: d, d_max, std, zeta
+    REAL, PARAMETER :: w_tol = 1.0e-10 ! Min weight tolerance
 
     std   = SQRT(temperature/k_spring) ! Spring bond standard deviation
     d_max = 3.0*std                    ! Impose a limit on variation, say 3*std
@@ -82,9 +83,8 @@ CONTAINS
     END IF
     d_max = d_max + bond ! This is the actual max d allowed
 
-    ratio   = 0.0
-    r_old   = r   ! Store old configuration
-    pot_old = pot ! Store old nonbonded potential
+    r_old    = r   ! Store old configuration
+    pot_old  = pot ! Store old nonbonded potential
 
     m = random_integer ( 1, m_max ) ! Number of atoms to regrow
     c = random_integer ( 1, 4 )     ! Growth option
@@ -121,11 +121,25 @@ CONTAINS
           END IF
        END DO ! End loop over k_max tries
 
+       IF ( SUM(w) < w_tol ) THEN ! Early exit if this happens at any stage
+          r        = r_old   ! Restore original configuration
+          pot      = pot_old ! Restore original potential energy
+          accepted = .FALSE. ! No possible move: reject
+          RETURN
+       END IF
+
        k      = pick ( w )           ! Pick winning try according to weights
        r(:,i) = r_try(:,k)           ! Store winning position
        w_new  = w_new * REAL(SUM(w)) ! Accumulate total weight
 
     END DO ! End loop to regrow last m atoms, computing new weight
+
+    IF ( w_new < w_tol ) THEN ! Overall weight is too small
+       r        = r_old   ! Restore original configuration
+       pot      = pot_old ! Restore original potential energy
+       accepted = .FALSE. ! No possible move: reject
+       RETURN
+    END IF
 
     CALL energy ( overlap, pot_new ) ! Compute full nonbonded energy
     r_new = r                        ! Store new configuration
@@ -158,7 +172,7 @@ CONTAINS
        END IF
 
        ! Remaining tries only required to compute weight
-       
+
        DO k = 2, k_max ! Loop over k_max-1 other tries
           d          = random_bond ( bond, std, d_max )     ! Generate random bond length around d=bond
           r_try(:,k) = r(:,i-1) + d * random_vector ( )     ! Trial position in random direction from i-1
@@ -175,17 +189,26 @@ CONTAINS
 
     END DO ! End loop to regrow last m atoms computing old weight
 
+    IF ( w_old < w_tol ) THEN ! The old weight really should be non-zero
+       WRITE ( unit=error_unit, fmt='(a,es20.8)' ) 'Old weight error', w_old
+       STOP 'Impossible error in regrow'
+    END IF
+
     ! END OF PART 2: OLD CONFIGURATION AND WEIGHT ARE COMPLETE
 
-    ! Choose either old or new configuration
+    ! Choose either old or new configuration according to weight
+    ! All non-bonded Boltzmann factors are incorporated into the weights
+    ! All spring-bond Boltzmann factors are included in the selection of d
+
     CALL RANDOM_NUMBER(zeta)
-    IF ( zeta < ( w_new / w_old ) ) THEN ! Accept
-       ratio = 1.0
-       r     = r_new
-       pot   = pot_new
-    ELSE ! Reject
-       r   = r_old
-       pot = pot_old
+    IF ( zeta < ( w_new / w_old ) ) THEN
+       r        = r_new
+       pot      = pot_new
+       accepted = .TRUE.
+    ELSE
+       r        = r_old
+       pot      = pot_old
+       accepted = .FALSE.
     END IF
 
   END SUBROUTINE regrow
@@ -199,8 +222,8 @@ CONTAINS
     ! If overlap==.true., the value of pot should not be used
     ! Actual calculation is performed by subroutine energy_1
 
-    REAL               :: pot_i
-    INTEGER            :: i
+    REAL    :: pot_i
+    INTEGER :: i
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
