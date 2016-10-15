@@ -9,13 +9,13 @@ PROGRAM mc_zvt_lj
   USE maths_module,     ONLY : metropolis, random_integer
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       resize, energy_1, energy, energy_lrc, &
-       &                       move, create, destroy, n, r, ne
+       &                       move, create, destroy, n, r, potovr
 
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
   ! Cubic periodic boundary conditions
-  ! Conducts Monte Carlo at the given temperature
+  ! Conducts grand canonical Monte Carlo at the given temperature and activity
   ! Uses no special neighbour lists
 
   ! Reads several variables and options from standard input using a namelist nml
@@ -25,6 +25,9 @@ PROGRAM mc_zvt_lj
   ! However, input configuration, output configuration, most calculations, and all results 
   ! are given in simulation units defined by the model
   ! For example, for Lennard-Jones, sigma = 1, epsilon = 1
+
+  ! Note that long-range corrections are not included in the acceptance/rejection
+  ! of creation and destruction moves, but are added to the simulation averages
 
   ! Despite the program name, there is nothing here specific to Lennard-Jones
   ! The model is defined in mc_module
@@ -44,13 +47,14 @@ PROGRAM mc_zvt_lj
   REAL :: pres_virial ! virial pressure (to be averaged)
   REAL :: potential   ! potential energy per atom (to be averaged)
 
-  LOGICAL            :: overlap
+  TYPE(potovr) :: eng_old, eng_new ! Composite energy = pot & vir & overlap variables
+
   INTEGER            :: blk, stp, i, nstep, nblock
   INTEGER            :: try, ntry, ioerr
   INTEGER            :: m_tries, m_moves ! count tries and moves
   INTEGER            :: c_tries, c_moves ! count tries and moves for creation
   INTEGER            :: d_tries, d_moves ! count tries and moves for destruction
-  REAL               :: pot_old, pot_new, pot_lrc, del_pot, vir_old, vir_new, vir_lrc, del_vir, delta
+  REAL               :: pot_lrc, vir_lrc, delta
   REAL               :: prob_move, prob_create
   REAL, DIMENSION(3) :: ri   ! position of atom i
   REAL, DIMENSION(3) :: zeta ! random numbers
@@ -106,11 +110,13 @@ PROGRAM mc_zvt_lj
 
   CALL resize ! Increase the size of the r array
 
-  CALL energy ( box, r_cut, overlap, pot, vir )
-  IF ( overlap ) THEN
+  eng_old = energy ( box, r_cut )
+  IF ( eng_old%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_zvt_lj'
   END IF
+  pot = eng_old%pot
+  vir = eng_old%vir
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Initial values' )
 
@@ -140,25 +146,27 @@ PROGRAM mc_zvt_lj
            IF ( zeta(1) < prob_move ) THEN ! try particle move
 
               m_tries = m_tries + 1
-              CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
-              zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
-              i = random_integer ( 1, n )
-              ri(:) = r(:,i)
-              CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_old, vir_old )
-              IF ( overlap ) THEN ! should never happen
+              i       = random_integer ( 1, n )
+              ri(:)   = r(:,i)
+              eng_old = energy_1 ( ri, i, box, r_cut )
+
+              IF ( eng_old%ovr ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in mc_zvt_lj'
               END IF
-              ri(:) = ri(:) + zeta * dr_max / box  ! trial move to new position (in box=1 units)
-              ri(:) = ri(:) - ANINT ( ri(:) )      ! periodic boundary correction
-              CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_new, vir_new )
 
-              IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
-                 delta = ( pot_new - pot_old ) / temperature
+              CALL RANDOM_NUMBER ( zeta )           ! Three uniform random numbers in range (0,1)
+              zeta    = 2.0*zeta - 1.0              ! now in range (-1,+1)
+              ri(:)   = ri(:) + zeta * dr_max / box ! Trial move to new position (in box=1 units)
+              ri(:)   = ri(:) - ANINT ( ri(:) )     ! Periodic boundary correction
+              eng_new = energy_1 ( ri, i, box, r_cut )
+
+              IF ( .NOT. eng_new%ovr ) THEN ! consider non-overlapping configuration
+                 delta = ( eng_new%pot - eng_old%pot ) / temperature
                  IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
-                    pot = pot + pot_new - pot_old ! update potential energy
-                    vir = vir + vir_new - vir_old ! update virial
+                    pot = pot + eng_new%pot - eng_old%pot ! update potential energy
+                    vir = vir + eng_new%vir - eng_old%vir ! update virial
                     CALL move ( i, ri )           ! update position
                     m_moves = m_moves + 1         ! increment move counter
                  END IF ! reject Metropolis test
@@ -169,53 +177,39 @@ PROGRAM mc_zvt_lj
 
               IF ( n+1 > SIZE(r,dim=2) ) CALL resize
 
-              CALL RANDOM_NUMBER ( ri ) ! three uniform random numbers in range (0,1)
+              CALL RANDOM_NUMBER ( ri ) ! Three uniform random numbers in range (0,1)
               ri = ri - 0.5             ! now in range (-0.5,+0.5)
-              CALL energy_1 ( ri, n+1, ne, box, r_cut, overlap, del_pot, del_vir )
-              CALL energy_lrc ( n+1, box, r_cut, pot_lrc, vir_lrc ) ! LRC for n+1 atoms
-              del_pot = del_pot + pot_lrc
-              del_vir = del_vir + vir_lrc
-              CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc ) ! LRC for n atoms
-              del_pot = del_pot - pot_lrc
-              del_vir = del_vir - vir_lrc
+              eng_new = energy_1 ( ri, n+1, box, r_cut )
 
-              IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
-                 delta = del_pot / temperature - LOG ( activity / REAL ( n+1 ) )
+              IF ( .NOT. eng_new%ovr ) THEN ! Consider non-overlapping configuration
+                 delta = eng_new%pot / temperature - LOG ( activity / REAL ( n+1 ) )
                  IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
                     CALL create ( ri )            ! create new particle
-                    pot     = pot + del_pot       ! update total potential energy
-                    vir     = vir + del_vir       ! update total virial
+                    pot     = pot + eng_new%pot   ! update total potential energy
+                    vir     = vir + eng_new%vir   ! update total virial
                     c_moves = c_moves + 1         ! increment creation move counter
                  END IF ! reject Metropolis test
               END IF ! reject overlapping configuration
 
            ELSE ! try destroy
               d_tries = d_tries + 1
-              i = random_integer ( 1, n )
+              i       = random_integer ( 1, n ) ! Choose particle at random
+              eng_old = energy_1 ( r(:,i), i, box, r_cut )
 
-              CALL energy_1 ( r(:,i), i, ne, box, r_cut, overlap, del_pot, del_vir )
-              CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc ) ! LRC for n atoms
-              del_pot = del_pot + pot_lrc
-              del_vir = del_vir + vir_lrc
-              CALL energy_lrc ( n-1, box, r_cut, pot_lrc, vir_lrc ) ! LRC for n-1 atoms
-              del_pot = del_pot - pot_lrc
-              del_vir = del_vir - vir_lrc
-              del_pot = -del_pot ! change sign for a removal
-              del_vir = -del_vir ! change sign for a removal
-
-              IF ( overlap ) THEN ! should never happen
+              IF ( eng_old%ovr ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap found on particle removal'
                  STOP 'Error in mc_zvt_lj'
               END IF
-              delta = del_pot/temperature - LOG ( REAL ( n ) / activity )
-              IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
-                 CALL destroy ( i )            ! destroy chosen particle
-                 pot     = pot + del_pot       ! update total potential energy
-                 vir     = vir + del_vir       ! update total virial
-                 d_moves = d_moves + 1         ! increment destruction move counter
-              END IF ! reject Metropolis test
 
-           END IF ! end choice of move type
+              delta = -eng_old%pot/temperature - LOG ( REAL ( n ) / activity )
+              IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
+                 CALL destroy ( i )            ! Destroy chosen particle
+                 pot     = pot - eng_old%pot   ! Update total potential energy
+                 vir     = vir - eng_old%vir   ! Update total virial
+                 d_moves = d_moves + 1         ! Increment destruction move counter
+              END IF ! End accept Metropolis test
+
+           END IF ! End choice of move type
 
         END DO ! End loop over tries of different kinds
 
@@ -229,8 +223,8 @@ PROGRAM mc_zvt_lj
      END DO ! End loop over steps
 
      CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk            ! number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box ) ! save configuration
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk                   ! Number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r(:,1:n)*box ) ! Save configuration
 
   END DO ! End loop over blocks
 
@@ -238,16 +232,18 @@ PROGRAM mc_zvt_lj
 
   CALL calculate ( 'Final values' )
 
-  CALL energy ( box, r_cut, overlap, pot, vir )
-  IF ( overlap ) THEN ! should never happen
+  eng_old = energy ( box, r_cut )
+  IF ( eng_old%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_zvt_lj'
   END IF
+  pot = eng_old%pot
+  vir = eng_old%vir
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Final check' )
   CALL time_stamp ( output_unit )
 
-  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
+  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r(:,1:n)*box )
 
   CALL deallocate_arrays
   CALL conclusion ( output_unit )

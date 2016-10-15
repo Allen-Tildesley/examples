@@ -7,7 +7,7 @@ PROGRAM mc_nvt_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       energy_1, energy, energy_lrc, move, n, r, ne
+       &                       energy_1, energy, energy_lrc, move, n, r, potovr
 
   IMPLICIT NONE
 
@@ -39,9 +39,10 @@ PROGRAM mc_nvt_lj
   REAL :: pres_virial ! virial pressure (to be averaged)
   REAL :: potential   ! potential energy per atom (to be averaged)
 
-  LOGICAL            :: overlap
+  TYPE(potovr) :: eng_old, eng_new ! Composite energy = pot & vir & overlap variables
+  
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
-  REAL               :: pot_old, pot_new, pot_lrc, vir_old, vir_new, vir_lrc, delta
+  REAL               :: pot_lrc, vir_lrc, delta
   REAL, DIMENSION(3) :: ri   ! position of atom i
   REAL, DIMENSION(3) :: zeta ! random numbers
 
@@ -91,11 +92,13 @@ PROGRAM mc_nvt_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  CALL energy ( box, r_cut, overlap, pot, vir )
-  IF ( overlap ) THEN
+  eng_old = energy ( box, r_cut )
+  IF ( eng_old%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_lj'
   END IF
+  pot = eng_old%pot
+  vir = eng_old%vir
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Initial values' )
 
@@ -111,26 +114,27 @@ PROGRAM mc_nvt_lj
 
         DO i = 1, n ! Begin loop over atoms
 
-           CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
-           zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
+           ri(:)   = r(:,i)
+           eng_old = energy_1 ( ri, i, box, r_cut )
 
-           ri(:) = r(:,i)
-           CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_old, vir_old )
-           IF ( overlap ) THEN ! should never happen
+           IF ( eng_old%ovr ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_lj'
            END IF
-           ri(:) = ri(:) + zeta * dr_max / box ! trial move to new position (in box=1 units)
-           ri(:) = ri(:) - ANINT ( ri(:) )     ! periodic boundary correction
-           CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_new, vir_new )
 
-           IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
-              delta = ( pot_new - pot_old ) / temperature
-              IF ( metropolis ( delta ) ) THEN    ! accept Metropolis test
-                 pot    = pot + pot_new - pot_old ! update potential energy
-                 vir    = vir + vir_new - vir_old ! update virial
-                 CALL move ( i, ri )              ! update position
-                 moves  = moves + 1               ! increment move counter
+           CALL RANDOM_NUMBER ( zeta )           ! Three uniform random numbers in range (0,1)
+           zeta    = 2.0*zeta - 1.0              ! now in range (-1,+1)
+           ri(:)   = ri(:) + zeta * dr_max / box ! Trial move to new position (in box=1 units)
+           ri(:)   = ri(:) - ANINT ( ri(:) )     ! Periodic boundary correction
+           eng_new = energy_1 ( ri, i, box, r_cut )
+
+           IF ( .NOT. eng_new%ovr ) THEN ! consider non-overlapping configuration
+              delta = ( eng_new%pot - eng_old%pot ) / temperature
+              IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
+                 pot = pot + eng_new%pot - eng_old%pot ! update potential energy
+                 vir = vir + eng_new%vir - eng_old%vir ! update virial
+                 CALL move ( i, ri )                   ! update position
+                 moves  = moves + 1                    ! increment move counter
               END IF ! reject Metropolis test
            END IF ! reject overlapping configuration
 
@@ -153,11 +157,13 @@ PROGRAM mc_nvt_lj
 
   CALL calculate ( 'Final values' )
 
-  CALL energy ( box, r_cut, overlap, pot, vir )
-  IF ( overlap ) THEN ! should never happen
+  eng_old = energy ( box, r_cut )
+  IF ( eng_old%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_lj'
   END IF
+  pot = eng_old%pot
+  vir = eng_old%vir
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Final check' )
 

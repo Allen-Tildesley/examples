@@ -111,12 +111,12 @@ PROGRAM bd_nvt_lj
      DO stp = 1, nstep ! Begin loop over steps
 
         ! BAOAB algorithm
-        CALL b ( dt/2.0 )                                 ! B kick half-step
-        CALL a ( dt/2.0 )                                 ! A drift half-step
-        CALL o ( dt )                                     ! O random velocities and friction step
-        CALL a ( dt/2.0 )                                 ! A drift half-step
+        CALL b_propagator ( dt/2.0 )                      ! B kick half-step
+        CALL a_propagator ( dt/2.0 )                      ! A drift half-step
+        CALL o_propagator ( dt )                          ! O random velocities and friction step
+        CALL a_propagator ( dt/2.0 )                      ! A drift half-step
         CALL force ( box, r_cut, pot, pot_sh, vir, lap )  ! Force evaluation
-        CALL b ( dt/2.0 )                                 ! B kick half-step
+        CALL b_propagator ( dt/2.0 )                      ! B kick half-step
 
         CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
 
@@ -146,20 +146,20 @@ PROGRAM bd_nvt_lj
 
 CONTAINS
 
-  SUBROUTINE a ( t ) ! A propagator (drift)
+  SUBROUTINE a_propagator ( t ) ! A propagator (drift)
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
     r(:,:) = r(:,:) + t * v(:,:) / box ! positions in box=1 units
     r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! periodic boundaries (box=1 units)
-  END SUBROUTINE a
+  END SUBROUTINE a_propagator
 
-  SUBROUTINE b ( t ) ! B propagator (kick)
+  SUBROUTINE b_propagator ( t ) ! B propagator (kick)
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
     v(:,:) = v(:,:) + t * f(:,:)
-  END SUBROUTINE b
+  END SUBROUTINE b_propagator
 
-  SUBROUTINE o ( t ) ! O propagator (friction and random contributions)
+  SUBROUTINE o_propagator ( t ) ! O propagator (friction and random contributions)
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! time over which to propagate (typically dt)
 
@@ -179,7 +179,7 @@ CONTAINS
     CALL random_normals ( 0.0, SQRT(temperature), zeta ) ! random momenta
     v = EXP(-x) * v + c * zeta
 
-  END SUBROUTINE o
+  END SUBROUTINE o_propagator
 
   SUBROUTINE calculate ( string )
     IMPLICIT NONE

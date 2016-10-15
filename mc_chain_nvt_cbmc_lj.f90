@@ -6,7 +6,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       regrow, energy, spring_pot, n, r
+       &                       regrow, energy, spring_pot, n, r, potovr
 
   IMPLICIT NONE
 
@@ -38,8 +38,9 @@ PROGRAM mc_chain_nvt_cbmc_lj
   INTEGER :: m_max       ! Maximum atoms in regrow
   INTEGER :: k_max       ! Number of random tries per atom in regrow
 
-  INTEGER :: blk, stp, nstep, nblock, ioerr
-  LOGICAL :: overlap, accepted
+  INTEGER      :: blk, stp, nstep, nblock, ioerr
+  LOGICAL      :: accepted
+  TYPE(potovr) :: eng
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -85,11 +86,12 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r ) ! Second call gets r
 
-  CALL energy ( overlap, pot )
-  IF ( overlap ) THEN
+  eng = energy ( )
+  IF ( eng%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_chain_nvt_cbmc_lj'
   END IF
+  pot = eng%pot
 
   CALL calculate ( 'Initial values' )
 

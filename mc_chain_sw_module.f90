@@ -9,18 +9,19 @@ MODULE mc_module
   PUBLIC :: regrow, crank, pivot, weight, qcount
   PUBLIC :: n, r
 
-  INTEGER                             :: n     ! Number of atoms
-  REAL,   DIMENSION(:,:), ALLOCATABLE :: r     ! Atomic positions (3,n)
-  REAL,   DIMENSION(:,:), ALLOCATABLE :: r_old ! Working array (3,n)
-  REAL,   DIMENSION(:,:), ALLOCATABLE :: r_new ! Working array (3,n)
+  INTEGER                             :: n ! Number of atoms
+  REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! Atomic positions (3,n)
 
-  REAL,    PARAMETER :: sigma = 1.0             ! core diameter
-  INTEGER, PARAMETER :: lt = -1, gt = 1, ne = 0 ! options for j-range
+  REAL, DIMENSION(:,:), ALLOCATABLE :: r_old ! Working array (3,n)
+  REAL, DIMENSION(:,:), ALLOCATABLE :: r_new ! Working array (3,n)
+
+  REAL,    PARAMETER :: sigma = 1.0     ! Core diameter
+  INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
 
 CONTAINS
 
   SUBROUTINE introduction ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Hard-sphere chain with fixed bond length'
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Square-well attractive potential'
@@ -29,7 +30,7 @@ CONTAINS
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
   END SUBROUTINE conclusion
 
@@ -41,7 +42,7 @@ CONTAINS
     DEALLOCATE ( r, r_old, r_new )
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE regrow ( s, m_max, k_max, bond, range, q, accepted ) ! Routine to regrow polymer
+  SUBROUTINE regrow ( s, m_max, k_max, bond, range, q, accepted )
     USE maths_module, ONLY : random_integer, random_vector, pick
 
     REAL,    DIMENSION(0:), INTENT(in)    :: s        ! Entropy table used in accept function
@@ -72,8 +73,8 @@ CONTAINS
 
     REAL, PARAMETER :: w_tol = 0.5 ! Min weight tolerance (w takes integer values)
 
-    r_old    = r ! Store old configuration
-    q_old    = q ! Store old q
+    r_old = r ! Store old configuration
+    q_old = q ! Store old q
 
     m = random_integer ( 1, m_max ) ! Number of atoms to regrow
     c = random_integer ( 1, 4 )     ! Growth option
@@ -282,8 +283,8 @@ CONTAINS
 
     r = r_old ! Copy old position (somewhat redundant here)
 
-    i     = random_integer ( 1, n )                   ! Pick random atom to move
-    q_new = q_old - qcount_1 ( r(:,i), i, ne, range ) ! Subtract old energies for moving atom
+    i     = random_integer ( 1, n )               ! Pick random atom to move
+    q_new = q_old - qcount_1 ( r(:,i), i, range ) ! Subtract old energies for moving atom
 
     CALL RANDOM_NUMBER ( zeta )        ! Uniform random number in range (0,1)
     phi = ( 2.0*zeta - 1.0 ) * phi_max ! Rotation angle in desired range
@@ -306,14 +307,14 @@ CONTAINS
     rij = rotate_vector ( phi, axis, rij ) ! Rotate relative vector
     r(:,i) = rj + rij                      ! New absolute position
 
-    IF ( weight_1 ( r(:,i), i, ne ) == 0 ) THEN ! Check for overlaps
+    IF ( weight_1 ( r(:,i), i ) == 0 ) THEN ! Check for overlaps
        r        = r_old   ! Restore original configuration
        q        = q_old   ! Redundant but for clarity
        accepted = .FALSE. ! This move is rejected
        RETURN
     END IF ! End check for overlaps
 
-    q_new = q_new + qcount_1 ( r(:,i), i, ne, range ) ! Add new energies for moving atom
+    q_new = q_new + qcount_1 ( r(:,i), i, range ) ! Add new energies for moving atom
     r_new = r
 
     IF ( accept ( s, q_old, q_new ) ) THEN
@@ -332,7 +333,8 @@ CONTAINS
     INTEGER :: w ! Returns configuration weight = 0 (overlap) or 1 (no overlap)
 
     ! Arithmetically w is the product of all the pair Boltzmann factors
-    ! Here, each is 0 or 1, but in the more general case we would multiply them
+    ! Here, each is 0 or 1, which allows us to treat them as Boolean variables
+    ! but in the more general case they would be real and we would multiply them all together
 
     INTEGER :: i
 
@@ -350,33 +352,36 @@ CONTAINS
     INTEGER                           :: w       ! Returns weight (0 or 1) associated with single atom
     REAL,    DIMENSION(3), INTENT(in) :: ri      ! Coordinates of atom of interest
     INTEGER,               INTENT(in) :: i       ! Index of atom of interest
-    INTEGER,               INTENT(in) :: j_range ! Partner index range
+    INTEGER, OPTIONAL,     INTENT(in) :: j_range ! Partner index range
 
     ! Calculates weight associated with atom ri (not necessarily identical with r(:,i))
     ! due to nonbonded interactions with j/=i, j>i, or j<i depending on j_range
     ! This is athermal, based on hard core nonbonded overlaps only
     ! The result is either 0 (overlap) or 1 (non overlap)
     ! Arithmetically w is the product of all the pair Boltzmann factors
-    ! Here, each is 0 or 1, but in the more general case we would multiply them
+    ! Here, each is 0 or 1, which allows us to treat them as Boolean variables
+    ! but in the more general case they would be real and we would multiply them all together
 
     INTEGER            :: j, j1, j2
     REAL, DIMENSION(3) :: rij
     REAL               :: rij_sq
 
-    SELECT CASE ( j_range )
-    CASE ( ne )
+    IF ( PRESENT ( j_range ) ) THEN
+       SELECT CASE ( j_range )
+       CASE ( lt )
+          j1 = 1
+          j2 = i-1
+       CASE ( gt )
+          j1 = i+1
+          j2 = n
+       CASE default
+          WRITE ( unit = error_unit, fmt='(a,i10)') 'j_range error should never happen ', j_range
+          STOP 'Impossible error in weight_1'
+       END SELECT
+    ELSE
        j1 = 1
        j2 = n
-    CASE ( lt )
-       j1 = 1
-       j2 = i-1
-    CASE ( gt )
-       j1 = i+1
-       j2 = n
-    CASE default
-       WRITE ( unit = error_unit, fmt='(a,i10)') 'j_range error should never happen ', j_range
-       STOP 'Impossible error in weight_1'
-    END SELECT
+    END IF
 
     w = 0 ! Weight is zero unless we get through the following loop
 
@@ -402,17 +407,17 @@ CONTAINS
 
     q = 0
     DO i = 1, n-1 ! Loop over atoms, checking upwards for partners
-       q = q + qcount_1 ( r(:,i), i, gt, range )
+       q = q + qcount_1 ( r(:,i), i, range, gt )
     END DO ! End loop over atoms, checking upwards for partners
 
   END FUNCTION qcount
 
-  FUNCTION qcount_1 ( ri, i, j_range, range ) RESULT ( q )
+  FUNCTION qcount_1 ( ri, i, range, j_range ) RESULT ( q )
     INTEGER                           :: q       ! Counts square-well interactions for single atom
     REAL,    DIMENSION(3), INTENT(in) :: ri      ! Coordinates of atom of interest
     INTEGER,               INTENT(in) :: i       ! Index of atom of interest
-    INTEGER,               INTENT(in) :: j_range ! Partner index range
     REAL,                  INTENT(in) :: range   ! Range of attractive well
+    INTEGER, OPTIONAL,     INTENT(in) :: j_range ! Optional partner index range
 
     INTEGER            :: j, j1, j2
     REAL, DIMENSION(3) :: rij
@@ -420,20 +425,22 @@ CONTAINS
 
     range_sq = range**2
 
-    SELECT CASE ( j_range )
-    CASE ( ne )
+    IF ( PRESENT ( j_range ) ) THEN
+       SELECT CASE ( j_range )
+       CASE ( lt )
+          j1 = 1
+          j2 = i-1
+       CASE ( gt )
+          j1 = i+1
+          j2 = n
+       CASE default ! should never happen
+          WRITE ( unit = error_unit, fmt='(a,i10)') 'j_range error ', j_range
+          STOP 'Impossible error in qcount_1'
+       END SELECT
+    ELSE
        j1 = 1
        j2 = n
-    CASE ( lt )
-       j1 = 1
-       j2 = i-1
-    CASE ( gt )
-       j1 = i+1
-       j2 = n
-    CASE default
-       WRITE ( unit = error_unit, fmt='(a,i10)') 'j_range error should never happen ', j_range
-       STOP 'Impossible error in qcount_1'
-    END SELECT
+    END IF
 
     q = 0
 
@@ -452,7 +459,7 @@ CONTAINS
   FUNCTION accept ( s, q_old, q_new, w_old, w_new )
     LOGICAL                                      :: accept       ! Returns accept/reject decision based on
     REAL,    DIMENSION(0:), INTENT(in)           :: s            ! Entropy table
-    INTEGER,                INTENT(in)           :: q_old, q_new ! old & new energies, and if present,
+    INTEGER,                INTENT(in)           :: q_old, q_new ! Old & new energies, and if present,
     REAL,                   INTENT(in), OPTIONAL :: w_old, w_new ! old & new weights
 
     ! This routine is essentially the Metropolis-Hastings formula, generalized
@@ -463,6 +470,7 @@ CONTAINS
 
     INTEGER         :: nq
     REAL            :: zeta, delta
+    REAL, PARAMETER :: w_tol = 0.5 ! Min weight tolerance (w takes integer values)
     REAL, PARAMETER :: exponent_guard = 75.0
 
     ! Check that we are within bounds for the entropy table
@@ -476,15 +484,12 @@ CONTAINS
 
     IF ( PRESENT ( w_new ) ) THEN ! Inclusion of weights
 
-       ! Weights should have positive integer values, so we can check against 0.5
-       ! Otherwise we should compare with a very small value
-
-       IF ( w_old < 0.5 ) THEN ! Should never happen
+       IF ( w_old < w_tol ) THEN ! Should never happen
           WRITE ( unit = error_unit, fmt='(a,es15.8)') 'w_old error ', w_old
           STOP 'Impossible error in accept'
        END IF
 
-       IF ( w_new < 0.5 ) THEN ! Should really have been detected before
+       IF ( w_new < w_tol ) THEN ! Should really have been detected before
           accept = .FALSE. ! This move is rejected
           RETURN
        END IF

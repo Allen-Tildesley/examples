@@ -8,12 +8,12 @@ PROGRAM mc_npt_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       energy_1, energy, energy_lrc, move, n, r, ne
+       &                       energy_1, energy, energy_lrc, move, n, r, potovr
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
   ! Cubic periodic boundary conditions
-  ! Conducts Monte Carlo at the given temperature and pressure
+  ! Conducts isothermal-isobaric Monte Carlo at the given temperature and pressure
   ! Uses no special neighbour lists
 
   ! Reads several variables and options from standard input using a namelist nml
@@ -50,10 +50,11 @@ PROGRAM mc_npt_lj
   REAL :: pres_virial    ! virial pressure (to be averaged)
   REAL :: potential      ! potential energy per atom (to be averaged)
 
-  LOGICAL            :: overlap
+  TYPE(potovr) :: eng_old, eng_new ! Composite energy = pot & vir & overlap variables
+
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL               :: box_scale, box_new, den_scale, delta, zeta1
-  REAL               :: pot_old, pot_new, pot_lrc, vir_old, vir_new, vir_lrc
+  REAL               :: pot_lrc, vir_lrc
   REAL, DIMENSION(3) :: ri   ! position of atom i
   REAL, DIMENSION(3) :: zeta ! random numbers
 
@@ -104,11 +105,13 @@ PROGRAM mc_npt_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  CALL energy ( box, r_cut, overlap, pot, vir )
-  IF ( overlap ) THEN
+  eng_old = energy ( box, r_cut )
+  IF ( eng_old%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_npt_lj'
   END IF
+  pot = eng_old%pot
+  vir = eng_old%vir
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Initial values' )
 
@@ -125,54 +128,55 @@ PROGRAM mc_npt_lj
 
         DO i = 1, n ! Begin loop over atoms
 
-           CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
-           zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
+           ri(:)   = r(:,i)
+           eng_old = energy_1 ( ri, i, box, r_cut )
 
-           ri(:) = r(:,i)
-           CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_old, vir_old )
-           IF ( overlap ) THEN ! should never happen
+           IF ( eng_old%ovr ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_npt_lj'
            END IF
-           ri(:) = ri(:) + zeta * dr_max / box ! trial move to new position (box=1 units)
-           ri(:) = ri(:) - ANINT ( ri(:) )     ! periodic boundary correction
-           CALL  energy_1 ( ri, i, ne, box, r_cut, overlap, pot_new, vir_new )
 
-           IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
+           CALL RANDOM_NUMBER ( zeta )           ! Three uniform random numbers in range (0,1)
+           zeta    = 2.0*zeta - 1.0              ! now in range (-1,+1)
+           ri(:)   = ri(:) + zeta * dr_max / box ! Trial move to new position (box=1 units)
+           ri(:)   = ri(:) - ANINT ( ri(:) )     ! Periodic boundary correction
+           eng_new = energy_1 ( ri, i, box, r_cut )
 
-              delta = ( pot_new - pot_old ) / temperature
+           IF ( .NOT. eng_new%ovr ) THEN ! Consider non-overlapping configuration
 
-              IF (  metropolis ( delta )  ) THEN ! accept Metropolis test
-                 pot = pot + pot_new - pot_old   ! update potential energy
-                 vir = vir + vir_new - vir_old   ! update virial
-                 CALL move ( i, ri )             ! update position
-                 moves = moves + 1               ! increment move counter
-              END IF ! reject Metropolis test
+              delta = ( eng_new%pot - eng_old%pot ) / temperature
 
-           END IF ! reject overlapping configuration
+              IF (  metropolis ( delta )  ) THEN ! Accept Metropolis test
+                 pot = pot + eng_new%pot - eng_old%pot   ! Update potential energy
+                 vir = vir + eng_new%vir - eng_old%vir   ! Update virial
+                 CALL move ( i, ri )                     ! Update position
+                 moves = moves + 1                       ! Increment move counter
+              END IF ! End accept Metropolis test
+
+           END IF ! End consider non-overlapping configuration
 
         END DO ! End loop over atoms
 
         move_ratio = REAL(moves) / REAL(n)
 
         box_move_ratio = 0.0
-        CALL RANDOM_NUMBER ( zeta1 )     ! uniform random number in range (0,1)
-        zeta1     = 2.0*zeta1 - 1.0      ! now in range (-1,+1)
-        box_scale = EXP ( zeta1*db_max ) ! sampling log(box) and log(vol) uniformly
-        box_new   = box * box_scale      ! new box (in sigma units)
-        den_scale = 1.0 / box_scale**3   ! density scaling factor
-        CALL energy ( box_new, r_cut, overlap, pot_new, vir_new )
+        CALL RANDOM_NUMBER ( zeta1 )          ! Uniform random number in range (0,1)
+        zeta1     = 2.0*zeta1 - 1.0           ! now in range (-1,+1)
+        box_scale = EXP ( zeta1*db_max )      ! Sampling log(box) and log(vol) uniformly
+        box_new   = box * box_scale           ! New box (in sigma units)
+        den_scale = 1.0 / box_scale**3        ! Density scaling factor
+        eng_new   = energy ( box_new, r_cut ) ! New energy, virial etc
 
-        IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
+        IF ( .NOT. eng_new%ovr ) THEN ! Consider non-overlapping configuration
 
-           delta = ( (pot_new-pot) + pressure * ( box_new**3 - box**3 )  ) / temperature &
-                &   + REAL(n+1) * LOG(den_scale) ! factor (n+1) consistent with box scaling
+           delta = ( (eng_new%pot-pot) + pressure * ( box_new**3 - box**3 )  ) / temperature &
+                &   + REAL(n+1) * LOG(den_scale) ! Factor (n+1) consistent with box scaling
 
-           IF ( metropolis ( delta ) ) THEN ! accept because Metropolis test
-              pot     = pot_new     ! update both parts of potential
-              vir     = vir_new     ! update both parts of virial
-              box     = box_new     ! update box
-              box_move_ratio = 1.0  ! increment move counter
+           IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
+              pot     = eng_new%pot ! Update potential
+              vir     = eng_new%vir ! Update virial
+              box     = box_new     ! Update box
+              box_move_ratio = 1.0  ! Increment move counter
            END IF ! reject Metropolis test
 
         END IF ! reject overlapping configuration
@@ -192,11 +196,13 @@ PROGRAM mc_npt_lj
 
   CALL calculate ( 'Final values' )
 
-  CALL energy ( box, r_cut, overlap, pot, vir )
-  IF ( overlap ) THEN ! should never happen
+  eng_old = energy ( box, r_cut )
+  IF ( eng_old%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_npt_lj'
   END IF
+  pot = eng_old%pot
+  vir = eng_old%vir
   CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Final check' )
 

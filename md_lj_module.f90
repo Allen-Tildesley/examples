@@ -22,6 +22,7 @@ MODULE md_module
 CONTAINS
 
   SUBROUTINE introduction ( output_unit )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'

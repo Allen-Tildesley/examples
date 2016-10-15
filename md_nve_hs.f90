@@ -95,7 +95,7 @@ PROGRAM md_nve_hs
   partner(:) = n
 
   DO i = 1, n
-     CALL update ( i, gt, box ) ! initial search for collision partners >i
+     CALL update ( i, box, gt ) ! initial search for collision partners >i
   END DO
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Collision Rate', 'Coll Pressure' ] )
@@ -123,16 +123,16 @@ PROGRAM md_nve_hs
 
         DO k = 1, n
            IF ( ( k == i ) .OR. ( partner(k) == i ) .OR. ( k == j ) .OR. ( partner(k) == j ) ) THEN
-              CALL update ( k, gt, box ) ! search for partners >k
+              CALL update ( k, box, gt ) ! search for partners >k
            ENDIF
         END DO
 
-        CALL update ( i, lt, box ) ! search for partners <i
-        CALL update ( j, lt, box ) ! search for partners <j
+        CALL update ( i, box, lt ) ! search for partners <i
+        CALL update ( j, box, lt ) ! search for partners <j
 
      END DO ! End loop over collisions
 
-      ! Collisional time averages in sigma units
+     ! Collisional time averages in sigma units
      coll_rate = 2.0*REAL (ncoll) / t / REAL(n)            ! collision rate per particle
      pres_coll = density*temp_kinet + vir_sum / t / box**3 ! ideal + collisional virial / volume
      CALL blk_add ( [coll_rate, pres_coll] ) ! time averages

@@ -6,27 +6,27 @@ MODULE mc_module
 
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: n, r, lt, ne, gt
+  PUBLIC :: n, r
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: overlap_1, overlap, n_overlap_1, n_overlap
+  PUBLIC :: overlap_1, overlap, n_overlap
 
-  INTEGER                             :: n ! number of atoms
-  REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
+  INTEGER                             :: n ! Number of atoms
+  REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! Positions (3,n)
 
-  INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
-  REAL,    PARAMETER :: sigma = 1.0             ! hard-sphere diameter (unit of length)
+  INTEGER, PARAMETER :: lt = -1, gt = 1 ! j-range options
+  REAL,    PARAMETER :: sigma = 1.0     ! Hard-sphere diameter (unit of length)
 
 CONTAINS
 
   SUBROUTINE introduction ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Hard sphere potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ', sigma    
   END SUBROUTINE introduction
   
   SUBROUTINE conclusion ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
   END SUBROUTINE conclusion
 
@@ -39,8 +39,10 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   FUNCTION overlap ( box )
-    LOGICAL             :: overlap ! shows if an overlap was detected
-    REAL,    INTENT(in) :: box     ! simulation box length
+    LOGICAL            :: overlap ! Shows if an overlap was detected
+    REAL,   INTENT(in) :: box     ! Simulation box length
+
+    ! Actual calculation is performed by function overlap_1
 
     INTEGER :: i
 
@@ -49,25 +51,27 @@ CONTAINS
        STOP 'Error in overlap'
     END IF
 
-    overlap  = .FALSE.
-
     DO i = 1, n - 1
-       IF ( overlap_1 ( r(:,i), i, gt, box ) ) THEN
-          overlap = .TRUE.
-          EXIT ! jump out of loop
+       IF ( overlap_1 ( r(:,i), i, box, gt ) ) THEN
+          overlap = .TRUE. ! Overlap detected
+          RETURN           ! Return immediately
        END IF
     END DO
 
+    overlap  = .FALSE. ! No overlaps detected
+
   END FUNCTION overlap
 
-  FUNCTION overlap_1 ( ri, i, j_range, box ) RESULT ( overlap )
-    LOGICAL                        :: overlap    ! shows if an overlap was detected
-    REAL, DIMENSION(3), INTENT(in) :: ri         ! coordinates of atom of interest
-    INTEGER,            INTENT(in) :: i, j_range ! index, and partner index range
-    REAL,               INTENT(in) :: box        ! simulation box length
+  FUNCTION overlap_1 ( ri, i, box, j_range ) RESULT ( overlap )
+    LOGICAL                        :: overlap ! Shows if an overlap was detected
+    REAL, DIMENSION(3), INTENT(in) :: ri      ! Coordinates of atom of interest
+    INTEGER,            INTENT(in) :: i       ! Index of atom of interest
+    REAL,               INTENT(in) :: box     ! Simulation box length
+    INTEGER, OPTIONAL,  INTENT(in) :: j_range ! Optional partner index range
 
     ! Detects overlap of atom in ri
-    ! with j/=i, j>i, or j<i depending on j_range
+    ! The coordinates in ri are not necessarily identical with those in r(:,i)
+    ! The optional argument j_range restricts partner indices to j>i, or j<i
     ! It is assumed that r is in units where box = 1
 
     INTEGER            :: j, j1, j2
@@ -79,25 +83,28 @@ CONTAINS
        STOP 'Error in overlap_1'
     END IF
 
+    IF ( PRESENT ( j_range ) ) THEN
+       SELECT CASE ( j_range )
+       CASE ( lt ) ! j < i
+          j1 = 1
+          j2 = i-1
+       CASE ( gt ) ! j > i
+          j1 = i+1
+          j2 = n
+       CASE default ! should never happen
+          WRITE ( unit = error_unit, fmt='(a,i10)') 'j_range error ', j_range
+          STOP 'Impossible error in overlap_1'
+       END SELECT
+    ELSE
+       j1 = 1
+       j2 = n
+    END IF
+
     box_sq = box**2
 
-    overlap = .FALSE.
+    DO j = j1, j2 ! Loop over selected range of partners
 
-    SELECT CASE ( j_range )
-    CASE ( lt ) ! j < i
-       j1 = 1
-       j2 = i-1
-    CASE ( gt ) ! j > i
-       j1 = i+1
-       j2 = n
-    CASE ( ne ) ! j /= i
-       j1 = 1
-       j2 = n
-    END SELECT
-
-    DO j = j1, j2
-
-       IF ( i == j ) CYCLE
+       IF ( i == j ) CYCLE ! Skip self
 
        rij(:) = ri(:) - r(:,j)
        rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units
@@ -105,17 +112,22 @@ CONTAINS
        rij_sq = rij_sq * box_sq ! now in sigma=1 units
 
        IF ( rij_sq < 1.0 ) THEN
-          overlap = .TRUE.
-          EXIT ! jump out of loop
+          overlap = .TRUE. ! Overlap detected
+          RETURN           ! Return immediately
        END IF
 
-    END DO
+    END DO ! End loop over selected range of partners
+
+    overlap = .FALSE. ! No overlaps detected
 
   END FUNCTION overlap_1
 
   FUNCTION n_overlap ( box )
-    INTEGER             :: n_overlap ! counts overlaps
-    REAL,    INTENT(in) :: box       ! simulation box length
+    INTEGER             :: n_overlap ! Counts overlaps
+    REAL,    INTENT(in) :: box       ! Simulation box length
+
+    ! This routine is used in the calculation of pressure
+    ! Actual calculation is performed by function n_overlap_1
 
     INTEGER :: i
 
@@ -127,20 +139,23 @@ CONTAINS
     n_overlap  = 0
 
     DO i = 1, n - 1
-       n_overlap = n_overlap + n_overlap_1 ( r(:,i), i, gt, box )
+       n_overlap = n_overlap + n_overlap_1 ( r(:,i), i, box, gt )
     END DO
 
   END FUNCTION n_overlap
 
-  FUNCTION n_overlap_1 ( ri, i, j_range, box ) RESULT ( n_overlap )
-    INTEGER                        :: n_overlap  ! counts overlaps
-    REAL, DIMENSION(3), INTENT(in) :: ri         ! coordinates of atom of interest
-    INTEGER,            INTENT(in) :: i, j_range ! index, and partner index range
-    REAL,               INTENT(in) :: box        ! simulation box length
+  FUNCTION n_overlap_1 ( ri, i, box, j_range ) RESULT ( n_overlap )
+    INTEGER                        :: n_overlap ! Counts overlaps
+    REAL, DIMENSION(3), INTENT(in) :: ri        ! Coordinates of atom of interest
+    INTEGER,            INTENT(in) :: i         ! Index of atom of interest
+    REAL,               INTENT(in) :: box       ! Simulation box length
+    INTEGER, OPTIONAL,  INTENT(in) :: j_range   ! Optional partner index range
 
     ! Counts overlaps of atom in ri
-    ! with j/=i, j>i, or j<i depending on j_range
+    ! The coordinates in ri are not necessarily identical with those in r(:,i)
+    ! The optional argument j_range restricts partner indices to j>i, or j<i
     ! It is assumed that r is in units where box = 1
+    ! This routine is used in the calculation of pressure
 
     INTEGER            :: j, j1, j2
     REAL               :: box_sq, rij_sq
@@ -151,25 +166,29 @@ CONTAINS
        STOP 'Error in n_overlap_1'
     END IF
 
-    box_sq = box**2
+    IF ( PRESENT ( j_range ) ) THEN
+       SELECT CASE ( j_range )
+       CASE ( lt ) ! j < i
+          j1 = 1
+          j2 = i-1
+       CASE ( gt ) ! j > i
+          j1 = i+1
+          j2 = n
+       CASE default ! should never happen
+          WRITE ( unit = error_unit, fmt='(a,i10)') 'j_range error ', j_range
+          STOP 'Impossible error in n_overlap_1'
+       END SELECT
+    ELSE
+       j1 = 1
+       j2 = n
+    END IF
 
+    box_sq    = box**2
     n_overlap = 0
-
-    SELECT CASE ( j_range )
-    CASE ( lt ) ! j < i
-       j1 = 1
-       j2 = i-1
-    CASE ( gt ) ! j > i
-       j1 = i+1
-       j2 = n
-    CASE ( ne ) ! j /= i
-       j1 = 1
-       j2 = n
-    END SELECT
 
     DO j = j1, j2
 
-       IF ( i == j ) CYCLE
+       IF ( i == j ) CYCLE ! Skip self
 
        rij(:) = ri(:) - r(:,j)
        rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units

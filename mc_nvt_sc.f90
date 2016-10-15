@@ -8,7 +8,7 @@ PROGRAM mc_nvt_sc
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : random_rotate_vector, orientational_order
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       overlap_1, overlap, n_overlap, n, r, e, ne
+       &                       overlap_1, overlap, n_overlap, n, r, e
 
   IMPLICIT NONE
 
@@ -113,7 +113,7 @@ PROGRAM mc_nvt_sc
            ri(:) = ri(:) - ANINT ( ri(:) )                 ! periodic boundary correction
            ei(:) = random_rotate_vector ( de_max, e(:,i) ) ! trial move to new orientation
 
-           IF ( .NOT. overlap_1 ( ri, ei, i, ne, box, length ) ) THEN ! accept
+           IF ( .NOT. overlap_1 ( ri, ei, i, box, length ) ) THEN ! accept
               r(:,i) = ri(:)     ! update position
               e(:,i) = ei(:)     ! update orientation
               moves  = moves + 1 ! increment move counter

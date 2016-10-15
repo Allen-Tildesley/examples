@@ -7,22 +7,41 @@ MODULE mc_module
   IMPLICIT NONE
   PRIVATE
 
-  PUBLIC :: n, r, lt, ne, gt
+  PUBLIC :: n, r
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  public :: resize, energy_1, energy, energy_lrc
+  PUBLIC :: resize, energy_1, energy, energy_lrc
   PUBLIC :: move, create, destroy
+  PUBLIC :: potovr
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
 
-  INTEGER, PARAMETER :: lt = -1, ne = 0, gt = 1 ! j-range options
-  REAL,    PARAMETER :: sigma = 1.0             ! Lennard-Jones diameter (unit of length)
-  REAL,    PARAMETER :: epslj = 1.0             ! Lennard-Jones well depth (unit of energy)
+  INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
+  REAL,    PARAMETER :: sigma = 1.0     ! Lennard-Jones diameter (unit of length)
+  REAL,    PARAMETER :: epslj = 1.0     ! Lennard-Jones well depth (unit of energy)
 
+  TYPE potovr ! A composite variable for interaction energies comprising
+     REAL    :: pot ! the potential energy and
+     REAL    :: vir ! the virial and
+     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
+  END TYPE potovr
+
+  INTERFACE OPERATOR (+)
+     MODULE PROCEDURE add_potovr
+  END INTERFACE OPERATOR (+)
+  
 CONTAINS
 
+  FUNCTION add_potovr ( a, b ) RESULT (c)
+    TYPE(potovr)             :: c    ! Result is the sum of the two inputs
+    TYPE(potovr), INTENT(in) :: a, b
+    c%pot = a%pot +    b%pot
+    c%vir = a%vir +    b%vir
+    c%ovr = a%ovr .OR. b%ovr
+  END FUNCTION add_potovr
+  
   SUBROUTINE introduction ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',   sigma    
@@ -30,16 +49,16 @@ CONTAINS
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays ( box, r_cut )
-    REAL, INTENT(in) :: box   ! simulation box length
-    REAL, INTENT(in) :: r_cut ! potential cutoff distance
+    REAL, INTENT(in) :: box   ! Simulation box length
+    REAL, INTENT(in) :: r_cut ! Potential cutoff distance
 
     REAL :: r_cut_box
-    
+
     ALLOCATE ( r(3,n) )
 
     r_cut_box = r_cut / box
@@ -54,10 +73,11 @@ CONTAINS
     DEALLOCATE ( r )
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE resize ! reallocates r array, twice as large
+  SUBROUTINE resize 
 
+    ! Reallocates r array, twice as large
     ! This is employed by mc_zvt_lj, grand canonical ensemble
-    
+
     REAL, DIMENSION(:,:), ALLOCATABLE :: tmp
     INTEGER                           :: n_old, n_new
 
@@ -65,58 +85,62 @@ CONTAINS
     n_new = 2*n_old
     WRITE( unit=output_unit, fmt='(a,i10,a,i10)' ) 'Reallocating r from old ', n_old, ' to ', n_new
 
-    ALLOCATE ( tmp(3,n_new) ) ! new size for r
-    tmp(:,1:n_old) = r(:,:)   ! copy elements across
+    ALLOCATE ( tmp(3,n_new) ) ! New size for r
+    tmp(:,1:n_old) = r(:,:)   ! Copy elements across
 
     CALL move_ALLOC ( tmp, r )
 
   END SUBROUTINE resize
 
-  SUBROUTINE energy ( box, r_cut, overlap, pot, vir )
-    REAL,    INTENT(in)  :: box        ! simulation box length
-    REAL,    INTENT(in)  :: r_cut      ! potential cutoff distance
-    LOGICAL, INTENT(out) :: overlap    ! shows if an overlap was detected
-    REAL,    INTENT(out) :: pot, vir   ! potential and virial 
+  FUNCTION energy ( box, r_cut )
+    TYPE(potovr)     :: energy ! Returns a composite of pot, vir and ovr
+    REAL, INTENT(in) :: box    ! Simulation box length
+    REAL, INTENT(in) :: r_cut  ! Potential cutoff distance
 
-    ! Calculates potential and virial for whole system
-    ! Includes a check for overlap (potential too high) to avoid overflow
-    ! If overlap==.true., the values of pot and vir should not be used
-    ! Actual calculation is performed by subroutine energy_1
+    ! energy%pot is the nonbonded potential energy for whole system
+    ! energy%vir is the corresponding virial for whole system
+    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this flag is .true., the values of energy%pot, energy%vir should not be used
+    ! Actual calculation is performed by function energy_1
 
-    REAL               :: pot_i, vir_i
-    INTEGER            :: i
+    TYPE(potovr) :: energy_i
+    INTEGER      :: i
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
        STOP 'Error in energy'
     END IF
-    
-    overlap  = .FALSE.
-    pot      = 0.0
-    vir      = 0.0
 
+    energy = potovr ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    
     DO i = 1, n - 1
-       CALL energy_1 ( r(:,i), i, gt, box, r_cut, overlap, pot_i, vir_i )
-       IF ( overlap ) EXIT ! jump out of loop
-       pot  = pot  + pot_i
-       vir  = vir  + vir_i
+       energy_i = energy_1 ( r(:,i), i, box, r_cut, gt )
+       IF ( energy_i%ovr ) THEN
+          energy%ovr = .TRUE. ! Overlap detected
+          RETURN              ! Return immediately
+       END IF
+       energy = energy + energy_i
     END DO
+
+    energy%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
     
-  END SUBROUTINE energy
+  END FUNCTION energy
 
-  SUBROUTINE energy_1 ( ri, i, j_range, box, r_cut, overlap, pot, vir )
+  FUNCTION energy_1 ( ri, i, box, r_cut, j_range ) RESULT ( energy )
+    TYPE(potovr)                    :: energy  ! Returns a composite of pot, vir and ovr
+    REAL, DIMENSION(3), INTENT(in)  :: ri      ! Coordinates of atom of interest
+    INTEGER,            INTENT(in)  :: i       ! Index of atom of interest
+    REAL,               INTENT(in)  :: box     ! Simulation box length
+    REAL,               INTENT(in)  :: r_cut   ! Potential cutoff distance
+    INTEGER, OPTIONAL,  INTENT(in)  :: j_range ! Optional partner index range
 
-    REAL, DIMENSION(3), INTENT(in)  :: ri         ! coordinates of atom of interest
-    INTEGER,            INTENT(in)  :: i, j_range ! index, and partner index range
-    REAL,               INTENT(in)  :: box        ! simulation box length
-    REAL,               INTENT(in)  :: r_cut      ! potential cutoff distance
-    LOGICAL,            INTENT(out) :: overlap    ! shows if an overlap was detected
-    REAL,               INTENT(out) :: pot, vir   ! potential and virial
+    ! energy%pot is the nonbonded potential energy of atom ri with a set of other atoms
+    ! energy%vir is the corresponding virial of atom ri
+    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this is .true., the value of energy%pot should not be used
+    ! The coordinates in ri are not necessarily identical with those in r(:,i)
+    ! The optional argument j_range restricts partner indices to j>i, or j<i
 
-    ! Calculates potential energy and virial of atom in ri
-    ! with j/=i, j>i, or j<i depending on j_range
-    ! Includes a check for overlap (potential too high) to avoid overflow
-    ! If overlap==.true., the values of pot and vir should not be used
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
@@ -131,25 +155,28 @@ CONTAINS
        STOP 'Error in energy_1'
     END IF
 
+    IF ( PRESENT ( j_range ) ) THEN
+       SELECT CASE ( j_range )
+       CASE ( lt ) ! j < i
+          j1 = 1
+          j2 = i-1
+       CASE ( gt ) ! j > i
+          j1 = i+1
+          j2 = n
+       CASE default ! should never happen
+          WRITE ( unit = error_unit, fmt='(a,i10)') 'j_range error ', j_range
+          STOP 'Impossible error in energy_1'
+       END SELECT
+    ELSE
+       j1 = 1
+       j2 = n
+    END IF
+
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    pot     = 0.0
-    vir     = 0.0
-    overlap = .FALSE.
-
-    SELECT CASE ( j_range )
-    CASE ( lt ) ! j < i
-       j1 = 1
-       j2 = i-1
-    CASE ( gt ) ! j > i
-       j1 = i+1
-       j2 = n
-    CASE ( ne ) ! j /= i
-       j1 = 1
-       j2 = n
-    END SELECT
+    energy = potovr ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
 
     DO j = j1, j2
 
@@ -165,22 +192,26 @@ CONTAINS
           sr2    = 1.0 / rij_sq    ! (sigma/rij)**2
 
           IF ( sr2 > sr2_overlap ) THEN
-             overlap = .TRUE.
-             EXIT ! jump out of loop
+             energy%ovr = .TRUE. ! Overlap detected
+             RETURN              ! Return immediately
           END IF
 
           sr6 = sr2**3
-          pot = pot + sr6**2 - sr6
-          vir = vir + 2.0*sr6**2 - sr6
+          energy%pot = energy%pot + sr6**2 - sr6
+          energy%vir = energy%vir + 2.0*sr6**2 - sr6
 
        END IF
 
     END DO
-    pot = 4.0 * pot
-    vir = 24.0 * vir
-    vir = vir / 3.0
 
-  END SUBROUTINE energy_1
+    ! Include numerical factors
+    energy%pot = 4.0 * energy%pot
+    energy%vir = 24.0 * energy%vir
+    energy%vir = energy%vir / 3.0
+
+    energy%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
+
+  END FUNCTION energy_1
 
   SUBROUTINE energy_lrc ( n, box, r_cut, pot, vir )
     INTEGER, INTENT(in)  :: n        ! number of atoms
@@ -210,7 +241,7 @@ CONTAINS
     REAL,    DIMENSION(3), INTENT(in) :: ri
 
     r(:,i) = ri
-    
+
   END SUBROUTINE move
 
   SUBROUTINE create ( ri )
@@ -218,7 +249,7 @@ CONTAINS
 
     n        = n+1 ! increase number of atoms
     r(:,n)   = ri  ! add new atom at the end
-    
+
   END SUBROUTINE create
 
   SUBROUTINE destroy ( i )
@@ -228,5 +259,5 @@ CONTAINS
     n         = n - 1  ! reduce number of atoms
 
   END SUBROUTINE destroy
-  
+
 END MODULE mc_module

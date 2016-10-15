@@ -9,7 +9,7 @@ PROGRAM qmc_pi_lj
   USE maths_module,     ONLY : metropolis
   USE qmc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       energy_cl_1, energy_qu_1, energy_cl, energy_qu, move, &
-       &                       n, p, r, ne
+       &                       n, p, r, potovr
 
   IMPLICIT NONE
 
@@ -48,9 +48,9 @@ PROGRAM qmc_pi_lj
   REAL :: potential_qu ! quantum potential energy per atom (to be averaged)
   REAL :: energy       ! total energy per atom (to be averaged)
 
-  LOGICAL            :: overlap
+  TYPE(potovr)       :: eng_cl_old, eng_cl_new
   INTEGER            :: blk, stp, i, k, nstep, nblock, moves, ioerr
-  REAL               :: pot_cl_old, pot_cl_new, pot_qu_old, pot_qu_new, kin, delta, k_spring
+  REAL               :: pot_qu_old, pot_qu_new, kin, delta, k_spring
   REAL, DIMENSION(3) :: rik  ! position of atom i in polymer k
   REAL, DIMENSION(3) :: zeta ! random numbers
 
@@ -122,12 +122,13 @@ PROGRAM qmc_pi_lj
   r(:,:,:) = r(:,:,:) - ANINT ( r(:,:,:) ) ! Periodic boundaries (box=1 units)
 
   ! Calculate classical LJ and quantum spring potential energies
-  CALL energy_cl ( box, r_cut, overlap, pot_cl )
-  IF ( overlap ) THEN
+  eng_cl_old = energy_cl ( box, r_cut )
+  IF ( eng_cl_old%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
-  CALL energy_qu ( box, k_spring, pot_qu )
+  pot_cl = eng_cl_old%pot
+  pot_qu = energy_qu ( box, k_spring )
 
   ! Calculate derived energies
   CALL calculate ( 'Initial values' )
@@ -146,32 +147,31 @@ PROGRAM qmc_pi_lj
 
            DO k = 1, p ! Begin loop over ring polymers
 
-              CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
-              zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
-
               rik(:) = r(:,i,k)
-              CALL energy_cl_1 ( rik, i, k, ne, box, r_cut, overlap, pot_cl_old )
-              IF ( overlap ) THEN ! should never happen
+              eng_cl_old = energy_cl_1 ( rik, i, k, box, r_cut )
+              IF ( eng_cl_old%ovr ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in qmc_pi_lj'
               END IF
-              CALL energy_qu_1 ( rik, i, k, ne, box, k_spring, pot_qu_old )
+              pot_qu_old = energy_qu_1 ( rik, i, k, box, k_spring )
 
-              rik(:) = rik(:) + zeta * dr_max / box ! trial move to new position (in box=1 units) 
-              rik(:) = rik(:) - ANINT ( rik(:) )    ! periodic boundary correction
+              CALL RANDOM_NUMBER ( zeta )           ! Three uniform random numbers in range (0,1)
+              zeta = 2.0*zeta - 1.0                 ! now in range (-1,+1)
+              rik(:) = rik(:) + zeta * dr_max / box ! Trial move to new position (in box=1 units) 
+              rik(:) = rik(:) - ANINT ( rik(:) )    ! Periodic boundary correction
 
-              CALL energy_cl_1 ( rik, i, k, ne, box, r_cut, overlap, pot_cl_new )
+              eng_cl_new = energy_cl_1 ( rik, i, k, box, r_cut )
 
-              IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
-                 CALL energy_qu_1 ( rik, i, k, ne, box, k_spring, pot_qu_new )
-                 delta = ( pot_cl_new + pot_qu_new - pot_cl_old - pot_qu_old ) / temperature
-                 IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
-                    pot_cl = pot_cl + pot_cl_new - pot_cl_old ! update classical LJ potential energy
-                    pot_qu = pot_qu + pot_qu_new - pot_qu_old ! update quantum spring potential energy
-                    CALL move ( i, k, rik )                   ! update position
-                    moves  = moves + 1                        ! increment move counter
-                 END IF ! reject Metropolis test
-              END IF ! reject overlapping configuration
+              IF ( .NOT. eng_cl_new%ovr ) THEN ! Consider non-overlapping configuration
+                 pot_qu_new = energy_qu_1 ( rik, i, k, box, k_spring )
+                 delta = ( eng_cl_new%pot + pot_qu_new - eng_cl_old%pot - pot_qu_old ) / temperature
+                 IF ( metropolis ( delta ) ) THEN ! Metropolis test
+                    pot_cl = pot_cl + eng_cl_new%pot - eng_cl_old%pot ! Update classical LJ potential energy
+                    pot_qu = pot_qu + pot_qu_new     - pot_qu_old     ! Update quantum spring potential energy
+                    CALL move ( i, k, rik )                           ! Update position
+                    moves  = moves + 1                                ! Increment move counter
+                 END IF ! End Metropolis test
+              END IF ! End consider overlapping configuration
 
            END DO ! End loop over ring polymers
 
@@ -200,12 +200,13 @@ PROGRAM qmc_pi_lj
 
   CALL calculate ( 'Final values' )
 
-  CALL energy_cl ( box, r_cut, overlap, pot_cl )
-  IF ( overlap ) THEN ! this should never happen
+  eng_cl_old = energy_cl ( box, r_cut )
+  IF ( eng_cl_old%ovr ) THEN ! this should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
-  CALL energy_qu ( box, k_spring, pot_qu )
+  pot_cl = eng_cl_old%pot
+  pot_qu = energy_qu ( box, k_spring )
   CALL calculate ( 'Final check' )
 
   ! Write each ring polymer to a unique file

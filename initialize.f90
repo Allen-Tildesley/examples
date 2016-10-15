@@ -24,7 +24,7 @@ PROGRAM initialize
   INTEGER            :: molecule_option
   CHARACTER(len=10)  :: molecules
 
-  CHARACTER(len=7), PARAMETER :: filename = 'cnf.out'
+  CHARACTER(len=7), PARAMETER :: filename = 'cnf.inp' ! Will be used as an input file for simulations
   INTEGER,          PARAMETER :: atoms = 0, linear = 1, nonlinear = 2, chain = 3
 
   NAMELIST /nml/ nc, n, temperature, inertia, density, bond, &

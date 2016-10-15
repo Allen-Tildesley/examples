@@ -7,81 +7,95 @@ MODULE dpd_module
   IMPLICIT NONE
   PRIVATE
 
-  PUBLIC :: n, r, v, f, ij
+  PUBLIC :: n, r, v, f
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: force, make_ij, lowe, shardlow
 
-  INTEGER                              :: n  ! number of atoms
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: r  ! positions (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: v  ! velocities (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: f  ! forces (3,n)
-  INTEGER, DIMENSION(:,:), ALLOCATABLE :: ij ! list of ij pairs within range (2,n*(n-1)/2)
-  INTEGER                              :: np ! number of pairs within range
+  INTEGER                              :: n  ! Number of atoms
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: r  ! Positions (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: v  ! Velocities (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: f  ! Forces (3,n)
 
-  REAL, PARAMETER :: r_cut = 1.0  ! cutoff distance (unit of length)
+  INTEGER                              :: nl ! List size
+  INTEGER, DIMENSION(:,:), ALLOCATABLE :: ij ! List of ij pairs within range (2,nl)
+  INTEGER                              :: np ! Number of pairs within range
+
+  REAL, PARAMETER :: r_cut = 1.0  ! Cutoff distance (unit of length)
 
 CONTAINS
 
   SUBROUTINE introduction ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'DPD soft potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, r_cut = ', r_cut    
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
   END SUBROUTINE conclusion
 
-  SUBROUTINE allocate_arrays
-    ALLOCATE ( r(3,n), v(3,n), f(3,n), ij(2,n*(n-1)/2) )
+  SUBROUTINE allocate_arrays ( box )
+    REAL, INTENT(in) :: box ! Simulation box length
+
+    REAL, PARAMETER :: pi = 4.0*ATAN(1.0)
+
+    ! Estimate pair list size, with 30% margin for error
+    nl = CEILING ( 1.3*(4.0*pi/3.0)*REAL(n*(n-1)/2)*(r_cut/box)**3 )
+    ALLOCATE ( r(3,n), v(3,n), f(3,n), ij(2,nl) )
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
     DEALLOCATE ( r, v, f, ij )
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE make_ij ( box ) ! compile randomized list of pairs within range
-    USE maths_module, only : random_integer
-    REAL, INTENT(in) :: box    ! simulation box length
+  SUBROUTINE make_ij ( box ) 
+    USE maths_module, ONLY : random_integer
+    REAL, INTENT(in) :: box ! Simulation box length
+
+    ! Compile randomized list of pairs within range, ij
 
     INTEGER            :: p, q, i, j
     REAL               :: rij_sq
     REAL, DIMENSION(3) :: rij
 
     p = 0
-    DO i = 1, n-1 ! outer loop over atoms
-       DO j = i+1, n ! inner loop over atoms
+    DO i = 1, n-1 ! Outer loop over atoms
+       DO j = i+1, n ! Inner loop over atoms
 
           rij(:)  = r(:,i) - r(:,j)
           rij(:) = rij(:) - ANINT ( rij(:) )
-          rij(:) = rij(:) * box ! now in r_cut=1 units
+          rij(:) = rij(:) * box ! Now in r_cut=1 units
           rij_sq = SUM ( rij(:)**2 )
 
           IF ( rij_sq < 1.0 ) THEN ! Test for centre-centre spherical cutoff
              p = p + 1
+             IF ( p > nl ) THEN
+                WRITE ( unit=error_unit, fmt='(a,2i15)') 'Pair list error', p, nl
+                STOP 'List error in make_ij'
+             END IF
              ij(1,p) = i
              ij(2,p) = j
           END IF ! End test for centre-centre spherical cutoff
        END DO ! End inner loop over atoms
     END DO ! End outer loop over atoms
 
-    np = p ! store number of pairs
+    np = p ! Store number of pairs
 
-    !  construct random permutation
+    !  Construct random permutation
     DO p = 1, np-1
-       q = random_integer ( p, np ) ! random integer in [p,np] inclusive
-       IF ( p /= q ) ij(:,[p,q]) = ij(:,[q,p]) ! swap directly using slices
+       q = random_integer ( p, np )            ! Random integer in [p,np] inclusive
+       IF ( p /= q ) ij(:,[p,q]) = ij(:,[q,p]) ! Swap directly using slices
     END DO
 
   END SUBROUTINE make_ij
 
   SUBROUTINE force ( box, a, pot, vir, lap )
-    REAL, INTENT(in)  :: box ! simulation box length
-    REAL, INTENT(in)  :: a   ! force strength parameter
-    REAL, INTENT(out) :: pot ! total potential energy
-    REAL, INTENT(out) :: vir ! virial
+    REAL, INTENT(in)  :: box ! Simulation box length
+    REAL, INTENT(in)  :: a   ! Force strength parameter
+    REAL, INTENT(out) :: pot ! Total potential energy
+    REAL, INTENT(out) :: vir ! Virial
     REAL, INTENT(out) :: lap ! Laplacian
 
     ! Calculates potential, virial and forces
@@ -98,7 +112,7 @@ CONTAINS
     vir = 0.0
     lap = 0.0
 
-    DO p = 1, np ! loop over all pairs within range
+    DO p = 1, np ! Loop over all pairs within range
        i = ij(1,p)
        j = ij(2,p)
 
@@ -106,7 +120,7 @@ CONTAINS
        rij(:)  = rij(:) - ANINT ( rij(:) ) ! periodic boundary conditions in box=1 units
        rij(:)  = rij(:) * box              ! now in r_cut=1 units
        rij_sq  = SUM ( rij**2 )            ! squared separation
-       if ( rij_sq > 1.0 ) cycle           ! this should never happen
+       IF ( rij_sq > 1.0 ) CYCLE           ! this should never happen
        rij_mag = SQRT ( rij_sq )           ! separation distance
        wij     = 1.0 - rij_mag             ! weight function
        rij_hat = rij / rij_mag             ! unit separation vector
@@ -128,20 +142,21 @@ CONTAINS
   END SUBROUTINE force
 
   SUBROUTINE lowe ( box, temperature, gamma_step )
-    USE maths_module, only : random_normal
-    REAL, INTENT(in) :: box         ! simulation box length
-    REAL, INTENT(in) :: temperature ! specified temperature
-    REAL, INTENT(in) :: gamma_step  ! pair selection probability = Gamma * timestep
+    USE maths_module, ONLY : random_normal
+    REAL, INTENT(in) :: box         ! Simulation box length
+    REAL, INTENT(in) :: temperature ! Specified temperature
+    REAL, INTENT(in) :: gamma_step  ! Pair selection probability = Gamma * timestep
 
+    ! Apply pairwise Lowe-Andersen thermostat to velocities
     ! It is assumed that ij contains a list of all pairs within range
 
     INTEGER            :: i, j, p
     REAL               :: rij_sq, rij_mag, zeta, v_par
     REAL, DIMENSION(3) :: rij, vij, rij_hat
 
-    DO p = 1, np ! loop over all pairs within range
+    DO p = 1, np ! Loop over all pairs within range
        CALL RANDOM_NUMBER ( zeta )
-       IF ( zeta < gamma_step ) THEN ! select pair with desired probability
+       IF ( zeta < gamma_step ) THEN ! Select pair with desired probability
           i = ij(1,p)
           j = ij(2,p)
 
@@ -160,17 +175,18 @@ CONTAINS
           v(:,i) = v(:,i) + vij
           v(:,j) = v(:,j) - vij
 
-       END IF ! end select pair with desired probability
-    END DO ! end loop over all pairs within range
+       END IF ! End select pair with desired probability
+    END DO ! End loop over all pairs within range
 
   END SUBROUTINE lowe
   
   SUBROUTINE shardlow ( box, temperature, gamma_step )
-    USE maths_module, only : random_normal
-    REAL, INTENT(in) :: box         ! simulation box length
-    REAL, INTENT(in) :: temperature ! specified temperature
+    USE maths_module, ONLY : random_normal
+    REAL, INTENT(in) :: box         ! Simulation box length
+    REAL, INTENT(in) :: temperature ! Specified temperature
     REAL, INTENT(in) :: gamma_step  ! Gamma * timestep
 
+    ! Implements the Shardlow integration algorithm for velocities
     ! It is assumed that ij contains a list of all pairs within range
 
     INTEGER            :: i, j, p
@@ -179,7 +195,7 @@ CONTAINS
 
     sqrt_gamma_step = SQRT(gamma_step)
 
-    DO p = 1, np ! loop over all pairs within range
+    DO p = 1, np ! Loop over all pairs within range
        i = ij(1,p)
        j = ij(2,p)
 
@@ -191,9 +207,9 @@ CONTAINS
        rij_sq    = SUM ( rij(:)**2 )
        rij_mag   = SQRT ( rij_sq )
        rij_hat   = rij / rij_mag
-       wij       = 1.0-rij_mag              ! weight function
-       sqrt_prob = sqrt_gamma_step * wij  ! sqrt of p-factor
-       prob      = sqrt_prob**2                ! p-factor
+       wij       = 1.0 - rij_mag         ! weight function
+       sqrt_prob = sqrt_gamma_step * wij ! sqrt of p-factor
+       prob      = sqrt_prob**2          ! p-factor
 
        ! First half step
        vij(:) = v(:,i) - v(:,j)
@@ -209,7 +225,7 @@ CONTAINS
        v(:,i) = v(:,i) + vij(:)
        v(:,j) = v(:,j) - vij(:)
 
-    END DO ! end loop over all pairs within range
+    END DO ! End loop over all pairs within range
 
   END SUBROUTINE shardlow
 

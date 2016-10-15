@@ -73,7 +73,7 @@ PROGRAM dpd
   nstep       = 1000
   dt          = 0.02
   temperature = 1.0
-  a           = 75.0 ! (actually =a*rho/kT) so to be multiplied by kT/rho
+  a           = 75.0 ! actually a*rho/kT: to be multiplied by kT/rho later
   gamma       = 4.5
   method      = 'Lowe'
 
@@ -115,7 +115,7 @@ PROGRAM dpd
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',          density
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Force strength a', a
 
-  CALL allocate_arrays
+  CALL allocate_arrays ( box )
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
 
@@ -173,7 +173,7 @@ CONTAINS
 
   SUBROUTINE kick ( t ) ! Kick propagator
     IMPLICIT NONE
-    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
+    REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
 
     v(:,:) = v(:,:) + t * f(:,:)
 
@@ -181,9 +181,9 @@ CONTAINS
 
   SUBROUTINE drift ( t ) ! Drift propagator
     IMPLICIT NONE
-    REAL, INTENT(in) :: t ! time over which to propagate (typically dt)
+    REAL, INTENT(in) :: t ! Time over which to propagate (typically dt)
 
-    r(:,:) = r(:,:) + t * v(:,:) / box  ! (positions in box=1 units)
+    r(:,:) = r(:,:) + t * v(:,:) / box ! (positions in box=1 units)
     r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   END SUBROUTINE drift

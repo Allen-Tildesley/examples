@@ -8,7 +8,7 @@ PROGRAM mc_nvt_poly_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis, random_rotate_quaternion
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       energy_1, energy, q_to_d, n, na, r, e, d, ne
+       &                       energy_1, energy, q_to_d, n, na, r, e, d, potovr
 
   IMPLICIT NONE
 
@@ -43,14 +43,13 @@ PROGRAM mc_nvt_poly_lj
   REAL :: pres_virial ! virial pressure (to be averaged)
   REAL :: potential   ! potential energy per molecule (to be averaged)
 
-  LOGICAL            :: overlap
-  INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
-  REAL               :: pot_old, pot_new, vir_old, vir_new, delta
-
-  REAL, DIMENSION(3)       :: ri   ! position of atom i
-  REAL, DIMENSION(0:3)     :: ei   ! orientation of atom i
+  TYPE(potovr) :: eng_old, eng_new ! Composite energy = pot & vir & overlap variables
+  INTEGER      :: blk, stp, i, nstep, nblock, moves, ioerr
+  REAL         :: delta
 
   INTEGER, PARAMETER       :: natom = 3
+  REAL, DIMENSION(3)       :: ri     ! position of molecule i
+  REAL, DIMENSION(0:3)     :: ei     ! orientation (quaternion) of molecule i
   REAL, DIMENSION(3,natom) :: di, db ! bond vectors
   REAL, DIMENSION(3)       :: zeta   ! random numbers
 
@@ -118,15 +117,14 @@ PROGRAM mc_nvt_poly_lj
      d(:,:,i) = q_to_d ( e(:,i), db ) ! Convert quaternions to space-fixed bond vectors
   END DO
 
-  CALL energy ( box, r_cut, rm_cut, overlap, pot, vir )
-  IF ( overlap ) THEN
+  eng_old = energy ( box, r_cut, rm_cut )
+  IF ( eng_old%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF
-  potential   = pot / REAL ( n )
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Initial virial pressure',  pres_virial
+  pot = eng_old%pot
+  vir = eng_old%vir
+  CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Potential', 'Virial Pressure' ] )
 
@@ -140,32 +138,33 @@ PROGRAM mc_nvt_poly_lj
 
         DO i = 1, n ! Begin loop over atoms
 
-           CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
-           zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
-
            ri(:)   = r(:,i)   ! copy old position
            ei(:)   = e(:,i)   ! copy old quaternion
            di(:,:) = d(:,:,i) ! copy old bond vectors
-           CALL  energy_1 ( ri, di, i, ne, box, r_cut, rm_cut, overlap, pot_old, vir_old )
-           IF ( overlap ) THEN ! should never happen
+           eng_old = energy_1 ( ri, di, i, box, r_cut, rm_cut )
+
+           IF ( eng_old%ovr ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_poly_lj'
            END IF
+
+           CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
+           zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
            ri(:) = ri(:) + zeta * dr_max / box  ! trial move to new position (in box=1 units)
            ri(:) = ri(:) - ANINT ( ri(:) )      ! periodic boundary correction
            ei = random_rotate_quaternion ( de_max, ei ) ! trial rotation
            di = q_to_d ( ei, db ) ! new space-fixed bond vectors (in box=1 units)
-           CALL  energy_1 ( ri, di, i, ne, box, r_cut, rm_cut, overlap, pot_new, vir_new )
+           eng_new = energy_1 ( ri, di, i, box, r_cut, rm_cut )
 
-           IF ( .NOT. overlap ) THEN ! consider non-overlapping configuration
-              delta = ( pot_new - pot_old ) / temperature
-              IF ( metropolis ( delta ) ) THEN      ! accept Metropolis test
-                 pot      = pot + pot_new - pot_old ! update potential energy
-                 vir      = vir + vir_new - vir_old ! update virial
-                 r(:,i)   = ri                      ! update position
-                 e(:,i)   = ei                      ! update quaternion
-                 d(:,:,i) = di                      ! update bond vectors
-                 moves  = moves + 1                 ! increment move counter
+           IF ( .NOT. eng_new%ovr ) THEN ! consider non-overlapping configuration
+              delta = ( eng_new%pot - eng_old%pot ) / temperature
+              IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
+                 pot      = pot + eng_new%pot - eng_old%pot ! update potential energy
+                 vir      = vir + eng_new%vir - eng_old%vir ! update virial
+                 r(:,i)   = ri                              ! update position
+                 e(:,i)   = ei                              ! update quaternion
+                 d(:,:,i) = di                              ! update bond vectors
+                 moves    = moves + 1                       ! increment move counter
               END IF ! reject Metropolis test
            END IF ! reject overlapping configuration
 
@@ -173,8 +172,7 @@ PROGRAM mc_nvt_poly_lj
 
         ! Calculate all variables for this step
         move_ratio  = REAL(moves) / REAL(n)
-        potential   = pot / REAL(n)
-        pres_virial = density * temperature + vir / box**3
+        CALL calculate ( )
         CALL blk_add ( [move_ratio,potential,pres_virial] )
 
      END DO ! End loop over steps
@@ -187,27 +185,39 @@ PROGRAM mc_nvt_poly_lj
 
   CALL run_end ( output_unit )
 
-  potential = pot / REAL ( n )
-  pres_virial  = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
+  CALL calculate ( 'Final values' )
 
-  CALL energy ( box, r_cut, rm_cut, overlap, pot, vir )
-  IF ( overlap ) THEN ! should never happen
+  eng_old = energy ( box, r_cut, rm_cut )
+  IF ( eng_old%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF
-  potential   = pot / REAL ( n )
-  pres_virial = density * temperature + vir / box**3
-  WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final potential energy', potential
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure',  pres_virial
+  pot = eng_old%pot
+  vir = eng_old%vir
+  CALL calculate ( 'Final check' )
 
   CALL write_cnf_mols ( cnf_prefix//out_tag, n, box, r*box, e )
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
   CALL conclusion ( output_unit )
+
+CONTAINS
+
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+
+    potential   = pot / REAL ( n )
+    pres_virial = density * temperature + vir / box**3
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential energy', potential
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure',  pres_virial
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM mc_nvt_poly_lj
 

@@ -27,9 +27,12 @@ CONTAINS
     DEALLOCATE ( r, v, coltime, partner )
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE update ( i, j_range, box ) ! updates collision details for atom i
-    INTEGER, INTENT(in) :: i, j_range   ! atom and set of collision partners
-    REAL,    INTENT(in) :: box          ! simulation box length
+  SUBROUTINE update ( i, box, j_range ) ! Updates collision details for atom i
+    INTEGER, INTENT(in) :: i       ! Index of atom of interest
+    REAL,    INTENT(in) :: box     ! Simulation box length
+    INTEGER, INTENT(in) :: j_range ! Partner index range
+
+    ! This routine updates the array elements coltime(i) and partner(i)
 
     INTEGER            :: j, j1, j2
     REAL, DIMENSION(3) :: rij, vij
@@ -45,6 +48,9 @@ CONTAINS
     CASE ( ne ) ! j /= i
        j1 = 1
        j2 = n
+    CASE default ! should never happen
+       WRITE ( unit = error_unit, fmt='(a,i10)') 'j_range error ', j_range
+       STOP 'Impossible error in update'
     END SELECT
 
     coltime(i) = HUGE(1.0)
@@ -57,7 +63,7 @@ CONTAINS
        rij(:) = rij(:) - ANINT ( rij(:) )
        rij(:) = rij(:) * box ! now in sigma=1 units
        vij(:) = v(:,i) - v(:,j)
-       bij  = DOT_PRODUCT ( rij, vij )
+       bij    = DOT_PRODUCT ( rij, vij )
 
        IF ( bij < 0.0 ) THEN
 
