@@ -1,7 +1,7 @@
 ! smc_lj_module.f90
 ! Energy, force, and move routines for SMC, LJ potential
 MODULE smc_module
-  
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
 
   IMPLICIT NONE
@@ -23,8 +23,9 @@ MODULE smc_module
   REAL,    PARAMETER :: sigma = 1.0     ! LJ diameter (unit of length)
   REAL,    PARAMETER :: epslj = 1.0     ! LJ well depth (unit of energy)
 
-  INTEGER, PARAMETER :: n_max = 256
-  
+  ! The use of n_max in this module is clumsy. We do it this way because at the time of writing
+  ! gfortran does not implement parameterized derived types (part of the Fortran 2003 standard)
+  INTEGER, PARAMETER :: n_max = 256 
   TYPE potovr ! A composite variable for interactions comprising
      REAL                     :: pot ! the potential energy and
      REAL                     :: vir ! the virial and
