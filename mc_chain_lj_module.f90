@@ -8,7 +8,7 @@ MODULE mc_module
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: regrow, energy, spring_pot
   PUBLIC :: n, r
-  PUBLIC :: potovr
+  PUBLIC :: pot_type
 
   INTEGER                             :: n ! Number of atoms
   REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! Atomic positions (3,n)
@@ -20,10 +20,10 @@ MODULE mc_module
   REAL,    PARAMETER :: epslj = 1.0     ! LJ well depth
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
 
-  TYPE potovr ! A composite variable for interaction energies comprising
+  TYPE pot_type ! A composite variable for interaction energies comprising
      REAL    :: pot ! the potential energy and
      LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
-  END TYPE potovr
+  END TYPE pot_type
 
 CONTAINS
 
@@ -78,7 +78,7 @@ CONTAINS
     REAL,   DIMENSION(3,k_max) :: r_try   ! Coordinates of trial atoms
 
     INTEGER         :: i
-    TYPE(potovr)    :: eng
+    TYPE(pot_type)    :: eng
     REAL            :: d, d_max, std, zeta
     REAL, PARAMETER :: w_tol = 1.0e-10 ! Min weight tolerance
 
@@ -226,14 +226,14 @@ CONTAINS
   END SUBROUTINE regrow
 
   FUNCTION energy ( )
-    TYPE(potovr) :: energy ! Returns a composite of pot and ovr
+    TYPE(pot_type) :: energy ! Returns a composite of pot and ovr
 
     ! energy%pot is the nonbonded potential energy for whole system
     ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this flag is .true., the value of energy%pot should not be used
     ! Actual calculation is performed by function energy_1
 
-    TYPE(potovr) :: eng
+    TYPE(pot_type) :: eng
     INTEGER      :: i
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
@@ -257,7 +257,7 @@ CONTAINS
   END FUNCTION energy
 
   FUNCTION energy_1 ( ri, i, j_range ) RESULT ( energy )
-    TYPE(potovr)                    :: energy  ! Returns a composite of pot and ovr
+    TYPE(pot_type)                    :: energy  ! Returns a composite of pot and ovr
     REAL, DIMENSION(3), INTENT(in)  :: ri      ! Coordinates of atom of interest
     INTEGER,            INTENT(in)  :: i       ! Index of atom of interest
     INTEGER, OPTIONAL,  INTENT(in)  :: j_range ! Optional partner index range

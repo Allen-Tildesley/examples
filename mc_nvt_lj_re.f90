@@ -8,7 +8,7 @@ PROGRAM mc_nvt_lj_re
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       energy_1, energy, energy_lrc, move, n, r, potovr
+       &                       energy_1, energy, move, n, r, pot_type
   USE mpi
 
   IMPLICIT NONE
@@ -48,14 +48,13 @@ PROGRAM mc_nvt_lj_re
   REAL :: pres_virial ! virial pressure (to be averaged)
   REAL :: potential   ! potential energy per atom (to be averaged)
 
-  TYPE(potovr) :: eng_old, eng_new ! Composite energy = pot & vir & overlap variables
+  TYPE(pot_type) :: eng_old, eng_new ! Composite energy = pot & vir & overlap variables
 
   REAL, DIMENSION(:), ALLOCATABLE :: every_temperature, every_beta, every_dr_max
 
   LOGICAL            :: swap
   INTEGER            :: blk, stp, i, nstep, nblock, moves, swap_interval, swapped, updown, ioerr
-  REAL               :: pot_lrc, vir_lrc, delta
-  REAL               :: beta, other_beta, other_pot
+  REAL               :: beta, other_beta, other_pot, delta
   REAL, DIMENSION(3) :: ri   ! position of atom i
   REAL, DIMENSION(3) :: zeta ! random numbers
 
@@ -153,7 +152,6 @@ PROGRAM mc_nvt_lj_re
   END IF
   pot = eng_old%pot
   vir = eng_old%vir
-  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Swap ratio', 'Potential', 'Virial Pressure' ] )
@@ -257,7 +255,6 @@ PROGRAM mc_nvt_lj_re
   END IF
   pot = eng_old%pot
   vir = eng_old%vir
-  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Final check' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
@@ -273,11 +270,12 @@ PROGRAM mc_nvt_lj_re
 CONTAINS
 
   SUBROUTINE calculate ( string )
+    USE mc_module, ONLY : energy_lrc, pressure_lrc
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    potential   = ( pot + pot_lrc ) / REAL ( n )
-    pres_virial = density * temperature + ( vir + vir_lrc ) / box**3
+    potential   = pot / REAL ( n ) + energy_lrc ( density, r_cut )
+    pres_virial = density * temperature + vir / box**3 + pressure_lrc ( density, r_cut )
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string

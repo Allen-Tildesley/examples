@@ -10,7 +10,7 @@ MODULE mc_module
   PUBLIC :: n, na, r, e, d
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: energy_1, energy, q_to_d
-  PUBLIC :: potovr
+  PUBLIC :: pot_type
 
   INTEGER                                :: n  ! number of molecules
   INTEGER                                :: na ! number of atoms per molecule
@@ -22,25 +22,25 @@ MODULE mc_module
   REAL,    PARAMETER :: sigma = 1.0     ! Lennard-Jones diameter (unit of length)
   REAL,    PARAMETER :: epslj = 1.0     ! Lennard-Jones well depth (unit of energy)
 
-  TYPE potovr ! A composite variable for interaction energies comprising
+  TYPE pot_type ! A composite variable for interaction energies comprising
      REAL    :: pot ! the potential energy and
      REAL    :: vir ! the virial and
      LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
-  END TYPE potovr
+  END TYPE pot_type
 
   INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_potovr
+     MODULE PROCEDURE add_pot_type
   END INTERFACE OPERATOR (+)
 
 CONTAINS
 
-  FUNCTION add_potovr ( a, b ) RESULT (c)
-    TYPE(potovr)             :: c    ! Result is the sum of the two inputs
-    TYPE(potovr), INTENT(in) :: a, b
+  FUNCTION add_pot_type ( a, b ) RESULT (c)
+    TYPE(pot_type)             :: c    ! Result is the sum of the two inputs
+    TYPE(pot_type), INTENT(in) :: a, b
     c%pot = a%pot +    b%pot
     c%vir = a%vir +    b%vir
     c%ovr = a%ovr .OR. b%ovr
-  END FUNCTION add_potovr
+  END FUNCTION add_pot_type
 
   SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
@@ -76,7 +76,7 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   FUNCTION energy ( box, r_cut, rm_cut )
-    TYPE(potovr)     :: energy ! Returns a composite of pot, vir and ovr
+    TYPE(pot_type)     :: energy ! Returns a composite of pot, vir and ovr
     REAL, INTENT(in) :: box    ! Simulation box length
     REAL, INTENT(in) :: r_cut  ! Potential cutoff distance
     REAL, INTENT(in) :: rm_cut ! Molecule-molecule cutoff distance
@@ -87,7 +87,7 @@ CONTAINS
     ! If this flag is .true., the values of energy%pot, energy%vir should not be used
     ! Actual calculation is performed by function energy_1
 
-    TYPE(potovr) :: energy_i
+    TYPE(pot_type) :: energy_i
     INTEGER      :: i
 
     IF ( SIZE(r,dim=2)  /= n ) THEN ! should never happen
@@ -95,7 +95,7 @@ CONTAINS
        STOP 'Error in energy'
     END IF
 
-    energy = potovr ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    energy = pot_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1
        energy_i = energy_1 ( r(:,i), d(:,:,i), i, box, r_cut, rm_cut, gt )
@@ -111,7 +111,7 @@ CONTAINS
   END FUNCTION energy
 
   FUNCTION energy_1 ( ri, di, i, box, r_cut, rm_cut, j_range ) RESULT ( energy )
-    TYPE(potovr)                        :: energy  ! Returns a composite of pot, vir and ovr
+    TYPE(pot_type)                        :: energy  ! Returns a composite of pot, vir and ovr
     REAL,    DIMENSION(3),   INTENT(in) :: ri      ! Coordinates of molecule of interest
     REAL,    DIMENSION(:,:), INTENT(in) :: di      ! Bond vectors of molecule of interest
     INTEGER,                 INTENT(in) :: i       ! Index of molecule of interest
@@ -178,7 +178,7 @@ CONTAINS
     sr12    = sr6**2
     pot_cut = sr12 - sr6 ! Potential at cutoff (without numerical factor 4)
 
-    energy = potovr ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    energy = pot_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Loop over j-molecules
 

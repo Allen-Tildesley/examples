@@ -7,7 +7,7 @@ PROGRAM md_nve_lj
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, energy_lrc, hessian, r, v, f, n
+       &                       force, r, v, f, n
 
   IMPLICIT NONE
 
@@ -34,7 +34,6 @@ PROGRAM md_nve_lj
   REAL :: r_cut       ! potential cutoff distance
   REAL :: pot         ! total potential energy
   REAL :: pot_sh      ! total shifted potential energy
-  REAL :: kin         ! total kinetic energy
   REAL :: vir         ! total virial
   REAL :: lap         ! total Laplacian
   REAL :: pres_virial ! virial pressure (to be averaged)
@@ -44,7 +43,6 @@ PROGRAM md_nve_lj
   REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
-  REAL    :: pot_lrc, vir_lrc, fsq, beta
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -90,7 +88,6 @@ PROGRAM md_nve_lj
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
-  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temp-kinet', 'Temp-config', 'Virial Pressure' ] )
@@ -108,8 +105,6 @@ PROGRAM md_nve_lj
         CALL force ( box, r_cut, pot, pot_sh, vir, lap ) ! Force evaluation
         v(:,:) = v(:,:) + 0.5 * dt * f(:,:)              ! Kick half-step
 
-        CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-
         ! Calculate all variables for this step
         CALL calculate ( )
         CALL blk_add ( [energy,energy_sh,temp_kinet,temp_config,pres_virial] )
@@ -125,7 +120,6 @@ PROGRAM md_nve_lj
   CALL run_end ( output_unit )
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
-  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
@@ -137,19 +131,22 @@ PROGRAM md_nve_lj
 CONTAINS
 
   SUBROUTINE calculate ( string ) 
+    USE md_module, ONLY : energy_lrc, pressure_lrc, hessian
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
     ! This routine calculates variables of interest and (optionally) writes them out
 
+    REAL    :: fsq, beta, kin
+
     kin         = 0.5*SUM(v**2)
-    energy      = ( pot + pot_lrc + kin ) / REAL ( n )
+    energy      = ( pot + kin ) / REAL ( n ) + energy_lrc ( density, r_cut )
     energy_sh   = ( pot_sh + kin ) / REAL ( n )
     temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
     fsq         = SUM ( f**2 )
     beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
     temp_config = 1.0 / beta
-    pres_virial = density * temp_kinet + ( vir + vir_lrc ) / box**3
+    pres_virial = density * temp_kinet + vir / box**3 + pressure_lrc ( density, r_cut )
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string

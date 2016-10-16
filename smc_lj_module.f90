@@ -9,8 +9,8 @@ MODULE smc_module
 
   PUBLIC :: n, r, r_old, v, f, move
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: force, force_1
-  public :: potovr
+  PUBLIC :: force, force_1, energy_lrc, pressure_lrc
+  public :: pot_type
 
   INTEGER                              :: n     ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r     ! positions (3,n)
@@ -26,27 +26,27 @@ MODULE smc_module
   ! The use of n_max in this module is clumsy. We do it this way because at the time of writing
   ! gfortran does not implement parameterized derived types (part of the Fortran 2003 standard)
   INTEGER, PARAMETER :: n_max = 256 
-  TYPE potovr ! A composite variable for interactions comprising
+  TYPE pot_type ! A composite variable for interactions comprising
      REAL                     :: pot ! the potential energy and
      REAL                     :: vir ! the virial and
      REAL, DIMENSION(3,n_max) :: f   ! the forces and
      LOGICAL                  :: ovr ! a flag indicating overlap (i.e. pot too high to use)
-  END TYPE potovr
+  END TYPE pot_type
 
   INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_potovr
+     MODULE PROCEDURE add_pot_type
   END INTERFACE OPERATOR (+)
 
 CONTAINS
 
-  FUNCTION add_potovr ( a, b ) RESULT (c)
-    TYPE(potovr)             :: c    ! Result is the sum of the two inputs
-    TYPE(potovr), INTENT(in) :: a, b
+  FUNCTION add_pot_type ( a, b ) RESULT (c)
+    TYPE(pot_type)             :: c    ! Result is the sum of the two inputs
+    TYPE(pot_type), INTENT(in) :: a, b
     c%pot = a%pot +    b%pot
     c%vir = a%vir +    b%vir
     c%f   = a%f   +    b%f
     c%ovr = a%ovr .OR. b%ovr
-  END FUNCTION add_potovr
+  END FUNCTION add_pot_type
 
   SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
@@ -87,7 +87,7 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   FUNCTION force ( box, r_cut )
-    TYPE(potovr)     :: force  ! Returns composite of forces, pot, vir and ovr
+    TYPE(pot_type)     :: force  ! Returns composite of forces, pot, vir and ovr
     REAL, INTENT(in) :: box    ! simulation box length
     REAL, INTENT(in) :: r_cut  ! potential cutoff distance
 
@@ -95,9 +95,9 @@ CONTAINS
     ! Actual calculation is performed by function force_1
 
     INTEGER            :: i
-    TYPE(potovr) :: force_i
+    TYPE(pot_type) :: force_i
 
-    force = potovr ( f=0.0, pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    force = pot_type ( f=0.0, pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1 ! Begin loop over atoms
 
@@ -115,7 +115,7 @@ CONTAINS
   END FUNCTION force
 
   FUNCTION force_1 ( box, r_cut, i, j_range ) RESULT ( force )
-    TYPE(potovr)                  :: force   ! Returns composite of forces, pot, vir and ovr
+    TYPE(pot_type)                  :: force   ! Returns composite of forces, pot, vir and ovr
     REAL,              INTENT(in) :: box     ! simulation box length
     REAL,              INTENT(in) :: r_cut   ! potential cutoff distance
     INTEGER,           INTENT(in) :: i       ! index of atom of interest
@@ -159,7 +159,7 @@ CONTAINS
     sr12    = sr6 **2
     pot_cut = sr12 - sr6 ! without numerical factors
 
-    force = potovr ( f=0.0, pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    force = pot_type ( f=0.0, pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Begin loop over atoms
 
@@ -202,5 +202,36 @@ CONTAINS
     force%ovr = .false. ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION force_1
+  FUNCTION energy_lrc ( density, r_cut )
+    REAL                :: energy_lrc ! Returns long-range energy/atom
+    REAL,    INTENT(in) :: density    ! Number density N/V
+    REAL,    INTENT(in) :: r_cut      ! Cutoff distance
+
+    ! Calculates long-range correction for Lennard-Jones energy per atom
+    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
+
+    REAL            :: sr3
+    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
+
+    sr3        = 1.0 / r_cut**3
+    energy_lrc = pi * ( (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3 ) * density
+
+  END FUNCTION energy_lrc
+
+  FUNCTION pressure_lrc ( density, r_cut )
+    REAL                :: pressure_lrc ! Returns long-range pressure
+    REAL,    INTENT(in) :: density      ! Number density N/V
+    REAL,    INTENT(in) :: r_cut        ! Cutoff distance
+
+    ! Calculates long-range correction for Lennard-Jones pressure
+    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
+
+    REAL            :: sr3
+    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
+
+    sr3          = 1.0 / r_cut**3
+    pressure_lrc = pi * ( (32.0/9.0) * sr3**3  - (16.0/3.0) * sr3 ) * density**2
+
+  END FUNCTION pressure_lrc
 
 END MODULE smc_module

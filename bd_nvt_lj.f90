@@ -8,7 +8,7 @@ PROGRAM bd_nvt_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : random_normals
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, r, v, f, n, energy_lrc
+       &                       force, r, v, f, n
 
   IMPLICIT NONE
 
@@ -36,7 +36,6 @@ PROGRAM bd_nvt_lj
   REAL :: r_cut       ! potential cutoff distance
   REAL :: pot         ! total potential energy
   REAL :: pot_sh      ! total shifted potential energy
-  REAL :: kin         ! total kinetic energy
   REAL :: vir         ! total virial
   REAL :: lap         ! total Laplacian
   REAL :: temperature ! temperature (specified)
@@ -48,7 +47,6 @@ PROGRAM bd_nvt_lj
   REAL :: gamma       ! friction coefficient
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
-  REAL    :: pot_lrc, vir_lrc
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -99,7 +97,6 @@ PROGRAM bd_nvt_lj
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
-  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temp-kinet', 'Temp-config', 'Virial Pressure' ] )
@@ -118,8 +115,6 @@ PROGRAM bd_nvt_lj
         CALL force ( box, r_cut, pot, pot_sh, vir, lap )  ! Force evaluation
         CALL b_propagator ( dt/2.0 )                      ! B kick half-step
 
-        CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
-
         ! Calculate all variables for this step
         CALL calculate ( )
         CALL blk_add ( [energy,energy_sh,temp_kinet,temp_config,pres_virial] )
@@ -135,7 +130,6 @@ PROGRAM bd_nvt_lj
   CALL run_end ( output_unit )
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
-  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
@@ -182,15 +176,18 @@ CONTAINS
   END SUBROUTINE o_propagator
 
   SUBROUTINE calculate ( string )
+    USE md_module, ONLY : energy_lrc, pressure_lrc
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
+    REAL :: kin
+
     kin         = 0.5*SUM(v**2)
-    energy      = ( pot + pot_lrc + kin ) / REAL ( n )
+    energy      = ( pot + kin ) / REAL ( n ) + energy_lrc ( density, r_cut )
     energy_sh   = ( pot_sh + kin ) / REAL ( n )
     temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
     temp_config = SUM ( f**2 ) / lap
-    pres_virial = density * temperature + ( vir + vir_lrc ) / box**3
+    pres_virial = density * temperature + vir / box**3 + pressure_lrc ( density, r_cut )
 
     IF ( PRESENT ( string ) ) THEN ! output required
        WRITE ( unit=output_unit, fmt='(a)'           ) string

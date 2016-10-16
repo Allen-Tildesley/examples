@@ -11,7 +11,7 @@ MODULE qmc_module
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: energy_cl_1, energy_cl, energy_qu_1, energy_qu
   PUBLIC :: move
-  PUBLIC :: potovr
+  PUBLIC :: pot_type
 
   INTEGER                                :: n ! number of atoms
   INTEGER                                :: p ! number of beads
@@ -21,23 +21,23 @@ MODULE qmc_module
   REAL,    PARAMETER :: sigma = 1.0     ! Lennard-Jones diameter (unit of length)
   REAL,    PARAMETER :: epslj = 1.0     ! Lennard-Jones well depth (unit of energy)
 
-  TYPE potovr ! A composite variable for interaction energies comprising
+  TYPE pot_type ! A composite variable for interaction energies comprising
      REAL    :: pot ! the potential energy and
      LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
-  END TYPE potovr
+  END TYPE pot_type
 
   INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_potovr
+     MODULE PROCEDURE add_pot_type
   END INTERFACE OPERATOR (+)
 
 CONTAINS
 
-  FUNCTION add_potovr ( a, b ) RESULT (c)
-    TYPE(potovr)             :: c    ! Result is the sum of the two inputs
-    TYPE(potovr), INTENT(in) :: a, b
+  FUNCTION add_pot_type ( a, b ) RESULT (c)
+    TYPE(pot_type)             :: c    ! Result is the sum of the two inputs
+    TYPE(pot_type), INTENT(in) :: a, b
     c%pot = a%pot +    b%pot
     c%ovr = a%ovr .OR. b%ovr
-  END FUNCTION add_potovr
+  END FUNCTION add_pot_type
 
   SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
@@ -73,7 +73,7 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   FUNCTION energy_cl ( box, r_cut ) RESULT ( energy )
-    TYPE(potovr)     :: energy ! Returns a composite of pot and ovr
+    TYPE(pot_type)     :: energy ! Returns a composite of pot and ovr
     REAL, INTENT(in) :: box    ! Simulation box length
     REAL, INTENT(in) :: r_cut  ! Potential cutoff distance
 
@@ -82,7 +82,7 @@ CONTAINS
     ! If this flag is .true., the value of energy%pot should not be used
     ! Actual calculation is performed by subroutine energy_cl_1
 
-    TYPE(potovr) :: energy_ik
+    TYPE(pot_type) :: energy_ik
     INTEGER      :: i, k
 
     IF ( n /= SIZE(r,dim=2) ) THEN ! should never happen
@@ -94,7 +94,7 @@ CONTAINS
        STOP 'Error in energy_cl'
     END IF
 
-    energy = potovr ( pot=0.0, ovr=.FALSE. ) ! Initialize
+    energy = pot_type ( pot=0.0, ovr=.FALSE. ) ! Initialize
 
     DO k = 1, p ! Loop over ring polymers
        DO i = 1, n - 1 ! Loop over atoms within polymer
@@ -112,7 +112,7 @@ CONTAINS
   END FUNCTION energy_cl
 
   FUNCTION energy_cl_1 ( rik, i, k, box, r_cut, j_range ) RESULT ( energy )
-    TYPE(potovr)                    :: energy  ! Returns a composite of pot and ovr
+    TYPE(pot_type)                    :: energy  ! Returns a composite of pot and ovr
     REAL, DIMENSION(3), INTENT(in)  :: rik     ! Coordinates of atom of interest
     INTEGER,            INTENT(in)  :: i, k    ! Index and polymer id of atom of interest
     REAL,               INTENT(in)  :: box     ! Simulation box length
@@ -164,7 +164,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    energy = potovr ( pot=0.0, ovr=.FALSE. ) ! Initialize
+    energy = pot_type ( pot=0.0, ovr=.FALSE. ) ! Initialize
 
     DO j = j1, j2
 

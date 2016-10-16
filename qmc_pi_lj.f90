@@ -9,7 +9,7 @@ PROGRAM qmc_pi_lj
   USE maths_module,     ONLY : metropolis
   USE qmc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       energy_cl_1, energy_qu_1, energy_cl, energy_qu, move, &
-       &                       n, p, r, potovr
+       &                       n, p, r, pot_type
 
   IMPLICIT NONE
 
@@ -48,7 +48,7 @@ PROGRAM qmc_pi_lj
   REAL :: potential_qu ! quantum potential energy per atom (to be averaged)
   REAL :: energy       ! total energy per atom (to be averaged)
 
-  TYPE(potovr)       :: eng_cl_old, eng_cl_new
+  TYPE(pot_type)       :: eng_cl_old, eng_cl_new
   INTEGER            :: blk, stp, i, k, nstep, nblock, moves, ioerr
   REAL               :: pot_qu_old, pot_qu_new, kin, delta, k_spring
   REAL, DIMENSION(3) :: rik  ! position of atom i in polymer k

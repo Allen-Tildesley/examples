@@ -13,7 +13,7 @@ MODULE mc_module
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   public :: resize, energy_1, energy, energy_lrc
   PUBLIC :: move, create, destroy
-  PUBLIC :: potovr
+  PUBLIC :: pot_type
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
@@ -22,14 +22,14 @@ MODULE mc_module
   REAL,    PARAMETER :: sigma = 1.0     ! Lennard-Jones diameter (unit of length)
   REAL,    PARAMETER :: epslj = 1.0     ! Lennard-Jones well depth (unit of energy)
 
-  TYPE potovr ! A composite variable for interaction energies comprising
+  TYPE pot_type ! A composite variable for interaction energies comprising
      REAL    :: pot ! the potential energy and
      REAL    :: vir ! the virial and
      LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
-  END TYPE potovr
+  END TYPE pot_type
 
   INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_potovr
+     MODULE PROCEDURE add_pot_type
   END INTERFACE OPERATOR (+)
 
 CONTAINS
@@ -81,7 +81,7 @@ CONTAINS
   END SUBROUTINE resize
 
   FUNCTION energy ( box, r_cut )
-    TYPE(potovr)     :: energy ! Returns a composite of pot, vir and ovr
+    TYPE(pot_type)     :: energy ! Returns a composite of pot, vir and ovr
     REAL, INTENT(in) :: box    ! Simulation box length
     REAL, INTENT(in) :: r_cut  ! Potential cutoff distance
 
@@ -91,7 +91,7 @@ CONTAINS
     ! If this flag is .true., the values of energy%pot, energy%vir should not be used
     ! Actual calculation is performed by function energy_1
 
-    TYPE(potovr) :: energy_i
+    TYPE(pot_type) :: energy_i
     INTEGER      :: i
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
@@ -99,7 +99,7 @@ CONTAINS
        STOP 'Error in energy'
     END IF
     
-    energy = potovr ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    energy = pot_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1
        energy_i = energy_1 ( r(:,i), i, box, r_cut, gt )
@@ -115,7 +115,7 @@ CONTAINS
   END FUNCTION energy
 
   function energy_1 ( ri, i, box, r_cut, j_range ) result ( energy )
-    TYPE(potovr)                   :: energy  ! Returns a composite of pot, vir and ovr
+    TYPE(pot_type)                   :: energy  ! Returns a composite of pot, vir and ovr
     REAL, DIMENSION(3), INTENT(in) :: ri      ! Coordinates of atom of interest
     INTEGER,            INTENT(in) :: i       ! Index of atom of interest
     REAL,               INTENT(in) :: box     ! Simulation box length
@@ -164,7 +164,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    energy = potovr ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    energy = pot_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
 
     DO j = j1, j2
 
@@ -201,28 +201,54 @@ CONTAINS
 
   END SUBROUTINE energy_1
 
-  SUBROUTINE energy_lrc ( n, box, r_cut, pot, vir )
-    INTEGER, INTENT(in)  :: n        ! number of atoms
-    REAL,    INTENT(in)  :: box      ! simulation box length
-    REAL,    INTENT(in)  :: r_cut    ! cutoff distance
-    REAL,    INTENT(out) :: pot, vir ! potential and virial
+  FUNCTION energy_lrc ( density, r_cut )
+    REAL                :: energy_lrc ! Returns long-range energy/atom
+    REAL,    INTENT(in) :: density    ! Number density N/V
+    REAL,    INTENT(in) :: r_cut      ! Cutoff distance
 
-    ! Calculates long-range corrections for Lennard-Jones potential and virial
-    ! These are the corrections to the total values
-    ! r_cut, box, and the results, are in LJ units where sigma = 1, epsilon = 1
+    ! Calculates long-range correction for Lennard-Jones energy per atom
+    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
 
-    REAL               :: sr3, density
-    REAL, PARAMETER    :: pi = 4.0 * ATAN(1.0)
+    REAL            :: sr3
+    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
 
-    sr3 = ( 1.0 / r_cut ) ** 3
-    pot = (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3
-    vir = (32.0/9.0) * sr3**3  - (32.0/6.0) * sr3
+    sr3        = 1.0 / r_cut**3
+    energy_lrc = pi * ( (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3 ) * density
 
-    density = REAL(n) / box**3
-    pot     = pot * pi * density * REAL(n)
-    vir     = vir * pi * density * REAL(n)
+  END FUNCTION energy_lrc
 
-  END SUBROUTINE energy_lrc
+  FUNCTION pressure_lrc ( density, r_cut )
+    REAL                :: pressure_lrc ! Returns long-range pressure
+    REAL,    INTENT(in) :: density      ! Number density N/V
+    REAL,    INTENT(in) :: r_cut        ! Cutoff distance
+
+    ! Calculates long-range correction for Lennard-Jones pressure
+    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
+
+    REAL            :: sr3, density
+    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
+
+    sr3          = 1.0 / r_cut**3
+    pressure_lrc = pi * ( (32.0/9.0) * sr3**3  - (16.0/3.0) * sr3 ) * density**2
+
+  END FUNCTION pressure_lrc
+
+  FUNCTION pressure_delta ( density, r_cut )
+    REAL                :: pressure_delta ! Returns pressure delta correction
+    REAL,    INTENT(in) :: density        ! Number density N/V
+    REAL,    INTENT(in) :: r_cut          ! Cutoff distance
+
+    ! Calculates correction for Lennard-Jones pressure
+    ! due to discontinuity in the potential at r_cut
+    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
+
+    REAL            :: sr3, density
+    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
+
+    sr3            = 1.0 / r_cut**3
+    pressure_delta = pi * (8.0/3.0) * ( sr3**3  - sr3 ) * density**2
+
+  END FUNCTION pressure_delta
 
   SUBROUTINE move ( i, ri )
     INTEGER,               INTENT(in) :: i

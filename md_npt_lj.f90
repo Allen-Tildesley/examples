@@ -7,7 +7,7 @@ PROGRAM md_npt_lj
   USE maths_module,     ONLY : random_normal, random_normals
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, r, v, f, n, energy_lrc
+       &                       force, r, v, f, n
 
   IMPLICIT NONE
 
@@ -66,7 +66,6 @@ PROGRAM md_npt_lj
   REAL,    DIMENSION(m) :: p_eta_baro ! barostat thermal momenta
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
-  REAL    :: pot_lrc, vir_lrc
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -139,7 +138,6 @@ PROGRAM md_npt_lj
   p_eps = random_normal ( 0.0, SQRT(temperature*w_eps) ) ! strain momentum
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
-  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Conserved', 'Energy', 'Shifted Energy', &
@@ -166,7 +164,6 @@ PROGRAM md_npt_lj
         CALL u3 ( dt/2.0 )
         CALL u4 ( dt/4.0, 1, m )
 
-        CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
         CALL calculate ()
 
         ! Calculate all variables for this step
@@ -183,7 +180,6 @@ PROGRAM md_npt_lj
   CALL run_end ( output_unit )
 
   CALL force ( box, r_cut, pot, pot_sh, vir, lap )
-  CALL energy_lrc ( n, box, r_cut, pot_lrc, vir_lrc )
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
@@ -334,23 +330,22 @@ CONTAINS
   END SUBROUTINE u4
 
   SUBROUTINE calculate ( string ) 
+    USE md_module, ONLY : energy_lrc, pressure_lrc
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
     ! This routine calculates variables of interest and (optionally) writes them out
 
-    pot         = pot + pot_lrc
-    vir         = vir + vir_lrc
-    kin         = 0.5*SUM(v**2)
-    energy      = ( pot + kin ) / REAL ( n )
-    energy_sh   = ( pot_sh + kin ) / REAL ( n )
     conserved   = pot_sh + kin + SUM(0.5*p_eta**2/q) + SUM(0.5*p_eta_baro**2/q_baro) + 0.5*p_eps**2/w_eps
     conserved   = conserved + temperature * ( g*eta(1) + SUM(eta(2:m)) + SUM(eta_baro) )
     conserved   = conserved / REAL(n)
     temp_kinet  = 2.0 * kin / g
     temp_config = SUM(f**2) / lap
     density     = REAL(n) / box**3
-    pres_virial = density * temperature + vir / box**3
+    kin         = 0.5*SUM(v**2)
+    energy      = ( pot + kin ) / REAL ( n ) + energy_lrc ( density, r_cut )
+    energy_sh   = ( pot_sh + kin ) / REAL ( n )
+    pres_virial = density * temperature + vir / box**3 + pressure_lrc ( density, r_cut )
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string

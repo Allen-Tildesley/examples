@@ -9,7 +9,7 @@ PROGRAM smc_nvt_lj
   USE maths_module,     ONLY : random_normals, metropolis
   USE smc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       force, force_1, &
-       &                       r, r_old, v, f, move, n, potovr
+       &                       r, r_old, v, f, move, n, pot_type
 
   IMPLICIT NONE
 
@@ -50,7 +50,7 @@ PROGRAM smc_nvt_lj
   INTEGER :: blk, stp, nstep, nblock, ioerr
   INTEGER :: i, n_move
   REAL    :: kin_old, kin_new, delta, move_ratio
-  TYPE(potovr) :: for_old, for_new
+  TYPE(pot_type) :: for_old, for_new
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'

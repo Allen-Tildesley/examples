@@ -9,7 +9,7 @@ MODULE md_module
   PRIVATE
   PUBLIC :: n, r, v, f
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: force, hessian, energy_lrc
+  PUBLIC :: force, hessian, energy_lrc, pressure_lrc
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
@@ -147,27 +147,37 @@ CONTAINS
 
   END SUBROUTINE force
 
-  SUBROUTINE energy_lrc ( n, box, r_cut, pot, vir )
-    INTEGER, INTENT(in)  :: n        ! number of atoms
-    REAL,    INTENT(in)  :: box      ! simulation box length
-    REAL,    INTENT(in)  :: r_cut    ! potential cutoff distance
-    REAL,    INTENT(out) :: pot, vir ! potential and virial
+  FUNCTION energy_lrc ( density, r_cut )
+    REAL                :: energy_lrc ! Returns long-range energy/atom
+    REAL,    INTENT(in) :: density    ! Number density N/V
+    REAL,    INTENT(in) :: r_cut      ! Cutoff distance
 
-    ! Calculates long-range corrections for Lennard-Jones potential and virial
-    ! These are the corrections to the total values
-    ! Results are in LJ units where sigma = 1, epsilon = 1
+    ! Calculates long-range correction for Lennard-Jones energy per atom
+    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
 
-    REAL               :: sr3, density
-    REAL, PARAMETER    :: pi = 4.0 * ATAN(1.0)
+    REAL            :: sr3
+    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
 
-    sr3     = 1.0 / r_cut**3
-    pot     = (8.0/9.0)  * sr3**3 - (8.0/3.0)  * sr3
-    vir     = (32.0/9.0) * sr3**3 - (32.0/6.0) * sr3
-    density =  REAL(n)/box**3
-    pot     = pot * pi * density * REAL(n)
-    vir     = vir * pi * density * REAL(n)
+    sr3        = 1.0 / r_cut**3
+    energy_lrc = pi * ( (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3 ) * density
 
-  END SUBROUTINE energy_lrc
+  END FUNCTION energy_lrc
+
+  FUNCTION pressure_lrc ( density, r_cut )
+    REAL                :: pressure_lrc ! Returns long-range pressure
+    REAL,    INTENT(in) :: density      ! Number density N/V
+    REAL,    INTENT(in) :: r_cut        ! Cutoff distance
+
+    ! Calculates long-range correction for Lennard-Jones pressure
+    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
+
+    REAL            :: sr3
+    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
+
+    sr3          = 1.0 / r_cut**3
+    pressure_lrc = pi * ( (32.0/9.0) * sr3**3  - (16.0/3.0) * sr3 ) * density**2
+
+  END FUNCTION pressure_lrc
 
   FUNCTION hessian ( box, r_cut ) RESULT ( hes )
     REAL, INTENT(in)  :: box    ! simulation box length

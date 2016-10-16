@@ -9,7 +9,7 @@ MODULE md_module
 
   PUBLIC :: n, r, v, f
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  public :: force
+  PUBLIC :: force, energy_lrc, pressure_lrc
 
   INTEGER                                :: n      ! number of atoms
   REAL,    DIMENSION(:,:),   ALLOCATABLE :: r      ! positions (3,n)
@@ -158,5 +158,36 @@ CONTAINS
     vir = vir / 3.0
 
   END SUBROUTINE force
+  FUNCTION energy_lrc ( density, r_cut )
+    REAL                :: energy_lrc ! Returns long-range energy/atom
+    REAL,    INTENT(in) :: density    ! Number density N/V
+    REAL,    INTENT(in) :: r_cut      ! Cutoff distance
+
+    ! Calculates long-range correction for Lennard-Jones energy per atom
+    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
+
+    REAL            :: sr3
+    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
+
+    sr3        = 1.0 / r_cut**3
+    energy_lrc = pi * ( (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3 ) * density
+
+  END FUNCTION energy_lrc
+
+  FUNCTION pressure_lrc ( density, r_cut )
+    REAL                :: pressure_lrc ! Returns long-range pressure
+    REAL,    INTENT(in) :: density      ! Number density N/V
+    REAL,    INTENT(in) :: r_cut        ! Cutoff distance
+
+    ! Calculates long-range correction for Lennard-Jones pressure
+    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
+
+    REAL            :: sr3
+    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
+
+    sr3          = 1.0 / r_cut**3
+    pressure_lrc = pi * ( (32.0/9.0) * sr3**3  - (16.0/3.0) * sr3 ) * density**2
+
+  END FUNCTION pressure_lrc
 
 END MODULE md_module
