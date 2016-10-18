@@ -2,59 +2,78 @@
 ! Energy and move routines for MC, LJ potential, link-lists
 MODULE mc_module
 
+  ! This (together with link_list_module.f90) functions as a drop-in replacement
+  ! for mc_lj_module.f90 which should work in our constant-NVT and zVT programs.
+  ! However, we have adopted a simple approach of setting up the list structure,
+  ! by calling initialize_list (in allocate_arrays) and make_list (in potential),
+  ! just once at the start of the run. Consequently some small modifications are needed
+  ! to make it work with the constant-NPT program, since the box length varies.
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: n, r
-  PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: resize, energy_1, energy, energy_lrc, pressure_lrc, pressure_delta
-  PUBLIC :: move, create, destroy
-  PUBLIC :: pot_type
 
-  INTEGER                              :: n ! number of atoms
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,:)
-  INTEGER, DIMENSION(:),   ALLOCATABLE :: j_list ! list of j-neighbours
+  ! Public routines
+  PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
+  PUBLIC :: potential_1, potential, potential_lrc, pressure_lrc, pressure_delta
+  PUBLIC :: move, create, destroy
+
+  ! Public data
+  INTEGER,                              PUBLIC :: n ! number of atoms
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! positions (3,n)
+
+  ! Private data
+  INTEGER, DIMENSION(:),   ALLOCATABLE :: j_list ! list of j-neighbours (n)
 
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
   REAL,    PARAMETER :: sigma = 1.0     ! Lennard-Jones diameter (unit of length)
   REAL,    PARAMETER :: epslj = 1.0     ! Lennard-Jones well depth (unit of energy)
 
-  TYPE pot_type ! A composite variable for interaction energies comprising
-     REAL    :: pot ! the potential energy and
-     REAL    :: vir ! the virial and
-     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
-  END TYPE pot_type
+  ! Public derived type
+  PUBLIC :: potential_type
+  TYPE potential_type ! A composite variable for interactions comprising
+     REAL    :: pot     ! the potential energy and
+     REAL    :: vir     ! the virial and
+     LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+  END TYPE potential_type
 
   INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_pot_type
+     MODULE PROCEDURE add_potential_type
   END INTERFACE OPERATOR (+)
 
 CONTAINS
 
-  FUNCTION add_pot_type ( a, b ) RESULT (c)
-    TYPE(pot_type)             :: c    ! Result is the sum of the two inputs
-    TYPE(pot_type), INTENT(in) :: a, b
-    c%pot = a%pot +    b%pot
-    c%vir = a%vir +    b%vir
-    c%ovr = a%ovr .OR. b%ovr
-  END FUNCTION add_pot_type
+  FUNCTION add_potential_type ( a, b ) RESULT (c)
+    IMPLICIT NONE
+    TYPE(potential_type)             :: c    ! Result is the sum of the two inputs
+    TYPE(potential_type), INTENT(in) :: a, b
+    c%pot     = a%pot      +   b%pot
+    c%vir     = a%vir      +   b%vir
+    c%overlap = a%overlap .OR. b%overlap
+  END FUNCTION add_potential_type
 
   SUBROUTINE introduction ( output_unit )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
-    WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential (cut but not shifted)'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',     sigma    
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epsilon = ', epslj    
+
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion ( output_unit )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
+
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
+
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays ( box, r_cut )
     USE link_list_module, ONLY : initialize_list
+    IMPLICIT NONE
     REAL, INTENT(in) :: box   ! Simulation box length
     REAL, INTENT(in) :: r_cut ! Potential cutoff distance
 
@@ -68,96 +87,94 @@ CONTAINS
        STOP 'Error in allocate_arrays'
     END IF
 
+    ! We assume that box will not change during the run
     CALL initialize_list ( n, r_cut_box )
 
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
     USE link_list_module, ONLY : finalize_list
+    IMPLICIT NONE
+
     DEALLOCATE ( r, j_list )
     CALL finalize_list
+
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE resize
-
-    ! Reallocates r array, twice as large
-    ! This is employed by mc_zvt_lj, grand canonical ensemble
-
-    REAL, DIMENSION(:,:), ALLOCATABLE :: tmp
-    INTEGER                           :: n_old, n_new
-
-    n_old = SIZE(r,dim=2)
-    n_new = 2*n_old
-    WRITE( unit=output_unit, fmt='(a,i10,a,i10)' ) 'Reallocating r from old ', n_old, ' to ', n_new
-
-    ALLOCATE ( tmp(3,n_new) ) ! New size for r
-    tmp(:,1:n_old) = r(:,:)   ! Copy elements across
-
-    CALL MOVE_ALLOC ( tmp, r )
-
-  END SUBROUTINE resize
-
-  FUNCTION energy ( box, r_cut )
+  FUNCTION potential ( box, r_cut ) RESULT ( system )
     USE link_list_module, ONLY : make_list
+    IMPLICIT NONE
+    TYPE(potential_type) :: system ! Returns a composite of pot, vir and overlap
+    REAL, INTENT(in)     :: box    ! Simulation box length
+    REAL, INTENT(in)     :: r_cut  ! Potential cutoff
 
-    TYPE(pot_type)      :: energy ! Returns a composite of pot, vir and ovr
-    REAL, INTENT(in)  :: box    ! Simulation box length
-    REAL, INTENT(in)  :: r_cut  ! Potential cutoff
+    ! system%pot is the nonbonded potential energy for whole system
+    ! system%vir is the corresponding virial for whole system
+    ! system%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this flag is .true., the values of system%pot, system%vir should not be used
+    ! Actual calculation is performed by function potential_1
 
-    ! energy%pot is the nonbonded potential energy for whole system
-    ! energy%vir is the corresponding virial for whole system
-    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this flag is .true., the values of energy%pot, energy%vir should not be used
-    ! Actual calculation is performed by function energy_1
+    ! We assume that the main program calls this function at the start,
+    ! and hence use this opportunity to call the make_list function.
+    ! We also assume that the box length remains constant throughout
+    ! The list is maintained by create_in_list, destroy_in_list, move_in_list
+    ! which are called in other routines below.
 
-    TYPE(pot_type)  :: energy_i
-    INTEGER       :: i
-    LOGICAL, SAVE :: first_call = .TRUE.
+    TYPE(potential_type) :: atom
+    INTEGER              :: i
+    LOGICAL, SAVE        :: first_call = .TRUE.
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
-       STOP 'Error in energy'
+       STOP 'Error in potential'
     END IF
+
     IF ( first_call ) THEN
        r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
        CALL make_list ( n, r )
        first_call = .FALSE.
     END IF
 
-    energy = pot_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    system = potential_type ( pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     DO i = 1, n
-       energy_i = energy_1 ( r(:,i), i, box, r_cut, gt )
-       IF ( energy_i%ovr ) THEN
-          energy%ovr = .TRUE. ! Overlap detected
-          RETURN              ! Return immediately
+
+       atom = potential_1 ( r(:,i), i, box, r_cut, gt )
+
+       IF ( atom%overlap ) THEN
+          system%overlap = .TRUE. ! Overlap detected
+          RETURN                  ! Return immediately
        END IF
-       energy = energy + energy_i
+
+       system = system + atom
+
     END DO
 
-    energy%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    system%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
-  END FUNCTION energy
+  END FUNCTION potential
 
-  FUNCTION energy_1 ( ri, i, box, r_cut, j_range ) RESULT ( energy )
-    TYPE(pot_type)                    :: energy  ! Returns a composite of pot, vir and ovr
-    REAL, DIMENSION(3), INTENT(in)  :: ri      ! Coordinates of atom of interest
-    INTEGER,            INTENT(in)  :: i       ! Index of atom of interest
-    REAL,               INTENT(in)  :: box     ! Simulation box length
-    REAL,               INTENT(in)  :: r_cut   ! Potential cutoff distance
-    INTEGER, OPTIONAL,  INTENT(in)  :: j_range ! Optional partner index range
+  FUNCTION potential_1 ( ri, i, box, r_cut, j_range ) RESULT ( atom )
+    IMPLICIT NONE
+    TYPE(potential_type)           :: atom    ! Returns a composite of pot, vir and overlap
+    REAL, DIMENSION(3), INTENT(in) :: ri      ! Coordinates of atom of interest
+    INTEGER,            INTENT(in) :: i       ! Index of atom of interest
+    REAL,               INTENT(in) :: box     ! Simulation box length
+    REAL,               INTENT(in) :: r_cut   ! Potential cutoff distance
+    INTEGER, OPTIONAL,  INTENT(in) :: j_range ! Optional partner index range
 
-    ! energy%pot is the nonbonded potential energy of atom ri with a set of other atoms
-    ! energy%vir is the corresopnding virial of atom ri
-    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this is .true., the value of energy%pot should not be used
+    ! atom%pot is the nonbonded potential energy of atom ri with a set of other atoms
+    ! atom%vir is the corresponding virial of atom ri
+    ! atom%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this is .true., the value of atom%pot should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
-    ! The optional argument j_range restricts partner indices to j>i, or j<i
+    ! The optional argument j_range restricts partner indices to "half" which is
+    ! actually implemented in the get_neighbours routine
 
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
-    INTEGER            :: j, jj, nj
+    INTEGER            :: j, jj
     LOGICAL            :: half
     REAL               :: r_cut_box, r_cut_box_sq, box_sq
     REAL               :: sr2, sr6, rij_sq
@@ -166,64 +183,73 @@ CONTAINS
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
-       STOP 'Error in energy_1'
+       STOP 'Error in potential_1'
     END IF
 
     half = PRESENT ( j_range)
-    CALL get_neighbours ( i, nj, half )
+    CALL get_neighbours ( i, half ) ! Put neighbours in j_list
 
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    energy = pot_type ( pot=0.0, vir= 0.0, ovr=.FALSE. ) ! Initialize
+    atom = potential_type ( pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
-    DO jj = 1, nj
-       j = j_list(jj)
+    jj = 0
 
-       IF ( i == j ) CYCLE
+    DO ! Loop until no more entries in j_list
+       jj = jj + 1        ! Next entry
+       j  = j_list(jj)    ! Get neighbour index
+       IF ( j == 0 ) EXIT ! List exhausted
 
-       rij(:) = ri(:) - r(:,j)
-       rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units
-       rij_sq = SUM ( rij**2 )
+       IF ( i == j ) CYCLE ! Skip self ( should never happen)
 
-       IF ( rij_sq < r_cut_box_sq ) THEN
+       rij(:) = ri(:) - r(:,j)            ! Separation vector
+       rij(:) = rij(:) - ANINT ( rij(:) ) ! Periodic boundaries in box=1 units
+       rij_sq = SUM ( rij**2 )            ! Squared separation in box=1 units
+
+       IF ( rij_sq < r_cut_box_sq ) THEN ! Check within range
 
           rij_sq = rij_sq * box_sq ! now in sigma=1 units
           sr2 = 1.0 / rij_sq       ! (sigma/rij)**2
 
           IF ( sr2 > sr2_overlap ) THEN
-             energy%ovr = .TRUE. ! Overlap detected
-             RETURN              ! Return immediately
+             atom%overlap = .TRUE. ! Overlap detected
+             RETURN                ! Return immediately
           END IF
 
           sr6 = sr2**3
-          energy%pot = energy%pot + sr6**2 - sr6
-          energy%vir = energy%vir + 2.0 * sr6**2 - sr6
 
-       END IF
+          atom%pot = atom%pot + sr6**2 - sr6       ! LJ potential (cut but not shifted)
+          atom%vir = atom%vir + 2.0 * sr6**2 - sr6 ! LJ virial
 
-    END DO
+       END IF ! End check within range
+
+    END DO ! End loop until no more entries in j_list
 
     ! Numerical factors
-    energy%pot = 4.0 * energy%pot 
-    energy%vir = 24.0 * energy%vir
-    energy%vir = energy%vir / 3.0
+    atom%pot     = atom%pot * 4.0
+    atom%vir     = atom%vir * 24.0 / 3.0
+    atom%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
 
-    energy%ovr = .FALSE. ! No overlaps detected (redundant but for clarity)
+  END FUNCTION potential_1
 
-  END FUNCTION energy_1
-
-  SUBROUTINE get_neighbours ( i, nj, half )
+  SUBROUTINE get_neighbours ( i, half )
     USE link_list_module, ONLY : sc, list, head, c
+    IMPLICIT NONE
+    INTEGER, INTENT(in) :: i    ! particle whose neighbours are required
+    LOGICAL, INTENT(in) :: half ! determining the range of neighbours searched
 
-    ! Arguments
-    INTEGER, INTENT(in)  :: i  ! particle whose neighbours are required
-    LOGICAL, INTENT(in)  :: half ! determining the range of neighbours searched
-    INTEGER, INTENT(out) :: nj ! number of j-partners
+    ! This routine uses the link-list cell structure to fill out the array j_list
+    ! with possible neighbours of atom i, padding with zeroes
+    ! If half==.false., all 27 cells are searched.
+    ! If half==.true., only the i-cell, and 13 neighbour cells, are searched
+    ! and moreover, in the i-cell, we only look down-list
 
-    ! Set up vectors to each cell in neighbourhood of 3x3x3 cells in cubic lattice
-    INTEGER, PARAMETER :: nk = 13 
+    ! We have a cubic cell lattice
+    ! Set up vectors to each cell in the 3x3x3 neighbourhood of a given cell
+    ! To work properly, these are listed with inversion symmetry about (0,0,0)
+    INTEGER,                      PARAMETER :: nk = 13 
     INTEGER, DIMENSION(3,-nk:nk), PARAMETER :: d = RESHAPE( [ &
          &   -1,-1,-1,    0,-1,-1,    1,-1,-1, &
          &   -1, 1,-1,    0, 1,-1,    1, 1,-1, &
@@ -235,19 +261,19 @@ CONTAINS
          &   -1,-1, 1,    0,-1, 1,    1,-1, 1, &
          &   -1, 1, 1,    0, 1, 1,    1, 1, 1    ], [ 3, 2*nk+1 ] )
 
-    ! Local variables
-    INTEGER :: k1, k2, k, j
+    INTEGER               :: k1, k2, k, j, nj
     INTEGER, DIMENSION(3) :: cj
 
-    IF ( half ) THEN ! check half neighbour cells and j downlist from i in current cell
+    IF ( half ) THEN ! Check half neighbour cells and j downlist from i in current cell
        k1 = 0
        k2 = nk
-    ELSE ! check every atom other than i in all cells
+    ELSE ! Check every atom other than i in all cells
        k1 = -nk
        k2 =  nk
     END IF
 
-    nj = 0 ! Will store number of neighbours found
+    j_list = 0 ! Initialize with zero values everywhere
+    nj     = 0 ! Next position in list to be filled
 
     DO k = k1, k2 ! Begin loop over neighbouring cells
 
@@ -262,38 +288,46 @@ CONTAINS
 
        DO ! Begin loop over j atoms in list
 
-          IF ( j == 0 ) EXIT
+          IF ( j == 0 ) EXIT  ! Exhausted list
+          IF ( j == i ) CYCLE ! Skip self
 
-          IF ( j /= i ) THEN
-             nj         = nj + 1 ! increment count of j atoms
-             j_list(nj) = j      ! store new j atom
-          END IF
-          j = list(j) ! Next atom in j cell
+          nj = nj + 1 ! Increment count of j atoms
 
-       ENDDO ! End loop over j atoms in list
+          IF ( nj >= n ) THEN ! Check more than n-1 neighbours (should never happen)
+             WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Neighbour error for j_list', nj, n
+             STOP 'Impossible error in get_neighbours'
+          END IF ! End check more than n-1 neighbours
 
-    ENDDO ! End loop over neighbouring cells 
+          j_list(nj) = j       ! Store new j atom
+          j          = list(j) ! Next atom in j cell
+
+       END DO ! End loop over j atoms in list
+
+    END DO ! End loop over neighbouring cells 
 
   END SUBROUTINE get_neighbours
 
-  FUNCTION energy_lrc ( density, r_cut )
-    REAL                :: energy_lrc ! Returns long-range energy/atom
-    REAL,    INTENT(in) :: density    ! Number density N/V
-    REAL,    INTENT(in) :: r_cut      ! Cutoff distance
+  FUNCTION potential_lrc ( density, r_cut )
+    IMPLICIT NONE
+    REAL                :: potential_lrc ! Returns long-range correction to potential/atom
+    REAL,    INTENT(in) :: density       ! Number density N/V
+    REAL,    INTENT(in) :: r_cut         ! Cutoff distance
 
-    ! Calculates long-range correction for Lennard-Jones energy per atom
+    ! Calculates long-range correction for Lennard-Jones potential per atom
     ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
 
     REAL            :: sr3
     REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
 
-    sr3        = 1.0 / r_cut**3
-    energy_lrc = pi * ( (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3 ) * density
+    sr3 = 1.0 / r_cut**3
 
-  END FUNCTION energy_lrc
+    potential_lrc = pi * ( (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3 ) * density
+
+  END FUNCTION potential_lrc
 
   FUNCTION pressure_lrc ( density, r_cut )
-    REAL                :: pressure_lrc ! Returns long-range pressure
+    IMPLICIT NONE
+    REAL                :: pressure_lrc ! Returns long-range correction to pressure
     REAL,    INTENT(in) :: density      ! Number density N/V
     REAL,    INTENT(in) :: r_cut        ! Cutoff distance
 
@@ -303,13 +337,15 @@ CONTAINS
     REAL            :: sr3
     REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
 
-    sr3          = 1.0 / r_cut**3
+    sr3 = 1.0 / r_cut**3
+
     pressure_lrc = pi * ( (32.0/9.0) * sr3**3  - (16.0/3.0) * sr3 ) * density**2
 
   END FUNCTION pressure_lrc
 
   FUNCTION pressure_delta ( density, r_cut )
-    REAL                :: pressure_delta ! Returns pressure delta correction
+    IMPLICIT NONE
+    REAL                :: pressure_delta ! Returns delta correction to pressure
     REAL,    INTENT(in) :: density        ! Number density N/V
     REAL,    INTENT(in) :: r_cut          ! Cutoff distance
 
@@ -320,13 +356,15 @@ CONTAINS
     REAL            :: sr3
     REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
 
-    sr3            = 1.0 / r_cut**3
+    sr3 = 1.0 / r_cut**3
+
     pressure_delta = pi * (8.0/3.0) * ( sr3**3  - sr3 ) * density**2
 
   END FUNCTION pressure_delta
 
   SUBROUTINE move ( i, ri )
     USE link_list_module, ONLY : c_index, move_in_list
+    IMPLICIT NONE
     INTEGER,               INTENT(in) :: i
     REAL,    DIMENSION(3), INTENT(in) :: ri
 
@@ -340,12 +378,13 @@ CONTAINS
 
   SUBROUTINE create ( ri )
     USE link_list_module, ONLY : c_index, create_in_list
+    IMPLICIT NONE
     REAL, DIMENSION(3), INTENT(in) :: ri
 
     INTEGER, DIMENSION(3) :: ci
 
-    n      = n+1               ! increase number of atoms
-    r(:,n) = ri(:)             ! add new atom at the end
+    n      = n+1               ! Increase number of atoms
+    r(:,n) = ri(:)             ! Add new atom at the end
     ci(:)  = c_index ( ri(:) ) ! New cell index
     CALL create_in_list ( n, ci )
 
@@ -353,12 +392,13 @@ CONTAINS
 
   SUBROUTINE destroy ( i )
     USE link_list_module, ONLY : destroy_in_list, move_in_list, c
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: i
 
-    r(:,i) = r(:,n) ! replace atom i coordinates with atom n
+    r(:,i) = r(:,n) ! Replace atom i coordinates with atom n
     CALL destroy_in_list ( n, c(:,n) )
     CALL move_in_list ( i, c(:,n) )
-    n = n - 1  ! reduce number of atoms
+    n = n - 1  ! Reduce number of atoms
 
   END SUBROUTINE destroy
 

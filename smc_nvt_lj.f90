@@ -9,7 +9,7 @@ PROGRAM smc_nvt_lj
   USE maths_module,     ONLY : random_normals, metropolis
   USE smc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       force, force_1, &
-       &                       r, r_old, v, f, move, n, pot_type
+       &                       r, r_old, v, f, move, n, potential_type
 
   IMPLICIT NONE
 
@@ -50,7 +50,7 @@ PROGRAM smc_nvt_lj
   INTEGER :: blk, stp, nstep, nblock, ioerr
   INTEGER :: i, n_move
   REAL    :: kin_old, kin_new, delta, move_ratio
-  TYPE(pot_type) :: for_old, for_new
+  TYPE(potential_type) :: for_old, for_new
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -113,7 +113,7 @@ PROGRAM smc_nvt_lj
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   for_old = force ( box, r_cut )
-  IF ( for_old%ovr ) THEN
+  IF ( for_old%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in smc_nvt_lj'
   END IF
@@ -139,7 +139,7 @@ PROGRAM smc_nvt_lj
               r_old(:,i) = r(:,i)                    ! Store old position of this atom
               for_old    = force_1 ( box, r_cut, i ) ! Old force and potential etc
 
-              IF ( for_old%ovr ) THEN ! should never happen
+              IF ( for_old%overlap ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in smc_nvt_lj'
               END IF
@@ -151,7 +151,7 @@ PROGRAM smc_nvt_lj
               r(:,i) = r(:,i) - ANINT ( r(:,i) )                     ! Periodic boundaries (box=1 units)
               for_new = force_1 ( box, r_cut, i )                    ! New force and potential etc
 
-              IF ( for_new%ovr ) THEN ! Test for overlap
+              IF ( for_new%overlap ) THEN ! Test for overlap
                  r(:,i) = r_old(:,i)                                 ! Restore position
               ELSE
                  v(:,i) = v(:,i) + 0.5 * dt * for_new%f(:,i)         ! Kick half-step for one atom
@@ -187,7 +187,7 @@ PROGRAM smc_nvt_lj
               r = r - ANINT ( r )                                ! Periodic boundaries (box=1 units)
            END WHERE
            for_new = force ( box, r_cut )                        ! New force and potential etc
-           IF ( for_new%ovr ) THEN ! Test for overlap
+           IF ( for_new%overlap ) THEN ! Test for overlap
               r          = r_old                                 ! Restore positions
               move_ratio = 0.0                                   ! Set move counter
            ELSE

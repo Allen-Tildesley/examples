@@ -10,7 +10,7 @@ MODULE smc_module
   PUBLIC :: n, r, r_old, v, f, move
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: force, force_1, energy_lrc, pressure_lrc
-  public :: pot_type
+  public :: potential_type
 
   INTEGER                              :: n     ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r     ! positions (3,n)
@@ -26,27 +26,27 @@ MODULE smc_module
   ! The use of n_max in this module is clumsy. We do it this way because at the time of writing
   ! gfortran does not implement parameterized derived types (part of the Fortran 2003 standard)
   INTEGER, PARAMETER :: n_max = 256 
-  TYPE pot_type ! A composite variable for interactions comprising
+  TYPE potential_type ! A composite variable for interactions comprising
      REAL                     :: pot ! the potential energy and
      REAL                     :: vir ! the virial and
      REAL, DIMENSION(3,n_max) :: f   ! the forces and
-     LOGICAL                  :: ovr ! a flag indicating overlap (i.e. pot too high to use)
-  END TYPE pot_type
+     LOGICAL                  :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+  END TYPE potential_type
 
   INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_pot_type
+     MODULE PROCEDURE add_potential_type
   END INTERFACE OPERATOR (+)
 
 CONTAINS
 
-  FUNCTION add_pot_type ( a, b ) RESULT (c)
-    TYPE(pot_type)             :: c    ! Result is the sum of the two inputs
-    TYPE(pot_type), INTENT(in) :: a, b
+  FUNCTION add_potential_type ( a, b ) RESULT (c)
+    TYPE(potential_type)             :: c    ! Result is the sum of the two inputs
+    TYPE(potential_type), INTENT(in) :: a, b
     c%pot = a%pot +    b%pot
     c%vir = a%vir +    b%vir
     c%f   = a%f   +    b%f
-    c%ovr = a%ovr .OR. b%ovr
-  END FUNCTION add_pot_type
+    c%overlap = a%overlap .OR. b%overlap
+  END FUNCTION add_potential_type
 
   SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
@@ -87,7 +87,7 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   FUNCTION force ( box, r_cut )
-    TYPE(pot_type)     :: force  ! Returns composite of forces, pot, vir and ovr
+    TYPE(potential_type)     :: force  ! Returns composite of forces, pot, vir and overlap
     REAL, INTENT(in) :: box    ! simulation box length
     REAL, INTENT(in) :: r_cut  ! potential cutoff distance
 
@@ -95,27 +95,27 @@ CONTAINS
     ! Actual calculation is performed by function force_1
 
     INTEGER            :: i
-    TYPE(pot_type) :: force_i
+    TYPE(potential_type) :: force_i
 
-    force = pot_type ( f=0.0, pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    force = potential_type ( f=0.0, pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1 ! Begin loop over atoms
 
        force_i = force_1 ( box, r_cut, i, gt )
-       IF ( force_i%ovr ) THEN
-          force%ovr = .TRUE. ! Overlap detected
+       IF ( force_i%overlap ) THEN
+          force%overlap = .TRUE. ! Overlap detected
           RETURN             ! Return immediately
        END IF
        force = force + force_i
 
     END DO ! End loop over atoms
 
-    force%ovr = .FALSE. ! No overlaps detected (redundant but for clarity)
+    force%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION force
 
   FUNCTION force_1 ( box, r_cut, i, j_range ) RESULT ( force )
-    TYPE(pot_type)                  :: force   ! Returns composite of forces, pot, vir and ovr
+    TYPE(potential_type)                  :: force   ! Returns composite of forces, pot, vir and overlap
     REAL,              INTENT(in) :: box     ! simulation box length
     REAL,              INTENT(in) :: r_cut   ! potential cutoff distance
     INTEGER,           INTENT(in) :: i       ! index of atom of interest
@@ -159,7 +159,7 @@ CONTAINS
     sr12    = sr6 **2
     pot_cut = sr12 - sr6 ! without numerical factors
 
-    force = pot_type ( f=0.0, pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    force = potential_type ( f=0.0, pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Begin loop over atoms
 
@@ -176,7 +176,7 @@ CONTAINS
           sr2     = 1.0 / rij_sq
 
           IF ( sr2 > sr2_overlap ) THEN
-             force%ovr = .TRUE. ! Overlap detected
+             force%overlap = .TRUE. ! Overlap detected
              RETURN             ! Return immediately
           END IF
 
@@ -199,7 +199,7 @@ CONTAINS
     force%pot = force%pot * 4.0
     force%vir = force%vir * 24.0 / 3.0
 
-    force%ovr = .false. ! No overlaps detected (redundant but for clarity)
+    force%overlap = .false. ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION force_1
   FUNCTION energy_lrc ( density, r_cut )

@@ -9,7 +9,7 @@ PROGRAM qmc_pi_lj
   USE maths_module,     ONLY : metropolis
   USE qmc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       energy_cl_1, energy_qu_1, energy_cl, energy_qu, move, &
-       &                       n, p, r, pot_type
+       &                       n, p, r, potential_type
 
   IMPLICIT NONE
 
@@ -48,7 +48,7 @@ PROGRAM qmc_pi_lj
   REAL :: potential_qu ! quantum potential energy per atom (to be averaged)
   REAL :: energy       ! total energy per atom (to be averaged)
 
-  TYPE(pot_type)       :: eng_cl_old, eng_cl_new
+  TYPE(potential_type)       :: eng_cl_old, eng_cl_new
   INTEGER            :: blk, stp, i, k, nstep, nblock, moves, ioerr
   REAL               :: pot_qu_old, pot_qu_new, kin, delta, k_spring
   REAL, DIMENSION(3) :: rik  ! position of atom i in polymer k
@@ -123,7 +123,7 @@ PROGRAM qmc_pi_lj
 
   ! Calculate classical LJ and quantum spring potential energies
   eng_cl_old = energy_cl ( box, r_cut )
-  IF ( eng_cl_old%ovr ) THEN
+  IF ( eng_cl_old%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
@@ -149,7 +149,7 @@ PROGRAM qmc_pi_lj
 
               rik(:) = r(:,i,k)
               eng_cl_old = energy_cl_1 ( rik, i, k, box, r_cut )
-              IF ( eng_cl_old%ovr ) THEN ! should never happen
+              IF ( eng_cl_old%overlap ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in qmc_pi_lj'
               END IF
@@ -162,7 +162,7 @@ PROGRAM qmc_pi_lj
 
               eng_cl_new = energy_cl_1 ( rik, i, k, box, r_cut )
 
-              IF ( .NOT. eng_cl_new%ovr ) THEN ! Consider non-overlapping configuration
+              IF ( .NOT. eng_cl_new%overlap ) THEN ! Consider non-overlapping configuration
                  pot_qu_new = energy_qu_1 ( rik, i, k, box, k_spring )
                  delta = ( eng_cl_new%pot + pot_qu_new - eng_cl_old%pot - pot_qu_old ) / temperature
                  IF ( metropolis ( delta ) ) THEN ! Metropolis test
@@ -201,7 +201,7 @@ PROGRAM qmc_pi_lj
   CALL calculate ( 'Final values' )
 
   eng_cl_old = energy_cl ( box, r_cut )
-  IF ( eng_cl_old%ovr ) THEN ! this should never happen
+  IF ( eng_cl_old%overlap ) THEN ! this should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in qmc_pi_lj'
   END IF

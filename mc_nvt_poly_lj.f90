@@ -8,7 +8,7 @@ PROGRAM mc_nvt_poly_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis, random_rotate_quaternion
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       energy_1, energy, q_to_d, n, na, r, e, d, pot_type
+       &                       energy_1, energy, q_to_d, n, na, r, e, d, potential_type
 
   IMPLICIT NONE
 
@@ -43,7 +43,7 @@ PROGRAM mc_nvt_poly_lj
   REAL :: pres_virial ! virial pressure (to be averaged)
   REAL :: potential   ! potential energy per molecule (to be averaged)
 
-  TYPE(pot_type) :: eng_old, eng_new ! Composite energy = pot & vir & overlap variables
+  TYPE(potential_type) :: eng_old, eng_new ! Composite energy = pot & vir & overlap variables
   INTEGER      :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL         :: delta
 
@@ -118,7 +118,7 @@ PROGRAM mc_nvt_poly_lj
   END DO
 
   eng_old = energy ( box, r_cut, rm_cut )
-  IF ( eng_old%ovr ) THEN
+  IF ( eng_old%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF
@@ -143,7 +143,7 @@ PROGRAM mc_nvt_poly_lj
            di(:,:) = d(:,:,i) ! copy old bond vectors
            eng_old = energy_1 ( ri, di, i, box, r_cut, rm_cut )
 
-           IF ( eng_old%ovr ) THEN ! should never happen
+           IF ( eng_old%overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_poly_lj'
            END IF
@@ -156,7 +156,7 @@ PROGRAM mc_nvt_poly_lj
            di = q_to_d ( ei, db ) ! new space-fixed bond vectors (in box=1 units)
            eng_new = energy_1 ( ri, di, i, box, r_cut, rm_cut )
 
-           IF ( .NOT. eng_new%ovr ) THEN ! consider non-overlapping configuration
+           IF ( .NOT. eng_new%overlap ) THEN ! consider non-overlapping configuration
               delta = ( eng_new%pot - eng_old%pot ) / temperature
               IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
                  pot      = pot + eng_new%pot - eng_old%pot ! update potential energy
@@ -188,7 +188,7 @@ PROGRAM mc_nvt_poly_lj
   CALL calculate ( 'Final values' )
 
   eng_old = energy ( box, r_cut, rm_cut )
-  IF ( eng_old%ovr ) THEN ! should never happen
+  IF ( eng_old%overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF

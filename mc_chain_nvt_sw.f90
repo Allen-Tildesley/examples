@@ -23,7 +23,7 @@ PROGRAM mc_chain_nvt_sw
   ! Input configuration, output configuration, all calculations, and all results 
   ! are given in simulation units defined by the model:
   ! atomic core diameter sigma = 1, well-depth epsilon=1
-  ! Energy is -q, where q is the total number of attractive well interactions
+  ! Potential energy is -q, where q is the total number of attractive well interactions
   ! This is a negative integer, but for convenience we refer to q as energy
   ! Configurational weights are calculated on the basis of the athermal interactions
   ! only, i.e. weight=1 if no overlap, weight=0 if any overlap
@@ -32,26 +32,30 @@ PROGRAM mc_chain_nvt_sw
   REAL    :: temperature    ! temperature (specified, in units of well depth)
   REAL    :: bond           ! bond length (in units of core diameter)
   REAL    :: range          ! range of attractive well (specified, same units)
-  REAL    :: regrow_ratio   ! acceptance ratio for regrowth moves
-  REAL    :: crank_ratio    ! acceptance ratio for crankshaft moves
-  REAL    :: pivot_ratio    ! acceptance ratio for pivot moves
   INTEGER :: m_max          ! maximum atoms in regrow
   INTEGER :: k_max          ! number of random tries per atom in regrow
   REAL    :: crank_max      ! maximum move angle in crankshaft
-  REAL    :: crank_fraction ! fraction of atoms to try in crankshaft
-  INTEGER :: n_crank        ! number of atoms to try in crankshaft
+  REAL    :: crank_fraction ! fraction of atoms to try in crankshaft per step
+  INTEGER :: n_crank        ! number of crankshaft tries per step
   REAL    :: pivot_max      ! maximum move angle in pivot
-  REAL    :: pivot_fraction ! fraction of atoms to try in pivot
-  INTEGER :: n_pivot        ! number of atoms to try in pivot
+  REAL    :: pivot_fraction ! fraction of atoms to try in pivot per step
+  INTEGER :: n_pivot        ! number of pivot tries per step
   INTEGER :: q              ! total attractive interaction (negative of energy)
-  REAL    :: potential      ! potential energy per atom (for averaging)
-  REAL    :: r_gyration     ! Radius of gyration (for averaging)
+  INTEGER :: q_max          ! max value of q seen in simulation (minimum energy)
   INTEGER :: nq             ! Maximum anticipated energy
 
+  ! Quantities for averaging
+  REAL :: regrow_ratio ! acceptance ratio for regrowth moves
+  REAL :: crank_ratio  ! acceptance ratio for crankshaft moves
+  REAL :: pivot_ratio  ! acceptance ratio for pivot moves
+  REAL :: pe           ! total potential energy of system
+  REAL :: r_g          ! Radius of gyration
+
+  ! Histograms and tables
   REAL, DIMENSION(:), ALLOCATABLE :: h ! Histogram of q values (0:nq)
   REAL, DIMENSION(:), ALLOCATABLE :: s ! Entropy histogram used in acceptance (0:nq)
 
-  INTEGER :: blk, stp, nstep, nblock, ioerr, try, n_acc, q_max
+  INTEGER :: blk, stp, nstep, nblock, ioerr, try, n_acc
   LOGICAL :: accepted
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.', his_prefix = 'his.'
@@ -108,8 +112,8 @@ PROGRAM mc_chain_nvt_sw
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length (in sigma units)', bond
   n_crank = NINT(crank_fraction*REAL(n))
   n_pivot = NINT(pivot_fraction*REAL(n))
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of atoms in crankshaft',  n_crank
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of atoms in pivot',       n_pivot
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of crankshaft tries per step', n_crank
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of pivot tries per step',      n_pivot
 
   CALL allocate_arrays
   nq = 6*n ! Anticipated maximum number of pair interactions within range
@@ -130,7 +134,7 @@ PROGRAM mc_chain_nvt_sw
 
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'Crank ratio', 'Pivot ratio', 'Potential', 'Rad Gyration' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'Crank ratio', 'Pivot ratio', 'PE', 'Rg' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -173,7 +177,7 @@ PROGRAM mc_chain_nvt_sw
 
         ! Calculate all variables for this step
         CALL calculate()
-        CALL blk_add ( [regrow_ratio,crank_ratio,pivot_ratio,potential,r_gyration] )
+        CALL blk_add ( [regrow_ratio,crank_ratio,pivot_ratio,pe,r_g] )
 
      END DO ! End loop over steps
 
@@ -211,32 +215,34 @@ CONTAINS
 
     REAL, DIMENSION(3) :: r_cm
 
-    r_cm       = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
-    r_gyration = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
-    potential  = -REAL(q) / REAL(n)
+    r_cm = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
+    r_g  = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
+    pe   = -REAL(q)
 
     IF ( PRESENT ( string ) ) THEN ! output required
        WRITE ( unit=output_unit, fmt='(a)'          ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Potential',    potential
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Rad Gyration', r_gyration
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'PE', pe
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Rg', r_g
     END IF
 
   END SUBROUTINE calculate
 
   SUBROUTINE update_histogram
+    IMPLICIT NONE
 
     IF ( q > nq .OR. q < 0 ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'q out of range ', q, nq
        STOP 'Error in update_histogram'
     END IF
 
-    h(q) = h(q) + 1.0
+    h(q)  = h(q) + 1.0
     q_max = MAX ( q, q_max )
 
   END SUBROUTINE update_histogram
 
   SUBROUTINE write_histogram ( filename )
     USE, INTRINSIC :: iso_fortran_env, ONLY : iostat_end, iostat_eor
+    IMPLICIT NONE
 
     CHARACTER(len=*), INTENT(in) :: filename
 

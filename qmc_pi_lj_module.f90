@@ -11,7 +11,7 @@ MODULE qmc_module
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: energy_cl_1, energy_cl, energy_qu_1, energy_qu
   PUBLIC :: move
-  PUBLIC :: pot_type
+  PUBLIC :: potential_type
 
   INTEGER                                :: n ! number of atoms
   INTEGER                                :: p ! number of beads
@@ -21,23 +21,23 @@ MODULE qmc_module
   REAL,    PARAMETER :: sigma = 1.0     ! Lennard-Jones diameter (unit of length)
   REAL,    PARAMETER :: epslj = 1.0     ! Lennard-Jones well depth (unit of energy)
 
-  TYPE pot_type ! A composite variable for interaction energies comprising
+  TYPE potential_type ! A composite variable for interaction energies comprising
      REAL    :: pot ! the potential energy and
-     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
-  END TYPE pot_type
+     LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+  END TYPE potential_type
 
   INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_pot_type
+     MODULE PROCEDURE add_potential_type
   END INTERFACE OPERATOR (+)
 
 CONTAINS
 
-  FUNCTION add_pot_type ( a, b ) RESULT (c)
-    TYPE(pot_type)             :: c    ! Result is the sum of the two inputs
-    TYPE(pot_type), INTENT(in) :: a, b
+  FUNCTION add_potential_type ( a, b ) RESULT (c)
+    TYPE(potential_type)             :: c    ! Result is the sum of the two inputs
+    TYPE(potential_type), INTENT(in) :: a, b
     c%pot = a%pot +    b%pot
-    c%ovr = a%ovr .OR. b%ovr
-  END FUNCTION add_pot_type
+    c%overlap = a%overlap .OR. b%overlap
+  END FUNCTION add_potential_type
 
   SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
@@ -73,16 +73,16 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   FUNCTION energy_cl ( box, r_cut ) RESULT ( energy )
-    TYPE(pot_type)     :: energy ! Returns a composite of pot and ovr
+    TYPE(potential_type)     :: energy ! Returns a composite of pot and overlap
     REAL, INTENT(in) :: box    ! Simulation box length
     REAL, INTENT(in) :: r_cut  ! Potential cutoff distance
 
     ! energy%pot is the nonbonded classical potential energy for whole system
-    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
+    ! energy%overlap is a flag indicating overlap (potential too high) to avoid overflow
     ! If this flag is .true., the value of energy%pot should not be used
     ! Actual calculation is performed by subroutine energy_cl_1
 
-    TYPE(pot_type) :: energy_ik
+    TYPE(potential_type) :: energy_ik
     INTEGER      :: i, k
 
     IF ( n /= SIZE(r,dim=2) ) THEN ! should never happen
@@ -94,25 +94,25 @@ CONTAINS
        STOP 'Error in energy_cl'
     END IF
 
-    energy = pot_type ( pot=0.0, ovr=.FALSE. ) ! Initialize
+    energy = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
 
     DO k = 1, p ! Loop over ring polymers
        DO i = 1, n - 1 ! Loop over atoms within polymer
           energy_ik = energy_cl_1 ( r(:,i,k), i, k, box, r_cut, gt )
-          IF ( energy_ik%ovr ) THEN
-             energy%ovr = .TRUE. ! Overlap detected
+          IF ( energy_ik%overlap ) THEN
+             energy%overlap = .TRUE. ! Overlap detected
              RETURN              ! Return immediately
           END IF
           energy = energy + energy_ik
        END DO ! End loop over atoms within polymer
     END DO ! End loop over ring polymers
 
-    energy%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    energy%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION energy_cl
 
   FUNCTION energy_cl_1 ( rik, i, k, box, r_cut, j_range ) RESULT ( energy )
-    TYPE(pot_type)                    :: energy  ! Returns a composite of pot and ovr
+    TYPE(potential_type)                    :: energy  ! Returns a composite of pot and overlap
     REAL, DIMENSION(3), INTENT(in)  :: rik     ! Coordinates of atom of interest
     INTEGER,            INTENT(in)  :: i, k    ! Index and polymer id of atom of interest
     REAL,               INTENT(in)  :: box     ! Simulation box length
@@ -120,7 +120,7 @@ CONTAINS
     INTEGER, OPTIONAL,  INTENT(in)  :: j_range ! Optional partner index range
 
     ! energy%pot is the nonbonded potential energy of atom rik with a set of other atoms
-    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
+    ! energy%overlap is a flag indicating overlap (potential too high) to avoid overflow
     ! If this is .true., the value of energy%pot should not be used
     ! The coordinates in rik are not necessarily identical with those in r(:,i,k)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
@@ -164,7 +164,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    energy = pot_type ( pot=0.0, ovr=.FALSE. ) ! Initialize
+    energy = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
 
     DO j = j1, j2
 
@@ -180,7 +180,7 @@ CONTAINS
           sr2        = 1.0 / r_ik_jk_sq    ! (sigma/rikjk)**2
 
           IF ( sr2 > sr2_overlap ) THEN
-             energy%ovr = .TRUE. ! Overlap detected
+             energy%overlap = .TRUE. ! Overlap detected
              RETURN              ! Return immediately
           END IF
 
@@ -195,7 +195,7 @@ CONTAINS
     energy%pot = 4.0 * energy%pot        ! factor of 4*epsilon
     energy%pot = energy%pot / REAL ( p ) ! classical potentials are weaker by a factor p
 
-    energy%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    energy%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION energy_cl_1
 

@@ -5,14 +5,16 @@ MODULE mc_module
 
   IMPLICIT NONE
   PRIVATE
+
+  ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: regrow, energy, spring_pot
-  PUBLIC :: n, r
-  PUBLIC :: pot_type
+  PUBLIC :: regrow, potential, spring_pot
 
-  INTEGER                             :: n ! Number of atoms
-  REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! Atomic positions (3,n)
+  ! Public data
+  INTEGER,                             PUBLIC :: n ! Number of atoms
+  REAL,   DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! Atomic positions (3,n)
 
+  ! Private data
   REAL, DIMENSION(:,:), ALLOCATABLE :: r_old ! Working array (3,n)
   REAL, DIMENSION(:,:), ALLOCATABLE :: r_new ! Working array (3,n)
 
@@ -20,46 +22,72 @@ MODULE mc_module
   REAL,    PARAMETER :: epslj = 1.0     ! LJ well depth
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
 
-  TYPE pot_type ! A composite variable for interaction energies comprising
-     REAL    :: pot ! the potential energy and
-     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
-  END TYPE pot_type
+  ! Public derived type
+  PUBLIC :: potential_type
+  TYPE potential_type ! A composite variable for interactions comprising
+     REAL    :: pot     ! the potential energy and
+     LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+  END TYPE potential_type
+
+  INTERFACE OPERATOR (+)
+     MODULE PROCEDURE add_potential_type
+  END INTERFACE OPERATOR (+)
 
 CONTAINS
 
+  FUNCTION add_potential_type ( a, b ) RESULT (c)
+    TYPE(potential_type)             :: c    ! Result is the sum of the two inputs
+    TYPE(potential_type), INTENT(in) :: a, b
+    c%pot     = a%pot       +  b%pot
+    c%overlap = a%overlap .OR. b%overlap
+  END FUNCTION add_potential_type
+
   SUBROUTINE introduction ( output_unit )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
-    WRITE ( unit=output_unit, fmt='(a)'           ) 'LJ chain with harmonic bond potential'
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'LJ chain, no cutoff, no shift'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',   sigma    
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epslj = ', epslj    
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Harmonic spring bond potential'
+
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion ( output_unit )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
+
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
+
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays
+    IMPLICIT NONE
+
     ALLOCATE ( r(3,n), r_old(3,n), r_new(3,n) ) 
+
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
+    IMPLICIT NONE
+
     DEALLOCATE ( r, r_old, r_new )
+
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE regrow ( temperature, m_max, k_max, bond, k_spring, pot, accepted )
+  SUBROUTINE regrow ( temperature, m_max, k_max, bond, k_spring, accepted )
     USE maths_module, ONLY : random_integer, random_vector, pick
+    IMPLICIT NONE
 
     REAL,    INTENT(in)    :: temperature ! Specified temperature
     INTEGER, INTENT(in)    :: m_max       ! Max atoms to regrow
     INTEGER, INTENT(in)    :: k_max       ! Number of random tries per atom in regrow
     REAL,    INTENT(in)    :: bond        ! Bond length
     REAL,    INTENT(in)    :: k_spring    ! Harmonic bond spring constant
-    REAL,    INTENT(inout) :: pot         ! Total nonbonded potential energy (to be updated)
     LOGICAL, INTENT(out)   :: accepted    ! Indicates acceptance or rejection of moves
 
-    ! This routine carries out a single regrowth move
+    ! This routine carries out a single regrowth move, modifying the array r
+
     ! A short sequence of m atoms (m<=m_max) is deleted and regrown in the CBMC manner
     ! We randomly select which end of the chain to apply each of these operations to
     ! At each stage, k_max different atom positions are tried
@@ -67,20 +95,21 @@ CONTAINS
     ! Rosenbluth weights are computed using the external (nonbonded) potential
     ! Acceptance/rejection is determined using these weights
 
-    REAL                       :: w_old   ! Old weight
-    REAL                       :: w_new   ! New weight
-    REAL                       :: pot_old ! Old potential energy
-    REAL                       :: pot_new ! New potential energy
-    INTEGER                    :: m       ! Number of atoms to regrow
-    INTEGER                    :: c       ! Growth option
-    INTEGER                    :: k       ! Try index
-    REAL,   DIMENSION(k_max)   :: w       ! Rosenbluth weights (involving nonbonded interactions)
-    REAL,   DIMENSION(3,k_max) :: r_try   ! Coordinates of trial atoms
+    ! r_old and r_new are used as working arrays
 
-    INTEGER         :: i
-    TYPE(pot_type)    :: eng
-    REAL            :: d, d_max, std, zeta
-    REAL, PARAMETER :: w_tol = 1.0e-10 ! Min weight tolerance
+    REAL                       :: w_old ! Old weight
+    REAL                       :: w_new ! New weight
+    INTEGER                    :: m     ! Number of atoms to regrow
+    INTEGER                    :: c     ! Growth option
+    INTEGER                    :: k     ! Try index
+    REAL,   DIMENSION(k_max)   :: w     ! Rosenbluth weights (involving nonbonded interactions)
+    REAL,   DIMENSION(3,k_max) :: r_try ! Coordinates of trial atoms
+
+    INTEGER              :: i
+    TYPE(potential_type) :: atom
+    REAL                 :: d, d_max, std, zeta
+    REAL, DIMENSION(3)   :: r1
+    REAL, PARAMETER      :: w_tol = 1.0e-10 ! Min weight tolerance
 
     std   = SQRT(temperature/k_spring) ! Spring bond standard deviation
     d_max = 3.0*std                    ! Impose a limit on variation, say 3*std
@@ -91,7 +120,6 @@ CONTAINS
     d_max = d_max + bond ! This is the actual max d allowed
 
     r_old    = r   ! Store old configuration
-    pot_old  = pot ! Store old nonbonded potential
 
     m = random_integer ( 1, m_max ) ! Number of atoms to regrow
     c = random_integer ( 1, 4 )     ! Growth option
@@ -101,60 +129,59 @@ CONTAINS
     SELECT CASE ( c )
 
     CASE ( 1 ) ! Remove from end and add to end
-       r(:,1:n-m) = r_old(:,1:n-m) ! copy first n-m atoms
+       r(:,1:n-m) = r_old(:,1:n-m) ! Copy first n-m atoms
 
     CASE ( 2 ) ! Remove from end and add to start
-       r(:,1:n-m) = r_old(:,n-m:1:-1) ! copy and reverse first n-m atoms
+       r(:,1:n-m) = r_old(:,n-m:1:-1) ! Copy and reverse first n-m atoms
 
     CASE ( 3 ) ! Remove from start and add to start
-       r(:,1:n-m) = r_old(:,n:m+1:-1) ! copy and reverse last n-m atoms
+       r(:,1:n-m) = r_old(:,n:m+1:-1) ! Copy and reverse last n-m atoms
 
     CASE ( 4 ) ! Remove from start and add to end
-       r(:,1:n-m) = r_old(:,m+1:n) ! copy last n-m atoms
+       r(:,1:n-m) = r_old(:,m+1:n) ! Copy last n-m atoms
 
     END SELECT
+
+    ! Take the opportunity to place atom 1 at the origin
+    r1         = r(:,1)
+    r(:,1:n-m) = r(:,1:n-m) - SPREAD ( r1, dim=2, ncopies=n-m )
 
     w_new = 1.0
     DO i = n-m+1, n ! Loop to regrow last m atoms, computing new weight
 
        DO k = 1, k_max ! Loop over k_max tries
-          d          = random_bond ( bond, std, d_max ) ! Generate random bond length around d=bond
-          r_try(:,k) = r(:,i-1) + d * random_vector()   ! Trial position in random direction from i-1
-          eng        = energy_1 ( r_try(:,k), i, lt )   ! Nonbonded interactions with earlier atoms
-          IF ( eng%ovr ) THEN
-             w(k) = 0.0 ! Store weight for this try (zero)
-          ELSE
-             w(k) = EXP ( -eng%pot / temperature ) ! Store weight for this try (Boltzmann factor)
-          END IF
+
+          d          = random_bond ( bond, std, d_max )  ! Generate random bond length around d=bond
+          r_try(:,k) = r(:,i-1) + d * random_vector()    ! Trial position in random direction from i-1
+          atom       = potential_1 ( r_try(:,k), i, lt ) ! Nonbonded interactions with earlier atoms
+
+          IF ( atom%overlap ) THEN                  ! Overlap test
+             w(k) = 0.0                             ! Store weight for this try (zero)
+          ELSE                                      ! Safe to calculate weight
+             w(k) = EXP ( -atom%pot / temperature ) ! Store weight for this try (Boltzmann factor)
+          END IF                                    ! End overlap test
+
        END DO ! End loop over k_max tries
 
        IF ( SUM(w) < w_tol ) THEN ! Early exit if this happens at any stage
           r        = r_old   ! Restore original configuration
-          pot      = pot_old ! Restore original potential energy
           accepted = .FALSE. ! No possible move: reject
           RETURN
        END IF
 
-       k      = pick ( w )           ! Pick winning try according to weights
-       r(:,i) = r_try(:,k)           ! Store winning position
-       w_new  = w_new * REAL(SUM(w)) ! Accumulate total weight
+       k      = pick ( w )     ! Pick winning try according to weights
+       r(:,i) = r_try(:,k)     ! Store winning position
+       w_new  = w_new * SUM(w) ! Accumulate total weight
 
     END DO ! End loop to regrow last m atoms, computing new weight
 
     IF ( w_new < w_tol ) THEN ! Overall weight is too small
        r        = r_old   ! Restore original configuration
-       pot      = pot_old ! Restore original potential energy
        accepted = .FALSE. ! No possible move: reject
        RETURN
     END IF
 
-    eng = energy ( )  ! Compute full nonbonded energy
-    IF ( eng%ovr ) THEN ! This should have been detected earlier
-       WRITE ( unit=error_unit, fmt='(a)' ) 'Overlap error'
-       STOP 'Impossible error in regrow'
-    END IF
-    pot_new = eng%pot ! Store new potential energy
-    r_new   = r       ! Store new configuration
+    r_new = r ! Store new configuration
 
     ! END OF PART 1: NEW CONFIGURATION AND WEIGHT ARE COMPLETE
 
@@ -176,28 +203,32 @@ CONTAINS
        ! Old position and weight are stored as try 1
 
        r_try(:,1) = r(:,i)
-       eng        = energy_1 ( r_try(:,1), i, lt ) ! Nonbonded energy with earlier atoms
-       IF ( eng%ovr ) THEN
-          w(1) = 0.0 ! Current weight is zero; this should not happen
-       ELSE
-          w(1) = EXP ( -eng%pot / temperature ) ! Current weight given by Boltzmann factor
-       END IF
+       atom       = potential_1 ( r_try(:,1), i, lt ) ! Nonbonded energy with earlier atoms
+
+       IF ( atom%overlap ) THEN                  ! Overlap test
+          w(1) = 0.0                             ! Current weight is zero; should not happen
+       ELSE                                      ! Safe to calculate weight
+          w(1) = EXP ( -atom%pot / temperature ) ! Current weight given by Boltzmann factor
+       END IF                                    ! End overlap test
 
        ! Remaining tries only required to compute weight
 
        DO k = 2, k_max ! Loop over k_max-1 other tries
-          d          = random_bond ( bond, std, d_max ) ! Generate random bond length around d=bond
-          r_try(:,k) = r(:,i-1) + d * random_vector ( ) ! Trial position in random direction from i-1
-          eng        = energy_1 ( r_try(:,k), i, lt )   ! Nonbonded interactions with earlier atoms
-          IF ( eng%ovr ) THEN
-             w(k) = 0.0 ! Store weight for this try (zero)
-          ELSE
-             w(k) = EXP ( -eng%pot / temperature ) ! Store weight for this try (Boltzmann factor)
-          END IF
+
+          d          = random_bond ( bond, std, d_max )  ! Generate random bond length around d=bond
+          r_try(:,k) = r(:,i-1) + d * random_vector ( )  ! Trial position in random direction from i-1
+          atom       = potential_1 ( r_try(:,k), i, lt ) ! Nonbonded interactions with earlier atoms
+
+          IF ( atom%overlap ) THEN                  ! Overlap test
+             w(k) = 0.0                             ! Store weight for this try (zero)
+          ELSE                                      ! Safe to calculate weight
+             w(k) = EXP ( -atom%pot / temperature ) ! Store weight for this try (Boltzmann factor)
+          END IF                                    ! End overlap test
+
        END DO ! End loop over k_max-1 other tries
 
-       r(:,i) = r_try(:,1)           ! Restore winning position (always the original one)
-       w_old  = w_old * REAL(SUM(w)) ! Accumulate total weight
+       r(:,i) = r_try(:,1)     ! Restore winning position (always the original one)
+       w_old  = w_old * SUM(w) ! Accumulate total weight
 
     END DO ! End loop to regrow last m atoms computing old weight
 
@@ -215,56 +246,56 @@ CONTAINS
     CALL RANDOM_NUMBER(zeta)
     IF ( zeta < ( w_new / w_old ) ) THEN
        r        = r_new
-       pot      = pot_new
        accepted = .TRUE.
     ELSE
        r        = r_old
-       pot      = pot_old
        accepted = .FALSE.
     END IF
 
   END SUBROUTINE regrow
 
-  FUNCTION energy ( )
-    TYPE(pot_type) :: energy ! Returns a composite of pot and ovr
+  FUNCTION potential ( ) RESULT ( system )
+    IMPLICIT NONE
+    TYPE(potential_type) :: system ! Returns a composite of pot and overlap
 
-    ! energy%pot is the nonbonded potential energy for whole system
-    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this flag is .true., the value of energy%pot should not be used
-    ! Actual calculation is performed by function energy_1
+    ! system%pot is the nonbonded potential energy for whole system
+    ! system%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this flag is .true., the value of system%pot should not be used
+    ! Actual calculation is performed by function potential_1
 
-    TYPE(pot_type) :: eng
-    INTEGER      :: i
+    TYPE(potential_type) :: atom
+    INTEGER              :: i
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
-       STOP 'Error in energy'
+       STOP 'Impossible error in potential'
     END IF
 
-    energy%pot = 0.0
+    system = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1
-       eng = energy_1 ( r(:,i), i, gt )
-       IF ( eng%ovr ) THEN
-          energy%ovr = .TRUE. ! Overlap detected
-          RETURN              ! Return immediately
+       atom = potential_1 ( r(:,i), i, gt )
+       IF ( atom%overlap ) THEN
+          system%overlap = .TRUE. ! Overlap detected
+          RETURN                  ! Return immediately
        END IF
-       energy%pot = energy%pot  + eng%pot
+       system = system  + atom
     END DO
 
-    energy%ovr = .FALSE. ! No overlaps detected
+    system%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
 
-  END FUNCTION energy
+  END FUNCTION potential
 
-  FUNCTION energy_1 ( ri, i, j_range ) RESULT ( energy )
-    TYPE(pot_type)                    :: energy  ! Returns a composite of pot and ovr
+  FUNCTION potential_1 ( ri, i, j_range ) RESULT ( atom )
+    IMPLICIT NONE
+    TYPE(potential_type)            :: atom    ! Returns a composite of pot and overlap
     REAL, DIMENSION(3), INTENT(in)  :: ri      ! Coordinates of atom of interest
     INTEGER,            INTENT(in)  :: i       ! Index of atom of interest
     INTEGER, OPTIONAL,  INTENT(in)  :: j_range ! Optional partner index range
 
-    ! energy%pot is the nonbonded potential energy of atom ri with a set of other atoms
-    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this is .true., the value of energy%pot should not be used
+    ! atom%pot is the nonbonded potential energy of atom ri with a set of other atoms
+    ! atom%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this is .true., the value of atom%pot should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
 
@@ -278,7 +309,7 @@ CONTAINS
 
     IF ( n > SIZE(r,dim=2) ) THEN ! Should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
-       STOP 'Error in energy_1'
+       STOP 'Error in potential_1'
     END IF
 
     IF ( PRESENT ( j_range ) ) THEN
@@ -291,14 +322,14 @@ CONTAINS
           j2 = n
        CASE default ! should never happen
           WRITE ( unit = error_unit, fmt='(a,i10)') 'j_range error ', j_range
-          STOP 'Impossible error in energy_1'
+          STOP 'Impossible error in potential_1'
        END SELECT
     ELSE
        j1 = 1
        j2 = n
     END IF
 
-    energy%pot = 0.0
+    atom = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Loop over selected range of partners
 
@@ -309,22 +340,23 @@ CONTAINS
        sr2    = 1.0 / rij_sq   ! (sigma/rij)**2
 
        IF ( sr2 > sr2_overlap ) THEN
-          energy%ovr = .TRUE. ! Overlap detected
-          RETURN              ! Return immediately
+          atom%overlap = .TRUE. ! Overlap detected
+          RETURN                ! Return immediately
        END IF
 
-       sr6 = sr2**3
-       energy%pot = energy%pot + sr6**2 - sr6
+       sr6      = sr2**3
+       atom%pot = atom%pot + sr6**2 - sr6 ! LJ potential (neither cut nor shifted)
 
     END DO ! End loop over selected range of partners
 
-    energy%ovr = .FALSE.          ! No overlaps detected
-    energy%pot = 4.0 * energy%pot ! Numerical factor
+    atom%pot     = atom%pot * 4.0 ! Numerical factor
+    atom%overlap = .FALSE.        ! No overlaps detected (redundant but for clarity)
 
-  END FUNCTION energy_1
+  END FUNCTION potential_1
 
   FUNCTION random_bond ( b, std, d_max ) RESULT ( d )
     USE maths_module, ONLY : random_normal
+    IMPLICIT NONE
     REAL             :: d     ! Returns random bond length, generated around a
     REAL, INTENT(in) :: b     ! specified mean bond length, Gaussian-distributed with
     REAL, INTENT(in) :: std   ! specified standard deviation, but subject to a
@@ -346,12 +378,14 @@ CONTAINS
        CALL RANDOM_NUMBER ( zeta )         ! Uniform in range 0..1 for rejection method
        IF ( zeta <= (d/d_max)**2 ) EXIT    ! Compare with ratio of distributions to accept
     END DO ! End loop over attempts
+
   END FUNCTION random_bond
 
   FUNCTION spring_pot ( b, k ) RESULT ( pot )
-    REAL             :: pot ! Internal spring potential energy, given
-    REAL, INTENT(in) :: b   ! specified bond length and
-    REAL, INTENT(in) :: k   ! specified force constant
+    IMPLICIT NONE
+    REAL             :: pot ! Returns internal spring potential energy
+    REAL, INTENT(in) :: b   ! Specified bond length
+    REAL, INTENT(in) :: k   ! Specified force constant
 
     INTEGER            :: i
     REAL               :: d
@@ -365,7 +399,7 @@ CONTAINS
        pot = pot + (d-b)**2        ! Squared displacement
     END DO ! End loop over atoms
 
-    ! Numerical factors
+    ! Numerical factor
     pot = pot * 0.5 * k
 
   END FUNCTION spring_pot

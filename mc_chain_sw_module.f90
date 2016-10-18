@@ -5,13 +5,16 @@ MODULE mc_module
 
   IMPLICIT NONE
   PRIVATE
+
+  ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: regrow, crank, pivot, weight, qcount
-  PUBLIC :: n, r
 
-  INTEGER                             :: n ! Number of atoms
-  REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! Atomic positions (3,n)
+  ! Public data
+  INTEGER,                             PUBLIC :: n ! Number of atoms
+  REAL,   DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! Atomic positions (3,n)
 
+  ! Private data
   REAL, DIMENSION(:,:), ALLOCATABLE :: r_old ! Working array (3,n)
   REAL, DIMENSION(:,:), ALLOCATABLE :: r_new ! Working array (3,n)
 
@@ -21,6 +24,7 @@ MODULE mc_module
 CONTAINS
 
   SUBROUTINE introduction ( output_unit )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Hard-sphere chain with fixed bond length'
@@ -30,20 +34,30 @@ CONTAINS
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion ( output_unit )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
+
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
+
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays
+    IMPLICIT NONE
+
     ALLOCATE ( r(3,n), r_old(3,n), r_new(3,n) )
+
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
+    IMPLICIT NONE
+
     DEALLOCATE ( r, r_old, r_new )
+
   END SUBROUTINE deallocate_arrays
 
   SUBROUTINE regrow ( s, m_max, k_max, bond, range, q, accepted )
     USE maths_module, ONLY : random_integer, random_vector, pick
+    IMPLICIT NONE
 
     REAL,    DIMENSION(0:), INTENT(in)    :: s        ! Entropy table used in accept function
     INTEGER,                INTENT(in)    :: m_max    ! Max atoms to regrow
@@ -53,7 +67,10 @@ CONTAINS
     INTEGER,                INTENT(inout) :: q        ! Energy, negative of (to be updated)
     LOGICAL,                INTENT(out)   :: accepted ! Indicates success or failure of move
 
-    ! This routine carries out a single regrowth move
+    ! This routine carries out a single regrowth move, modifying the array r
+    ! It is assumed that q contains the (negative of the) energy on input
+    ! and this is updated to give the new value, if the move is accepted, on return
+
     ! A short sequence of m atoms (m<=m_max) is deleted and regrown in the CBMC manner
     ! We randomly select which end of the chain to apply each of these operations to
     ! At each stage, k_max different atom positions are tried
@@ -62,16 +79,19 @@ CONTAINS
     ! hard-core overlap part of the non-bonded interactions: essentially they count non-overlaps
     ! Hence they are suitable for use in both NVT and Wang-Landau simulations
 
-    INTEGER                      :: q_old, q_new ! Old and new energies
-    REAL                         :: w_old, w_new ! Old and new weights
-    INTEGER                      :: m            ! Number of atoms to regrow
-    INTEGER                      :: c            ! Growth option
-    INTEGER                      :: k            ! Try index
-    INTEGER, DIMENSION(k_max)    :: w            ! Rosenbluth weights (here integers, 0 or 1)
-    REAL,    DIMENSION(3,k_max)  :: r_try        ! Coordinates of trial atoms
-    INTEGER                      :: i            ! Atom index
+    INTEGER                      :: q_old ! Old energy
+    INTEGER                      :: q_new ! New energy
+    REAL                         :: w_old ! Old weight
+    REAL                         :: w_new ! New weight
+    INTEGER                      :: m     ! Number of atoms to regrow
+    INTEGER                      :: c     ! Growth option
+    INTEGER                      :: k     ! Try index
+    INTEGER, DIMENSION(k_max)    :: w     ! Rosenbluth weights (here integers, 0 or 1)
+    REAL,    DIMENSION(3,k_max)  :: r_try ! Coordinates of trial atoms
 
-    REAL, PARAMETER :: w_tol = 0.5 ! Min weight tolerance (w takes integer values)
+    INTEGER            :: i
+    REAL, DIMENSION(3) :: r1
+    REAL, PARAMETER    :: w_tol = 0.5 ! Min weight tolerance (w takes integer values)
 
     r_old = r ! Store old configuration
     q_old = q ! Store old q
@@ -84,18 +104,22 @@ CONTAINS
     SELECT CASE ( c )
 
     CASE ( 1 ) ! Remove from end and add to end
-       r(:,1:n-m) = r_old(:,1:n-m) ! copy first n-m atoms
+       r(:,1:n-m) = r_old(:,1:n-m) ! Copy first n-m atoms
 
     CASE ( 2 ) ! Remove from end and add to start
-       r(:,1:n-m) = r_old(:,n-m:1:-1) ! copy and reverse first n-m atoms
+       r(:,1:n-m) = r_old(:,n-m:1:-1) ! Copy and reverse first n-m atoms
 
     CASE ( 3 ) ! Remove from start and add to start
-       r(:,1:n-m) = r_old(:,n:m+1:-1) ! copy and reverse last n-m atoms
+       r(:,1:n-m) = r_old(:,n:m+1:-1) ! Copy and reverse last n-m atoms
 
     CASE ( 4 ) ! Remove from start and add to end
-       r(:,1:n-m) = r_old(:,m+1:n) ! copy last n-m atoms
+       r(:,1:n-m) = r_old(:,m+1:n) ! Copy last n-m atoms
 
     END SELECT
+
+    ! Take the opportunity to place atom 1 at the origin
+    r1         = r(:,1)
+    r(:,1:n-m) = r(:,1:n-m) - SPREAD ( r1, dim=2, ncopies=n-m )
 
     w_new = 1.0
     DO i = n-m+1, n ! Loop to regrow last m atoms, computing new weight
@@ -135,10 +159,10 @@ CONTAINS
     SELECT CASE ( c )
 
     CASE ( 1, 2 ) ! Remove and hence reconstruct at end
-       r = r_old(:,1:n) ! copy all n atoms
+       r = r_old(:,1:n) ! Copy all n atoms
 
     CASE ( 3, 4 ) ! Remove and reconstruct at start
-       r = r_old(:,n:1:-1) ! copy and reverse all n atoms
+       r = r_old(:,n:1:-1) ! Copy and reverse all n atoms
 
     END SELECT
 
@@ -148,7 +172,7 @@ CONTAINS
        ! Old position and weight are stored as try 1
 
        r_try(:,1) = r(:,i) ! Current position
-       w(1) = 1            ! Current weight must be 1
+       w(1)       = 1      ! Current weight must be 1
 
        ! Remaining tries only required to compute weight
 
@@ -179,6 +203,7 @@ CONTAINS
 
   SUBROUTINE pivot ( s, phi_max, range, q, accepted )
     USE maths_module, ONLY : random_integer, random_vector, rotate_vector
+    IMPLICIT NONE
 
     REAL,    DIMENSION(0:), INTENT(in)    :: s        ! Entropy table used in accept function
     REAL,                   INTENT(in)    :: phi_max  ! Maximum angle of pivot
@@ -186,30 +211,33 @@ CONTAINS
     INTEGER,                INTENT(inout) :: q        ! Energy, negative of (to be updated)
     LOGICAL,                INTENT(out)   :: accepted ! Indicates success or failure of move
 
-    ! This routine carries out a pivot move
+    ! This routine carries out a pivot move, modifying the array r
+    ! It is assumed that q contains the (negative of the) energy on input
+    ! and this is updated to give the new value, if the move is accepted, on return
+
     ! An atom is picked at random, and the part of the chain lying to one side of it
     ! is rotated as a whole, by a random angle, about a randomly oriented axis
     ! There are no weights to take into account in the acceptance/rejection decision
     ! (the function weight_1 is used simply to indicate overlap / no overlap)
 
-    INTEGER            :: q_old, q_new ! Old and new energies
-    INTEGER            :: j            ! Pivot position
-    INTEGER            :: k            ! Which part to pivot
-    INTEGER            :: i            ! Atom index
-    REAL, DIMENSION(3) :: rj, rij      ! Local position vectors
-    REAL, DIMENSION(3) :: axis         ! Pivot axis
-    REAL               :: phi          ! Pivot angle
-    REAL               :: zeta         ! Random number
+    INTEGER              :: q_old ! Old energy
+    INTEGER              :: q_new ! New energy
+    INTEGER              :: j     ! Index of pivot
+    REAL,   DIMENSION(3) :: rj    ! Position of pivot
+
+    REAL,   DIMENSION(3) :: r1, rij, axis
+    INTEGER              :: i, k
+    REAL                 :: zeta, phi
+
+    IF ( n < 3 ) THEN
+       accepted = .FALSE. ! Makes no sense to pivot such a short chain
+       RETURN             ! Return immediately
+    END IF
 
     r_old = r ! Store old configuration
     q_old = q ! Store old q
 
-    j = random_integer ( 2, n-1 ) ! Pivot position (not at either end)
-    k = random_integer ( 1, 2 )   ! Which part to pivot (actually redundant here)
-
-    axis = random_vector ()            ! Pivot rotation axis
-    CALL RANDOM_NUMBER ( zeta )        ! Uniform random number in range (0,1)
-    phi = phi_max * ( 2.0*zeta - 1.0 ) ! Pivot rotation angle in desired range
+    k = random_integer ( 1, 2 ) ! Which part to pivot (actually redundant here)
 
     SELECT CASE ( k )
     CASE ( 1 )
@@ -218,15 +246,34 @@ CONTAINS
        r = r_old(:,n:1:-1) ! Copy and reverse atoms
     END SELECT
 
+    ! Take the opportunity to place atom 1 at the origin
+    r1     = r(:,1)
+    r(:,:) = r(:,:) - SPREAD ( r1, dim=2, ncopies=n )
+
+    j  = random_integer ( 2, n-1 ) ! Pivot position (not at either end)
+    rj = r(:,j) ! Pivot point
+
+    DO i = 2, j ! Loop over static atoms, redundant but for roundoff
+       IF ( weight_1 ( r(:,i), i, lt ) == 0 ) THEN ! Check for overlaps
+          r        = r_old   ! Restore original configuration
+          q        = q_old   ! Redundant but for clarity
+          accepted = .FALSE. ! This move is rejected
+          RETURN
+       END IF ! End check for overlaps
+    END DO ! End loop over static atoms, redundant but for roundoff
+
     ! Pivot, and check for overlap in new configuration
     ! NB include overlap checks within rotated segment, because of roundoff
 
-    rj = r(:,j) ! Pivot point
+    axis = random_vector ()            ! Pivot rotation axis
+    CALL RANDOM_NUMBER ( zeta )        ! Uniform random number in range (0,1)
+    phi = phi_max * ( 2.0*zeta - 1.0 ) ! Pivot rotation angle in desired range
 
     DO i = j+1, n ! Loop over moving atoms
-       rij = r(:,i) - rj                      ! Relative vector of atom
-       rij = rotate_vector ( phi, axis, rij ) ! Rotate relative vector
-       r(:,i) = rj + rij                      ! New absolute position
+
+       rij    = r(:,i) - rj                      ! Relative vector of atom
+       rij    = rotate_vector ( phi, axis, rij ) ! Rotate relative vector
+       r(:,i) = rj + rij                         ! New absolute position
 
        IF ( weight_1 ( r(:,i), i, lt ) == 0 ) THEN ! Check for overlaps
           r        = r_old   ! Restore original configuration
@@ -254,6 +301,7 @@ CONTAINS
 
   SUBROUTINE crank ( s, phi_max, range, q, accepted )
     USE maths_module, ONLY : random_integer, rotate_vector
+    IMPLICIT NONE
 
     REAL,    DIMENSION(0:), INTENT(in)    :: s        ! Entropy table used in accept function
     REAL,                   INTENT(in)    :: phi_max  ! Maximum crank angle
@@ -261,7 +309,10 @@ CONTAINS
     INTEGER,                INTENT(inout) :: q        ! Energy, negative of (to be updated)
     LOGICAL,                INTENT(out)   :: accepted ! Indicates success or failure of move
 
-    ! This routine carries out a crankshaft move
+    ! This routine carries out a crankshaft move, modifying the array r
+    ! It is assumed that q contains the (negative of the) energy on input
+    ! and this is updated to give the new value, if the move is accepted, on return
+
     ! An atom is picked at random. Unless it is an end-atom, a rotation axis
     ! is defined as the line joining the two atoms on either side, and the
     ! chosen atom is rotated about that axis by a random angle.
@@ -270,13 +321,17 @@ CONTAINS
     ! There are no weights to take into account in the acceptance/rejection decision
     ! (the function weight_1 is used simply to indicate overlap / no overlap)
 
-    INTEGER            :: q_old, q_new ! Old and new energies
-    INTEGER            :: i            ! Atom index
-    REAL, DIMENSION(3) :: rj, rij      ! Local position vectors
-    REAL, DIMENSION(3) :: axis         ! Crankshaft axis
-    REAL               :: phi          ! Crankshaft angle
-    REAL               :: zeta         ! Random number
-    REAL               :: norm
+    INTEGER :: q_old ! Old energy
+    INTEGER :: q_new ! New energy
+
+    INTEGER            :: i
+    REAL, DIMENSION(3) :: rj, rij, axis
+    REAL               :: phi, zeta, norm
+
+    IF ( n < 3 ) THEN
+       accepted = .FALSE. ! Makes no sense to crank such a short chain
+       RETURN             ! Return immediately
+    END IF
 
     r_old = r ! Store old configuration
     q_old = q ! Store old q
@@ -290,22 +345,22 @@ CONTAINS
     phi = ( 2.0*zeta - 1.0 ) * phi_max ! Rotation angle in desired range
 
     IF ( i == 1 ) THEN            ! Rotate about 2--3 bond
-       rj   = r(:,2)              !   reference position
        axis = r(:,2) - r(:,3)     !   axis of rotation
+       rj   = r(:,2)              !   reference position on axis
     ELSE IF ( i == n ) THEN       ! Rotate about (n-1)--(n-2) bond
-       rj   = r(:,n-1)            !   reference position
        axis = r(:,n-1) - r(:,n-2) !   axis of rotation
+       rj   = r(:,n-1)            !   reference position on axis
     ELSE                          ! Rotate about (i-1)--(i+1) bond
-       rj   = r(:,i-1)            !   reference position
        axis = r(:,i+1) - r(:,i-1) !   axis of rotation
+       rj   = r(:,i-1)            !   reference position on axis
     END IF
 
     norm = SQRT(SUM(axis**2)) ! Squared length of rotation axis
     axis = axis / norm        ! Unit vector along rotation axis
 
-    rij = r(:,i) - rj                      ! Relative vector of atom
-    rij = rotate_vector ( phi, axis, rij ) ! Rotate relative vector
-    r(:,i) = rj + rij                      ! New absolute position
+    rij    = r(:,i) - rj                      ! Relative vector of atom
+    rij    = rotate_vector ( phi, axis, rij ) ! Rotate relative vector
+    r(:,i) = rj + rij                         ! New absolute position
 
     IF ( weight_1 ( r(:,i), i ) == 0 ) THEN ! Check for overlaps
        r        = r_old   ! Restore original configuration
@@ -330,6 +385,7 @@ CONTAINS
   END SUBROUTINE crank
 
   FUNCTION weight () RESULT ( w )
+    IMPLICIT NONE
     INTEGER :: w ! Returns configuration weight = 0 (overlap) or 1 (no overlap)
 
     ! Arithmetically w is the product of all the pair Boltzmann factors
@@ -349,13 +405,16 @@ CONTAINS
   END FUNCTION weight
 
   FUNCTION weight_1 ( ri, i, j_range ) RESULT ( w )
+    IMPLICIT NONE
     INTEGER                           :: w       ! Returns weight (0 or 1) associated with single atom
     REAL,    DIMENSION(3), INTENT(in) :: ri      ! Coordinates of atom of interest
     INTEGER,               INTENT(in) :: i       ! Index of atom of interest
     INTEGER, OPTIONAL,     INTENT(in) :: j_range ! Partner index range
 
-    ! Calculates weight associated with atom ri (not necessarily identical with r(:,i))
-    ! due to nonbonded interactions with j/=i, j>i, or j<i depending on j_range
+    ! Calculates weight associated with atom ri due to nonbonded interactions with other atoms
+    ! The coordinates in ri are not necessarily identical with those in r(:,i)
+    ! The optional argument j_range restricts partner indices to j>i, or j<i
+
     ! This is athermal, based on hard core nonbonded overlaps only
     ! The result is either 0 (overlap) or 1 (non overlap)
     ! Arithmetically w is the product of all the pair Boltzmann factors
@@ -389,9 +448,9 @@ CONTAINS
 
        IF ( ABS(j-i) <= 1 ) CYCLE ! Skip self and bonded neighbours
 
-       rij    = ri(:) - r(:,j)     ! Separation vector
-       rij_sq = SUM(rij**2)        ! Squared separation
-       IF (  rij_sq < 1.0 ) RETURN ! Overlap detected, no need to continue
+       rij    = ri(:) - r(:,j)    ! Separation vector
+       rij_sq = SUM(rij**2)       ! Squared separation
+       IF ( rij_sq < 1.0 ) RETURN ! Overlap detected, no need to continue
 
     END DO ! End loop over selected range of partners
 
@@ -400,12 +459,16 @@ CONTAINS
   END FUNCTION weight_1
 
   FUNCTION qcount ( range ) RESULT ( q )
-    INTEGER          :: q     ! Counts all square-well interactions
+    IMPLICIT NONE
+    INTEGER          :: q     ! Returns a count of all square-well interactions
     REAL, INTENT(in) :: range ! Range of attractive well
+
+    ! Actual calculation is performed by function qcount_1
 
     INTEGER :: i
 
     q = 0
+
     DO i = 1, n-1 ! Loop over atoms, checking upwards for partners
        q = q + qcount_1 ( r(:,i), i, range, gt )
     END DO ! End loop over atoms, checking upwards for partners
@@ -413,11 +476,16 @@ CONTAINS
   END FUNCTION qcount
 
   FUNCTION qcount_1 ( ri, i, range, j_range ) RESULT ( q )
-    INTEGER                           :: q       ! Counts square-well interactions for single atom
+    IMPLICIT NONE
+    INTEGER                           :: q       ! Returns a count of square-well interactions
     REAL,    DIMENSION(3), INTENT(in) :: ri      ! Coordinates of atom of interest
     INTEGER,               INTENT(in) :: i       ! Index of atom of interest
     REAL,                  INTENT(in) :: range   ! Range of attractive well
     INTEGER, OPTIONAL,     INTENT(in) :: j_range ! Optional partner index range
+
+    ! Counts square-well interactions between specified atom and a set of other atoms
+    ! The coordinates in ri are not necessarily identical with those in r(:,i)
+    ! The optional argument j_range restricts partner indices to j>i, or j<i
 
     INTEGER            :: j, j1, j2
     REAL, DIMENSION(3) :: rij
@@ -457,21 +525,22 @@ CONTAINS
   END FUNCTION qcount_1
 
   FUNCTION accept ( s, q_old, q_new, w_old, w_new )
-    LOGICAL                                      :: accept       ! Returns accept/reject decision based on
-    REAL,    DIMENSION(0:), INTENT(in)           :: s            ! Entropy table
-    INTEGER,                INTENT(in)           :: q_old, q_new ! Old & new energies, and if present,
-    REAL,                   INTENT(in), OPTIONAL :: w_old, w_new ! old & new weights
+    USE maths_module, ONLY : metropolis
+    IMPLICIT NONE
+    LOGICAL                            :: accept       ! Returns accept/reject decision based on
+    REAL,    DIMENSION(0:), INTENT(in) :: s            ! supplied entropy table,
+    INTEGER,                INTENT(in) :: q_old, q_new ! old & new energies, and if present,
+    REAL,    OPTIONAL,      INTENT(in) :: w_old, w_new ! old & new weights
 
     ! This routine is essentially the Metropolis-Hastings formula, generalized
     ! to use a specified tabulated function of the energy in the exponent
     ! For NVT MC, s(q) is just E(q)/kT = -q/kT since energy is -q
     ! For Wang-Landau, s(q) is the entropy function, which is updated through the run
-    ! In either case, weights (positive integer values) may appear from the regrowth moves
+    ! In either case, weights (real, but taking positive integer values here) may optionally appear
 
     INTEGER         :: nq
-    REAL            :: zeta, delta
+    REAL            :: delta
     REAL, PARAMETER :: w_tol = 0.5 ! Min weight tolerance (w takes integer values)
-    REAL, PARAMETER :: exponent_guard = 75.0
 
     ! Check that we are within bounds for the entropy table
     nq = UBOUND(s,1)
@@ -499,14 +568,7 @@ CONTAINS
 
     END IF ! End inclusion of weights
 
-    IF ( delta > exponent_guard ) THEN ! too high, reject without evaluating
-       accept = .FALSE.
-    ELSE IF ( delta < 0.0 ) THEN ! downhill, accept without evaluating
-       accept = .TRUE.
-    ELSE
-       CALL RANDOM_NUMBER ( zeta ) ! Uniform random number in range (0,1)
-       accept = EXP(-delta) > zeta ! Metropolis test
-    END IF
+    accept = metropolis ( delta )
 
   END FUNCTION accept
 

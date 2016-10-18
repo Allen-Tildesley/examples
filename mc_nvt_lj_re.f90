@@ -8,7 +8,7 @@ PROGRAM mc_nvt_lj_re
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       energy_1, energy, move, n, r, pot_type
+       &                       potential_1, potential, move, n, r, potential_type
   USE mpi
 
   IMPLICIT NONE
@@ -36,19 +36,24 @@ PROGRAM mc_nvt_lj_re
   ! The model is defined in mc_module
 
   ! Most important variables
-  REAL :: box         ! box length
-  REAL :: density     ! density
-  REAL :: dr_max      ! maximum MC displacement
-  REAL :: temperature ! specified temperature
-  REAL :: r_cut       ! potential cutoff distance
-  REAL :: pot         ! total potential energy
-  REAL :: vir         ! total virial
-  REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
-  REAL :: swap_ratio  ! acceptance ratio of swaps with higher neighbour (to be averaged)
-  REAL :: pres_virial ! virial pressure (to be averaged)
-  REAL :: potential   ! potential energy per atom (to be averaged)
+  REAL :: box         ! Box length
+  REAL :: density     ! Density
+  REAL :: dr_max      ! Maximum MC displacement
+  REAL :: temperature ! Specified temperature
+  REAL :: r_cut       ! Potential cutoff distance
+  REAL :: pot         ! Total potential energy
+  REAL :: vir         ! Total virial
 
-  TYPE(pot_type) :: eng_old, eng_new ! Composite energy = pot & vir & overlap variables
+  ! Quantities to be averaged
+  REAL :: m_ratio ! Acceptance ratio of moves
+  REAL :: x_ratio ! Acceptance ratio of exchange swaps with higher neighbour
+  REAL :: en_cut  ! internal energy per atom for simulated, cut, potential
+  REAL :: en_full ! internal energy per atom for full potential with LRC
+  REAL :: p_cut   ! pressure for simulated, cut, potential
+  REAL :: p_full  ! pressure for full potential with LRC
+
+  ! Composite interaction = pot & vir & overlap variables
+  TYPE(potential_type) :: system, atom_old, atom_new
 
   REAL, DIMENSION(:), ALLOCATABLE :: every_temperature, every_beta, every_dr_max
 
@@ -145,16 +150,17 @@ PROGRAM mc_nvt_lj_re
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  eng_old = energy ( box, r_cut )
-  IF ( eng_old%ovr ) THEN
+  system = potential ( box, r_cut ) ! Initial energy and overlap check
+  IF ( system%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_lj_re'
   END IF
-  pot = eng_old%pot
-  vir = eng_old%vir
+  pot = system%pot
+  vir = system%vir
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Swap ratio', 'Potential', 'Virial Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Swap ratio', &
+       &            'E/N (cut)', 'P (cut)', 'E/N (full)', 'P (full)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -166,75 +172,96 @@ PROGRAM mc_nvt_lj_re
 
         DO i = 1, n ! Begin loop over atoms
 
-           ri(:)   = r(:,i)
-           eng_old = energy_1 ( ri, i, box, r_cut )
+           ri(:)    = r(:,i)
+           atom_old = potential_1 ( ri, i, box, r_cut ) ! Old atom potential, virial etc
 
-           IF ( eng_old%ovr ) THEN ! should never happen
+           IF ( atom_old%overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_lj_re'
            END IF
 
-           CALL RANDOM_NUMBER ( zeta )            ! Three uniform random numbers in range (0,1)
-           zeta    = 2.0*zeta - 1.0               ! now in range (-1,+1)
-           ri(:)   = ri(:) + zeta * dr_max / box  ! Trial move to new position (in box=1 units)
-           ri(:)   = ri(:) - ANINT ( ri(:) )      ! Periodic boundary correction
-           eng_new = energy_1 ( ri, i, box, r_cut )
+           CALL RANDOM_NUMBER ( zeta )                  ! Three uniform random numbers in range (0,1)
+           zeta     = 2.0*zeta - 1.0                    ! now in range (-1,+1)
+           ri(:)    = ri(:) + zeta * dr_max / box       ! Trial move to new position (in box=1 units)
+           ri(:)    = ri(:) - ANINT ( ri(:) )           ! Periodic boundary correction
+           atom_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
 
-           IF ( .NOT. eng_new%ovr ) THEN ! consider non-overlapping configuration
-              delta = ( eng_new%pot - eng_old%pot ) / temperature
-              IF ( metropolis ( delta ) ) THEN    ! accept Metropolis test
-                 pot    = pot + eng_new%pot - eng_old%pot ! update potential energy
-                 vir    = vir + eng_new%vir - eng_old%vir ! update virial
-                 CALL move ( i, ri )              ! update position
-                 moves  = moves + 1               ! increment move counter
-              END IF ! reject Metropolis test
-           END IF ! reject overlapping configuration
+           IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
+
+              delta = ( atom_new%pot - atom_old%pot ) / temperature
+
+              IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
+                 pot = pot + atom_new%pot - atom_old%pot ! Update potential energy
+                 vir = vir + atom_new%vir - atom_old%vir ! Update virial
+                 CALL move ( i, ri )                     ! Update position
+                 moves = moves + 1                       ! Increment move counter
+              END IF ! End accept Metropolis test
+
+           END IF ! End test for overlapping configuration
 
         END DO ! End loop over atoms
 
-        IF ( MOD (stp, swap_interval) == 0 ) THEN ! test for swap interval
+        m_ratio  = REAL(moves) / REAL(n)
+
+        IF ( MOD (stp, swap_interval) == 0 ) THEN ! Test for swap interval
+
            swapped = 0
-           DO updown = 1, 2 ! loop to look one way then the other
-              IF ( MOD(m,2) == MOD(updown,2) ) THEN ! look up, partner is m+1
-                 IF ( m+1 < p ) THEN ! ensure partner exists
-                    other_beta = every_beta(m+1)
+
+           DO updown = 1, 2 ! Loop to look one way then the other
+
+              IF ( MOD(m,2) == MOD(updown,2) ) THEN ! Look up, partner is m+1
+
+                 IF ( m+1 < p ) THEN ! Ensure partner exists
+                    other_beta = every_beta(m+1) ! We already know the other beta
                     CALL MPI_Sendrecv ( pot,       1, MPI_REAL, m+1, msg1_id, &
                          &              other_pot, 1, MPI_REAL, m+1, msg2_id, &
-                         &              MPI_COMM_WORLD, msg_status, msg_error )
-                    delta = -(beta - other_beta) * (pot - other_pot)
-                    swap  = metropolis ( delta )
+                         &              MPI_COMM_WORLD, msg_status, msg_error ) ! Exchange pot
+                    delta = -(beta - other_beta) * (pot - other_pot) ! Delta for Metropolis decision
+                    swap  = metropolis ( delta ) ! Decision taken on this process
                     CALL MPI_Send ( swap, 1, MPI_LOGICAL, m+1, msg3_id, &
-                         &          MPI_COMM_WORLD, msg_error )
-                    IF ( swap ) THEN ! exchange configurations
+                         &          MPI_COMM_WORLD, msg_error ) ! Send decision to other process
+
+                    IF ( swap ) THEN ! Exchange configurations
                        CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m+1, msg1_id, m+1, msg2_id, &
                             &                      MPI_COMM_WORLD, msg_status, msg_error )
-                       pot = other_pot
+                       pot = other_pot ! Other pot is already here, but we need to exchange vir
+                       CALL MPI_Sendrecv_replace ( vir, 1, MPI_REAL, m+1, msg1_id, m+1, msg2_id, &
+                            &                      MPI_COMM_WORLD, msg_status, msg_error )
                        swapped = 1
-                    END IF ! end exchange configurations
-                 END IF ! end ensure partner exists
-              ELSE ! look down, partner is m-1
-                 IF ( m-1 >= 0 ) THEN ! ensure partner exists
-                    other_beta = every_beta(m-1)
+                    END IF ! End exchange configurations
+
+                 END IF ! End ensure partner exists
+
+              ELSE ! Look down, partner is m-1
+
+                 IF ( m-1 >= 0 ) THEN ! Ensure partner exists
                     CALL MPI_Sendrecv (  pot,       1, MPI_REAL, m-1, msg2_id, &
                          &               other_pot, 1, MPI_REAL, m-1, msg1_id, &
-                         &               MPI_COMM_WORLD, msg_status, msg_error )
+                         &               MPI_COMM_WORLD, msg_status, msg_error ) ! Exchange pot
                     CALL MPI_Recv ( swap, 1, MPI_LOGICAL, m-1, msg3_id, &
-                         &          MPI_COMM_WORLD, msg_status, msg_error )
-                    IF ( swap ) THEN ! exchange configurations
+                         &          MPI_COMM_WORLD, msg_status, msg_error ) ! Let other process take decision
+
+                    IF ( swap ) THEN ! Exchange configurations
                        CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m-1, msg2_id, m-1, msg1_id, &
                             &                      MPI_COMM_WORLD,msg_status,msg_error)
-                       pot = other_pot
-                    END IF ! end exchange configurations
-                 END IF ! end ensure partner exists
-              END IF ! end choice of which way to look
-           END DO ! end loop to look one way then the other
-        END IF ! end test for swap interval
+                       pot = other_pot ! Other pot is already here, but we need to exchange vir
+                       CALL MPI_Sendrecv_replace ( vir, 1, MPI_REAL, m-1, msg2_id, m-1, msg1_id, &
+                            &                      MPI_COMM_WORLD,msg_status,msg_error)
+                    END IF ! End exchange configurations
+
+                 END IF ! End ensure partner exists
+
+              END IF ! End choice of which way to look
+
+           END DO ! End loop to look one way then the other
+
+        END IF ! End test for swap interval
+
+        x_ratio  = REAL(swapped*swap_interval) ! Include factor for only attempting at intervals
 
         ! Calculate all variables for this step
-        move_ratio  = REAL(moves) / REAL(n)
-        swap_ratio  = REAL(swapped*swap_interval) ! factor for only attempting at intervals
         CALL calculate ( )
-        CALL blk_add ( [move_ratio,swap_ratio,potential,pres_virial] )
+        CALL blk_add ( [m_ratio,x_ratio,en_cut,p_cut,en_full,p_full] )
 
      END DO ! End loop over steps
 
@@ -248,13 +275,13 @@ PROGRAM mc_nvt_lj_re
 
   CALL calculate ( 'Final values' )
 
-  eng_old = energy ( box, r_cut )
-  IF ( eng_old%ovr ) THEN ! should never happen
+  system = potential ( box, r_cut )
+  IF ( system%overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_lj_re'
   END IF
-  pot = eng_old%pot
-  vir = eng_old%vir
+  pot = system%pot
+  vir = system%vir
   CALL calculate ( 'Final check' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
@@ -270,17 +297,24 @@ PROGRAM mc_nvt_lj_re
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE mc_module, ONLY : energy_lrc, pressure_lrc
+    USE mc_module, ONLY : potential_lrc, pressure_lrc, pressure_delta
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    potential   = pot / REAL ( n ) + energy_lrc ( density, r_cut )
-    pres_virial = density * temperature + vir / box**3 + pressure_lrc ( density, r_cut )
+    en_cut  = pot / REAL ( n )                          ! PE/N for cut (but not shifted) potential
+    en_cut  = en_cut + 1.5 * temperature                ! Add ideal gas contribution KE/N
+    en_full = en_cut + potential_lrc ( density, r_cut ) ! Add long-range contribution to PE/N
+    p_cut   = vir / box**3                              ! Virial contribution to P
+    p_cut   = p_cut + density * temperature             ! Add ideal gas contribution to P
+    p_full  = p_cut + pressure_lrc ( density, r_cut )   ! Add long-range contribution to P
+    p_cut   = p_cut + pressure_delta ( density, r_cut ) ! Add delta correction to P
 
     IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential energy', potential
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure',  pres_virial
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut)',  en_cut
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut)',    p_cut
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en_full
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',   p_full
     END IF
 
   END SUBROUTINE calculate

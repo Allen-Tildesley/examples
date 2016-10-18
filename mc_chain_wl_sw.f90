@@ -6,8 +6,7 @@ PROGRAM mc_chain_wl_sw
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       regrow, crank, pivot, qcount, weight, &
-       &                       n, r
+       &                       regrow, crank, pivot, qcount, weight, n, r
 
   IMPLICIT NONE
 
@@ -32,38 +31,42 @@ PROGRAM mc_chain_wl_sw
   ! A stage consists of many blocks, during which the entropy is adjusted by a value ds
   ! The stage is deemed to be finished when h(q) is sufficiently flat
   ! At the end of each stage, the histograms are printed and reset, and ds is divided by 2
-  
+
   ! The model is the same one studied by
   ! MP Taylor, W Paul, K Binder, J Chem Phys, 131, 114907 (2009)
 
   ! Most important variables
   REAL    :: bond           ! bond length (in units of core diameter)
   REAL    :: range          ! range of attractive well (specified, same units)
-  REAL    :: regrow_ratio   ! acceptance ratio for regrowth moves
-  REAL    :: crank_ratio    ! acceptance ratio for crankshaft moves
-  REAL    :: pivot_ratio    ! acceptance ratio for pivot moves
   INTEGER :: m_max          ! maximum atoms in regrow
   INTEGER :: k_max          ! number of random tries per atom in regrow
   REAL    :: crank_max      ! maximum move angle in crankshaft
-  REAL    :: crank_fraction ! fraction of atoms to try in crankshaft
-  INTEGER :: n_crank        ! number of atoms to try in crankshaft
+  REAL    :: crank_fraction ! fraction of atoms to try in crankshaft per step
+  INTEGER :: n_crank        ! number of crankshaft tries per step
   REAL    :: pivot_max      ! maximum move angle in pivot
-  REAL    :: pivot_fraction ! fraction of atoms to try in pivot
-  INTEGER :: n_pivot        ! number of atoms to try in pivot
+  REAL    :: pivot_fraction ! fraction of atoms to try in pivot per step
+  INTEGER :: n_pivot        ! number of pivot tries per step
   INTEGER :: q              ! total attractive interaction (negative of energy)
+  INTEGER :: q_max          ! max value of q seen in simulation (minimum energy)
   REAL    :: flatness       ! flatness criterion
   LOGICAL :: flat           ! Flag indicating that histogram is flat
   INTEGER :: nstep          ! Steps per block (at end of which we do flatness check)
   INTEGER :: stage          ! Counts stages in entropy function refinement
-  INTEGER :: nstage         ! Determines termination point
+  INTEGER :: nstage         ! Determines termination point for run
   REAL    :: ds             ! Entropy increment for Wang-Landau method
   INTEGER :: nq             ! Maximum anticipated energy
 
+  ! Quantities for averaging
+  REAL :: regrow_ratio ! acceptance ratio for regrowth moves
+  REAL :: crank_ratio  ! acceptance ratio for crankshaft moves
+  REAL :: pivot_ratio  ! acceptance ratio for pivot moves
+  
+  ! Histograms and tables
   REAL, DIMENSION(:), ALLOCATABLE :: h ! Histogram of q values (0:nq)
   REAL, DIMENSION(:), ALLOCATABLE :: g ! Histogram of radius of gyration (0:nq)
   REAL, DIMENSION(:), ALLOCATABLE :: s ! Entropy histogram used in acceptance (0:nq)
 
-  INTEGER :: blk, stp, ioerr, try, n_acc, q_max
+  INTEGER :: blk, stp, ioerr, try, n_acc
   LOGICAL :: accepted
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.', his_prefix = 'his.'
@@ -120,8 +123,8 @@ PROGRAM mc_chain_wl_sw
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length (in sigma units)', bond
   n_crank = NINT(crank_fraction*REAL(n))
   n_pivot = NINT(pivot_fraction*REAL(n))
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of atoms in crankshaft',  n_crank
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of atoms in pivot',       n_pivot
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of crankshaft tries per step', n_crank
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of pivot tries per step',      n_pivot
 
   CALL allocate_arrays
   nq = 6*n ! Anticipated maximum number of pair interactions within range
@@ -221,6 +224,7 @@ PROGRAM mc_chain_wl_sw
 CONTAINS
 
   SUBROUTINE update_histogram
+    IMPLICIT NONE
 
     ! This routine updates the probability histogram of (negative) energies
     ! It also updates the entropy histogram by ds
@@ -240,12 +244,13 @@ CONTAINS
     h(q) = h(q) + 1.0
     s(q) = s(q) + ds
     g(q) = g(q) + r_g
-    
+
     q_max = MAX ( q, q_max )
 
   END SUBROUTINE update_histogram
 
   FUNCTION histogram_flat ( flatness ) RESULT ( flat )
+    IMPLICIT NONE
     LOGICAL            :: flat     ! Returns a signal that the histogram is "sufficiently flat"
     REAL,   INTENT(in) :: flatness ! Specified degree of flatness to pass the test
 
@@ -272,7 +277,7 @@ CONTAINS
 
   SUBROUTINE write_histogram ( filename )
     USE, INTRINSIC :: iso_fortran_env, ONLY : iostat_end, iostat_eor
-
+    IMPLICIT NONE
     CHARACTER(len=*), INTENT(in) :: filename
 
     ! This routine writes out the histograms at the end of each stage

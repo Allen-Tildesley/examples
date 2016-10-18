@@ -6,18 +6,20 @@ MODULE link_list_module
   IMPLICIT NONE
   PRIVATE
 
+  ! Public routines
   PUBLIC :: initialize_list, finalize_list, make_list, check_list
   PUBLIC :: move_in_list, create_in_list, destroy_in_list, c_index
-  PUBLIC :: sc, head, list, c
 
-  INTEGER,                                PROTECTED :: sc   ! dimensions of head array, assume cubic box
-  INTEGER, DIMENSION(:,:,:), ALLOCATABLE, PROTECTED :: head ! head(0:sc-1,0:sc-1,0:sc-1), assume cubic box
-  INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED :: list ! list(n)
-  INTEGER, DIMENSION(:,:),   ALLOCATABLE, PROTECTED :: c    ! c(3,n) 3D cell index of each atom
+  ! Public (protected) data
+  INTEGER,                                PROTECTED, PUBLIC :: sc   ! dimensions of head array
+  INTEGER, DIMENSION(:,:,:), ALLOCATABLE, PROTECTED, PUBLIC :: head ! head(0:sc-1,0:sc-1,0:sc-1)
+  INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED, PUBLIC :: list ! list(n)
+  INTEGER, DIMENSION(:,:),   ALLOCATABLE, PROTECTED, PUBLIC :: c    ! c(3,n) 3D cell index of each atom
 
 CONTAINS
 
   SUBROUTINE initialize_list ( n, r_cut_box ) ! Routine to allocate list arrays
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: n         ! Number of particles
     REAL,    INTENT(in) :: r_cut_box ! rcut/box, assume never changes
 
@@ -35,11 +37,15 @@ CONTAINS
   END SUBROUTINE initialize_list
 
   SUBROUTINE finalize_list ! Routine to deallocate list arrays
+    IMPLICIT NONE
+
     DEALLOCATE ( list, c )
     DEALLOCATE ( head )
+
   END SUBROUTINE finalize_list
 
   SUBROUTINE make_list ( n, r ) ! Routine to make list
+    IMPLICIT NONE
     INTEGER,                 INTENT(in) :: n ! Number of atoms
     REAL,    DIMENSION(3,n), INTENT(in) :: r ! Atom coordinates
 
@@ -48,13 +54,14 @@ CONTAINS
     head(:,:,:) = 0
 
     DO i = 1, n ! Loop over all atoms
-       c(:,i) = c_index ( r(:,i) )       ! Index function. allocating i to cell
+       c(:,i) = c_index ( r(:,i) )       ! Index function allocating i to cell
        CALL create_in_list ( i, c(:,i) ) ! This does the work of adding i to list
     END DO ! End loop over all atoms
 
   END SUBROUTINE make_list
 
   FUNCTION c_index ( ri ) RESULT ( ci )
+    IMPLICIT NONE
     INTEGER, DIMENSION(3)             :: ci ! Returns 3D cell index in range 0..sc-1, calculated from
     REAL,    DIMENSION(3), INTENT(in) :: ri ! position in box = 1 units
 
@@ -65,7 +72,7 @@ CONTAINS
        WRITE ( unit=error_unit, fmt='(a,3f15.5)') 'Atom not in main box', ri
        STOP 'Error in c_index'
     END IF
-    
+
     ci(:) = FLOOR ( ( ri(:) + 0.5 ) * REAL(sc) ) ! The index formula
 
     ! Guard against small chance of roundoff error
@@ -75,7 +82,8 @@ CONTAINS
   END FUNCTION c_index
 
   SUBROUTINE create_in_list ( i, ci ) ! Routine to create i in cell ci
-    INTEGER,               INTENT(in) :: i  ! index of atom
+    IMPLICIT NONE
+    INTEGER,               INTENT(in) :: i  ! Index of atom
     INTEGER, DIMENSION(3), INTENT(in) :: ci ! 3D index of cell in which i lies
 
     list(i)                 = head(ci(1),ci(2),ci(3)) ! transfer old head to list
@@ -85,7 +93,8 @@ CONTAINS
   END SUBROUTINE create_in_list
 
   SUBROUTINE destroy_in_list ( i, ci ) ! Routine to destroy i in cell ci
-    INTEGER,               INTENT(in) :: i  ! index of atom
+    IMPLICIT NONE
+    INTEGER,               INTENT(in) :: i  ! Index of atom
     INTEGER, DIMENSION(3), INTENT(in) :: ci ! 3D index of cell in which i lies
 
     INTEGER :: this, next
@@ -118,8 +127,9 @@ CONTAINS
     END IF
 
   END SUBROUTINE destroy_in_list
-  
+
   SUBROUTINE move_in_list ( i, ci ) ! Routine to move i from current cell to ci
+    IMPLICIT NONE
     INTEGER,               INTENT(in) :: i
     INTEGER, DIMENSION(3), INTENT(in) :: ci
 
@@ -131,6 +141,7 @@ CONTAINS
   END SUBROUTINE move_in_list
 
   SUBROUTINE check_list ( n, r ) ! Routine to check consistency of cell lists
+    IMPLICIT NONE
     INTEGER,                 INTENT(in) :: n ! Number of atoms
     REAL,    DIMENSION(3,n), INTENT(in) :: r ! Atom positions
 

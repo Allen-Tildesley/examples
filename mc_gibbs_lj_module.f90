@@ -11,9 +11,9 @@ MODULE mc_module
 
   PUBLIC :: n, r
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  public :: resize, energy_1, energy, energy_lrc
+  public :: energy_1, energy, energy_lrc
   PUBLIC :: move, create, destroy
-  PUBLIC :: pot_type
+  PUBLIC :: potential_type
 
   INTEGER                              :: n ! number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
@@ -22,14 +22,14 @@ MODULE mc_module
   REAL,    PARAMETER :: sigma = 1.0     ! Lennard-Jones diameter (unit of length)
   REAL,    PARAMETER :: epslj = 1.0     ! Lennard-Jones well depth (unit of energy)
 
-  TYPE pot_type ! A composite variable for interaction energies comprising
+  TYPE potential_type ! A composite variable for interaction energies comprising
      REAL    :: pot ! the potential energy and
      REAL    :: vir ! the virial and
-     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
-  END TYPE pot_type
+     LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+  END TYPE potential_type
 
   INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_pot_type
+     MODULE PROCEDURE add_potential_type
   END INTERFACE OPERATOR (+)
 
 CONTAINS
@@ -62,36 +62,18 @@ CONTAINS
     DEALLOCATE ( r )
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE resize ! reallocates r array, twice as large
-
-    ! This is employed by mc_zvt_lj, grand canonical ensemble
-    
-    REAL, DIMENSION(:,:), ALLOCATABLE :: tmp
-    INTEGER                           :: n_old, n_new
-
-    n_old = SIZE(r,dim=2)
-    n_new = 2*n_old
-    WRITE( unit=output_unit, fmt='(a,i10,a,i10)' ) 'Reallocating r from old ', n_old, ' to ', n_new
-
-    ALLOCATE ( tmp(3,n_new) ) ! new size for r
-    tmp(:,1:n_old) = r(:,:)   ! copy elements across
-
-    CALL move_ALLOC ( tmp, r )
-
-  END SUBROUTINE resize
-
   FUNCTION energy ( box, r_cut )
-    TYPE(pot_type)     :: energy ! Returns a composite of pot, vir and ovr
+    TYPE(potential_type)     :: energy ! Returns a composite of pot, vir and overlap
     REAL, INTENT(in) :: box    ! Simulation box length
     REAL, INTENT(in) :: r_cut  ! Potential cutoff distance
 
     ! energy%pot is the nonbonded potential energy for whole system
     ! energy%vir is the corresponding virial for whole system
-    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
+    ! energy%overlap is a flag indicating overlap (potential too high) to avoid overflow
     ! If this flag is .true., the values of energy%pot, energy%vir should not be used
     ! Actual calculation is performed by function energy_1
 
-    TYPE(pot_type) :: energy_i
+    TYPE(potential_type) :: energy_i
     INTEGER      :: i
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
@@ -99,23 +81,23 @@ CONTAINS
        STOP 'Error in energy'
     END IF
     
-    energy = pot_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    energy = potential_type ( pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1
        energy_i = energy_1 ( r(:,i), i, box, r_cut, gt )
-       IF ( energy_i%ovr ) THEN
-          energy%ovr = .TRUE. ! Overlap detected
+       IF ( energy_i%overlap ) THEN
+          energy%overlap = .TRUE. ! Overlap detected
           RETURN              ! Return immediately
        END IF
        energy = energy + energy_i
     END DO
 
-    energy%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    energy%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
     
   END FUNCTION energy
 
   function energy_1 ( ri, i, box, r_cut, j_range ) result ( energy )
-    TYPE(pot_type)                   :: energy  ! Returns a composite of pot, vir and ovr
+    TYPE(potential_type)                   :: energy  ! Returns a composite of pot, vir and overlap
     REAL, DIMENSION(3), INTENT(in) :: ri      ! Coordinates of atom of interest
     INTEGER,            INTENT(in) :: i       ! Index of atom of interest
     REAL,               INTENT(in) :: box     ! Simulation box length
@@ -124,7 +106,7 @@ CONTAINS
 
     ! energy%pot is the nonbonded potential energy of atom ri with a set of other atoms
     ! energy%vir is the corresponding virial of atom ri
-    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
+    ! energy%overlap is a flag indicating overlap (potential too high) to avoid overflow
     ! If this is .true., the value of energy%pot should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
@@ -164,7 +146,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    energy = pot_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    energy = potential_type ( pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     DO j = j1, j2
 
@@ -180,7 +162,7 @@ CONTAINS
           sr2    = 1.0 / rij_sq    ! (sigma/rij)**2
 
           IF ( sr2 > sr2_overlap ) THEN
-             energy%ovr = .TRUE. ! Overlap detected
+             energy%overlap = .TRUE. ! Overlap detected
              return              ! Return immediately
           END IF
 
@@ -197,7 +179,7 @@ CONTAINS
     energy%vir = 24.0 * energy%vir
     energy%vir = energy%vir / 3.0
 
-    energy%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    energy%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END SUBROUTINE energy_1
 

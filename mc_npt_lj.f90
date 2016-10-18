@@ -8,7 +8,7 @@ PROGRAM mc_npt_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       energy_1, energy, move, n, r, pot_type
+       &                       potential_1, potential, move, n, r, potential_type
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions)
@@ -36,21 +36,26 @@ PROGRAM mc_npt_lj
   ! The logarithm of the box length is sampled uniformly
 
   ! Most important variables
-  REAL :: box            ! box length
-  REAL :: dr_max         ! maximum MC particle displacement
-  REAL :: db_max         ! maximum MC box displacement
-  REAL :: temperature    ! specified temperature
-  REAL :: pressure       ! specified pressure
-  REAL :: r_cut          ! potential cutoff distance
-  REAL :: pot            ! total potential energy
-  REAL :: vir            ! total virial
-  REAL :: move_ratio     ! acceptance ratio of moves (to be averaged)
-  REAL :: box_move_ratio ! acceptance ratio of box moves (to be averaged)
-  REAL :: density        ! density (to be averaged)
-  REAL :: pres_virial    ! virial pressure (to be averaged)
-  REAL :: potential      ! potential energy per atom (to be averaged)
+  REAL :: box         ! Box length
+  REAL :: dr_max      ! Maximum MC particle displacement
+  REAL :: db_max      ! Maximum MC box displacement
+  REAL :: temperature ! Specified temperature
+  REAL :: pressure    ! Specified pressure
+  REAL :: r_cut       ! Potential cutoff distance
+  REAL :: pot         ! Total potential energy
+  REAL :: vir         ! Total virial
 
-  TYPE(pot_type) :: eng_old, eng_new ! Composite energy = pot & vir & overlap variables
+  ! Quantities to be averaged
+  REAL :: m_ratio ! Acceptance ratio of moves
+  REAL :: v_ratio ! Acceptance ratio of volume moves
+  REAL :: density ! Density
+  REAL :: p_cut   ! Pressure for simulated, cut, potential
+  REAL :: p_full  ! Pressure for full potential with LRC
+  REAL :: en_cut  ! Internal energy per atom for simulated, cut, potential
+  REAL :: en_full ! Internal energy per atom for full potential with LRC
+
+  ! Composite interaction = pot & vir & overlap variables
+  TYPE(potential_type) :: system, atom_old, atom_new
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL               :: box_scale, box_new, den_scale, delta, zeta1
@@ -104,17 +109,17 @@ PROGRAM mc_npt_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  eng_old = energy ( box, r_cut )
-  IF ( eng_old%ovr ) THEN
+  system = potential ( box, r_cut ) ! Initial energy and overlap check
+  IF ( system%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_npt_lj'
   END IF
-  pot = eng_old%pot
-  vir = eng_old%vir
+  pot = system%pot
+  vir = system%vir
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: &
-       &            'Move ratio', 'Box ratio', 'Density', 'Potential', 'Virial Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Volume ratio', &
+       &            'Density', 'E/N (cut)', 'P (cut)', 'E/N (full)', 'P (full)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -126,61 +131,61 @@ PROGRAM mc_npt_lj
 
         DO i = 1, n ! Begin loop over atoms
 
-           ri(:)   = r(:,i)
-           eng_old = energy_1 ( ri, i, box, r_cut )
+           ri(:)    = r(:,i)
+           atom_old = potential_1 ( ri, i, box, r_cut ) ! Old atom potential, virial etc
 
-           IF ( eng_old%ovr ) THEN ! should never happen
+           IF ( atom_old%overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_npt_lj'
            END IF
 
-           CALL RANDOM_NUMBER ( zeta )           ! Three uniform random numbers in range (0,1)
-           zeta    = 2.0*zeta - 1.0              ! now in range (-1,+1)
-           ri(:)   = ri(:) + zeta * dr_max / box ! Trial move to new position (box=1 units)
-           ri(:)   = ri(:) - ANINT ( ri(:) )     ! Periodic boundary correction
-           eng_new = energy_1 ( ri, i, box, r_cut )
+           CALL RANDOM_NUMBER ( zeta )                  ! Three uniform random numbers in range (0,1)
+           zeta     = 2.0*zeta - 1.0                    ! now in range (-1,+1)
+           ri(:)    = ri(:) + zeta * dr_max / box       ! Trial move to new position (box=1 units)
+           ri(:)    = ri(:) - ANINT ( ri(:) )           ! Periodic boundary correction
+           atom_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
 
-           IF ( .NOT. eng_new%ovr ) THEN ! Consider non-overlapping configuration
+           IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
 
-              delta = ( eng_new%pot - eng_old%pot ) / temperature
+              delta = ( atom_new%pot - atom_old%pot ) / temperature
 
               IF (  metropolis ( delta )  ) THEN ! Accept Metropolis test
-                 pot = pot + eng_new%pot - eng_old%pot   ! Update potential energy
-                 vir = vir + eng_new%vir - eng_old%vir   ! Update virial
+                 pot = pot + atom_new%pot - atom_old%pot ! Update potential energy
+                 vir = vir + atom_new%vir - atom_old%vir ! Update virial
                  CALL move ( i, ri )                     ! Update position
                  moves = moves + 1                       ! Increment move counter
               END IF ! End accept Metropolis test
 
-           END IF ! End consider non-overlapping configuration
+           END IF ! End test for non-overlapping configuration
 
         END DO ! End loop over atoms
 
-        move_ratio = REAL(moves) / REAL(n)
+        m_ratio = REAL(moves) / REAL(n)
 
-        box_move_ratio = 0.0
-        CALL RANDOM_NUMBER ( zeta1 )          ! Uniform random number in range (0,1)
-        zeta1     = 2.0*zeta1 - 1.0           ! now in range (-1,+1)
-        box_scale = EXP ( zeta1*db_max )      ! Sampling log(box) and log(vol) uniformly
-        box_new   = box * box_scale           ! New box (in sigma units)
-        den_scale = 1.0 / box_scale**3        ! Density scaling factor
-        eng_new   = energy ( box_new, r_cut ) ! New energy, virial etc
+        v_ratio = 0.0                            ! Zero volume move counter
+        CALL RANDOM_NUMBER ( zeta1 )             ! Uniform random number in range (0,1)
+        zeta1     = 2.0*zeta1 - 1.0              ! now in range (-1,+1)
+        box_scale = EXP ( zeta1*db_max )         ! Sampling log(box) and log(vol) uniformly
+        box_new   = box * box_scale              ! New box (in sigma units)
+        den_scale = 1.0 / box_scale**3           ! Density scaling factor
+        system    = potential ( box_new, r_cut ) ! New system energy, virial etc
 
-        IF ( .NOT. eng_new%ovr ) THEN ! Consider non-overlapping configuration
+        IF ( .NOT. system%overlap ) THEN ! Test for non-overlapping configuration
 
-           delta = ( (eng_new%pot-pot) + pressure * ( box_new**3 - box**3 )  ) / temperature &
+           delta = ( (system%pot-pot) + pressure * ( box_new**3 - box**3 )  ) / temperature &
                 &   + REAL(n+1) * LOG(den_scale) ! Factor (n+1) consistent with box scaling
 
            IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-              pot     = eng_new%pot ! Update potential
-              vir     = eng_new%vir ! Update virial
-              box     = box_new     ! Update box
-              box_move_ratio = 1.0  ! Increment move counter
+              pot     = system%pot ! Update potential
+              vir     = system%vir ! Update virial
+              box     = box_new    ! Update box
+              v_ratio = 1.0        ! Set move counter
            END IF ! reject Metropolis test
 
-        END IF ! reject overlapping configuration
+        END IF ! End test for overlapping configuration
 
         CALL calculate ( )
-        CALL blk_add ( [move_ratio,box_move_ratio,density,potential,pres_virial] )
+        CALL blk_add ( [m_ratio,v_ratio,density,en_cut,p_cut,en_full,p_full] )
 
      END DO ! End loop over steps
 
@@ -194,13 +199,13 @@ PROGRAM mc_npt_lj
 
   CALL calculate ( 'Final values' )
 
-  eng_old = energy ( box, r_cut )
-  IF ( eng_old%ovr ) THEN ! should never happen
+  system = potential ( box, r_cut )
+  IF ( system%overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_npt_lj'
   END IF
-  pot = eng_old%pot
-  vir = eng_old%vir
+  pot = system%pot
+  vir = system%vir
   CALL calculate ( 'Final check' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
@@ -212,19 +217,26 @@ PROGRAM mc_npt_lj
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE mc_module, ONLY : energy_lrc, pressure_lrc
+    USE mc_module, ONLY : potential_lrc, pressure_lrc, pressure_delta
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    density     = REAL(n) / box**3
-    potential   = pot / REAL ( n ) + energy_lrc ( density, r_cut )
-    pres_virial = density * temperature + vir / box**3 + pressure_lrc ( density, r_cut )
+    density = REAL(n) / box**3                          ! Number density N/V
+    en_cut  = pot / REAL ( n )                          ! PE/N for cut (but not shifted) potential
+    en_cut  = en_cut + 1.5 * temperature                ! Add ideal gas contribution KE/N
+    en_full = en_cut + potential_lrc ( density, r_cut ) ! Add long-range contribution to PE/N
+    p_cut   = vir / box**3                              ! Virial contribution to P
+    p_cut   = p_cut + density * temperature             ! Add ideal gas contribution to P
+    p_full  = p_cut + pressure_lrc ( density, r_cut )   ! Add long-range contribution to P
+    p_cut   = p_cut + pressure_delta ( density, r_cut ) ! Add delta correction to P
 
     IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential energy', potential
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure',  pres_virial
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',          density
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',    density
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut)',  en_cut
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut)',    p_cut
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en_full
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',   p_full
     END IF
 
   END SUBROUTINE calculate

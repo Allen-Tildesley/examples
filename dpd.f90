@@ -138,11 +138,11 @@ PROGRAM dpd
         CALL thermalize ( box, temperature, gamma*dt )
 
         ! Velocity Verlet step
-        CALL kick    ( dt/2.0 )                ! Kick half-step
-        CALL drift   ( dt )                    ! Drift step 
-        CALL make_ij ( box )                   ! Construct list of pairs within range
-        CALL force   ( box, a, pot, vir, lap ) ! Force evaluation
-        CALL kick    ( dt/2.0 )                ! Kick half-step
+        CALL kick_propagator ( dt/2.0 )      ! Kick half-step
+        CALL drift_propagator ( dt )         ! Drift step 
+        CALL make_ij ( box )                 ! Construct list of pairs within range
+        CALL force ( box, a, pot, vir, lap ) ! Force evaluation
+        CALL kick_propagator ( dt/2.0 )      ! Kick half-step
 
         ! Calculate all variables for this step
         CALL calculate ( )
@@ -171,22 +171,22 @@ PROGRAM dpd
 
 CONTAINS
 
-  SUBROUTINE kick ( t ) ! Kick propagator
+  SUBROUTINE kick_propagator ( t )
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
 
     v(:,:) = v(:,:) + t * f(:,:)
 
-  END SUBROUTINE kick
+  END SUBROUTINE kick_propagator
 
-  SUBROUTINE drift ( t ) ! Drift propagator
+  SUBROUTINE drift_propagator ( t )
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt)
 
     r(:,:) = r(:,:) + t * v(:,:) / box ! (positions in box=1 units)
     r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  END SUBROUTINE drift
+  END SUBROUTINE drift_propagator
 
   SUBROUTINE calculate ( string )
     IMPLICIT NONE

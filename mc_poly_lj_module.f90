@@ -10,7 +10,7 @@ MODULE mc_module
   PUBLIC :: n, na, r, e, d
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: energy_1, energy, q_to_d
-  PUBLIC :: pot_type
+  PUBLIC :: potential_type
 
   INTEGER                                :: n  ! number of molecules
   INTEGER                                :: na ! number of atoms per molecule
@@ -22,25 +22,25 @@ MODULE mc_module
   REAL,    PARAMETER :: sigma = 1.0     ! Lennard-Jones diameter (unit of length)
   REAL,    PARAMETER :: epslj = 1.0     ! Lennard-Jones well depth (unit of energy)
 
-  TYPE pot_type ! A composite variable for interaction energies comprising
+  TYPE potential_type ! A composite variable for interaction energies comprising
      REAL    :: pot ! the potential energy and
      REAL    :: vir ! the virial and
-     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
-  END TYPE pot_type
+     LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+  END TYPE potential_type
 
   INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_pot_type
+     MODULE PROCEDURE add_potential_type
   END INTERFACE OPERATOR (+)
 
 CONTAINS
 
-  FUNCTION add_pot_type ( a, b ) RESULT (c)
-    TYPE(pot_type)             :: c    ! Result is the sum of the two inputs
-    TYPE(pot_type), INTENT(in) :: a, b
+  FUNCTION add_potential_type ( a, b ) RESULT (c)
+    TYPE(potential_type)             :: c    ! Result is the sum of the two inputs
+    TYPE(potential_type), INTENT(in) :: a, b
     c%pot = a%pot +    b%pot
     c%vir = a%vir +    b%vir
-    c%ovr = a%ovr .OR. b%ovr
-  END FUNCTION add_pot_type
+    c%overlap = a%overlap .OR. b%overlap
+  END FUNCTION add_potential_type
 
   SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! unit for standard output
@@ -76,18 +76,18 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   FUNCTION energy ( box, r_cut, rm_cut )
-    TYPE(pot_type)     :: energy ! Returns a composite of pot, vir and ovr
+    TYPE(potential_type)     :: energy ! Returns a composite of pot, vir and overlap
     REAL, INTENT(in) :: box    ! Simulation box length
     REAL, INTENT(in) :: r_cut  ! Potential cutoff distance
     REAL, INTENT(in) :: rm_cut ! Molecule-molecule cutoff distance
 
     ! energy%pot is the nonbonded potential energy for whole system
     ! energy%vir is the corresponding virial for whole system
-    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
+    ! energy%overlap is a flag indicating overlap (potential too high) to avoid overflow
     ! If this flag is .true., the values of energy%pot, energy%vir should not be used
     ! Actual calculation is performed by function energy_1
 
-    TYPE(pot_type) :: energy_i
+    TYPE(potential_type) :: energy_i
     INTEGER      :: i
 
     IF ( SIZE(r,dim=2)  /= n ) THEN ! should never happen
@@ -95,23 +95,23 @@ CONTAINS
        STOP 'Error in energy'
     END IF
 
-    energy = pot_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    energy = potential_type ( pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1
        energy_i = energy_1 ( r(:,i), d(:,:,i), i, box, r_cut, rm_cut, gt )
-       IF ( energy_i%ovr ) THEN
-          energy%ovr = .TRUE. ! Overlap detected
+       IF ( energy_i%overlap ) THEN
+          energy%overlap = .TRUE. ! Overlap detected
           RETURN              ! Return immediately
        END IF
        energy = energy + energy_i
     END DO
 
-    energy%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    energy%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION energy
 
   FUNCTION energy_1 ( ri, di, i, box, r_cut, rm_cut, j_range ) RESULT ( energy )
-    TYPE(pot_type)                        :: energy  ! Returns a composite of pot, vir and ovr
+    TYPE(potential_type)                        :: energy  ! Returns a composite of pot, vir and overlap
     REAL,    DIMENSION(3),   INTENT(in) :: ri      ! Coordinates of molecule of interest
     REAL,    DIMENSION(:,:), INTENT(in) :: di      ! Bond vectors of molecule of interest
     INTEGER,                 INTENT(in) :: i       ! Index of molecule of interest
@@ -122,7 +122,7 @@ CONTAINS
 
     ! energy%pot is the nonbonded potential energy of molecule ri/di with a set of other molecules
     ! energy%vir is the corresponding virial of molecule ri/di
-    ! energy%ovr is a flag indicating overlap (potential too high) to avoid overflow
+    ! energy%overlap is a flag indicating overlap (potential too high) to avoid overflow
     ! If this is .true., the value of energy%pot should not be used
     ! The coordinates in ri and di are not necessarily identical with those in r(:,i) and d(:,i)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
@@ -178,7 +178,7 @@ CONTAINS
     sr12    = sr6**2
     pot_cut = sr12 - sr6 ! Potential at cutoff (without numerical factor 4)
 
-    energy = pot_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
+    energy = potential_type ( pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Loop over j-molecules
 
@@ -202,7 +202,7 @@ CONTAINS
                    sr2    = 1.0 / rab_sq    ! (sigma/rab)**2
 
                    IF ( sr2 > sr2_overlap ) THEN
-                      energy%ovr = .TRUE. ! Overlap detected
+                      energy%overlap = .TRUE. ! Overlap detected
                       RETURN              ! Return immediately
                    END IF
 
@@ -228,7 +228,7 @@ CONTAINS
     energy%vir = 24.0 * energy%vir
     energy%vir = energy%vir / 3.0
 
-    energy%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    energy%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION energy_1
 

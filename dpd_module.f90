@@ -25,18 +25,24 @@ MODULE dpd_module
 CONTAINS
 
   SUBROUTINE introduction ( output_unit )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'DPD soft potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, r_cut = ', r_cut    
+
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion ( output_unit )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
+
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
+
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays ( box )
+    IMPLICIT NONE
     REAL, INTENT(in) :: box ! Simulation box length
 
     REAL, PARAMETER :: pi = 4.0*ATAN(1.0)
@@ -44,17 +50,25 @@ CONTAINS
     ! Estimate pair list size, with 30% margin for error
     nl = CEILING ( 1.3*(4.0*pi/3.0)*REAL(n*(n-1)/2)*(r_cut/box)**3 )
     ALLOCATE ( r(3,n), v(3,n), f(3,n), ij(2,nl) )
+
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
+    IMPLICIT NONE
+
     DEALLOCATE ( r, v, f, ij )
+
   END SUBROUTINE deallocate_arrays
 
   SUBROUTINE make_ij ( box ) 
     USE maths_module, ONLY : random_integer
+    IMPLICIT NONE
     REAL, INTENT(in) :: box ! Simulation box length
 
-    ! Compile randomized list of pairs within range, ij
+    ! Compiles randomized list of pairs within range, and stores in the array ij
+    ! with np indicating the number of such pairs
+
+    ! It is assumed that positions in the array r are in units where box = 1
 
     INTEGER            :: p, q, i, j
     REAL               :: rij_sq
@@ -92,16 +106,20 @@ CONTAINS
   END SUBROUTINE make_ij
 
   SUBROUTINE force ( box, a, pot, vir, lap )
+    IMPLICIT NONE
     REAL, INTENT(in)  :: box ! Simulation box length
     REAL, INTENT(in)  :: a   ! Force strength parameter
     REAL, INTENT(out) :: pot ! Total potential energy
     REAL, INTENT(out) :: vir ! Virial
     REAL, INTENT(out) :: lap ! Laplacian
 
-    ! Calculates potential, virial and forces
-    ! It is assumed that positions are in units where box = 1
+    ! Calculates potential (pot), virial (vir), Laplacian (lap)
+    ! Also calculates forces and stores them in the array f
+
+    ! It is assumed that positions in the array r are in units where box = 1
+    ! and that the array ij contains a list of all np pairs within range
+
     ! Forces are calculated in units where r_cut = 1
-    ! It is assumed that ij contains a list of all pairs within range
 
     INTEGER            :: p, i, j
     REAL               :: rij_sq, rij_mag, wij
@@ -143,12 +161,15 @@ CONTAINS
 
   SUBROUTINE lowe ( box, temperature, gamma_step )
     USE maths_module, ONLY : random_normal
+    IMPLICIT NONE
     REAL, INTENT(in) :: box         ! Simulation box length
     REAL, INTENT(in) :: temperature ! Specified temperature
     REAL, INTENT(in) :: gamma_step  ! Pair selection probability = Gamma * timestep
 
-    ! Apply pairwise Lowe-Andersen thermostat to velocities
-    ! It is assumed that ij contains a list of all pairs within range
+    ! Apply pairwise Lowe-Andersen thermostat to velocities stored in array v
+
+    ! It is assumed that positions in the array r are in units where box = 1
+    ! and that the array ij contains a list of all np pairs within range
 
     INTEGER            :: i, j, p
     REAL               :: rij_sq, rij_mag, zeta, v_par
@@ -179,15 +200,18 @@ CONTAINS
     END DO ! End loop over all pairs within range
 
   END SUBROUTINE lowe
-  
+
   SUBROUTINE shardlow ( box, temperature, gamma_step )
     USE maths_module, ONLY : random_normal
+    IMPLICIT NONE
     REAL, INTENT(in) :: box         ! Simulation box length
     REAL, INTENT(in) :: temperature ! Specified temperature
     REAL, INTENT(in) :: gamma_step  ! Gamma * timestep
 
-    ! Implements the Shardlow integration algorithm for velocities
-    ! It is assumed that ij contains a list of all pairs within range
+    ! Implements the Shardlow integration algorithm for velocities stored in array v
+
+    ! It is assumed that positions in the array r are in units where box = 1
+    ! and that the array ij contains a list of all np pairs within range
 
     INTEGER            :: i, j, p
     REAL               :: rij_sq, rij_mag, sqrt_gamma_step, prob, sqrt_prob, zeta, v_par, wij
@@ -230,4 +254,3 @@ CONTAINS
   END SUBROUTINE shardlow
 
 END MODULE dpd_module
-

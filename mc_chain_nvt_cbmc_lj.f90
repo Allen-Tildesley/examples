@@ -5,8 +5,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       regrow, energy, spring_pot, n, r, pot_type
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, regrow, n, r
 
   IMPLICIT NONE
 
@@ -27,20 +26,20 @@ PROGRAM mc_chain_nvt_cbmc_lj
   ! The model is defined in mc_module
 
   ! Most important variables
-  REAL    :: temperature ! Temperature (specified, in units of well depth)
-  REAL    :: bond        ! Intramolecular bond length
-  REAL    :: k_spring    ! Strength of intramolecular bond springs
-  REAL    :: pot_bonds   ! Bond spring potential energy per atom (for averaging)
-  REAL    :: pot         ! Nonbonded potential energy
-  REAL    :: potential   ! Nonbonded potential energy per atom (for averaging)
-  REAL    :: move_ratio  ! Acceptance ratio for regrowth moves (for averaging)
-  REAL    :: r_g         ! Radius of gyration (for averaging)
-  INTEGER :: m_max       ! Maximum atoms in regrow
-  INTEGER :: k_max       ! Number of random tries per atom in regrow
+  REAL    :: temperature   ! Temperature (specified, in units of well depth)
+  REAL    :: bond          ! Intramolecular bond length
+  REAL    :: k_spring      ! Strength of intramolecular bond springs
+  INTEGER :: m_max         ! Maximum atoms in regrow
+  INTEGER :: k_max         ! Number of random tries per atom in regrow
 
-  INTEGER      :: blk, stp, nstep, nblock, ioerr
-  LOGICAL      :: accepted
-  TYPE(pot_type) :: eng
+  ! Quantities for averaging
+  REAL :: move_ratio   ! Acceptance ratio for regrowth moves
+  REAL :: pe_bonded    ! Total bond spring potential energy
+  REAL :: pe_nonbonded ! Total nonbonded potential energy
+  REAL :: r_g          ! Radius of gyration
+
+  INTEGER :: blk, stp, nstep, nblock, ioerr
+  LOGICAL :: accepted
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -86,16 +85,9 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r ) ! Second call gets r
 
-  eng = energy ( )
-  IF ( eng%ovr ) THEN
-     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
-     STOP 'Error in mc_chain_nvt_cbmc_lj'
-  END IF
-  pot = eng%pot
-
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'Nonbonded Pot', 'Spring Pot', 'Rad Gyration' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'PE (nonbonded)', 'PE (bonded)', 'Rg' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -103,7 +95,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        CALL regrow ( temperature, m_max, k_max, bond, k_spring, pot, accepted )
+        CALL regrow ( temperature, m_max, k_max, bond, k_spring, accepted )
         IF ( accepted ) THEN
            move_ratio = 1.0
         ELSE
@@ -112,7 +104,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
         ! Calculate all variables for this step
         CALL calculate()
-        CALL blk_add ( [move_ratio,potential,pot_bonds,r_g] )
+        CALL blk_add ( [move_ratio,pe_nonbonded,pe_bonded,r_g] )
 
      END DO ! End loop over steps
 
@@ -135,21 +127,30 @@ PROGRAM mc_chain_nvt_cbmc_lj
 CONTAINS
 
   SUBROUTINE calculate ( string )
+    USE mc_module, ONLY : potential, spring_pot, potential_type
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    REAL, DIMENSION(3) :: r_cm
+    REAL, DIMENSION(3)   :: r_cm
+    TYPE(potential_type) :: system
 
-    potential = pot / REAL ( n )
-    pot_bonds = spring_pot ( bond, k_spring ) / REAL(n)
-    r_cm      = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
-    r_g       = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
+    system = potential ( ) ! Calculate nonbonded potential with overlap flag
+
+    IF ( system%overlap ) THEN ! Overlap test (might happen with initial configuration)
+       WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
+       STOP 'Error in mc_chain_nvt_cbmc_lj/calculate'
+    END IF ! End overlap test
+
+    pe_nonbonded = system%pot
+    pe_bonded    = spring_pot ( bond, k_spring )
+    r_cm         = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
+    r_g          = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
 
     IF ( PRESENT ( string ) ) THEN ! output required
        WRITE ( unit=output_unit, fmt='(a)'          ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Nonbonded Pot', potential
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Spring Pot',    pot_bonds
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Rad Gyration',  r_g
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'PE (nonbonded)', pe_nonbonded
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'PE (bonded)',    pe_bonded
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Rg',             r_g
     END IF
 
   END SUBROUTINE calculate
