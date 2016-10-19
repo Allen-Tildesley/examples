@@ -30,17 +30,18 @@ PROGRAM mc_nvt_sc
   REAL :: length      ! cylinder length (in units where sigma=1)
   REAL :: box         ! box length (in units where sigma=1)
   REAL :: density     ! reduced density n*sigma**3/box**3
-  REAL :: order       ! orientational order parameter
   REAL :: dr_max      ! maximum MC displacement
   REAL :: de_max      ! maximum MC rotation
   REAL :: epsilon     ! pressure scaling parameter
-  REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
-  REAL :: pres_virial ! virial pressure in units kT/sigma**3 (to be averaged)
+
+  ! Quantities to be averaged
+  REAL :: move_ratio ! acceptance ratio of moves
+  REAL :: pkt        ! pressure in units kT/sigma**3
+  REAL :: order      ! orientational order parameter
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL, DIMENSION(3) :: ri, ei     ! position and orientation of atom i
   REAL, DIMENSION(3) :: zeta       ! random numbers
-  REAL               :: box_scaled ! scaled box for pressure calculation
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -94,7 +95,9 @@ PROGRAM mc_nvt_sc
      STOP 'Error in mc_nvt_sc'
   END IF
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Virial Pressure', 'P2 Order' ] )
+  CALL calculate ( 'Initial values' )
+
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'P/kT', 'Order' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -106,28 +109,26 @@ PROGRAM mc_nvt_sc
 
         DO i = 1, n ! Begin loop over atoms
 
-           CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
+           CALL RANDOM_NUMBER ( zeta ) ! Three uniform random numbers in range (0,1)
            zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
-           ri(:) = r(:,i) + zeta * dr_max / box            ! trial move to new position (in box=1 units)
-           ri(:) = ri(:) - ANINT ( ri(:) )                 ! periodic boundary correction
-           ei(:) = random_rotate_vector ( de_max, e(:,i) ) ! trial move to new orientation
+           ri(:) = r(:,i) + zeta * dr_max / box            ! Trial move to new position (in box=1 units)
+           ri(:) = ri(:) - ANINT ( ri(:) )                 ! Periodic boundary correction
+           ei(:) = random_rotate_vector ( de_max, e(:,i) ) ! Trial move to new orientation
 
-           IF ( .NOT. overlap_1 ( ri, ei, i, box, length ) ) THEN ! accept
-              r(:,i) = ri(:)     ! update position
-              e(:,i) = ei(:)     ! update orientation
-              moves  = moves + 1 ! increment move counter
-           END IF ! reject overlapping configuration
+           IF ( .NOT. overlap_1 ( ri, ei, i, box, length ) ) THEN ! Accept
+              r(:,i) = ri(:)     ! Update position
+              e(:,i) = ei(:)     ! Update orientation
+              moves  = moves + 1 ! Increment move counter
+           END IF ! End accept
 
         END DO ! End loop over atoms
 
+        move_ratio = REAL(moves) / REAL(n)
+
         ! Calculate all variables for this step
-        move_ratio  = REAL(moves) / REAL(n)
-        box_scaled  = box / (1.0+epsilon) 
-        pres_virial = REAL ( n_overlap ( box_scaled, length ) ) / (3.0*epsilon) ! virial part
-        pres_virial = density + pres_virial / box**3 ! divide virial by volume and add ideal gas part
-        order       = orientational_order ( e )
-        CALL blk_add ( [move_ratio,pres_virial,order] )
+        call calculate ( )
+        CALL blk_add ( [move_ratio,pkt,order] )
 
      END DO ! End loop over steps
 
@@ -143,11 +144,34 @@ PROGRAM mc_nvt_sc
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_sc'
   END IF
-  
+
+  CALL calculate ( 'Final values' )
+
   CALL write_cnf_mols ( cnf_prefix//out_tag, n, box, r*box, e )
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
   CALL conclusion ( output_unit )
+
+CONTAINS
+
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+
+    REAL :: box_scaled ! scaled box for pressure calculation
+
+    box_scaled = box / (1.0+epsilon) 
+    pkt        = REAL ( n_overlap ( box_scaled, length ) ) / (3.0*epsilon*box**3) ! virial part of P/kT
+    pkt        = pkt + density                                                    ! add ideal gas part of P/kT
+    order      = orientational_order ( e )
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P/kT',  pkt
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Order', order
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM mc_nvt_sc

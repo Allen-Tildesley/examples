@@ -26,17 +26,18 @@ PROGRAM mc_nvt_hs
   ! in this case, for hard spheres, sigma = 1
 
   ! Most important variables
-  REAL :: box         ! box length
-  REAL :: density     ! density
-  REAL :: pres_virial ! pressure (to be averaged)
-  REAL :: dr_max      ! maximum MC displacement
-  REAL :: epsilon     ! pressure scaling parameter
-  REAL :: move_ratio  ! acceptance ratio of moves (to be averaged)
+  REAL :: box         ! Box length
+  REAL :: density     ! Density
+  REAL :: dr_max      ! Maximum MC displacement
+  REAL :: epsilon     ! Pressure scaling parameter
+
+  ! Quantities to be averaged
+  REAL :: move_ratio ! Acceptance ratio of moves
+  REAL :: pkt        ! Pressure in units kT/sigma**3
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL, DIMENSION(3) :: ri         ! position of atom i
   REAL, DIMENSION(3) :: zeta       ! random numbers
-  REAL               :: box_scaled ! scaled box for pressure calculation
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -86,7 +87,9 @@ PROGRAM mc_nvt_hs
      STOP 'Error in mc_nvt_hs'
   END IF
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Pres-virial' ] )
+  CALL calculate ( 'Initial values' )
+
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'P/kT' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -98,25 +101,24 @@ PROGRAM mc_nvt_hs
 
         DO i = 1, n ! Begin loop over atoms
 
-           CALL RANDOM_NUMBER ( zeta ) ! three uniform random numbers in range (0,1)
+           CALL RANDOM_NUMBER ( zeta ) ! Three uniform random numbers in range (0,1)
            zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
 
-           ri(:) = r(:,i) + zeta * dr_max / box ! trial move to new position (in box=1 units)
-           ri(:) = ri(:) - ANINT ( ri(:) )      ! periodic boundary correction
+           ri(:) = r(:,i) + zeta * dr_max / box ! Trial move to new position (in box=1 units)
+           ri(:) = ri(:) - ANINT ( ri(:) )      ! Periodic boundary correction
 
-           IF ( .NOT. overlap_1 ( ri, i, box ) ) THEN ! accept
-              r(:,i) = ri(:)     ! update position
-              moves  = moves + 1 ! increment move counter
-           END IF ! reject overlapping configuration
+           IF ( .NOT. overlap_1 ( ri, i, box ) ) THEN ! Accept
+              r(:,i) = ri(:)     ! Update position
+              moves  = moves + 1 ! Increment move counter
+           END IF ! End accept
 
         END DO ! End loop over atoms
 
+        move_ratio = REAL(moves) / REAL(n)
+
         ! Calculate all variables for this step
-        move_ratio  = REAL(moves) / REAL(n)
-        box_scaled  = box / (1.0+epsilon) 
-        pres_virial = REAL ( n_overlap ( box_scaled ) ) / (3.0*epsilon) ! virial part
-        pres_virial = density + pres_virial / box**3 ! divide virial by volume and add ideal gas part
-        CALL blk_add ( [move_ratio,pres_virial] )
+        CALL calculate ( )
+        CALL blk_add ( [move_ratio,pkt] )
 
      END DO ! End loop over steps
 
@@ -133,10 +135,31 @@ PROGRAM mc_nvt_hs
      STOP 'Error in mc_nvt_hs'
   END IF
 
+  CALL calculate ( 'Final values' )
+
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays ! Deallocates r
   CALL conclusion ( output_unit )
+
+CONTAINS
+
+  SUBROUTINE calculate ( string )
+    IMPLICIT NONE
+    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+
+    REAL :: box_scaled ! scaled box for pressure calculation
+
+    box_scaled = box / (1.0+epsilon) 
+    pkt        = REAL ( n_overlap ( box_scaled ) ) / (3.0*epsilon*box**3) ! virial part of P/kT
+    pkt        = pkt + density                                            ! add ideal gas part of P/kT
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P/kT', pkt
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM mc_nvt_hs

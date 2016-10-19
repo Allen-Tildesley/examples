@@ -8,7 +8,7 @@ PROGRAM qmc_pi_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis
   USE qmc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       energy_cl_1, energy_qu_1, energy_cl, energy_qu, move, &
+       &                       potential_cl_1, potential_qu_1, potential_cl, potential_qu, &
        &                       n, p, r, potential_type
 
   IMPLICIT NONE
@@ -35,24 +35,27 @@ PROGRAM qmc_pi_lj
   ! The model is defined in qmc_module
 
   ! Most important variables
-  REAL :: box          ! box length
-  REAL :: lambda       ! de Boer length
-  REAL :: density      ! density
-  REAL :: dr_max       ! maximum MC displacement
-  REAL :: temperature  ! specified temperature
-  REAL :: r_cut        ! potential cutoff distance
-  REAL :: pot_cl       ! classical potential energy
-  REAL :: pot_qu       ! quantum potential energy
-  REAL :: move_ratio   ! acceptance ratio of moves (to be averaged)
-  REAL :: potential_cl ! classical potential energy per atom (to be averaged)
-  REAL :: potential_qu ! quantum potential energy per atom (to be averaged)
-  REAL :: energy       ! total energy per atom (to be averaged)
+  REAL :: box         ! box length
+  REAL :: lambda      ! de Boer length
+  REAL :: density     ! density
+  REAL :: dr_max      ! maximum MC displacement
+  REAL :: temperature ! specified temperature
+  REAL :: r_cut       ! potential cutoff distance
+  REAL :: pot_cl      ! classical potential energy
+  REAL :: pot_qu      ! quantum potential energy
 
-  TYPE(potential_type)       :: eng_cl_old, eng_cl_new
-  INTEGER            :: blk, stp, i, k, nstep, nblock, moves, ioerr
-  REAL               :: pot_qu_old, pot_qu_new, kin, delta, k_spring
-  REAL, DIMENSION(3) :: rik  ! position of atom i in polymer k
-  REAL, DIMENSION(3) :: zeta ! random numbers
+  ! Quantities to be averaged
+  REAL :: move_ratio ! acceptance ratio of moves
+  REAL :: en_cut     ! Internal energy per atom for simulated, cut, potential
+  REAL :: en_full    ! Internal energy per atom for full potential with LRC
+
+  ! Composite interaction = pot & overlap variables
+  TYPE(potential_type) :: system_cl, atom_cl_old, atom_cl_new
+
+  INTEGER              :: blk, stp, i, k, nstep, nblock, moves, ioerr
+  REAL                 :: atom_qu_old_pot, atom_qu_new_pot, delta, k_spring
+  REAL, DIMENSION(3)   :: rik  ! position of atom i in polymer k
+  REAL, DIMENSION(3)   :: zeta ! random numbers
 
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)            :: sav_tag = 'sav'       ! may be overwritten with block number
@@ -122,18 +125,16 @@ PROGRAM qmc_pi_lj
   r(:,:,:) = r(:,:,:) - ANINT ( r(:,:,:) ) ! Periodic boundaries (box=1 units)
 
   ! Calculate classical LJ and quantum spring potential energies
-  eng_cl_old = energy_cl ( box, r_cut )
-  IF ( eng_cl_old%overlap ) THEN
+  system_cl = potential_cl ( box, r_cut )
+  IF ( system_cl%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
-  pot_cl = eng_cl_old%pot
-  pot_qu = energy_qu ( box, k_spring )
-
-  ! Calculate derived energies
+  pot_cl = system_cl%pot
+  pot_qu = potential_qu ( box, k_spring )
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Pot-classical', 'Pot-quantum', 'Energy' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'E/N (cut)', 'E/N (full)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -147,40 +148,47 @@ PROGRAM qmc_pi_lj
 
            DO k = 1, p ! Begin loop over ring polymers
 
-              rik(:) = r(:,i,k)
-              eng_cl_old = energy_cl_1 ( rik, i, k, box, r_cut )
-              IF ( eng_cl_old%overlap ) THEN ! should never happen
+              rik(:)      = r(:,i,k)
+              atom_cl_old = potential_cl_1 ( rik, i, k, box, r_cut ) ! Old atom classical potential etc
+
+              IF ( atom_cl_old%overlap ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in qmc_pi_lj'
               END IF
-              pot_qu_old = energy_qu_1 ( rik, i, k, box, k_spring )
+
+              atom_qu_old_pot = potential_qu_1 ( rik, i, k, box, k_spring ) ! Old atom quantum potential
 
               CALL RANDOM_NUMBER ( zeta )           ! Three uniform random numbers in range (0,1)
               zeta = 2.0*zeta - 1.0                 ! now in range (-1,+1)
               rik(:) = rik(:) + zeta * dr_max / box ! Trial move to new position (in box=1 units) 
               rik(:) = rik(:) - ANINT ( rik(:) )    ! Periodic boundary correction
 
-              eng_cl_new = energy_cl_1 ( rik, i, k, box, r_cut )
+              atom_cl_new = potential_cl_1 ( rik, i, k, box, r_cut ) ! New atom classical potential etc
 
-              IF ( .NOT. eng_cl_new%overlap ) THEN ! Consider non-overlapping configuration
-                 pot_qu_new = energy_qu_1 ( rik, i, k, box, k_spring )
-                 delta = ( eng_cl_new%pot + pot_qu_new - eng_cl_old%pot - pot_qu_old ) / temperature
-                 IF ( metropolis ( delta ) ) THEN ! Metropolis test
-                    pot_cl = pot_cl + eng_cl_new%pot - eng_cl_old%pot ! Update classical LJ potential energy
-                    pot_qu = pot_qu + pot_qu_new     - pot_qu_old     ! Update quantum spring potential energy
-                    CALL move ( i, k, rik )                           ! Update position
-                    moves  = moves + 1                                ! Increment move counter
-                 END IF ! End Metropolis test
-              END IF ! End consider overlapping configuration
+              IF ( .NOT. atom_cl_new%overlap ) THEN ! Test for non-overlapping configuration
+
+                 atom_qu_new_pot = potential_qu_1 ( rik, i, k, box, k_spring ) ! New atom quantum potential
+
+                 delta = ( atom_cl_new%pot + atom_qu_new_pot - atom_cl_old%pot - atom_qu_old_pot ) / temperature
+
+                 IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
+                    pot_cl   = pot_cl + atom_cl_new%pot - atom_cl_old%pot ! Update classical potential energy
+                    pot_qu   = pot_qu + atom_qu_new_pot - atom_qu_old_pot ! Update quantum potential energy
+                    r(:,i,k) = rik                                        ! Update position
+                    moves  = moves + 1                                    ! Increment move counter
+                 END IF ! End accept Metropolis test
+
+              END IF ! End test for non-overlapping configuration
 
            END DO ! End loop over ring polymers
 
         END DO ! End loop over atoms
 
+        move_ratio = REAL(moves) / REAL(n)
+
         ! Calculate all variables for this step
-        move_ratio   = REAL(moves) / REAL(n)
         CALL calculate ( )
-        CALL blk_add ( [move_ratio,potential_cl,potential_qu,energy] )
+        CALL blk_add ( [move_ratio,en_cut,en_full] )
 
      END DO ! End loop over steps
 
@@ -200,13 +208,13 @@ PROGRAM qmc_pi_lj
 
   CALL calculate ( 'Final values' )
 
-  eng_cl_old = energy_cl ( box, r_cut )
-  IF ( eng_cl_old%overlap ) THEN ! this should never happen
+  system_cl = potential_cl ( box, r_cut )
+  IF ( system_cl%overlap ) THEN ! this should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
-  pot_cl = eng_cl_old%pot
-  pot_qu = energy_qu ( box, k_spring )
+  pot_cl = system_cl%pot
+  pot_qu = potential_qu ( box, k_spring )
   CALL calculate ( 'Final check' )
 
   ! Write each ring polymer to a unique file
@@ -223,21 +231,22 @@ PROGRAM qmc_pi_lj
 CONTAINS
   
   SUBROUTINE calculate ( string )
+    USE qmc_module, ONLY : potential_lrc
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
     ! This routine calculates variables of interest and (optionally) writes them out
 
-    kin          = 1.5 * n * p * temperature           ! Kinetic energy
-    potential_cl = pot_cl / REAL(n)                    ! Classical potential per atom
-    potential_qu = pot_qu / REAL(n)                    ! Quantum potential per atom
-    energy       = ( kin + pot_cl - pot_qu ) / REAL(n) ! Total energy per atom
+    real :: kin
+
+    kin     = 1.5 * n * p * temperature                 ! Kinetic energy
+    en_cut  = ( kin + pot_cl - pot_qu ) / REAL(n)       ! Total energy per atom (cut but not shifted)
+    en_full = en_cut + potential_lrc ( density, r_cut ) ! Add long-range contribution to PE/N
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Classical potential energy', potential_cl
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Quantum potential energy',   potential_qu
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Energy',                     energy
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut)',  en_cut
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en_full
     END IF
 
   END SUBROUTINE calculate
