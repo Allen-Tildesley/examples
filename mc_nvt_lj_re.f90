@@ -8,7 +8,8 @@ PROGRAM mc_nvt_lj_re
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       potential_1, potential, move, n, r, potential_type
+       &                       potential_1, potential, move, n, r, &
+       &                       potential_type, OPERATOR(+), OPERATOR(-)
   USE mpi
 
   IMPLICIT NONE
@@ -41,16 +42,14 @@ PROGRAM mc_nvt_lj_re
   REAL :: dr_max      ! Maximum MC displacement
   REAL :: temperature ! Specified temperature
   REAL :: r_cut       ! Potential cutoff distance
-  REAL :: pot         ! Total potential energy
-  REAL :: vir         ! Total virial
 
   ! Quantities to be averaged
   REAL :: m_ratio ! Acceptance ratio of moves
   REAL :: x_ratio ! Acceptance ratio of exchange swaps with higher neighbour
-  REAL :: en_cut  ! internal energy per atom for simulated, cut, potential
-  REAL :: en_full ! internal energy per atom for full potential with LRC
-  REAL :: p_cut   ! pressure for simulated, cut, potential
-  REAL :: p_full  ! pressure for full potential with LRC
+  REAL :: en_c    ! Internal energy per atom for simulated, cut, potential
+  REAL :: en      ! Internal energy per atom for full potential with LRC
+  REAL :: p_c     ! Pressure for simulated, cut, potential
+  REAL :: p       ! Pressure for full potential with LRC
 
   ! Composite interaction = pot & vir & overlap variables
   TYPE(potential_type) :: system, atom_old, atom_new
@@ -59,7 +58,7 @@ PROGRAM mc_nvt_lj_re
 
   LOGICAL            :: swap
   INTEGER            :: blk, stp, i, nstep, nblock, moves, swap_interval, swapped, updown, ioerr
-  REAL               :: beta, other_beta, other_pot, delta, zeta
+  REAL               :: beta, other_beta, other_pot_c, delta, zeta
   REAL, DIMENSION(3) :: ri
 
   INTEGER                      :: output_unit                                  ! output file unit number 
@@ -69,21 +68,22 @@ PROGRAM mc_nvt_lj_re
   CHARACTER(len=2)             :: m_tag                                        ! will contain rank number
 
   INTEGER                             :: m             ! MPI process rank (id of this process)
-  INTEGER                             :: p             ! MPI world size (number of processes)
+  INTEGER                             :: nproc         ! MPI world size (number of processes)
   INTEGER                             :: error         ! MPI error return
   INTEGER                             :: msg_error     ! MPI error return
   INTEGER, DIMENSION(MPI_STATUS_SIZE) :: msg_status    ! MPI status return
   INTEGER, PARAMETER                  :: msg1_id = 999 ! MPI message identifier
   INTEGER, PARAMETER                  :: msg2_id = 888 ! MPI message identifier
   INTEGER, PARAMETER                  :: msg3_id = 777 ! MPI message identifier
+  INTEGER, PARAMETER                  :: msg4_id = 666 ! MPI message identifier
 
   NAMELIST /nml/ nblock, nstep, swap_interval, every_temperature, r_cut, every_dr_max
 
   CALL MPI_Init(error)
   CALL MPI_Comm_rank(MPI_COMM_WORLD,m,error)
-  CALL MPI_Comm_size(MPI_COMM_WORLD,p,error)
-  IF ( p > 100 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,i15)') 'Number of processes is too large', p
+  CALL MPI_Comm_size(MPI_COMM_WORLD,nproc,error)
+  IF ( nproc > 100 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Number of processes is too large', nproc
      STOP 'Error in mc_nvt_lj_re'
   END IF
   WRITE(m_tag,fmt='(i2.2)') m ! convert rank into character form
@@ -96,11 +96,12 @@ PROGRAM mc_nvt_lj_re
      STOP 'Error in mc_nvt_lj_re'
   END IF
 
-  WRITE( unit=output_unit, fmt='(a)'        ) 'mc_nvt_lj_re'
-  WRITE( unit=output_unit, fmt='(a)'        ) 'Monte Carlo, constant-NVT, replica exchange'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'mc_nvt_lj_re'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT, replica exchange'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Simulation uses cut (but not shifted) potential'
   CALL introduction ( output_unit )
   WRITE( unit=output_unit, fmt='(a,t40,i15)') 'This is process rank',   m
-  WRITE( unit=output_unit, fmt='(a,t40,i15)') 'Number of processes is', p
+  WRITE( unit=output_unit, fmt='(a,t40,i15)') 'Number of processes is', nproc
   CALL time_stamp ( output_unit )
 
   CALL RANDOM_SEED () ! Initialize random number generator
@@ -108,15 +109,15 @@ PROGRAM mc_nvt_lj_re
   WRITE( unit=output_unit, fmt='(a,t40,f15.5)') 'First random number', zeta
   WRITE( unit=output_unit, fmt='(a)'          ) 'Should be different for different processes!'
 
-  ALLOCATE ( every_temperature(0:p-1), every_beta(0:p-1), every_dr_max(0:p-1) )
+  ALLOCATE ( every_temperature(0:nproc-1), every_beta(0:nproc-1), every_dr_max(0:nproc-1) )
 
   ! Set sensible defaults for testing
   nblock            = 10
   nstep             = 1000
   swap_interval     = 20
   r_cut             = 2.5
-  every_temperature = [ ( 0.7*(1.05)**i,  i = 0, p-1 ) ] ! just empirical settings for LJ
-  every_dr_max      = [ ( 0.15*(1.05)**i, i = 0, p-1 ) ] ! just empirical settings for LJ
+  every_temperature = [ ( 0.7*(1.05)**i,  i = 0, nproc-1 ) ] ! just empirical settings for LJ
+  every_dr_max      = [ ( 0.15*(1.05)**i, i = 0, nproc-1 ) ] ! just empirical settings for LJ
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
@@ -124,10 +125,10 @@ PROGRAM mc_nvt_lj_re
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in mc_nvt_lj_re'
   END IF
-  every_beta  = 1.0 / every_temperature ! all the inverse temperatures
-  temperature = every_temperature(m)    ! temperature for this process
-  dr_max      = every_dr_max(m)         ! max displacement for this process
-  beta        = every_beta(m)           ! inverse temperature for this process
+  every_beta  = 1.0 / every_temperature ! All the inverse temperatures
+  temperature = every_temperature(m)    ! Temperature for this process
+  dr_max      = every_dr_max(m)         ! Max displacement for this process
+  beta        = every_beta(m)           ! Inverse temperature for this process
 
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',               nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',      nstep
@@ -154,8 +155,6 @@ PROGRAM mc_nvt_lj_re
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_lj_re'
   END IF
-  pot = system%pot
-  vir = system%vir
   CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Swap ratio', &
@@ -185,13 +184,12 @@ PROGRAM mc_nvt_lj_re
 
            IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
 
-              delta = ( atom_new%pot - atom_old%pot ) / temperature
+              delta = ( atom_new%pot_c - atom_old%pot_c ) / temperature ! Use cut (but not shifted) potential
 
               IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                 pot = pot + atom_new%pot - atom_old%pot ! Update potential energy
-                 vir = vir + atom_new%vir - atom_old%vir ! Update virial
-                 CALL move ( i, ri )                     ! Update position
-                 moves = moves + 1                       ! Increment move counter
+                 system = system + atom_new - atom_old ! Update system values
+                 CALL move ( i, ri )                   ! Update position
+                 moves = moves + 1                     ! Increment move counter
               END IF ! End accept Metropolis test
 
            END IF ! End test for overlapping configuration
@@ -208,23 +206,20 @@ PROGRAM mc_nvt_lj_re
 
               IF ( MOD(m,2) == MOD(updown,2) ) THEN ! Look up, partner is m+1
 
-                 IF ( m+1 < p ) THEN ! Ensure partner exists
+                 IF ( m+1 < nproc ) THEN ! Ensure partner exists
                     other_beta = every_beta(m+1) ! We already know the other beta
-                    CALL MPI_Sendrecv ( pot,       1, MPI_REAL, m+1, msg1_id, &
-                         &              other_pot, 1, MPI_REAL, m+1, msg2_id, &
-                         &              MPI_COMM_WORLD, msg_status, msg_error ) ! Exchange pot
+                    CALL MPI_Recv ( other_pot_c, 1, MPI_REAL, m+1, msg1_id, &
+                         &          MPI_COMM_WORLD, msg_status, msg_error ) ! Receive pot_c from other process
 
-                    delta = -(beta - other_beta) * (pot - other_pot) ! Delta for Metropolis decision
+                    delta = -(beta - other_beta) * ( system%pot_c - other_pot_c ) ! Delta for Metropolis decision
                     swap  = metropolis ( delta ) ! Decision taken on this process
-                    CALL MPI_Send ( swap, 1, MPI_LOGICAL, m+1, msg3_id, &
+                    CALL MPI_Send ( swap, 1, MPI_LOGICAL, m+1, msg2_id, &
                          &          MPI_COMM_WORLD, msg_error ) ! Send decision to other process
 
                     IF ( swap ) THEN ! Exchange configurations
-                       CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m+1, msg1_id, m+1, msg2_id, &
+                       CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m+1, msg3_id, m+1, msg4_id, &
                             &                      MPI_COMM_WORLD, msg_status, msg_error )
-                       pot = other_pot ! Other pot is already here, but we need to exchange vir
-                       CALL MPI_Sendrecv_replace ( vir, 1, MPI_REAL, m+1, msg1_id, m+1, msg2_id, &
-                            &                      MPI_COMM_WORLD, msg_status, msg_error )
+                       system = potential ( box, r_cut ) ! Alternatively, we could exchange this information
                        swapped = 1
                     END IF ! End exchange configurations
 
@@ -233,19 +228,16 @@ PROGRAM mc_nvt_lj_re
               ELSE ! Look down, partner is m-1
 
                  IF ( m-1 >= 0 ) THEN ! Ensure partner exists
-                    CALL MPI_Sendrecv (  pot,       1, MPI_REAL, m-1, msg2_id, &
-                         &               other_pot, 1, MPI_REAL, m-1, msg1_id, &
-                         &               MPI_COMM_WORLD, msg_status, msg_error ) ! Exchange pot
+                    CALL MPI_Send ( system%pot_c, 1, MPI_REAL, m-1, msg1_id, &
+                         &          MPI_COMM_WORLD, msg_error ) ! Send pot_c to other process
 
-                    CALL MPI_Recv ( swap, 1, MPI_LOGICAL, m-1, msg3_id, &
-                         &          MPI_COMM_WORLD, msg_status, msg_error ) ! Let other process take decision
+                    CALL MPI_Recv ( swap, 1, MPI_LOGICAL, m-1, msg2_id, &
+                         &          MPI_COMM_WORLD, msg_status, msg_error ) ! Receive decision from other process
 
                     IF ( swap ) THEN ! Exchange configurations
-                       CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m-1, msg2_id, m-1, msg1_id, &
-                            &                      MPI_COMM_WORLD,msg_status,msg_error)
-                       pot = other_pot ! Other pot is already here, but we need to exchange vir
-                       CALL MPI_Sendrecv_replace ( vir, 1, MPI_REAL, m-1, msg2_id, m-1, msg1_id, &
-                            &                      MPI_COMM_WORLD,msg_status,msg_error)
+                       CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m-1, msg4_id, m-1, msg3_id, &
+                            &                      MPI_COMM_WORLD, msg_status, msg_error )
+                       system = potential ( box, r_cut ) ! Alternatively, we could exchange this information
                     END IF ! End exchange configurations
 
                  END IF ! End ensure partner exists
@@ -256,11 +248,11 @@ PROGRAM mc_nvt_lj_re
 
         END IF ! End test for swap interval
 
-        x_ratio  = REAL(swapped*swap_interval) ! Include factor for only attempting at intervals
+        x_ratio = REAL(swapped*swap_interval) ! Include factor for only attempting at intervals
 
         ! Calculate all variables for this step
         CALL calculate ( )
-        CALL blk_add ( [m_ratio,x_ratio,en_cut,p_cut,en_full,p_full] )
+        CALL blk_add ( [m_ratio,x_ratio,en_c,p_c,en,p] )
 
      END DO ! End loop over steps
 
@@ -279,8 +271,6 @@ PROGRAM mc_nvt_lj_re
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_lj_re'
   END IF
-  pot = system%pot
-  vir = system%vir
   CALL calculate ( 'Final check' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
@@ -300,20 +290,27 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    en_cut  = pot / REAL ( n )                          ! PE/N for cut (but not shifted) potential
-    en_cut  = en_cut + 1.5 * temperature                ! Add ideal gas contribution KE/N
-    en_full = en_cut + potential_lrc ( density, r_cut ) ! Add long-range contribution to PE/N
-    p_cut   = vir / box**3                              ! Virial contribution to P
-    p_cut   = p_cut + density * temperature             ! Add ideal gas contribution to P
-    p_full  = p_cut + pressure_lrc ( density, r_cut )   ! Add long-range contribution to P
-    p_cut   = p_cut + pressure_delta ( density, r_cut ) ! Add delta correction to P
+    ! This routine calculates the properties of interest from system values
+    ! In this example we simulate using the cut (but not shifted) potential
+    ! The values of < p_c >,  < en_c > and < density > should be consistent (for this potential)
+    ! For comparison, long-range corrections are also applied to give
+    ! estimates of < en > and < p > for the full (uncut) potential
+    ! The value of the cut-and-shifted potential pot_s is not used, in this example
+
+    en_c = system%pot_c / REAL ( n )               ! PE/N for cut (but not shifted) potential
+    en_c = en_c + 1.5 * temperature                ! Add ideal gas contribution KE/N to give E_c/N
+    en   = en_c + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E/N estimate
+    p_c  = system%vir / box**3                     ! Virial contribution to P_c
+    p_c  = p_c + density * temperature             ! Add ideal gas contribution to P_c
+    p    = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P
+    p_c  = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P)
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)'           ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut)',  en_cut
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut)',    p_cut
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en_full
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',   p_full
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut)',  en_c
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut)',    p_c
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',   p
     END IF
 
   END SUBROUTINE calculate

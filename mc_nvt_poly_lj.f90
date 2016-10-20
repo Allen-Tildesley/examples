@@ -8,7 +8,7 @@ PROGRAM mc_nvt_poly_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis, random_rotate_quaternion, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       potential_1, potential, q_to_d, n, na, r, e, d, db, potential_type
+       &                       potential_1, potential, n, r, e, potential_type
 
   IMPLICIT NONE
 
@@ -40,18 +40,16 @@ PROGRAM mc_nvt_poly_lj
 
   ! Quantities to be averaged
   REAL :: move_ratio ! acceptance ratio of moves
-  REAL :: p_cutsh    ! pressure (cut & shifted potential)
-  REAL :: en_cutsh   ! internal energy per molecule (cut & shifted potential)
+  REAL :: p    ! pressure (cut & shifted potential)
+  REAL :: en   ! internal energy per molecule (cut & shifted potential)
 
   ! Composite interaction = pot & vir & overlap variables
   TYPE(potential_type) :: system, molecule_old, molecule_new
 
-  INTEGER :: blk, stp, i, nstep, nblock, moves, ioerr
-  REAL    :: delta
-
-  REAL, DIMENSION(3)    :: ri
-  REAL, DIMENSION(0:3)  :: ei
-  REAL, DIMENSION(3,na) :: di
+  INTEGER              :: blk, stp, i, nstep, nblock, moves, ioerr
+  REAL                 :: delta
+  REAL, DIMENSION(3)   :: ri
+  REAL, DIMENSION(0:3) :: ei
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -100,10 +98,6 @@ PROGRAM mc_nvt_poly_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  DO i = 1, n ! Loop over molecules
-     d(:,:,i) = q_to_d ( e(:,i), db ) ! Convert quaternions to space-fixed atom vectors
-  END DO ! End loop over molecules
-
   system = potential ( box, r_cut )
   IF ( system%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
@@ -113,7 +107,7 @@ PROGRAM mc_nvt_poly_lj
   vir = system%vir
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'E/N (cut&shift)', 'P (cut&shift)' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'E/N', 'P' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -125,7 +119,7 @@ PROGRAM mc_nvt_poly_lj
 
         DO i = 1, n ! Begin loop over atoms
 
-           molecule_old = potential_1 ( r(:,i), d(:,:,i), i, box, r_cut ) ! Old molecule potential, virial, etc
+           molecule_old = potential_1 ( r(:,i), e(:,i), i, box, r_cut ) ! Old molecule potential, virial, etc
 
            IF ( molecule_old%overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
@@ -135,9 +129,8 @@ PROGRAM mc_nvt_poly_lj
            ri = random_translate_vector ( dr_max/box, r(:,i) ) ! Trial move to new position (in box=1 units)
            ri = ri - ANINT ( ri )                              ! Periodic boundary correction
            ei = random_rotate_quaternion ( de_max, e(:,i) )    ! Trial rotation
-           di = q_to_d ( ei, db )                              ! New space-fixed atom vectors
 
-           molecule_new = potential_1 ( ri, di, i, box, r_cut ) ! New molecule potential, virial etc
+           molecule_new = potential_1 ( ri, ei, i, box, r_cut ) ! New molecule potential, virial etc
 
            IF ( .NOT. molecule_new%overlap ) THEN ! Test for non-overlapping configuration
 
@@ -148,7 +141,6 @@ PROGRAM mc_nvt_poly_lj
                  vir      = vir + molecule_new%vir - molecule_old%vir ! Update virial
                  r(:,i)   = ri                                        ! Update position
                  e(:,i)   = ei                                        ! Update quaternion
-                 d(:,:,i) = di                                        ! Update atom vectors
                  moves    = moves + 1                                 ! Increment move counter
               END IF ! End accept Metropolis test
 
@@ -160,7 +152,7 @@ PROGRAM mc_nvt_poly_lj
 
         ! Calculate all variables for this step
         CALL calculate ( )
-        CALL blk_add ( [move_ratio,en_cutsh,p_cutsh] )
+        CALL blk_add ( [move_ratio,en,p] )
 
      END DO ! End loop over steps
 
@@ -195,15 +187,18 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    en_cutsh = pot / REAL ( n )                ! PE for cut & shifted potential
-    en_cutsh = en_cutsh + 3.0 * temperature    ! Add ideal gas contribution KE/N assuming nonlinear molecules 
-    p_cutsh  = vir / box**3                    ! Virial contribution to P
-    p_cutsh  = p_cutsh + density * temperature ! Add ideal gas contribution to P
+    ! The potential is assumed to be both cut and shifted
+    ! Therefore there are no long-range or delta corrections
+    
+    en = pot / REAL ( n )          ! PE per molecule
+    en = en + 3.0 * temperature    ! Add ideal gas contribution KE/N assuming nonlinear molecules 
+    p  = vir / box**3              ! Virial contribution to P
+    p  = p + density * temperature ! Add ideal gas contribution to P
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)'           ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut&shift)', en_cutsh
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)',   p_cutsh
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N', en
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P',   p
     END IF
 
   END SUBROUTINE calculate

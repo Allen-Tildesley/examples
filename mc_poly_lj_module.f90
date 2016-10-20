@@ -9,26 +9,25 @@ MODULE mc_module
 
   ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: potential_1, potential, q_to_d
+  PUBLIC :: potential_1, potential
 
   ! Public data
   INTEGER,                                PUBLIC :: n ! number of molecules
   REAL,    DIMENSION(:,:),   ALLOCATABLE, PUBLIC :: r ! centre of mass positions (3,n)
   REAL,    DIMENSION(:,:),   ALLOCATABLE, PUBLIC :: e ! quaternions (0:3,n)
-  REAL,    DIMENSION(:,:,:), ALLOCATABLE, PUBLIC :: d ! bond vectors (3,na,n)
 
-  INTEGER, PARAMETER,                  PUBLIC :: na = 3 ! Number of atoms per molecule
-  REAL,    PARAMETER, DIMENSION(3,na), PUBLIC :: db = RESHAPE ( [ &
+  ! Private data
+  INTEGER, PARAMETER                  :: na = 3 ! Number of atoms per molecule
+  REAL,    PARAMETER, DIMENSION(3,na) :: db = RESHAPE ( [ &
        &  0.0, 0.0,  1.0/SQRT(3.0), & 
        & -0.5, 0.0, -0.5/SQRT(3.0), &
        &  0.5, 0.0, -0.5/SQRT(3.0) ], [3,na] ) ! Bond vectors in body-fixed frame
 
-  ! Private data
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
   REAL,    PARAMETER :: sigma = 1.0     ! Lennard-Jones diameter (unit of length)
   REAL,    PARAMETER :: epslj = 1.0     ! Lennard-Jones well depth (unit of energy)
 
-  REAL,    PARAMETER :: diameter = 2.0 * SQRT ( MAXVAL ( SUM(db**2,dim=1) ) ) ! molecular diameter
+  REAL,    PARAMETER :: diameter = 2.0 * SQRT ( MAXVAL ( SUM(db**2,dim=1) ) ) ! Molecular diameter
 
   ! Public derived type
   PUBLIC :: potential_type
@@ -59,7 +58,8 @@ CONTAINS
 
     INTEGER :: i
 
-    WRITE ( unit=output_unit, fmt='(a)'           ) 'Shifted Lennard-Jones potential (no LRC)'
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Cut-and-shifted, with no long-range corrections'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',   sigma    
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epslj = ', epslj    
 
@@ -81,12 +81,12 @@ CONTAINS
 
   SUBROUTINE allocate_arrays ( box, r_cut )
     IMPLICIT NONE
-    REAL, INTENT(in) :: box    ! simulation box length
+    REAL, INTENT(in) :: box   ! simulation box length
     REAL, INTENT(in) :: r_cut ! potential cutoff distance
 
     REAL :: rm_cut_box
 
-    ALLOCATE ( r(3,n), e(0:3,n), d(3,na,n) )
+    ALLOCATE ( r(3,n), e(0:3,n) )
 
     rm_cut_box = ( r_cut+diameter ) / box
     IF ( rm_cut_box > 0.5 ) THEN
@@ -99,7 +99,7 @@ CONTAINS
   SUBROUTINE deallocate_arrays
     IMPLICIT NONE
 
-    DEALLOCATE ( r, e, d )
+    DEALLOCATE ( r, e )
 
   END SUBROUTINE deallocate_arrays
 
@@ -127,7 +127,7 @@ CONTAINS
 
     DO i = 1, n - 1
 
-       molecule = potential_1 ( r(:,i), d(:,:,i), i, box, r_cut, gt )
+       molecule = potential_1 ( r(:,i), e(:,i), i, box, r_cut, gt )
 
        IF ( molecule%overlap ) THEN
           system%overlap = .TRUE. ! Overlap detected
@@ -142,43 +142,42 @@ CONTAINS
 
   END FUNCTION potential
 
-  FUNCTION potential_1 ( ri, di, i, box, r_cut, j_range ) RESULT ( molecule )
+  FUNCTION potential_1 ( ri, ei, i, box, r_cut, j_range ) RESULT ( molecule )
+    USE maths_module, ONLY : q_to_a
     IMPLICIT NONE
     TYPE(potential_type)                :: molecule ! Returns a composite of pot, vir and overlap
     REAL,    DIMENSION(3),   INTENT(in) :: ri       ! Coordinates of molecule of interest
-    REAL,    DIMENSION(:,:), INTENT(in) :: di       ! Bond vectors of molecule of interest
+    REAL,    DIMENSION(0:3), INTENT(in) :: ei       ! Quaternion of molecule of interest
     INTEGER,                 INTENT(in) :: i        ! Index of molecule of interest
     REAL,                    INTENT(in) :: box      ! Simulation box length
     REAL,                    INTENT(in) :: r_cut    ! Potential cutoff distance
     INTEGER, OPTIONAL,       INTENT(in) :: j_range  ! Optional partner index range
 
-    ! molecule%pot is the nonbonded potential energy of molecule ri,di with a set of other molecules
-    ! molecule%vir is the corresponding virial of molecule ri,di
+    ! molecule%pot is the nonbonded potential energy of molecule ri,ei with a set of other molecules
+    ! molecule%vir is the corresponding virial of molecule ri,ei
     ! molecule%overlap is a flag indicating overlap (potential too high) to avoid overflow
     ! If this is .true., the value of molecule%pot should not be used
-    ! The coordinates in ri and di are not necessarily identical with those in r(:,i) and d(:,i)
+    ! The coordinates in ri and ei are not necessarily identical with those in r(:,i) and e(:,i)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
 
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
     ! Note that this is the shifted LJ potential
 
-    INTEGER            :: j, j1, j2, a, b
-    REAL               :: rm_cut_box, rm_cut_box_sq, r_cut_sq
-    REAL               :: sr2, sr6, sr12, rij_sq, rab_sq, potab, virab, pot_cut
-    REAL, DIMENSION(3) :: rij, rab, fab
-    REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
+    INTEGER               :: j, j1, j2, a, b
+    REAL                  :: rm_cut_box, rm_cut_box_sq, r_cut_sq
+    REAL                  :: sr2, sr6, sr12, rij_sq, rab_sq, potab, virab, pot_cut
+    REAL, DIMENSION(3)    :: rij, rab, fab
+    REAL, DIMENSION(3,na) :: di, dj
+    REAL, DIMENSION(3,3)  :: ai, aj
+    REAL, PARAMETER       :: sr2_overlap = 1.8 ! overlap threshold
 
     IF ( SIZE(r,dim=2)  /= n ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
        STOP 'Error in potential_1'
     END IF
-    IF ( SIZE(di,dim=1) /= 3 ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array bounds error for di', SIZE(di,dim=1)
-       STOP 'Error in potential_1'
-    END IF
-    IF ( SIZE(di,dim=2) /= na ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for di', SIZE(di,dim=2), na
+    IF ( SIZE(e,dim=2)  /= n ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for e', n, SIZE(e,dim=2)
        STOP 'Error in potential_1'
     END IF
 
@@ -210,6 +209,12 @@ CONTAINS
 
     molecule = potential_type ( pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
+    ! Compute all space-fixed atom vectors for molecule i
+    ai = q_to_a ( ei ) ! Rotation matrix for i
+    DO a = 1, na ! Loop over all atoms
+       di(:,a) = MATMUL ( db(:,a), ai ) ! NB: equivalent to ai_T*db, ai_T=transpose of ai
+    END DO ! End loop over all atoms
+
     DO j = j1, j2 ! Loop over selected range of partner molecules
 
        IF ( i == j ) CYCLE ! Skip self
@@ -221,13 +226,19 @@ CONTAINS
        IF ( rij_sq < rm_cut_box_sq ) THEN ! Test within molecular cutoff
 
           rij = rij * box ! now in sigma = 1 units
-          
+
+          ! Compute all space-fixed atom vectors for molecule j
+          aj = q_to_a ( e(:,j) ) ! Rotation matrix for j
+          DO a = 1, na ! Loop over all atoms
+             dj(:,a) = MATMUL ( db(:,a), aj ) ! NB: equivalent to aj_T*db, aj_T=transpose of aj
+          END DO ! End loop over all atoms
+
           ! Double loop over atoms on both molecules
-          DO a = 1, na
+          DO a = 1, na      
              DO b = 1, na
 
-                rab    = rij + di(:,a) - d(:,b,j) ! Atom-atom vector, sigma=1 units
-                rab_sq = SUM ( rab**2 )           ! Squared atom-atom separation, sigma=1 units
+                rab    = rij + di(:,a) - dj(:,b) ! Atom-atom vector, sigma=1 units
+                rab_sq = SUM ( rab**2 )          ! Squared atom-atom separation, sigma=1 units
 
                 IF ( rab_sq < r_cut_sq ) THEN ! Test within potential cutoff 
 
@@ -262,25 +273,5 @@ CONTAINS
     molecule%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential_1
-
-  FUNCTION q_to_d ( q, db ) RESULT ( ds )
-    USE maths_module, ONLY : q_to_a
-    IMPLICIT NONE
-    REAL, DIMENSION(3,na)             :: ds ! Returns space-fixed atom vectors calculated from
-    REAL, DIMENSION(0:3),  INTENT(in) :: q  ! molecular quaternion and
-    REAL, DIMENSION(3,na), INTENT(in) :: db ! body-fixed atom vectors
-
-    REAL, DIMENSION(3,3) :: a
-    INTEGER              :: i
-
-    a = q_to_a ( q ) ! Compute rotation matrix from quaternions
-
-    DO i = 1, na ! Loop over all atoms
-
-       ds(:,i) = MATMUL ( db(:,i), a ) ! NB: equivalent to ds = at*db, at=transpose of a
-
-    END DO ! End loop over all atoms
-
-  END FUNCTION q_to_d
 
 END MODULE mc_module

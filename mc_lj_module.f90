@@ -24,31 +24,52 @@ MODULE mc_module
   ! Public derived type
   PUBLIC :: potential_type
   TYPE potential_type   ! A composite variable for interactions comprising
-     REAL    :: pot     ! the potential energy and
+     REAL    :: pot_c   ! the potential energy cut at r_cut and
+     REAL    :: pot_s   ! the potential energy cut and shifted to 0 at r_cut, and
      REAL    :: vir     ! the virial and
      LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
   END TYPE potential_type
 
+  PUBLIC :: OPERATOR (+)
   INTERFACE OPERATOR (+)
      MODULE PROCEDURE add_potential_type
   END INTERFACE OPERATOR (+)
 
+  PUBLIC :: OPERATOR (-)
+  INTERFACE OPERATOR (-)
+     MODULE PROCEDURE subtract_potential_type
+  END INTERFACE OPERATOR (-)
+
+  PUBLIC :: add_potential_type, subtract_potential_type
+  
 CONTAINS
 
   FUNCTION add_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
     TYPE(potential_type)             :: c    ! Result is the sum of the two inputs
     TYPE(potential_type), INTENT(in) :: a, b
-    c%pot     = a%pot      +   b%pot
+    c%pot_c   = a%pot_c    +   b%pot_c
+    c%pot_s   = a%pot_s    +   b%pot_s
     c%vir     = a%vir      +   b%vir
     c%overlap = a%overlap .OR. b%overlap
   END FUNCTION add_potential_type
+
+  FUNCTION subtract_potential_type ( a, b ) RESULT (c)
+    IMPLICIT NONE
+    TYPE(potential_type)             :: c    ! Result is the difference of the two inputs
+    TYPE(potential_type), INTENT(in) :: a, b
+    c%pot_c   = a%pot_c    -   b%pot_c
+    c%pot_s   = a%pot_s    -   b%pot_s
+    c%vir     = a%vir      -   b%vir
+    c%overlap = a%overlap .OR. b%overlap ! this is meaningless, but inconsequential
+  END FUNCTION subtract_potential_type
 
   SUBROUTINE introduction ( output_unit )
     IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
-    WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential (cut but not shifted)'
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a)'           ) 'Cut and optionally shifted'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',   sigma    
     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epslj = ', epslj    
 
@@ -92,10 +113,11 @@ CONTAINS
     REAL, INTENT(in)     :: box    ! Simulation box length
     REAL, INTENT(in)     :: r_cut  ! Potential cutoff distance
 
-    ! system%pot is the nonbonded potential energy for whole system
+    ! system%pot_c is the nonbonded cut (not shifted) potential energy for whole system
+    ! system%pot_s is the nonbonded cut-and-shifted potential energy for whole system
     ! system%vir is the corresponding virial for whole system
     ! system%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this flag is .true., the values of system%pot, system%vir should not be used
+    ! If this flag is .true., the values of system%pot_c etc should not be used
     ! Actual calculation is performed by function potential_1
 
     TYPE(potential_type) :: atom
@@ -106,7 +128,7 @@ CONTAINS
        STOP 'Error in potential'
     END IF
 
-    system = potential_type ( pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
+    system = potential_type ( pot_c=0.0, pot_s=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1
 
@@ -134,17 +156,18 @@ CONTAINS
     REAL,               INTENT(in)  :: r_cut   ! Potential cutoff distance
     INTEGER, OPTIONAL,  INTENT(in)  :: j_range ! Optional partner index range
 
-    ! atom%pot is the nonbonded potential energy of atom ri with a set of other atoms
+    ! atom%pot_c is the nonbonded cut (not shifted) potential energy of atom ri with a set of other atoms
+    ! atom%pot_s is the nonbonded cut-and-shifted potential energy of atom ri with a set of other atoms
     ! atom%vir is the corresponding virial of atom ri
     ! atom%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this is .true., the value of atom%pot should not be used
+    ! If this is .true., the values of atom%pot_c etc should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
 
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
-    INTEGER            :: j, j1, j2
+    INTEGER            :: j, j1, j2, ncut
     REAL               :: r_cut_box, r_cut_box_sq, box_sq
     REAL               :: sr2, sr6, rij_sq
     REAL, DIMENSION(3) :: rij
@@ -176,7 +199,8 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    atom = potential_type ( pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
+    atom = potential_type ( pot_c=0.0, pot_s=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
+    ncut = 0
 
     DO j = j1, j2 ! Loop over selected range of partners
 
@@ -198,16 +222,23 @@ CONTAINS
 
           sr6 = sr2**3
 
-          atom%pot = atom%pot + sr6**2 - sr6     ! LJ potential (cut but not shifted)
-          atom%vir = atom%vir + 2.0*sr6**2 - sr6 ! LJ virial
+          atom%pot_c = atom%pot_c +     sr6**2 - sr6 ! LJ potential (cut but not shifted)
+          atom%vir   = atom%vir   + 2.0*sr6**2 - sr6 ! LJ virial
+          ncut       = ncut + 1
 
        END IF ! End check within range
 
     END DO ! End loop over selected range of partners
 
+    ! Calculate shifted potential
+    sr2        = 1.0 / r_cut**2 ! in sigma=1 units
+    sr6        = sr2**3
+    atom%pot_s = atom%pot_c - REAL ( ncut ) * ( sr6**2 - sr6 )
+
     ! Include numerical factors
-    atom%pot     = atom%pot * 4.0
-    atom%vir     = atom%vir * 24.0 / 3.0
+    atom%pot_c   = atom%pot_c * 4.0
+    atom%pot_s   = atom%pot_s * 4.0
+    atom%vir     = atom%vir   * 24.0 / 3.0
     atom%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential_1

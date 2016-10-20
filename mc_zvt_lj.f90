@@ -9,7 +9,8 @@ PROGRAM mc_zvt_lj
   USE maths_module,     ONLY : metropolis, random_integer, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_1, potential, &
-       &                       move, create, destroy, n, r, potential_type
+       &                       move, create, destroy, n, r, &
+       &                       potential_type, OPERATOR(+), OPERATOR(-)
 
   IMPLICIT NONE
 
@@ -38,18 +39,16 @@ PROGRAM mc_zvt_lj
   REAL :: temperature ! Specified temperature
   REAL :: activity    ! Specified activity z
   REAL :: r_cut       ! Potential cutoff distance
-  REAL :: pot         ! Total potential energy
-  REAL :: vir         ! Total virial
 
   ! Quantities to be averaged
   REAL :: m_ratio ! Acceptance ratio of moves
   REAL :: c_ratio ! Acceptance ratio of creation attempts
   REAL :: d_ratio ! Acceptance ratio of destruction attempts
   REAL :: density ! Density
-  REAL :: en_cut  ! Internal energy per atom for simulated, cut, potential
-  REAL :: en_full ! Internal energy per atom for full potential with LRC
-  REAL :: p_cut   ! Pressure for simulated, cut, potential
-  REAL :: p_full  ! Pressure for full potential with LRC
+  REAL :: en_c    ! Internal energy per atom for simulated, cut, potential
+  REAL :: en      ! Internal energy per atom for full potential with LRC
+  REAL :: p_c     ! Pressure for simulated, cut, potential
+  REAL :: p       ! Pressure for full potential with LRC
 
   ! Composite interaction = pot & vir & overlap variables
   TYPE(potential_type) :: system, atom_old, atom_new
@@ -118,8 +117,6 @@ PROGRAM mc_zvt_lj
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_zvt_lj'
   END IF
-  pot = system%pot
-  vir = system%vir
   CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Create ratio', 'Destroy ratio', &
@@ -164,13 +161,12 @@ PROGRAM mc_zvt_lj
 
               IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
 
-                 delta = ( atom_new%pot - atom_old%pot ) / temperature
+                 delta = ( atom_new%pot_c - atom_old%pot_c ) / temperature ! Use cut (but not shifted) potential
 
                  IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                    pot = pot + atom_new%pot - atom_old%pot ! Update potential energy
-                    vir = vir + atom_new%vir - atom_old%vir ! Update virial
-                    CALL move ( i, ri )                     ! Update position
-                    m_moves = m_moves + 1                   ! Increment move counter
+                    system = system + atom_new - atom_old ! Update system values
+                    CALL move ( i, ri )                   ! Update position
+                    m_moves = m_moves + 1                 ! Increment move counter
                  END IF ! End accept Metropolis test
 
               END IF ! End test for overlapping configuration
@@ -191,12 +187,11 @@ PROGRAM mc_zvt_lj
 
               IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
 
-                 delta = atom_new%pot / temperature - LOG ( activity / REAL ( n+1 ) )
+                 delta = atom_new%pot_c / temperature - LOG ( activity / REAL ( n+1 ) ) ! Use cut potential
 
                  IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
                     CALL create ( ri )            ! Create new particle
-                    pot     = pot + atom_new%pot  ! Update total potential energy
-                    vir     = vir + atom_new%vir  ! Update total virial
+                    system  = system + atom_new   ! Update system values
                     c_moves = c_moves + 1         ! Increment creation move counter
                  END IF ! End accept Metropolis test
 
@@ -214,12 +209,11 @@ PROGRAM mc_zvt_lj
                  STOP 'Error in mc_zvt_lj'
               END IF
 
-              delta = -atom_old%pot/temperature - LOG ( REAL ( n ) / activity )
+              delta = -atom_old%pot_c/temperature - LOG ( REAL ( n ) / activity ) ! Use cut potential
 
               IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
                  CALL destroy ( i )            ! Destroy chosen particle
-                 pot     = pot - atom_old%pot  ! Update total potential energy
-                 vir     = vir - atom_old%vir  ! Update total virial
+                 system  = system - atom_old   ! Update system values
                  d_moves = d_moves + 1         ! Increment destruction move counter
               END IF ! End accept Metropolis test
 
@@ -247,7 +241,7 @@ PROGRAM mc_zvt_lj
 
         ! Calculate all variables for this step
         CALL calculate ( )
-        CALL blk_add ( [m_ratio,c_ratio,d_ratio,density,en_cut,p_cut,en_full,p_full] )
+        CALL blk_add ( [m_ratio,c_ratio,d_ratio,density,en_c,p_c,en,p] )
 
      END DO ! End loop over steps
 
@@ -266,8 +260,6 @@ PROGRAM mc_zvt_lj
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_zvt_lj'
   END IF
-  pot = system%pot
-  vir = system%vir
   CALL calculate ( 'Final check' )
   CALL time_stamp ( output_unit )
 
@@ -283,22 +275,29 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    density = REAL(n) / box**3                          ! Number density N/V
-    en_cut  = pot / REAL ( n )                          ! PE/N for cut (but not shifted) potential
-    en_cut  = en_cut + 1.5 * temperature                ! Add ideal gas contribution KE/N
-    en_full = en_cut + potential_lrc ( density, r_cut ) ! Add long-range contribution to PE/N
-    p_cut   = vir / box**3                              ! Virial contribution to P
-    p_cut   = p_cut + density * temperature             ! Add ideal gas contribution to P
-    p_full  = p_cut + pressure_lrc ( density, r_cut )   ! Add long-range contribution to P
-    p_cut   = p_cut + pressure_delta ( density, r_cut ) ! Add delta correction to P
+    ! This routine calculates the properties of interest from system values
+    ! In this example we simulate using the cut (but not shifted) potential
+    ! The values of < p_c >,  < en_c > and < density > should be consistent (for this potential)
+    ! For comparison, long-range corrections are also applied to give
+    ! estimates of < en > and < p > for the full (uncut) potential
+    ! The value of the cut-and-shifted potential pot_s is not used, in this example
+
+    density = REAL(n) / box**3                        ! Number density N/V
+    en_c    = system%pot_c / REAL ( n )               ! PE/N for cut (but not shifted) potential
+    en_c    = en_c + 1.5 * temperature                ! Add ideal gas contribution KE/N to give E_c/N
+    en      = en_c + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E/N estimate
+    p_c     = system%vir / box**3                     ! Virial contribution to P_c
+    p_c     = p_c + density * temperature             ! Add ideal gas contribution to P_c
+    p       = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P
+    p_c     = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P)
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)'           ) string
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',    density
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut)',  en_cut
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut)',    p_cut
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en_full
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',   p_full
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut)',  en_c
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut)',    p_c
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',   p
     END IF
 
   END SUBROUTINE calculate
