@@ -6,6 +6,7 @@ PROGRAM mc_nvt_hs
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE maths_module,     only : random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       overlap_1, overlap, n_overlap, n, r
 
@@ -36,8 +37,7 @@ PROGRAM mc_nvt_hs
   REAL :: pkt        ! Pressure in units kT/sigma**3
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
-  REAL, DIMENSION(3) :: ri         ! position of atom i
-  REAL, DIMENSION(3) :: zeta       ! random numbers
+  REAL, DIMENSION(3) :: ri
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -101,11 +101,8 @@ PROGRAM mc_nvt_hs
 
         DO i = 1, n ! Begin loop over atoms
 
-           CALL RANDOM_NUMBER ( zeta ) ! Three uniform random numbers in range (0,1)
-           zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
-
-           ri(:) = r(:,i) + zeta * dr_max / box ! Trial move to new position (in box=1 units)
-           ri(:) = ri(:) - ANINT ( ri(:) )      ! Periodic boundary correction
+           ri(:) = random_translate_vector ( dr_max/box, r(:,i) ) ! Trial move to new position (in box=1 units)
+           ri(:) = ri(:) - ANINT ( ri(:) )                        ! Periodic boundary correction
 
            IF ( .NOT. overlap_1 ( ri, i, box ) ) THEN ! Accept
               r(:,i) = ri(:)     ! Update position

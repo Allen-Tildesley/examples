@@ -6,7 +6,7 @@ PROGRAM mc_zvt_lj
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE maths_module,     ONLY : metropolis, random_integer
+  USE maths_module,     ONLY : metropolis, random_integer, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_1, potential, &
        &                       move, create, destroy, n, r, potential_type
@@ -59,9 +59,8 @@ PROGRAM mc_zvt_lj
   INTEGER            :: m_tries, m_moves ! count tries and moves
   INTEGER            :: c_tries, c_moves ! count tries and moves for creation
   INTEGER            :: d_tries, d_moves ! count tries and moves for destruction
-  REAL               :: prob_move, prob_create, delta, zeta1
-  REAL, DIMENSION(3) :: ri   ! position of atom i
-  REAL, DIMENSION(3) :: zeta ! random numbers
+  REAL               :: prob_move, prob_create, delta, zeta
+  REAL, DIMENSION(3) :: ri
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -143,25 +142,24 @@ PROGRAM mc_zvt_lj
 
         DO try = 1, ntry ! Begin loop over tries of different kinds
 
-           CALL RANDOM_NUMBER ( zeta1 ) ! uniform random number in range (0,1)
+           CALL RANDOM_NUMBER ( zeta ) ! uniform random number in range (0,1)
 
-           IF ( zeta1 < prob_move ) THEN ! Try particle move
+           IF ( zeta < prob_move ) THEN ! Try particle move
 
               m_tries = m_tries + 1
 
-              i        = random_integer ( 1, n ) ! Choose moving particle at random
-              ri(:)    = r(:,i)
-              atom_old = potential_1 ( ri, i, box, r_cut ) ! Old atom potential, virial etc
+              i = random_integer ( 1, n ) ! Choose moving particle at random
+
+              atom_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial etc
 
               IF ( atom_old%overlap ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in mc_zvt_lj'
               END IF
 
-              CALL RANDOM_NUMBER ( zeta )                  ! Three uniform random numbers in range (0,1)
-              zeta     = 2.0*zeta - 1.0                    ! now in range (-1,+1)
-              ri(:)    = ri(:) + zeta * dr_max / box       ! Trial move to new position (in box=1 units)
-              ri(:)    = ri(:) - ANINT ( ri(:) )           ! Periodic boundary correction
+              ri(:) = random_translate_vector ( dr_max/box, r(:,i) ) ! Trial move to new position (in box=1 units)
+              ri(:) = ri(:) - ANINT ( ri(:) )                        ! Periodic boundary correction
+
               atom_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
 
               IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
@@ -177,7 +175,7 @@ PROGRAM mc_zvt_lj
 
               END IF ! End test for overlapping configuration
 
-           ELSE IF ( zeta1 < prob_move + prob_create ) THEN ! Try create
+           ELSE IF ( zeta < prob_move + prob_create ) THEN ! Try create
 
               c_tries = c_tries + 1
 
@@ -186,8 +184,9 @@ PROGRAM mc_zvt_lj
                  STOP 'Error in mc_zvt_lj'
               END IF
 
-              CALL RANDOM_NUMBER ( ri )                      ! Three uniform random numbers in range (0,1)
-              ri = ri - 0.5                                  ! now in range (-0.5,+0.5) for box=1 units
+              CALL RANDOM_NUMBER ( ri ) ! Three uniform random numbers in range (0,1)
+              ri = ri - 0.5             ! now in range (-0.5,+0.5) for box=1 units
+
               atom_new = potential_1 ( ri, n+1, box, r_cut ) ! New atom potential, virial, etc
 
               IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
@@ -205,8 +204,9 @@ PROGRAM mc_zvt_lj
 
            ELSE ! try destroy
 
-              d_tries  = d_tries + 1
-              i        = random_integer ( 1, n )               ! Choose particle at random
+              d_tries = d_tries + 1
+              i = random_integer ( 1, n ) ! Choose particle at random
+
               atom_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial, etc
 
               IF ( atom_old%overlap ) THEN ! should never happen

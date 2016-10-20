@@ -6,7 +6,7 @@ PROGRAM mc_nvt_lj_re
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE maths_module,     ONLY : metropolis
+  USE maths_module,     ONLY : metropolis, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_1, potential, move, n, r, potential_type
   USE mpi
@@ -59,9 +59,8 @@ PROGRAM mc_nvt_lj_re
 
   LOGICAL            :: swap
   INTEGER            :: blk, stp, i, nstep, nblock, moves, swap_interval, swapped, updown, ioerr
-  REAL               :: beta, other_beta, other_pot, delta
-  REAL, DIMENSION(3) :: ri   ! position of atom i
-  REAL, DIMENSION(3) :: zeta ! random numbers
+  REAL               :: beta, other_beta, other_pot, delta, zeta
+  REAL, DIMENSION(3) :: ri
 
   INTEGER                      :: output_unit                                  ! output file unit number 
   CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -106,8 +105,8 @@ PROGRAM mc_nvt_lj_re
 
   CALL RANDOM_SEED () ! Initialize random number generator
   CALL RANDOM_NUMBER ( zeta )
-  WRITE( unit=output_unit, fmt='(a,t40,3f15.5)') 'First three random numbers', zeta
-  WRITE( unit=output_unit, fmt='(a)'           ) 'These should be different for different processes!'
+  WRITE( unit=output_unit, fmt='(a,t40,f15.5)') 'First random number', zeta
+  WRITE( unit=output_unit, fmt='(a)'          ) 'Should be different for different processes!'
 
   ALLOCATE ( every_temperature(0:p-1), every_beta(0:p-1), every_dr_max(0:p-1) )
 
@@ -172,18 +171,16 @@ PROGRAM mc_nvt_lj_re
 
         DO i = 1, n ! Begin loop over atoms
 
-           ri(:)    = r(:,i)
-           atom_old = potential_1 ( ri, i, box, r_cut ) ! Old atom potential, virial etc
+           atom_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial etc
 
            IF ( atom_old%overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_lj_re'
            END IF
 
-           CALL RANDOM_NUMBER ( zeta )                  ! Three uniform random numbers in range (0,1)
-           zeta     = 2.0*zeta - 1.0                    ! now in range (-1,+1)
-           ri(:)    = ri(:) + zeta * dr_max / box       ! Trial move to new position (in box=1 units)
-           ri(:)    = ri(:) - ANINT ( ri(:) )           ! Periodic boundary correction
+           ri(:) = random_translate_vector ( dr_max/box, r(:,i) ) ! Trial move to new position (in box=1 units)
+           ri(:) = ri(:) - ANINT ( ri(:) )                        ! Periodic boundary correction
+
            atom_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
 
            IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
@@ -216,6 +213,7 @@ PROGRAM mc_nvt_lj_re
                     CALL MPI_Sendrecv ( pot,       1, MPI_REAL, m+1, msg1_id, &
                          &              other_pot, 1, MPI_REAL, m+1, msg2_id, &
                          &              MPI_COMM_WORLD, msg_status, msg_error ) ! Exchange pot
+
                     delta = -(beta - other_beta) * (pot - other_pot) ! Delta for Metropolis decision
                     swap  = metropolis ( delta ) ! Decision taken on this process
                     CALL MPI_Send ( swap, 1, MPI_LOGICAL, m+1, msg3_id, &
@@ -238,6 +236,7 @@ PROGRAM mc_nvt_lj_re
                     CALL MPI_Sendrecv (  pot,       1, MPI_REAL, m-1, msg2_id, &
                          &               other_pot, 1, MPI_REAL, m-1, msg1_id, &
                          &               MPI_COMM_WORLD, msg_status, msg_error ) ! Exchange pot
+
                     CALL MPI_Recv ( swap, 1, MPI_LOGICAL, m-1, msg3_id, &
                          &          MPI_COMM_WORLD, msg_status, msg_error ) ! Let other process take decision
 

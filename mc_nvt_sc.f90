@@ -6,7 +6,7 @@ PROGRAM mc_nvt_sc
 
   USE config_io_module, ONLY : read_cnf_mols, write_cnf_mols
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE maths_module,     ONLY : random_rotate_vector, orientational_order
+  USE maths_module,     ONLY : random_rotate_vector, random_translate_vector, orientational_order
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       overlap_1, overlap, n_overlap, n, r, e
 
@@ -40,8 +40,7 @@ PROGRAM mc_nvt_sc
   REAL :: order      ! orientational order parameter
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
-  REAL, DIMENSION(3) :: ri, ei     ! position and orientation of atom i
-  REAL, DIMENSION(3) :: zeta       ! random numbers
+  REAL, DIMENSION(3) :: ri, ei
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -109,12 +108,9 @@ PROGRAM mc_nvt_sc
 
         DO i = 1, n ! Begin loop over atoms
 
-           CALL RANDOM_NUMBER ( zeta ) ! Three uniform random numbers in range (0,1)
-           zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
-
-           ri(:) = r(:,i) + zeta * dr_max / box            ! Trial move to new position (in box=1 units)
-           ri(:) = ri(:) - ANINT ( ri(:) )                 ! Periodic boundary correction
-           ei(:) = random_rotate_vector ( de_max, e(:,i) ) ! Trial move to new orientation
+           ri(:) = random_translate_vector ( dr_max/box, r(:,i) ) ! Trial move to new position (in box=1 units)
+           ri(:) = ri(:) - ANINT ( ri(:) )                        ! Periodic boundary correction
+           ei(:) = random_rotate_vector ( de_max, e(:,i) )        ! Trial move to new orientation
 
            IF ( .NOT. overlap_1 ( ri, ei, i, box, length ) ) THEN ! Accept
               r(:,i) = ri(:)     ! Update position

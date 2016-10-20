@@ -6,7 +6,7 @@ PROGRAM mc_nvt_poly_lj
 
   USE config_io_module, ONLY : read_cnf_mols, write_cnf_mols
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE maths_module,     ONLY : metropolis, random_rotate_quaternion
+  USE maths_module,     ONLY : metropolis, random_rotate_quaternion, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_1, potential, q_to_d, n, na, r, e, d, db, potential_type
 
@@ -49,10 +49,9 @@ PROGRAM mc_nvt_poly_lj
   INTEGER :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL    :: delta
 
-  REAL, DIMENSION(3)    :: ri   ! position of molecule i
-  REAL, DIMENSION(0:3)  :: ei   ! orientation (quaternion) of molecule i
-  REAL, DIMENSION(3,na) :: di   ! atom vectors
-  REAL, DIMENSION(3)    :: zeta ! random numbers
+  REAL, DIMENSION(3)    :: ri
+  REAL, DIMENSION(0:3)  :: ei
+  REAL, DIMENSION(3,na) :: di
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -126,22 +125,18 @@ PROGRAM mc_nvt_poly_lj
 
         DO i = 1, n ! Begin loop over atoms
 
-           ri(:)        = r(:,i)                                ! Copy old position
-           ei(:)        = e(:,i)                                ! Copy old quaternion
-           di(:,:)      = d(:,:,i)                              ! Copy old atom vectors
-           molecule_old = potential_1 ( ri, di, i, box, r_cut ) ! Old molecule potential, virial, etc
+           molecule_old = potential_1 ( r(:,i), d(:,:,i), i, box, r_cut ) ! Old molecule potential, virial, etc
 
            IF ( molecule_old%overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_poly_lj'
            END IF
 
-           CALL RANDOM_NUMBER ( zeta )                          ! Three uniform random numbers in range (0,1)
-           zeta = 2.0*zeta - 1.0                                ! Now in range (-1,+1)
-           ri(:) = ri(:) + zeta * dr_max / box                  ! Trial move to new position (in box=1 units)
-           ri(:) = ri(:) - ANINT ( ri(:) )                      ! Periodic boundary correction
-           ei = random_rotate_quaternion ( de_max, ei )         ! Trial rotation
-           di = q_to_d ( ei, db )                               ! New space-fixed atom vectors
+           ri = random_translate_vector ( dr_max/box, r(:,i) ) ! Trial move to new position (in box=1 units)
+           ri = ri - ANINT ( ri )                              ! Periodic boundary correction
+           ei = random_rotate_quaternion ( de_max, e(:,i) )    ! Trial rotation
+           di = q_to_d ( ei, db )                              ! New space-fixed atom vectors
+
            molecule_new = potential_1 ( ri, di, i, box, r_cut ) ! New molecule potential, virial etc
 
            IF ( .NOT. molecule_new%overlap ) THEN ! Test for non-overlapping configuration

@@ -6,7 +6,7 @@ PROGRAM mc_npt_lj
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE maths_module,     ONLY : metropolis
+  USE maths_module,     ONLY : metropolis, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_1, potential, move, n, r, potential_type
   IMPLICIT NONE
@@ -58,9 +58,8 @@ PROGRAM mc_npt_lj
   TYPE(potential_type) :: system, atom_old, atom_new
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
-  REAL               :: box_scale, box_new, den_scale, delta, zeta1
-  REAL, DIMENSION(3) :: ri   ! position of atom i
-  REAL, DIMENSION(3) :: zeta ! random numbers
+  REAL               :: box_scale, box_new, den_scale, delta, zeta
+  REAL, DIMENSION(3) :: ri
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -131,18 +130,16 @@ PROGRAM mc_npt_lj
 
         DO i = 1, n ! Begin loop over atoms
 
-           ri(:)    = r(:,i)
-           atom_old = potential_1 ( ri, i, box, r_cut ) ! Old atom potential, virial etc
+           atom_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial etc
 
            IF ( atom_old%overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_npt_lj'
            END IF
 
-           CALL RANDOM_NUMBER ( zeta )                  ! Three uniform random numbers in range (0,1)
-           zeta     = 2.0*zeta - 1.0                    ! now in range (-1,+1)
-           ri(:)    = ri(:) + zeta * dr_max / box       ! Trial move to new position (box=1 units)
-           ri(:)    = ri(:) - ANINT ( ri(:) )           ! Periodic boundary correction
+           ri(:) = random_translate_vector ( dr_max/box, r(:,i) ) ! Trial move to new position (box=1 units)
+           ri(:) = ri(:) - ANINT ( ri(:) )                        ! Periodic boundary correction
+
            atom_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
 
            IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
@@ -162,13 +159,14 @@ PROGRAM mc_npt_lj
 
         m_ratio = REAL(moves) / REAL(n)
 
-        v_ratio = 0.0                            ! Zero volume move counter
-        CALL RANDOM_NUMBER ( zeta1 )             ! Uniform random number in range (0,1)
-        zeta1     = 2.0*zeta1 - 1.0              ! now in range (-1,+1)
-        box_scale = EXP ( zeta1*db_max )         ! Sampling log(box) and log(vol) uniformly
-        box_new   = box * box_scale              ! New box (in sigma units)
-        den_scale = 1.0 / box_scale**3           ! Density scaling factor
-        system    = potential ( box_new, r_cut ) ! New system energy, virial etc
+        v_ratio = 0.0                   ! Zero volume move counter
+        CALL RANDOM_NUMBER ( zeta )     ! Uniform random number in range (0,1)
+        zeta      = 2.0*zeta - 1.0      ! now in range (-1,+1)
+        box_scale = EXP ( zeta*db_max ) ! Sampling log(box) and log(vol) uniformly
+        box_new   = box * box_scale     ! New box (in sigma units)
+        den_scale = 1.0 / box_scale**3  ! Density scaling factor
+
+        system = potential ( box_new, r_cut ) ! New system energy, virial etc
 
         IF ( .NOT. system%overlap ) THEN ! Test for non-overlapping configuration
 

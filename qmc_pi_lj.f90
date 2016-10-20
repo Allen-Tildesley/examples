@@ -6,7 +6,7 @@ PROGRAM qmc_pi_lj
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE maths_module,     ONLY : metropolis
+  USE maths_module,     ONLY : metropolis, random_translate_vector
   USE qmc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_cl_1, potential_qu_1, potential_cl, potential_qu, &
        &                       n, p, r, potential_type
@@ -52,10 +52,9 @@ PROGRAM qmc_pi_lj
   ! Composite interaction = pot & overlap variables
   TYPE(potential_type) :: system_cl, atom_cl_old, atom_cl_new
 
-  INTEGER              :: blk, stp, i, k, nstep, nblock, moves, ioerr
-  REAL                 :: atom_qu_old_pot, atom_qu_new_pot, delta, k_spring
-  REAL, DIMENSION(3)   :: rik  ! position of atom i in polymer k
-  REAL, DIMENSION(3)   :: zeta ! random numbers
+  INTEGER            :: blk, stp, i, k, nstep, nblock, moves, ioerr
+  REAL               :: atom_qu_old_pot, atom_qu_new_pot, delta, k_spring
+  REAL, DIMENSION(3) :: rik
 
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)            :: sav_tag = 'sav'       ! may be overwritten with block number
@@ -148,20 +147,17 @@ PROGRAM qmc_pi_lj
 
            DO k = 1, p ! Begin loop over ring polymers
 
-              rik(:)      = r(:,i,k)
-              atom_cl_old = potential_cl_1 ( rik, i, k, box, r_cut ) ! Old atom classical potential etc
+              atom_cl_old = potential_cl_1 ( r(:,i,k), i, k, box, r_cut ) ! Old atom classical potential etc
 
               IF ( atom_cl_old%overlap ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in qmc_pi_lj'
               END IF
 
-              atom_qu_old_pot = potential_qu_1 ( rik, i, k, box, k_spring ) ! Old atom quantum potential
+              atom_qu_old_pot = potential_qu_1 ( r(:,i,k), i, k, box, k_spring ) ! Old atom quantum potential
 
-              CALL RANDOM_NUMBER ( zeta )           ! Three uniform random numbers in range (0,1)
-              zeta = 2.0*zeta - 1.0                 ! now in range (-1,+1)
-              rik(:) = rik(:) + zeta * dr_max / box ! Trial move to new position (in box=1 units) 
-              rik(:) = rik(:) - ANINT ( rik(:) )    ! Periodic boundary correction
+              rik(:) = random_translate_vector ( dr_max/box, r(:,i,k) ) ! Trial move to new position (in box=1 units) 
+              rik(:) = rik(:) - ANINT ( rik(:) )                        ! Periodic boundary correction
 
               atom_cl_new = potential_cl_1 ( rik, i, k, box, r_cut ) ! New atom classical potential etc
 
@@ -175,7 +171,7 @@ PROGRAM qmc_pi_lj
                     pot_cl   = pot_cl + atom_cl_new%pot - atom_cl_old%pot ! Update classical potential energy
                     pot_qu   = pot_qu + atom_qu_new_pot - atom_qu_old_pot ! Update quantum potential energy
                     r(:,i,k) = rik                                        ! Update position
-                    moves  = moves + 1                                    ! Increment move counter
+                    moves    = moves + 1                                  ! Increment move counter
                  END IF ! End accept Metropolis test
 
               END IF ! End test for non-overlapping configuration

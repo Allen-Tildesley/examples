@@ -8,53 +8,53 @@ MODULE maths_module
   IMPLICIT NONE
   PRIVATE
 
-  ! Random number routines
+  ! Public random number routines
   PUBLIC :: init_random_seed, random_integer, random_normal, random_normals, pick
   PUBLIC :: random_vector
   PUBLIC :: random_vector_1, random_vector_2, random_vector_3
   PUBLIC :: random_perpendicular_vector
-  PUBLIC :: random_rotate_vector
+  PUBLIC :: random_rotate_vector, random_translate_vector
   PUBLIC :: random_rotate_vector_1, random_rotate_vector_2, random_rotate_vector_3, random_rotate_vector_4
   PUBLIC :: random_quaternion, random_rotate_quaternion
   PUBLIC :: metropolis
 
-  ! Low-level mathematical routines and string operations
+  ! Public low-level mathematical routines and string operations
   PUBLIC :: rotate_vector, rotate_quaternion, cross_product, outer_product, q_to_a, lowercase
 
-  ! Order parameter calculations
+  ! Public order parameter calculations
   PUBLIC :: orientational_order, translational_order, nematic_order
 
-  ! Constants used throughout the module
-  REAL, PARAMETER :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
-  REAL, PARAMETER :: tol = 1.e-6
-
-  ! Define a generic interface for the pick functions
+  ! Generic interface for the pick functions
   INTERFACE pick
      MODULE PROCEDURE pick_i ! for integer weights
      MODULE PROCEDURE pick_r ! for real weights
   END INTERFACE pick
 
-  ! Define a generic interface for the outer_product functions
+  ! Generic interface for the outer_product functions
   INTERFACE outer_product
      MODULE PROCEDURE outer_product_2 ! for 2 vectors giving a rank-2 output
      MODULE PROCEDURE outer_product_3 ! for 3 vectors giving a rank-3 output
   END INTERFACE outer_product
 
-  ! Define a generic interface for the random_normals functions
+  ! Generic interface for the random_normals functions
   INTERFACE random_normals
      MODULE PROCEDURE random_normals_1 ! for rank 1 vector of normals
      MODULE PROCEDURE random_normals_2 ! for rank 2 vector of normals
   END INTERFACE random_normals
 
-  ! Define an interface to one of the random_vector algorithms
+  ! Interface to select one of the random_vector algorithms
   INTERFACE random_vector
      MODULE PROCEDURE random_vector_1 ! choose an alternative one instead if you prefer
   END INTERFACE random_vector
 
-  ! Define an interface to one of the random_rotate_vector algorithms
+  ! Interface to select one of the random_rotate_vector algorithms
   INTERFACE random_rotate_vector
      MODULE PROCEDURE random_rotate_vector_1 ! choose an alternative one instead if you prefer
   END INTERFACE random_rotate_vector
+
+  ! Private data
+  REAL, PARAMETER :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
+  REAL, PARAMETER :: tol = 1.e-6
 
 CONTAINS
 
@@ -313,7 +313,7 @@ CONTAINS
     norm = SUM ( old**2 ) ! Old squared length
     IF ( norm < tol ) STOP 'Error in random_perpendicular_vector' ! This should never happen
     n = old / SQRT(norm) ! Normalized old vector
-    
+
     DO ! Loop until generated vector is not too small
        e    = random_vector ()     ! Randomly oriented unit vector
        proj = DOT_PRODUCT ( e, n ) ! Projection along old
@@ -326,6 +326,21 @@ CONTAINS
 
   END FUNCTION random_perpendicular_vector
 
+  FUNCTION random_translate_vector ( dr_max, old ) result ( r )
+    REAL, DIMENSION(3)             :: r      ! Returns a vector translated by a
+    REAL,               INTENT(in) :: dr_max ! maximum displacement relative to
+    REAL, DIMENSION(3), INTENT(in) :: old    ! the old vector
+
+    ! A randomly chosen vector is added to the old one
+
+    REAL, DIMENSION(3) :: zeta ! Random numbers
+
+    CALL RANDOM_NUMBER ( zeta )   ! Three uniform random numbers in range (0,1)
+    zeta = 2.0*zeta - 1.0         ! now in range (-1,+1)
+    r(:) = old(:) + zeta * dr_max ! Move to new position
+
+  END FUNCTION random_translate_vector
+  
   FUNCTION random_rotate_vector_1 ( angle_max, old ) RESULT ( e ) ! 1st alternative algorithm
     REAL, DIMENSION(3)             :: e         ! Returns a unit vector rotated by a
     REAL,               INTENT(in) :: angle_max ! maximum angle (in radians) relative to
@@ -336,7 +351,7 @@ CONTAINS
     ! The magnitude of the rotation is not uniformly sampled, but this should not matter
 
     ! Note that the old vector should be normalized and we test for this
-    
+
     REAL :: norm
 
     norm = SUM ( old**2 ) ! Old squared length
@@ -444,7 +459,7 @@ CONTAINS
        norm1 = SUM ( zeta**2 )     ! Squared magnitude
        IF ( norm1 < 1.0 ) EXIT     ! Test for within unit disk
     END DO ! End loop until within unit disk
-    
+
     e(0) = zeta(1)
     e(1) = zeta(2)
 
@@ -454,7 +469,7 @@ CONTAINS
        norm2 = SUM ( zeta**2 )     ! Squared magnitude
        IF ( norm2 < 1.0 ) EXIT     ! Test for within unit disk
     END DO ! End loop until within unit disk
-    
+
     f = SQRT ( ( 1.0 - norm1 ) / norm2 )
     e(2) = zeta(1)*f
     e(3) = zeta(2)*f
@@ -609,7 +624,7 @@ CONTAINS
     INTEGER :: i, k 
 
     ! Leaves non-alphabetic characters unchanged
-    
+
     DO i = 1, LEN(oldstring) 
        k = IACHAR(oldstring(i:i)) 
        IF ( k >= IACHAR('A') .AND. k <= IACHAR('Z') ) THEN 
