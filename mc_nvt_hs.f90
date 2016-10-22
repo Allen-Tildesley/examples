@@ -146,6 +146,9 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
+    ! This routine calculates the properties of interest
+    ! and optionally writes them out (e.g. at the start and end of the run)
+
     REAL :: box_scaled ! scaled box for pressure calculation
 
     box_scaled = box / (1.0+epsilon) 

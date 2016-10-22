@@ -276,6 +276,7 @@ CONTAINS
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
     ! This routine calculates the properties of interest from system values
+    ! and optionally writes them out (e.g. at the start and end of the run)
     ! In this example we simulate using the cut (but not shifted) potential
     ! The values of < p_c >,  < en_c > and < density > should be consistent (for this potential)
     ! For comparison, long-range corrections are also applied to give

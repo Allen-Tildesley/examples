@@ -39,8 +39,6 @@ MODULE mc_module
   INTERFACE OPERATOR (-)
      MODULE PROCEDURE subtract_potential_type
   END INTERFACE OPERATOR (-)
-
-  PUBLIC :: add_potential_type, subtract_potential_type
   
 CONTAINS
 

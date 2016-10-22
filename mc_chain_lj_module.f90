@@ -29,9 +29,15 @@ MODULE mc_module
      LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
   END TYPE potential_type
 
+  PUBLIC :: OPERATOR (+)
   INTERFACE OPERATOR (+)
      MODULE PROCEDURE add_potential_type
   END INTERFACE OPERATOR (+)
+
+  PUBLIC :: OPERATOR (-)
+  INTERFACE OPERATOR (-)
+     MODULE PROCEDURE subtract_potential_type
+  END INTERFACE OPERATOR (-)
 
 CONTAINS
 
@@ -41,6 +47,14 @@ CONTAINS
     c%pot     = a%pot       +  b%pot
     c%overlap = a%overlap .OR. b%overlap
   END FUNCTION add_potential_type
+
+  FUNCTION subtract_potential_type ( a, b ) RESULT (c)
+    IMPLICIT NONE
+    TYPE(potential_type)             :: c    ! Result is the difference of the two inputs
+    TYPE(potential_type), INTENT(in) :: a, b
+    c%pot     = a%pot       -  b%pot
+    c%overlap = a%overlap .OR. b%overlap ! this is meaningless, but inconsequential
+  END FUNCTION subtract_potential_type
 
   SUBROUTINE introduction ( output_unit )
     IMPLICIT NONE

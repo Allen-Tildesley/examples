@@ -8,7 +8,8 @@ PROGRAM mc_nvt_poly_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis, random_rotate_quaternion, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       potential_1, potential, n, r, e, potential_type
+       &                       potential_1, potential, n, r, e, &
+       &                       potential_type, OPERATOR(+), OPERATOR(-)
 
   IMPLICIT NONE
 
@@ -30,20 +31,18 @@ PROGRAM mc_nvt_poly_lj
 
   ! Most important variables
   REAL :: box         ! box length
-  REAL :: density     ! density
+  REAL :: density     ! density (of molecules)
   REAL :: dr_max      ! maximum MC translational displacement
   REAL :: de_max      ! maximum MC rotational displacement
   REAL :: temperature ! specified temperature
   REAL :: r_cut       ! potential cutoff distance
-  REAL :: pot         ! total potential energy
-  REAL :: vir         ! total virial
 
   ! Quantities to be averaged
-  REAL :: move_ratio ! acceptance ratio of moves
-  REAL :: p    ! pressure (cut & shifted potential)
-  REAL :: en   ! internal energy per molecule (cut & shifted potential)
+  REAL :: m_ratio ! acceptance ratio of moves
+  REAL :: p_s     ! pressure (cut & shifted potential)
+  REAL :: en_s    ! internal energy per molecule (cut & shifted potential)
 
-  ! Composite interaction = pot & vir & overlap variables
+  ! Composite interaction = pot_s & vir & overlap variables
   TYPE(potential_type) :: system, molecule_old, molecule_new
 
   INTEGER              :: blk, stp, i, nstep, nblock, moves, ioerr
@@ -57,8 +56,9 @@ PROGRAM mc_nvt_poly_lj
 
   NAMELIST /nml/ nblock, nstep, temperature, r_cut, dr_max, de_max
 
-  WRITE( unit=output_unit, fmt='(a)' ) 'mc_nvt_poly_lj'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, polyatomic molecule'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'mc_nvt_poly_lj'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, polyatomic molecule'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Simulation uses cut-and-shifted potential'
   CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
 
@@ -103,11 +103,9 @@ PROGRAM mc_nvt_poly_lj
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF
-  pot = system%pot
-  vir = system%vir
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'E/N', 'P' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'E/N (cut&shift)', 'P (cut&shift)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -134,25 +132,24 @@ PROGRAM mc_nvt_poly_lj
 
            IF ( .NOT. molecule_new%overlap ) THEN ! Test for non-overlapping configuration
 
-              delta = ( molecule_new%pot - molecule_old%pot ) / temperature
+              delta = ( molecule_new%pot_s - molecule_old%pot_s ) / temperature
 
               IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                 pot      = pot + molecule_new%pot - molecule_old%pot ! Update potential energy
-                 vir      = vir + molecule_new%vir - molecule_old%vir ! Update virial
-                 r(:,i)   = ri                                        ! Update position
-                 e(:,i)   = ei                                        ! Update quaternion
-                 moves    = moves + 1                                 ! Increment move counter
+                 system = system + molecule_new - molecule_old ! Update potential energy
+                 r(:,i) = ri                                   ! Update position
+                 e(:,i) = ei                                   ! Update quaternion
+                 moves  = moves + 1                            ! Increment move counter
               END IF ! End accept Metropolis test
 
            END IF ! End test for non-overlapping configuration
 
         END DO ! End loop over atoms
 
-        move_ratio  = REAL(moves) / REAL(n)
+        m_ratio  = REAL(moves) / REAL(n)
 
         ! Calculate all variables for this step
         CALL calculate ( )
-        CALL blk_add ( [move_ratio,en,p] )
+        CALL blk_add ( [m_ratio,en_s,p_s] )
 
      END DO ! End loop over steps
 
@@ -171,8 +168,6 @@ PROGRAM mc_nvt_poly_lj
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF
-  pot = system%pot
-  vir = system%vir
   CALL calculate ( 'Final check' )
 
   CALL write_cnf_mols ( cnf_prefix//out_tag, n, box, r*box, e )
@@ -187,18 +182,22 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    ! The potential is assumed to be both cut and shifted
-    ! Therefore there are no long-range or delta corrections
+    ! This routine calculates the properties of interest from system values
+    ! and optionally writes them out (e.g. at the start and end of the run)
+    ! In this example we simulate using the cut-and-shifted potential only
+    ! The values of < p_s >,  < en_s > and density should be consistent (for this potential)
+    ! There are no long-range or delta corrections
+    ! The value of the cut (but not shifted) potential pot_c is not used, in this example
     
-    en = pot / REAL ( n )          ! PE per molecule
-    en = en + 3.0 * temperature    ! Add ideal gas contribution KE/N assuming nonlinear molecules 
-    p  = vir / box**3              ! Virial contribution to P
-    p  = p + density * temperature ! Add ideal gas contribution to P
+    en_s = system%pot_s / REAL ( n )   ! PE per molecule
+    en_s = en_s + 3.0 * temperature    ! Add ideal gas contribution KE/N assuming nonlinear molecules 
+    p_s  = system%vir / box**3         ! Virial contribution to P
+    p_s  = p_s + density * temperature ! Add ideal gas contribution to P
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)'           ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N', en
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P',   p
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut&shift)', en_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)',   p_s
     END IF
 
   END SUBROUTINE calculate

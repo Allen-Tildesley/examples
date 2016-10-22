@@ -33,10 +33,9 @@ PROGRAM mc_chain_nvt_cbmc_lj
   INTEGER :: k_max         ! Number of random tries per atom in regrow
 
   ! Quantities for averaging
-  REAL :: move_ratio   ! Acceptance ratio for regrowth moves
-  REAL :: pe_bonded    ! Total bond spring potential energy
-  REAL :: pe_nonbonded ! Total nonbonded potential energy
-  REAL :: r_g          ! Radius of gyration
+  REAL :: m_ratio ! Acceptance ratio for regrowth moves
+  REAL :: pe      ! Total nonbonded + bond spring potential energy
+  REAL :: r_g     ! Radius of gyration
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
   LOGICAL :: accepted
@@ -49,6 +48,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'mc_chain_nvt_cbmc_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, CBMC, chain molecule'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Simulation uses full nonbonded potential (no cutoff)'
   CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
 
@@ -87,7 +87,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'PE (nonbonded)', 'PE (bonded)', 'Rg' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'PE', 'Rg' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -97,14 +97,14 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
         CALL regrow ( temperature, m_max, k_max, bond, k_spring, accepted )
         IF ( accepted ) THEN
-           move_ratio = 1.0
+           m_ratio = 1.0
         ELSE
-           move_ratio = 0.0
+           m_ratio = 0.0
         END IF
 
         ! Calculate all variables for this step
         CALL calculate()
-        CALL blk_add ( [move_ratio,pe_nonbonded,pe_bonded,r_g] )
+        CALL blk_add ( [m_ratio,pe,r_g] )
 
      END DO ! End loop over steps
 
@@ -141,16 +141,14 @@ CONTAINS
        STOP 'Error in mc_chain_nvt_cbmc_lj/calculate'
     END IF ! End overlap test
 
-    pe_nonbonded = system%pot
-    pe_bonded    = spring_pot ( bond, k_spring )
-    r_cm         = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
-    r_g          = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
+    pe   = system%pot + spring_pot ( bond, k_spring )
+    r_cm = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
+    r_g  = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
 
     IF ( PRESENT ( string ) ) THEN ! output required
        WRITE ( unit=output_unit, fmt='(a)'          ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'PE (nonbonded)', pe_nonbonded
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'PE (bonded)',    pe_bonded
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Rg',             r_g
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'PE', pe
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Rg', r_g
     END IF
 
   END SUBROUTINE calculate
