@@ -51,7 +51,7 @@ PROGRAM mc_zvt_lj
   REAL :: p       ! Pressure for full potential with LRC
 
   ! Composite interaction = pot & vir & overlap variables
-  TYPE(potential_type) :: system, atom_old, atom_new
+  TYPE(potential_type) :: total, partial_old, partial_new
 
   INTEGER            :: blk, stp, i, nstep, nblock
   INTEGER            :: try, ntry, ioerr
@@ -89,7 +89,9 @@ PROGRAM mc_zvt_lj
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in mc_zvt_lj'
   END IF
-  prob_create = (1.0-prob_move)/2.0
+
+  prob_create = (1.0-prob_move)/2.0 ! So that create and destroy have equal probabilities
+
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',              nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',     nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',                   temperature
@@ -112,8 +114,9 @@ PROGRAM mc_zvt_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  system = potential ( box, r_cut ) ! Initial energy and overlap check
-  IF ( system%overlap ) THEN
+  ! Initial energy and overlap check
+  total = potential ( box, r_cut ) 
+  IF ( total%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_zvt_lj'
   END IF
@@ -121,8 +124,6 @@ PROGRAM mc_zvt_lj
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Create ratio', 'Destroy ratio', &
        &            'Density', 'E/N (cut)', 'P (cut)', 'E/N (full)', 'P (full)' ] )
-
-  ntry = n ! Each step consists of ntry tries (during which n might vary)
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -137,6 +138,8 @@ PROGRAM mc_zvt_lj
         d_tries = 0
         d_moves = 0
 
+        ntry = n ! Each step consists of ntry tries (during which n might vary)
+
         DO try = 1, ntry ! Begin loop over tries of different kinds
 
            CALL RANDOM_NUMBER ( zeta ) ! uniform random number in range (0,1)
@@ -147,9 +150,9 @@ PROGRAM mc_zvt_lj
 
               i = random_integer ( 1, n ) ! Choose moving particle at random
 
-              atom_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial etc
+              partial_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial etc
 
-              IF ( atom_old%overlap ) THEN ! should never happen
+              IF ( partial_old%overlap ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in mc_zvt_lj'
               END IF
@@ -157,16 +160,17 @@ PROGRAM mc_zvt_lj
               ri(:) = random_translate_vector ( dr_max/box, r(:,i) ) ! Trial move to new position (in box=1 units)
               ri(:) = ri(:) - ANINT ( ri(:) )                        ! Periodic boundary correction
 
-              atom_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
+              partial_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
 
-              IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
+              IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
 
-                 delta = ( atom_new%pot_c - atom_old%pot_c ) / temperature ! Use cut (but not shifted) potential
+                 delta = partial_new%pot_c - partial_old%pot_c ! Use cut (but not shifted) potential
+                 delta = delta / temperature                   ! Divide by temperature
 
                  IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                    system = system + atom_new - atom_old ! Update system values
-                    CALL move ( i, ri )                   ! Update position
-                    m_moves = m_moves + 1                 ! Increment move counter
+                    total = total + partial_new - partial_old ! Update total values
+                    CALL move ( i, ri )                       ! Update position
+                    m_moves = m_moves + 1                     ! Increment move counter
                  END IF ! End accept Metropolis test
 
               END IF ! End test for overlapping configuration
@@ -183,15 +187,16 @@ PROGRAM mc_zvt_lj
               CALL RANDOM_NUMBER ( ri ) ! Three uniform random numbers in range (0,1)
               ri = ri - 0.5             ! now in range (-0.5,+0.5) for box=1 units
 
-              atom_new = potential_1 ( ri, n+1, box, r_cut ) ! New atom potential, virial, etc
+              partial_new = potential_1 ( ri, n+1, box, r_cut ) ! New atom potential, virial, etc
 
-              IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
+              IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
 
-                 delta = atom_new%pot_c / temperature - LOG ( activity / REAL ( n+1 ) ) ! Use cut potential
+                 delta = partial_new%pot_c / temperature                  ! Use cut (not shifted) potential
+                 delta = delta - LOG ( activity * box**3 / REAL ( n+1 ) ) ! Activity term for creation
 
                  IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
                     CALL create ( ri )            ! Create new particle
-                    system  = system + atom_new   ! Update system values
+                    total   = total + partial_new ! Update total values
                     c_moves = c_moves + 1         ! Increment creation move counter
                  END IF ! End accept Metropolis test
 
@@ -200,20 +205,22 @@ PROGRAM mc_zvt_lj
            ELSE ! try destroy
 
               d_tries = d_tries + 1
+
               i = random_integer ( 1, n ) ! Choose particle at random
 
-              atom_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial, etc
+              partial_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial, etc
 
-              IF ( atom_old%overlap ) THEN ! should never happen
+              IF ( partial_old%overlap ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap found on particle removal'
                  STOP 'Error in mc_zvt_lj'
               END IF
 
-              delta = -atom_old%pot_c/temperature - LOG ( REAL ( n ) / activity ) ! Use cut potential
+              delta = -partial_old%pot_c / temperature                    ! Use cut (not shifted) potential
+              delta = delta - LOG ( REAL ( n ) / ( activity * box**3 )  ) ! Activity term for destruction
 
               IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
                  CALL destroy ( i )            ! Destroy chosen particle
-                 system  = system - atom_old   ! Update system values
+                 total   = total - partial_old ! Update total values
                  d_moves = d_moves + 1         ! Increment destruction move counter
               END IF ! End accept Metropolis test
 
@@ -255,8 +262,9 @@ PROGRAM mc_zvt_lj
 
   CALL calculate ( 'Final values' )
 
-  system = potential ( box, r_cut )
-  IF ( system%overlap ) THEN ! should never happen
+  ! Double-check book-keeping of totals and overlap
+  total = potential ( box, r_cut )
+  IF ( total%overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_zvt_lj'
   END IF
@@ -275,7 +283,7 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    ! This routine calculates the properties of interest from system values
+    ! This routine calculates the properties of interest from total values
     ! and optionally writes them out (e.g. at the start and end of the run)
     ! In this example we simulate using the cut (but not shifted) potential
     ! The values of < p_c >,  < en_c > and < density > should be consistent (for this potential)
@@ -284,10 +292,10 @@ CONTAINS
     ! The value of the cut-and-shifted potential pot_s is not used, in this example
 
     density = REAL(n) / box**3                        ! Number density N/V
-    en_c    = system%pot_c / REAL ( n )               ! PE/N for cut (but not shifted) potential
+    en_c    = total%pot_c / REAL ( n )                ! PE/N for cut (but not shifted) potential
     en_c    = en_c + 1.5 * temperature                ! Add ideal gas contribution KE/N to give E_c/N
     en      = en_c + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E/N estimate
-    p_c     = system%vir / box**3                     ! Virial contribution to P_c
+    p_c     = total%vir / box**3                      ! Virial contribution to P_c
     p_c     = p_c + density * temperature             ! Add ideal gas contribution to P_c
     p       = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P
     p_c     = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P)

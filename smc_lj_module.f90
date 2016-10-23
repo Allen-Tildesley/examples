@@ -21,8 +21,6 @@ MODULE smc_module
 
   ! Private data
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
-  REAL,    PARAMETER :: sigma = 1.0     ! LJ diameter (unit of length)
-  REAL,    PARAMETER :: epslj = 1.0     ! LJ well depth (unit of energy)
 
   ! Public derived type
   ! At the time of writing gfortran, and some other compilers, do not implement
@@ -76,10 +74,10 @@ CONTAINS
     IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
-    WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential'
-    WRITE ( unit=output_unit, fmt='(a)'           ) 'Cut and optionally shifted'
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',     sigma    
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epsilon = ', epslj    
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Cut and optionally shifted'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'   
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1' 
 
   END SUBROUTINE introduction
 
@@ -120,55 +118,55 @@ CONTAINS
 
   END SUBROUTINE deallocate_arrays
 
-  FUNCTION force ( box, r_cut ) RESULT ( system )
+  FUNCTION force ( box, r_cut ) RESULT ( total )
     IMPLICIT NONE
-    TYPE(potential_type) :: system ! Returns composite of forces, pot, vir and overlap
-    REAL, INTENT(in)     :: box    ! simulation box length
-    REAL, INTENT(in)     :: r_cut  ! potential cutoff distance
+    TYPE(potential_type) :: total ! Returns composite of forces, pot, vir and overlap
+    REAL, INTENT(in)     :: box   ! Simulation box length
+    REAL, INTENT(in)     :: r_cut ! Potential cutoff distance
 
-    ! system%pot_s is the cut-and-shifted potential energy for whole system
-    ! system%pot_c is the cut (but not shifted) version of the above
-    ! system%vir is the corresponding virial for whole system
-    ! system%f contains the forces on all the atoms
-    ! system%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this flag is .true., the values of system%pot_s etc should not be used
+    ! total%pot_s is the cut-and-shifted potential energy for whole system
+    ! total%pot_c is the cut (but not shifted) version of the above
+    ! total%vir is the corresponding virial for whole system
+    ! total%f contains the forces on all the atoms
+    ! total%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this flag is .true., the values of total%pot_s etc should not be used
     ! Actual calculation is performed by function force_1
 
     INTEGER              :: i
-    TYPE(potential_type) :: atom
+    TYPE(potential_type) :: partial ! atomic contributions to total
 
-    system = potential_type ( f=0.0, pot_s=0.0, pot_c=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
+    total = potential_type ( f=0.0, pot_s=0.0, pot_c=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1 ! Begin loop over atoms
 
-       atom = force_1 ( i, box, r_cut, gt )
+       partial = force_1 ( i, box, r_cut, gt )
 
-       IF ( atom%overlap ) THEN
-          system%overlap = .TRUE. ! Overlap detected
-          RETURN                  ! Return immediately
+       IF ( partial%overlap ) THEN
+          total%overlap = .TRUE. ! Overlap detected
+          RETURN                 ! Return immediately
        END IF
-       system = system + atom
+       total = total + partial
 
     END DO ! End loop over atoms
 
-    system%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
+    total%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION force
 
-  FUNCTION force_1 ( i, box, r_cut, j_range ) RESULT ( atom )
+  FUNCTION force_1 ( i, box, r_cut, j_range ) RESULT ( partial )
     IMPLICIT NONE
-    TYPE(potential_type)          :: atom    ! Returns composite of forces, pot, vir and overlap
-    INTEGER,           INTENT(in) :: i       ! index of atom of interest
-    REAL,              INTENT(in) :: box     ! simulation box length
-    REAL,              INTENT(in) :: r_cut   ! potential cutoff distance
+    TYPE(potential_type)          :: partial ! Returns composite of forces, pot, overlap etc for one atom
+    INTEGER,           INTENT(in) :: i       ! Index of atom of interest
+    REAL,              INTENT(in) :: box     ! Simulation box length
+    REAL,              INTENT(in) :: r_cut   ! Potential cutoff distance
     INTEGER, OPTIONAL, INTENT(in) :: j_range ! Optional partner index range
 
-    ! atom%pot_s is the cut-and-shifted potential energy of atom i with a set of other atoms
-    ! atom%pot_c is the cut (but not shifted) version of the above
-    ! atom%vir is the corresponding virial of atom i
-    ! atom%f contains the force on i and the reaction forces on all other atoms due to i
-    ! atom%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this is .true., the values of atom%pot_s etc should not be used
+    ! partial%pot_s is the cut-and-shifted potential energy of atom i with a set of other atoms
+    ! partial%pot_c is the cut (but not shifted) version of the above
+    ! partial%vir is the corresponding virial of atom i
+    ! partial%f contains the force on i and the reaction forces on all other atoms due to i
+    ! partial%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this is .true., the values of partial%pot_s etc should not be used
     ! The optional argument j_range restricts partner indices to j>i, or j<i
 
     ! It is assumed that positions are in units where box = 1
@@ -202,8 +200,8 @@ CONTAINS
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
 
-    atom = potential_type ( f=0.0, pot_s=0.0, pot_c=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
-    ncut = 0
+    partial = potential_type ( f=0.0, pot_s=0.0, pot_c=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
+    ncut    = 0
 
     DO j = j1, j2 ! Begin loop over atoms
 
@@ -220,37 +218,40 @@ CONTAINS
           sr2     = 1.0 / rij_sq
 
           IF ( sr2 > sr2_overlap ) THEN
-             atom%overlap = .TRUE. ! Overlap detected
-             RETURN                ! Return immediately
+             partial%overlap = .TRUE. ! Overlap detected
+             RETURN                   ! Return immediately
           END IF
 
-          sr6          = sr2 ** 3
-          sr12         = sr6 ** 2
-          potij        = sr12 - sr6
-          atom%pot_c   = atom%pot_c + potij ! LJ potential (cut but not shifted)
-          virij        = potij + sr12
-          atom%vir     = atom%vir + virij
-          fij          = rij * virij / rij_sq
-          atom%f(:,i)  = atom%f(:,i) + fij
-          atom%f(:,j)  = atom%f(:,j) - fij
-          ncut         = ncut + 1
+          sr6   = sr2 ** 3
+          sr12  = sr6 ** 2
+          potij = sr12 - sr6 ! LJ potential (cut but not shifted)
+          virij = potij + sr12
+          fij   = rij * virij / rij_sq
+
+          partial%pot_c  = partial%pot_c  + potij
+          partial%vir    = partial%vir    + virij
+          partial%f(:,i) = partial%f(:,i) + fij
+          partial%f(:,j) = partial%f(:,j) - fij
+
+          ncut = ncut + 1
 
        END IF ! End check within cutoff
 
     END DO ! End inner loop over atoms
 
     ! Calculate shifted potential
-    sr2        = 1.0 / r_cut**2 ! in sigma=1 units
-    sr6        = sr2 ** 3
-    sr12       = sr6 **2
-    atom%pot_s = atom%pot_c - real ( ncut ) * ( sr12 - sr6 )
+    sr2   = 1.0 / r_cut**2 ! in sigma=1 units
+    sr6   = sr2 ** 3
+    sr12  = sr6 **2
+    potij = sr12 - sr6
+    partial%pot_s = partial%pot_c - real ( ncut ) * potij
 
     ! Multiply results by numerical factors
-    atom%f        = atom%f * 24.0
-    atom%pot_s    = atom%pot_s * 4.0
-    atom%pot_c    = atom%pot_c * 4.0
-    atom%vir      = atom%vir * 24.0 / 3.0
-    atom%overlap  = .FALSE. ! No overlaps detected (redundant but for clarity)
+    partial%f       = partial%f * 24.0
+    partial%pot_s   = partial%pot_s * 4.0
+    partial%pot_c   = partial%pot_c * 4.0
+    partial%vir     = partial%vir * 24.0 / 3.0
+    partial%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION force_1
 

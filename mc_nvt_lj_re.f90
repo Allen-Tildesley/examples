@@ -52,7 +52,7 @@ PROGRAM mc_nvt_lj_re
   REAL :: p       ! Pressure for full potential with LRC
 
   ! Composite interaction = pot & vir & overlap variables
-  TYPE(potential_type) :: system, atom_old, atom_new
+  TYPE(potential_type) :: total, partial_old, partial_new
 
   REAL, DIMENSION(:), ALLOCATABLE :: every_temperature, every_beta, every_dr_max
 
@@ -150,8 +150,9 @@ PROGRAM mc_nvt_lj_re
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  system = potential ( box, r_cut ) ! Initial energy and overlap check
-  IF ( system%overlap ) THEN
+  ! Initial energy and overlap check
+  total = potential ( box, r_cut )
+  IF ( total%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_lj_re'
   END IF
@@ -170,9 +171,9 @@ PROGRAM mc_nvt_lj_re
 
         DO i = 1, n ! Begin loop over atoms
 
-           atom_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial etc
+           partial_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial etc
 
-           IF ( atom_old%overlap ) THEN ! should never happen
+           IF ( partial_old%overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_lj_re'
            END IF
@@ -180,16 +181,17 @@ PROGRAM mc_nvt_lj_re
            ri(:) = random_translate_vector ( dr_max/box, r(:,i) ) ! Trial move to new position (in box=1 units)
            ri(:) = ri(:) - ANINT ( ri(:) )                        ! Periodic boundary correction
 
-           atom_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
+           partial_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
 
-           IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
+           IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
 
-              delta = ( atom_new%pot_c - atom_old%pot_c ) / temperature ! Use cut (but not shifted) potential
+              delta = partial_new%pot_c - partial_old%pot_c ! Use cut (but not shifted) potential
+              delta = delta / temperature
 
               IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                 system = system + atom_new - atom_old ! Update system values
-                 CALL move ( i, ri )                   ! Update position
-                 moves = moves + 1                     ! Increment move counter
+                 total = total + partial_new - partial_old ! Update total values
+                 CALL move ( i, ri )                       ! Update position
+                 moves = moves + 1                         ! Increment move counter
               END IF ! End accept Metropolis test
 
            END IF ! End test for overlapping configuration
@@ -211,7 +213,7 @@ PROGRAM mc_nvt_lj_re
                     CALL MPI_Recv ( other_pot_c, 1, MPI_REAL, m+1, msg1_id, &
                          &          MPI_COMM_WORLD, msg_status, msg_error ) ! Receive pot_c from other process
 
-                    delta = -(beta - other_beta) * ( system%pot_c - other_pot_c ) ! Delta for Metropolis decision
+                    delta = -(beta - other_beta) * ( total%pot_c - other_pot_c ) ! Delta for Metropolis decision
                     swap  = metropolis ( delta ) ! Decision taken on this process
                     CALL MPI_Send ( swap, 1, MPI_LOGICAL, m+1, msg2_id, &
                          &          MPI_COMM_WORLD, msg_error ) ! Send decision to other process
@@ -219,7 +221,7 @@ PROGRAM mc_nvt_lj_re
                     IF ( swap ) THEN ! Exchange configurations
                        CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m+1, msg3_id, m+1, msg4_id, &
                             &                      MPI_COMM_WORLD, msg_status, msg_error )
-                       system = potential ( box, r_cut ) ! Alternatively, we could exchange this information
+                       total   = potential ( box, r_cut ) ! Alternatively, we could exchange this information
                        swapped = 1
                     END IF ! End exchange configurations
 
@@ -228,7 +230,7 @@ PROGRAM mc_nvt_lj_re
               ELSE ! Look down, partner is m-1
 
                  IF ( m-1 >= 0 ) THEN ! Ensure partner exists
-                    CALL MPI_Send ( system%pot_c, 1, MPI_REAL, m-1, msg1_id, &
+                    CALL MPI_Send ( total%pot_c, 1, MPI_REAL, m-1, msg1_id, &
                          &          MPI_COMM_WORLD, msg_error ) ! Send pot_c to other process
 
                     CALL MPI_Recv ( swap, 1, MPI_LOGICAL, m-1, msg2_id, &
@@ -237,7 +239,7 @@ PROGRAM mc_nvt_lj_re
                     IF ( swap ) THEN ! Exchange configurations
                        CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m-1, msg4_id, m-1, msg3_id, &
                             &                      MPI_COMM_WORLD, msg_status, msg_error )
-                       system = potential ( box, r_cut ) ! Alternatively, we could exchange this information
+                       total = potential ( box, r_cut ) ! Alternatively, we could exchange this information
                     END IF ! End exchange configurations
 
                  END IF ! End ensure partner exists
@@ -266,8 +268,9 @@ PROGRAM mc_nvt_lj_re
 
   CALL calculate ( 'Final values' )
 
-  system = potential ( box, r_cut )
-  IF ( system%overlap ) THEN ! should never happen
+  ! Double-check book-keeping for totals, and overlap
+  total = potential ( box, r_cut )
+  IF ( total%overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_lj_re'
   END IF
@@ -290,18 +293,18 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    ! This routine calculates the properties of interest from system values
+    ! This routine calculates the properties of interest from total values
     ! and optionally writes them out (e.g. at the start and end of the run)
     ! In this example we simulate using the cut (but not shifted) potential
-    ! The values of < p_c >,  < en_c > and < density > should be consistent (for this potential)
+    ! The values of < p_c >,  < en_c > and density should be consistent (for this potential)
     ! For comparison, long-range corrections are also applied to give
     ! estimates of < en > and < p > for the full (uncut) potential
     ! The value of the cut-and-shifted potential pot_s is not used, in this example
 
-    en_c = system%pot_c / REAL ( n )               ! PE/N for cut (but not shifted) potential
+    en_c = total%pot_c / REAL ( n )                ! PE/N for cut (but not shifted) potential
     en_c = en_c + 1.5 * temperature                ! Add ideal gas contribution KE/N to give E_c/N
     en   = en_c + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E/N estimate
-    p_c  = system%vir / box**3                     ! Virial contribution to P_c
+    p_c  = total%vir / box**3                      ! Virial contribution to P_c
     p_c  = p_c + density * temperature             ! Add ideal gas contribution to P_c
     p    = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P
     p_c  = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P)

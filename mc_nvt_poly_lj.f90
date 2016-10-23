@@ -43,7 +43,7 @@ PROGRAM mc_nvt_poly_lj
   REAL :: en_s    ! internal energy per molecule (cut & shifted potential)
 
   ! Composite interaction = pot_s & vir & overlap variables
-  TYPE(potential_type) :: system, molecule_old, molecule_new
+  TYPE(potential_type) :: total, partial_old, partial_new
 
   INTEGER              :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL                 :: delta
@@ -98,8 +98,9 @@ PROGRAM mc_nvt_poly_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  system = potential ( box, r_cut )
-  IF ( system%overlap ) THEN
+  ! Calculate total values of pot_s etc and check for overlap
+  total = potential ( box, r_cut )
+  IF ( total%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF
@@ -117,9 +118,9 @@ PROGRAM mc_nvt_poly_lj
 
         DO i = 1, n ! Begin loop over atoms
 
-           molecule_old = potential_1 ( r(:,i), e(:,i), i, box, r_cut ) ! Old molecule potential, virial, etc
+           partial_old = potential_1 ( r(:,i), e(:,i), i, box, r_cut ) ! Old molecule potential, virial, etc
 
-           IF ( molecule_old%overlap ) THEN ! should never happen
+           IF ( partial_old%overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_poly_lj'
            END IF
@@ -128,17 +129,18 @@ PROGRAM mc_nvt_poly_lj
            ri = ri - ANINT ( ri )                              ! Periodic boundary correction
            ei = random_rotate_quaternion ( de_max, e(:,i) )    ! Trial rotation
 
-           molecule_new = potential_1 ( ri, ei, i, box, r_cut ) ! New molecule potential, virial etc
+           partial_new = potential_1 ( ri, ei, i, box, r_cut ) ! New molecule potential, virial etc
 
-           IF ( .NOT. molecule_new%overlap ) THEN ! Test for non-overlapping configuration
+           IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
 
-              delta = ( molecule_new%pot_s - molecule_old%pot_s ) / temperature
+              delta = partial_new%pot_s - partial_old%pot_s ! Use cut-and-shifted potential
+              delta = delta / temperature                   ! Divide by temperature
 
               IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                 system = system + molecule_new - molecule_old ! Update potential energy
-                 r(:,i) = ri                                   ! Update position
-                 e(:,i) = ei                                   ! Update quaternion
-                 moves  = moves + 1                            ! Increment move counter
+                 total  = total + partial_new - partial_old ! Update potential energy
+                 r(:,i) = ri                                ! Update position
+                 e(:,i) = ei                                ! Update quaternion
+                 moves  = moves + 1                         ! Increment move counter
               END IF ! End accept Metropolis test
 
            END IF ! End test for non-overlapping configuration
@@ -163,8 +165,9 @@ PROGRAM mc_nvt_poly_lj
 
   CALL calculate ( 'Final values' )
 
-  system = potential ( box, r_cut )
-  IF ( system%overlap ) THEN ! should never happen
+  ! Double-check book-keeping for totals, and overlap
+  total = potential ( box, r_cut )
+  IF ( total%overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF
@@ -182,16 +185,16 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    ! This routine calculates the properties of interest from system values
+    ! This routine calculates the properties of interest from total values
     ! and optionally writes them out (e.g. at the start and end of the run)
     ! In this example we simulate using the cut-and-shifted potential only
-    ! The values of < p_s >,  < en_s > and density should be consistent (for this potential)
+    ! The values of < p_s >, < en_s > and density should be consistent (for this potential)
     ! There are no long-range or delta corrections
     ! The value of the cut (but not shifted) potential pot_c is not used, in this example
     
-    en_s = system%pot_s / REAL ( n )   ! PE per molecule
+    en_s = total%pot_s / REAL ( n )    ! PE per molecule
     en_s = en_s + 3.0 * temperature    ! Add ideal gas contribution KE/N assuming nonlinear molecules 
-    p_s  = system%vir / box**3         ! Virial contribution to P
+    p_s  = total%vir / box**3          ! Virial contribution to P
     p_s  = p_s + density * temperature ! Add ideal gas contribution to P
 
     IF ( PRESENT ( string ) ) THEN

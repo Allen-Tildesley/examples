@@ -132,16 +132,16 @@ CONTAINS
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
     REAL, DIMENSION(3)   :: r_cm
-    TYPE(potential_type) :: system
+    TYPE(potential_type) :: total
 
-    system = potential ( ) ! Calculate nonbonded potential with overlap flag
+    total = potential ( ) ! Calculate nonbonded potential with overlap flag
 
-    IF ( system%overlap ) THEN ! Overlap test (might happen with initial configuration)
+    IF ( total%overlap ) THEN ! Overlap test (might happen with initial configuration)
        WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
        STOP 'Error in mc_chain_nvt_cbmc_lj/calculate'
     END IF ! End overlap test
 
-    pe   = system%pot + spring_pot ( bond, k_spring )
+    pe   = total%pot + spring_pot ( bond, k_spring )
     r_cm = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
     r_g  = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
 

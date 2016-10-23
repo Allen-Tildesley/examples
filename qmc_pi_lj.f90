@@ -48,10 +48,10 @@ PROGRAM qmc_pi_lj
   REAL :: en      ! Internal energy per atom for full potential with LRC
 
   ! Composite interaction = pot & overlap variables
-  TYPE(potential_type) :: system, atom_old, atom_new
+  TYPE(potential_type) :: total, partial_old, partial_new
 
   INTEGER            :: blk, stp, i, k, nstep, nblock, moves, ioerr
-  REAL               :: system_spring, atom_old_spring, atom_new_spring, delta, k_spring
+  REAL               :: total_spring, partial_old_spring, partial_new_spring, delta, k_spring
   REAL, DIMENSION(3) :: rik
 
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -112,7 +112,7 @@ PROGRAM qmc_pi_lj
 
   CALL allocate_arrays ( box, r_cut ) ! Allocate r
 
-  ! Read each ring polymer from a unique file; we assume that n and box are compatible!
+  ! Read each ring polymer from a unique file; we assume that n and box are all the same!
   DO k = 1, p
      WRITE(k_tag,fmt='(i2.2)') k ! convert into character form
      cnf_prefix(4:5) = k_tag     ! insert into configuration filename
@@ -122,13 +122,13 @@ PROGRAM qmc_pi_lj
   r(:,:,:) = r(:,:,:) / box                ! Convert positions to box units
   r(:,:,:) = r(:,:,:) - ANINT ( r(:,:,:) ) ! Periodic boundaries (box=1 units)
 
-  ! Calculate classical LJ and quantum spring potential energies
-  system = potential ( box, r_cut )
-  IF ( system%overlap ) THEN
+  ! Calculate classical LJ and quantum spring potential energies & check overlap
+  total = potential ( box, r_cut )
+  IF ( total%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
-  system_spring = spring ( box, k_spring )
+  total_spring = spring ( box, k_spring )
   CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'E/N (cut)', 'E/N (full)' ] )
@@ -145,31 +145,33 @@ PROGRAM qmc_pi_lj
 
            DO k = 1, p ! Begin loop over ring polymers
 
-              atom_old = potential_1 ( r(:,i,k), i, k, box, r_cut ) ! Old atom classical potential etc
+              partial_old = potential_1 ( r(:,i,k), i, k, box, r_cut ) ! Old atom classical potential etc
 
-              IF ( atom_old%overlap ) THEN ! should never happen
+              IF ( partial_old%overlap ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in qmc_pi_lj'
               END IF
 
-              atom_old_spring = spring_1 ( r(:,i,k), i, k, box, k_spring ) ! Old atom quantum potential
+              partial_old_spring = spring_1 ( r(:,i,k), i, k, box, k_spring ) ! Old atom quantum potential
 
               rik(:) = random_translate_vector ( dr_max/box, r(:,i,k) ) ! Trial move to new position (in box=1 units) 
               rik(:) = rik(:) - ANINT ( rik(:) )                        ! Periodic boundary correction
 
-              atom_new = potential_1 ( rik, i, k, box, r_cut ) ! New atom classical potential etc
+              partial_new = potential_1 ( rik, i, k, box, r_cut ) ! New atom classical potential etc
 
-              IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
+              IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
 
-                 atom_new_spring = spring_1 ( rik, i, k, box, k_spring ) ! New atom quantum potential
+                 partial_new_spring = spring_1 ( rik, i, k, box, k_spring ) ! New atom quantum potential
 
-                 delta = ( atom_new%pot_c + atom_new_spring - atom_old%pot_c - atom_old_spring ) / temperature
+                 delta =         partial_new%pot_c  - partial_old%pot_c  ! Change in classical cut (but not shifted) potential
+                 delta = delta + partial_new_spring - partial_old_spring ! Add change in quantum potential
+                 delta = delta / temperature                             ! Divide by temperature
 
                  IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                    system        = system        + atom_new        - atom_old        ! Update classical system values
-                    system_spring = system_spring + atom_new_spring - atom_old_spring ! Update quantum system potential
-                    r(:,i,k) = rik                                                    ! Update position
-                    moves    = moves + 1                                              ! Increment move counter
+                    total        = total        + partial_new        - partial_old        ! Update classical total values
+                    total_spring = total_spring + partial_new_spring - partial_old_spring ! Update quantum system potential
+                    r(:,i,k)     = rik                                                    ! Update position
+                    moves        = moves + 1                                              ! Increment move counter
                  END IF ! End accept Metropolis test
 
               END IF ! End test for non-overlapping configuration
@@ -202,12 +204,13 @@ PROGRAM qmc_pi_lj
 
   CALL calculate ( 'Final values' )
 
-  system = potential ( box, r_cut )
-  IF ( system%overlap ) THEN ! this should never happen
+  ! Final double-check on book-keeping for totals, and overlap
+  total = potential ( box, r_cut )
+  IF ( total%overlap ) THEN ! this should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
-  system_spring = spring ( box, k_spring )
+  total_spring = spring ( box, k_spring )
   CALL calculate ( 'Final check' )
 
   ! Write each ring polymer to a unique file
@@ -222,13 +225,13 @@ PROGRAM qmc_pi_lj
   CALL conclusion ( output_unit )
 
 CONTAINS
-  
+
   SUBROUTINE calculate ( string )
     USE qmc_module, ONLY : potential_lrc
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
-    ! This routine calculates the properties of interest from system values
+    ! This routine calculates the properties of interest from total values
     ! and optionally writes them out (e.g. at the start and end of the run)
     ! In this example we simulate using the cut (but not shifted) potential
     ! The values of < en_c > and < density > should be consistent (for this potential)
@@ -236,10 +239,10 @@ CONTAINS
     ! an estimate of < en > for the full (uncut) potential
     ! The value of the cut-and-shifted potential pot_s is not used, in this example
 
-    real :: kin
+    REAL :: kin
 
     kin   = 1.5 * n * p * temperature                        ! Kinetic energy
-    en_c  = ( kin + system%pot_c - system_spring ) / REAL(n) ! Total energy per atom (cut but not shifted)
+    en_c  = ( kin + total%pot_c - total_spring ) / REAL(n)   ! Total energy per atom (cut but not shifted)
     en    = en_c + potential_lrc ( density, r_cut )          ! Add long-range contribution to PE/N
 
     IF ( PRESENT ( string ) ) THEN

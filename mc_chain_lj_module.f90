@@ -18,8 +18,6 @@ MODULE mc_module
   REAL, DIMENSION(:,:), ALLOCATABLE :: r_old ! Working array (3,n)
   REAL, DIMENSION(:,:), ALLOCATABLE :: r_new ! Working array (3,n)
 
-  REAL,    PARAMETER :: sigma = 1.0     ! LJ diameter
-  REAL,    PARAMETER :: epslj = 1.0     ! LJ well depth
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
 
   ! Public derived type
@@ -60,10 +58,10 @@ CONTAINS
     IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
-    WRITE ( unit=output_unit, fmt='(a)'           ) 'LJ chain, no cutoff, no shift'
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',   sigma    
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epslj = ', epslj    
-    WRITE ( unit=output_unit, fmt='(a)'           ) 'Harmonic spring bond potential'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'LJ chain, no cutoff, no shift'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'   
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1'   
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Harmonic spring bond potential'
 
   END SUBROUTINE introduction
 
@@ -120,7 +118,7 @@ CONTAINS
     REAL,   DIMENSION(3,k_max) :: r_try ! Coordinates of trial atoms
 
     INTEGER              :: i
-    TYPE(potential_type) :: atom
+    TYPE(potential_type) :: partial
     REAL                 :: d, d_max, std, zeta
     REAL, DIMENSION(3)   :: r1
     REAL, PARAMETER      :: w_tol = 1.0e-10 ! Min weight tolerance
@@ -133,7 +131,7 @@ CONTAINS
     END IF
     d_max = d_max + bond ! This is the actual max d allowed
 
-    r_old    = r   ! Store old configuration
+    r_old = r ! Store old configuration
 
     m = random_integer ( 1, m_max ) ! Number of atoms to regrow
     c = random_integer ( 1, 4 )     ! Growth option
@@ -167,13 +165,13 @@ CONTAINS
 
           d          = random_bond ( bond, std, d_max )  ! Generate random bond length around d=bond
           r_try(:,k) = r(:,i-1) + d * random_vector()    ! Trial position in random direction from i-1
-          atom       = potential_1 ( r_try(:,k), i, lt ) ! Nonbonded interactions with earlier atoms
+          partial    = potential_1 ( r_try(:,k), i, lt ) ! Nonbonded interactions with earlier atoms
 
-          IF ( atom%overlap ) THEN                  ! Overlap test
-             w(k) = 0.0                             ! Store weight for this try (zero)
-          ELSE                                      ! Safe to calculate weight
-             w(k) = EXP ( -atom%pot / temperature ) ! Store weight for this try (Boltzmann factor)
-          END IF                                    ! End overlap test
+          IF ( partial%overlap ) THEN                  ! Overlap test
+             w(k) = 0.0                                ! Store weight for this try (zero)
+          ELSE                                         ! Safe to calculate weight
+             w(k) = EXP ( -partial%pot / temperature ) ! Store weight for this try (Boltzmann factor)
+          END IF                                       ! End overlap test
 
        END DO ! End loop over k_max tries
 
@@ -217,13 +215,13 @@ CONTAINS
        ! Old position and weight are stored as try 1
 
        r_try(:,1) = r(:,i)
-       atom       = potential_1 ( r_try(:,1), i, lt ) ! Nonbonded energy with earlier atoms
+       partial    = potential_1 ( r_try(:,1), i, lt ) ! Nonbonded energy with earlier atoms
 
-       IF ( atom%overlap ) THEN                  ! Overlap test
-          w(1) = 0.0                             ! Current weight is zero; should not happen
-       ELSE                                      ! Safe to calculate weight
-          w(1) = EXP ( -atom%pot / temperature ) ! Current weight given by Boltzmann factor
-       END IF                                    ! End overlap test
+       IF ( partial%overlap ) THEN                  ! Overlap test
+          w(1) = 0.0                                ! Current weight is zero; should not happen
+       ELSE                                         ! Safe to calculate weight
+          w(1) = EXP ( -partial%pot / temperature ) ! Current weight given by Boltzmann factor
+       END IF                                       ! End overlap test
 
        ! Remaining tries only required to compute weight
 
@@ -231,13 +229,13 @@ CONTAINS
 
           d          = random_bond ( bond, std, d_max )  ! Generate random bond length around d=bond
           r_try(:,k) = r(:,i-1) + d * random_vector ( )  ! Trial position in random direction from i-1
-          atom       = potential_1 ( r_try(:,k), i, lt ) ! Nonbonded interactions with earlier atoms
+          partial    = potential_1 ( r_try(:,k), i, lt ) ! Nonbonded interactions with earlier atoms
 
-          IF ( atom%overlap ) THEN                  ! Overlap test
-             w(k) = 0.0                             ! Store weight for this try (zero)
-          ELSE                                      ! Safe to calculate weight
-             w(k) = EXP ( -atom%pot / temperature ) ! Store weight for this try (Boltzmann factor)
-          END IF                                    ! End overlap test
+          IF ( partial%overlap ) THEN                  ! Overlap test
+             w(k) = 0.0                                ! Store weight for this try (zero)
+          ELSE                                         ! Safe to calculate weight
+             w(k) = EXP ( -partial%pot / temperature ) ! Store weight for this try (Boltzmann factor)
+          END IF                                       ! End overlap test
 
        END DO ! End loop over k_max-1 other tries
 
@@ -268,16 +266,16 @@ CONTAINS
 
   END SUBROUTINE regrow
 
-  FUNCTION potential ( ) RESULT ( system )
+  FUNCTION potential ( ) RESULT ( total )
     IMPLICIT NONE
-    TYPE(potential_type) :: system ! Returns a composite of pot and overlap
+    TYPE(potential_type) :: total ! Returns a composite of pot and overlap
 
-    ! system%pot is the nonbonded potential energy for whole system
-    ! system%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this flag is .true., the value of system%pot should not be used
+    ! total%pot is the nonbonded potential energy for whole system
+    ! total%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this flag is .true., the value of total%pot should not be used
     ! Actual calculation is performed by function potential_1
 
-    TYPE(potential_type) :: atom
+    TYPE(potential_type) :: partial
     INTEGER              :: i
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
@@ -285,31 +283,31 @@ CONTAINS
        STOP 'Impossible error in potential'
     END IF
 
-    system = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
+    total = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1
-       atom = potential_1 ( r(:,i), i, gt )
-       IF ( atom%overlap ) THEN
-          system%overlap = .TRUE. ! Overlap detected
-          RETURN                  ! Return immediately
+       partial = potential_1 ( r(:,i), i, gt )
+       IF ( partial%overlap ) THEN
+          total%overlap = .TRUE. ! Overlap detected
+          RETURN                 ! Return immediately
        END IF
-       system = system  + atom
+       total = total + partial
     END DO
 
-    system%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
+    total%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION potential
 
-  FUNCTION potential_1 ( ri, i, j_range ) RESULT ( atom )
+  FUNCTION potential_1 ( ri, i, j_range ) RESULT ( partial )
     IMPLICIT NONE
-    TYPE(potential_type)            :: atom    ! Returns a composite of pot and overlap
+    TYPE(potential_type)            :: partial ! Returns a composite of pot and overlap for given atom
     REAL, DIMENSION(3), INTENT(in)  :: ri      ! Coordinates of atom of interest
     INTEGER,            INTENT(in)  :: i       ! Index of atom of interest
     INTEGER, OPTIONAL,  INTENT(in)  :: j_range ! Optional partner index range
 
-    ! atom%pot is the nonbonded potential energy of atom ri with a set of other atoms
-    ! atom%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this is .true., the value of atom%pot should not be used
+    ! partial%pot is the nonbonded potential energy of atom ri with a set of other atoms
+    ! partial%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this is .true., the value of partial%pot should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
 
@@ -317,7 +315,7 @@ CONTAINS
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
     INTEGER            :: j, j1, j2
-    REAL               :: sr2, sr6, rij_sq
+    REAL               :: sr2, sr6, sr12, rij_sq, potij
     REAL, DIMENSION(3) :: rij
     REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
 
@@ -343,7 +341,7 @@ CONTAINS
        j2 = n
     END IF
 
-    atom = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
+    partial = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Loop over selected range of partners
 
@@ -354,17 +352,20 @@ CONTAINS
        sr2    = 1.0 / rij_sq   ! (sigma/rij)**2
 
        IF ( sr2 > sr2_overlap ) THEN
-          atom%overlap = .TRUE. ! Overlap detected
-          RETURN                ! Return immediately
+          partial%overlap = .TRUE. ! Overlap detected
+          RETURN                   ! Return immediately
        END IF
 
-       sr6      = sr2**3
-       atom%pot = atom%pot + sr6**2 - sr6 ! LJ potential (neither cut nor shifted)
+       sr6   = sr2**3
+       sr12  = sr6**2
+       potij = sr12 - sr6 ! LJ potential (neither cut nor shifted)
+
+       partial%pot = partial%pot + potij
 
     END DO ! End loop over selected range of partners
 
-    atom%pot     = atom%pot * 4.0 ! Numerical factor
-    atom%overlap = .FALSE.        ! No overlaps detected (redundant but for clarity)
+    partial%pot     = partial%pot * 4.0 ! Numerical factor
+    partial%overlap = .FALSE.           ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION potential_1
 
@@ -408,9 +409,9 @@ CONTAINS
     pot = 0.0
 
     DO i = 1, n-1 ! Loop over atoms
-       rij = r(:,i) - r(:,i+1)     ! Bond vector
-       d = SQRT ( SUM ( rij**2 ) ) ! Bond distance
-       pot = pot + (d-b)**2        ! Squared displacement
+       rij = r(:,i) - r(:,i+1)       ! Bond vector
+       d   = SQRT ( SUM ( rij**2 ) ) ! Bond distance
+       pot = pot + (d-b)**2          ! Squared displacement
     END DO ! End loop over atoms
 
     ! Numerical factor

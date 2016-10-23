@@ -27,8 +27,6 @@ MODULE mc_module
   INTEGER, DIMENSION(:),   ALLOCATABLE :: j_list ! list of j-neighbours (n)
 
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
-  REAL,    PARAMETER :: sigma = 1.0     ! Lennard-Jones diameter (unit of length)
-  REAL,    PARAMETER :: epslj = 1.0     ! Lennard-Jones well depth (unit of energy)
 
   ! Public derived type
   PUBLIC :: potential_type
@@ -75,9 +73,10 @@ CONTAINS
     IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
-    WRITE ( unit=output_unit, fmt='(a)'           ) 'Lennard-Jones potential (cut but not shifted)'
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',     sigma    
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epsilon = ', epslj    
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Cut and optionally shifted'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'   
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1'   
 
   END SUBROUTINE introduction
 
@@ -119,18 +118,18 @@ CONTAINS
 
   END SUBROUTINE deallocate_arrays
 
-  FUNCTION potential ( box, r_cut ) RESULT ( system )
+  FUNCTION potential ( box, r_cut ) RESULT ( total )
     USE link_list_module, ONLY : make_list
     IMPLICIT NONE
-    TYPE(potential_type) :: system ! Returns a composite of pot, vir and overlap
-    REAL, INTENT(in)     :: box    ! Simulation box length
-    REAL, INTENT(in)     :: r_cut  ! Potential cutoff
+    TYPE(potential_type) :: total ! Returns a composite of pot, vir and overlap
+    REAL, INTENT(in)     :: box   ! Simulation box length
+    REAL, INTENT(in)     :: r_cut ! Potential cutoff
 
-    ! system%pot_c is the nonbonded cut (not shifted) potential energy for whole system
-    ! system%pot_s is the nonbonded cut-and-shifted potential energy for whole system
-    ! system%vir is the corresponding virial for whole system
-    ! system%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this flag is .true., the values of system%pot_c etc should not be used
+    ! total%pot_c is the nonbonded cut (not shifted) potential energy for whole system
+    ! total%pot_s is the nonbonded cut-and-shifted potential energy for whole system
+    ! total%vir is the corresponding virial for whole system
+    ! total%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this flag is .true., the values of total%pot_c etc should not be used
     ! Actual calculation is performed by function potential_1
 
     ! We assume that the main program calls this function at the start,
@@ -139,7 +138,7 @@ CONTAINS
     ! The list is maintained by create_in_list, destroy_in_list, move_in_list
     ! which are called in other routines below.
 
-    TYPE(potential_type) :: atom
+    TYPE(potential_type) :: partial
     INTEGER              :: i
     LOGICAL, SAVE        :: first_call = .TRUE.
 
@@ -154,39 +153,39 @@ CONTAINS
        first_call = .FALSE.
     END IF
 
-    system = potential_type ( pot_c=0.0, pot_s=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
+    total = potential_type ( pot_c=0.0, pot_s=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     DO i = 1, n
 
-       atom = potential_1 ( r(:,i), i, box, r_cut, gt )
+       partial = potential_1 ( r(:,i), i, box, r_cut, gt )
 
-       IF ( atom%overlap ) THEN
-          system%overlap = .TRUE. ! Overlap detected
-          RETURN                  ! Return immediately
+       IF ( partial%overlap ) THEN
+          total%overlap = .TRUE. ! Overlap detected
+          RETURN                 ! Return immediately
        END IF
 
-       system = system + atom
+       total = total + partial
 
     END DO
 
-    system%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    total%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential
 
-  FUNCTION potential_1 ( ri, i, box, r_cut, j_range ) RESULT ( atom )
+  FUNCTION potential_1 ( ri, i, box, r_cut, j_range ) RESULT ( partial )
     IMPLICIT NONE
-    TYPE(potential_type)           :: atom    ! Returns a composite of pot, vir and overlap
+    TYPE(potential_type)           :: partial ! Returns a composite of pot, vir and overlap for given atom
     REAL, DIMENSION(3), INTENT(in) :: ri      ! Coordinates of atom of interest
     INTEGER,            INTENT(in) :: i       ! Index of atom of interest
     REAL,               INTENT(in) :: box     ! Simulation box length
     REAL,               INTENT(in) :: r_cut   ! Potential cutoff distance
     INTEGER, OPTIONAL,  INTENT(in) :: j_range ! Optional partner index range
 
-    ! atom%pot_c is the nonbonded cut (not shifted) potential energy of atom ri with a set of other atoms
-    ! atom%pot_s is the nonbonded cut-and-shifted potential energy of atom ri with a set of other atoms
-    ! atom%vir is the corresponding virial of atom ri
-    ! atom%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this is .true., the value of atom%pot should not be used
+    ! partial%pot_c is the nonbonded cut (not shifted) potential energy of atom ri with a set of other atoms
+    ! partial%pot_s is the nonbonded cut-and-shifted potential energy of atom ri with a set of other atoms
+    ! partial%vir is the corresponding virial of atom ri
+    ! partial%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! If this is .true., the value of partial%pot should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
     ! The optional argument j_range restricts partner indices to "half" which is
     ! actually implemented in the get_neighbours routine
@@ -197,7 +196,7 @@ CONTAINS
     INTEGER            :: j, jj, ncut
     LOGICAL            :: half
     REAL               :: r_cut_box, r_cut_box_sq, box_sq
-    REAL               :: sr2, sr6, rij_sq
+    REAL               :: sr2, sr6, sr12, rij_sq, potij, virij
     REAL, DIMENSION(3) :: rij
     REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
 
@@ -213,7 +212,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    atom = potential_type ( pot_c=0.0, pot_s=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
+    partial = potential_type ( pot_c=0.0, pot_s=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
     ncut = 0
 
     jj = 0
@@ -235,30 +234,36 @@ CONTAINS
           sr2 = 1.0 / rij_sq       ! (sigma/rij)**2
 
           IF ( sr2 > sr2_overlap ) THEN
-             atom%overlap = .TRUE. ! Overlap detected
-             RETURN                ! Return immediately
+             partial%overlap = .TRUE. ! Overlap detected
+             RETURN                   ! Return immediately
           END IF
 
-          sr6 = sr2**3
+          sr6   = sr2**3
+          sr12  = sr6**2
+          potij = sr12 - sr6   ! LJ potential (cut but not shifted)
+          virij = potij + sr12 ! LJ virial
 
-          atom%pot_c = atom%pot_c + sr6**2 - sr6     ! LJ potential (cut but not shifted)
-          atom%vir   = atom%vir + 2.0 * sr6**2 - sr6 ! LJ virial
-          ncut       = ncut + 1
+          partial%pot_c = partial%pot_c + potij    
+          partial%vir   = partial%vir   + virij 
+
+          ncut = ncut + 1
 
        END IF ! End check within range
 
     END DO ! End loop until no more entries in j_list
 
     ! Calculate shifted potential
-    sr2        = 1.0 / r_cut**2 ! in sigma=1 units
-    sr6        = sr2**3
-    atom%pot_s = atom%pot_c - REAL ( ncut ) * ( sr6**2 - sr6 )
+    sr2   = 1.0 / r_cut**2 ! in sigma=1 units
+    sr6   = sr2**3
+    sr12  = sr6**2
+    potij = sr12 - sr6
+    partial%pot_s = partial%pot_c - REAL ( ncut ) * potij
 
     ! Numerical factors
-    atom%pot_c   = atom%pot_c * 4.0
-    atom%pot_s   = atom%pot_s * 4.0
-    atom%vir     = atom%vir   * 24.0 / 3.0
-    atom%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
+    partial%pot_c   = partial%pot_c * 4.0
+    partial%pot_s   = partial%pot_s * 4.0
+    partial%vir     = partial%vir   * 24.0 / 3.0
+    partial%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION potential_1
 

@@ -54,7 +54,7 @@ PROGRAM mc_npt_lj
   REAL :: en      ! Internal energy per atom for full potential with LRC
 
   ! Composite interaction = pot & vir & overlap variables
-  TYPE(potential_type) :: system, system_new, atom_old, atom_new
+  TYPE(potential_type) :: total, total_new, partial_old, partial_new
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL               :: box_scale, box_new, den_scale, delta, zeta
@@ -108,8 +108,9 @@ PROGRAM mc_npt_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  system = potential ( box, r_cut ) ! Initial energy and overlap check
-  IF ( system%overlap ) THEN
+  ! Initial energy and overlap check
+  total = potential ( box, r_cut ) 
+  IF ( total%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_npt_lj'
   END IF
@@ -128,9 +129,9 @@ PROGRAM mc_npt_lj
 
         DO i = 1, n ! Begin loop over atoms
 
-           atom_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial etc
+           partial_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial etc
 
-           IF ( atom_old%overlap ) THEN ! should never happen
+           IF ( partial_old%overlap ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_npt_lj'
            END IF
@@ -138,16 +139,17 @@ PROGRAM mc_npt_lj
            ri(:) = random_translate_vector ( dr_max/box, r(:,i) ) ! Trial move to new position (box=1 units)
            ri(:) = ri(:) - ANINT ( ri(:) )                        ! Periodic boundary correction
 
-           atom_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
+           partial_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
 
-           IF ( .NOT. atom_new%overlap ) THEN ! Test for non-overlapping configuration
+           IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
 
-              delta = ( atom_new%pot_c - atom_old%pot_c ) / temperature ! Use cut (but not shifted) potential
+              delta = partial_new%pot_c - partial_old%pot_c ! Use cut (but not shifted) potential
+              delta = delta / temperature
 
               IF (  metropolis ( delta )  ) THEN ! Accept Metropolis test
-                 system = system + atom_new - atom_old ! Update system values
-                 CALL move ( i, ri )                   ! Update position
-                 moves = moves + 1                     ! Increment move counter
+                 total = total + partial_new - partial_old ! Update total values
+                 CALL move ( i, ri )                       ! Update position
+                 moves = moves + 1                         ! Increment move counter
               END IF ! End accept Metropolis test
 
            END IF ! End test for non-overlapping configuration
@@ -163,17 +165,19 @@ PROGRAM mc_npt_lj
         box_new   = box * box_scale     ! New box (in sigma units)
         den_scale = 1.0 / box_scale**3  ! Density scaling factor
 
-        system_new = potential ( box_new, r_cut ) ! New system energy, virial etc
+        total_new = potential ( box_new, r_cut ) ! New total energy, virial etc
 
-        IF ( .NOT. system_new%overlap ) THEN ! Test for non-overlapping configuration
+        IF ( .NOT. total_new%overlap ) THEN ! Test for non-overlapping configuration
 
-           delta = ( system_new%pot_c - system%pot_c + pressure * ( box_new**3 - box**3 )  ) / temperature &
-                &   + REAL(n+1) * LOG(den_scale) ! Factor (n+1) consistent with log(box) sampling
+           delta = total_new%pot_c - total%pot_c              ! Use cut (but not shifted) potential
+           delta = delta + pressure * ( box_new**3 - box**3 ) ! Add PV term
+           delta = delta / temperature                        ! Divide by temperature
+           delta = delta + REAL(n+1) * LOG(den_scale)         ! Factor (n+1) consistent with log(box) sampling
 
            IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-              system  = system_new ! Update system values
-              box     = box_new    ! Update box
-              v_ratio = 1.0        ! Set move counter
+              total  = total_new ! Update total values
+              box     = box_new  ! Update box
+              v_ratio = 1.0      ! Set move counter
            END IF ! reject Metropolis test
 
         END IF ! End test for overlapping configuration
@@ -193,8 +197,9 @@ PROGRAM mc_npt_lj
 
   CALL calculate ( 'Final values' )
 
-  system = potential ( box, r_cut )
-  IF ( system%overlap ) THEN ! should never happen
+  ! Double-check book-keeping for totals, and overlap
+  total = potential ( box, r_cut )
+  IF ( total%overlap ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_npt_lj'
   END IF
@@ -213,7 +218,7 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    ! This routine calculates the properties of interest from system values
+    ! This routine calculates the properties of interest from total values
     ! and optionally writes them out (e.g. at the start and end of the run)
     ! In this example we simulate using the cut (but not shifted) potential
     ! Accordingly, < p_c > should match the input pressure and the values
@@ -223,10 +228,10 @@ CONTAINS
     ! The value of the cut-and-shifted potential pot_s is not used, in this example
     
     density = REAL(n) / box**3                        ! Number density N/V
-    en_c    = system%pot_c / REAL ( n )               ! PE/N for cut (but not shifted) potential
+    en_c    = total%pot_c / REAL ( n )                ! PE/N for cut (but not shifted) potential
     en_c    = en_c + 1.5 * temperature                ! Add ideal gas contribution KE/N to give E_c/N
     en      = en_c + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E/N estimate
-    p_c     = system%vir / box**3                     ! Virial contribution to P_c
+    p_c     = total%vir / box**3                      ! Virial contribution to P_c
     p_c     = p_c + density * temperature             ! Add ideal gas contribution to P_c
     p       = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P
     p_c     = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P)
