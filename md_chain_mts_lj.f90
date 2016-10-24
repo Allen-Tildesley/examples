@@ -7,7 +7,7 @@ PROGRAM md_chain_mts_lj
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, r, v, f, f_spring, n, spring, worst_bond
+       &                       force, spring, worst_bond, r, v, f, g, n
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms in a linear chain (positions, velocities)
@@ -26,15 +26,16 @@ PROGRAM md_chain_mts_lj
   ! The model is defined in md_module
 
   ! Most important variables
-  INTEGER :: n_mts      ! number of small steps per large step
-  REAL    :: dt         ! time step (smallest)
-  REAL    :: bond       ! bond length
-  REAL    :: k_spring   ! bond spring constant
-  REAL    :: pot        ! total LJ potential energy
-  REAL    :: pot_spring ! total spring potential energy
-  REAL    :: kin        ! total kinetic energy
-  REAL    :: temp_kinet ! kinetic temperature (LJ sigma=1 units, to be averaged)
-  REAL    :: energy     ! total energy per atom (LJ sigma=1 units, to be averaged)
+  INTEGER :: n_mts    ! Number of small steps per large step
+  REAL    :: dt       ! Time step (smallest)
+  REAL    :: bond     ! Bond length
+  REAL    :: k_spring ! Bond spring constant
+  REAL    :: pot      ! Total LJ potential energy
+  REAL    :: pot_h    ! Total spring harmonic potential energy
+
+  ! Quantities to be averaged
+  REAL :: tk ! temperature (kinetic)
+  REAL :: en ! internal energy per atom
 
   INTEGER :: blk, stp, nstep, nblock, stp_mts, ioerr
 
@@ -47,6 +48,8 @@ PROGRAM md_chain_mts_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_chain_mts_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE ensemble, chain molecule, multiple time steps'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Uses a potential shifted to vanish smoothly at cutoff, no LRC'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'No periodic boundaries'
   CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
 
@@ -80,11 +83,12 @@ PROGRAM md_chain_mts_lj
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r, v ) ! Second call is to get r and v
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
 
+  ! Initial calculation of forces f, spring forces g, and potential energies
   CALL force ( pot )
-  CALL spring ( k_spring, bond, pot_spring )
+  CALL spring ( k_spring, bond, pot_h )
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temp-Kinet' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N', 'T (kin)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -93,22 +97,22 @@ PROGRAM md_chain_mts_lj
      DO stp = 1, nstep ! Begin loop over steps
 
         ! Single time step of length n_mts*dt
-        v = v + 0.5 * REAL(n_mts) * dt * f  ! Kick half-step
+        v = v + 0.5 * REAL(n_mts) * dt * f  ! Kick half-step (long) with nonbonded forces f
 
-        DO stp_mts = 1, n_mts ! loop over n_mts steps of length dt
-           v = v + 0.5 * dt * f_spring                ! Kick half-step (small)
-           r = r + dt * v                             ! Drift step (small)
-           CALL spring ( k_spring, bond, pot_spring ) ! Spring force evaluation
-           v = v + 0.5 * dt * f_spring                ! Kick half-step (small)
-        END DO ! end loop over n_mts steps of length dt
+        DO stp_mts = 1, n_mts ! Loop over n_mts steps of length dt
+           v = v + 0.5 * dt * g                  ! Kick half-step (short) with spring forces g
+           r = r + dt * v                        ! Drift step (short)
+           CALL spring ( k_spring, bond, pot_h ) ! Evaluate spring forces g and potential
+           v = v + 0.5 * dt * g                  ! Kick half-step (short) with spring forces g
+        END DO ! End loop over n_mts steps of length dt
 
-        CALL force ( pot )   ! Non-bonded force evaluation
-        v = v + 0.5 * REAL(n_mts) * dt * f ! Kick half-step
+        CALL force ( pot ) ! Evaluate nonbonded forces f and potential
+        v = v + 0.5 * REAL(n_mts) * dt * f ! Kick half-step (long) with nonbonded forces f
         ! End single time step of length n_mts*dt
 
         ! Calculate all variables for this step
         CALL calculate ( )
-        CALL blk_add ( [energy,temp_kinet] )
+        CALL blk_add ( [en,tk] )
 
      END DO ! End loop over steps
 
@@ -120,8 +124,6 @@ PROGRAM md_chain_mts_lj
 
   CALL run_end ( output_unit )
 
-  CALL force ( pot )
-  CALL spring ( k_spring, bond, pot_spring )
   CALL calculate ( 'Final values' )
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
   CALL time_stamp ( output_unit )
@@ -137,14 +139,26 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    kin         = 0.5*SUM(v**2)
-    energy      = ( pot + pot_spring + kin ) / REAL ( n )
-    temp_kinet = 2.0 * kin / REAL ( 3*(n-1) )
+    ! This routine calculates the properties of interest from total values
+    ! and optionally writes them out (e.g. at the start and end of the run)
+    ! In this example we simulate using a specified potential (e.g. WCA LJ)
+    ! which goes to zero smoothly at the cutoff to highlight energy conservation
+    ! so long-range corrections for cut-and-shift versions do not arise
+
+    REAL    :: kin  ! Total kinetic energy
+    INTEGER :: free ! Number of degrees of freedom
+
+    kin = 0.5*SUM(v**2)
+    en  = ( pot + pot_h + kin ) / REAL ( n ) ! E/N = nonbonded + spring + kinetic energy
+
+    free = 3 * n                     ! Three degrees of freedom per atom
+    free = free - 6                  ! Correct for angular and linear momentum conservation
+    tk   = 2.0 * kin / REAL ( free ) ! Kinetic temperature
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Total energy', energy
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Temp-kinet',   temp_kinet
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'E/N',     en
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'T (kin)', tk
     END IF
 
   END SUBROUTINE calculate

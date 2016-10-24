@@ -7,49 +7,51 @@ MODULE md_module
   IMPLICIT NONE
   PRIVATE
 
-  PUBLIC :: n, r, v, f, f_spring
+  ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  public :: force, spring
+  PUBLIC :: force, spring
   PUBLIC :: rattle_a, rattle_b, worst_bond, milcshake_a, milcshake_b 
 
-  INTEGER                              :: n ! number of atoms
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: v ! velocities (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: f ! forces (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: f_spring                   ! spring forces (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: r_old, r_new               ! old, new positions (3,n)
-  LOGICAL, DIMENSION(:),   ALLOCATABLE :: moving, moved              ! iterative flags (n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: rij, rij_old, rij_new, vij ! bond vectors (3,n-1)
-  REAL,    DIMENSION(:),   ALLOCATABLE :: rijsq, lambda, rhs, rhsold ! squared bond lengths, constraint equation terms (n-1)
-  REAL,    DIMENSION(:),   ALLOCATABLE :: dd, dd_tmp                 ! diagonal part of constraint matrix (n-1)
-  REAL,    DIMENSION(:),   ALLOCATABLE :: dl, dl_tmp                 ! sub-diagonal part of constraint matrix (n-2)
-  REAL,    DIMENSION(:),   ALLOCATABLE :: du, du_tmp                 ! super-diagonal part of constraint matrix (n-2)
+  ! Public data
+  INTEGER,                              PUBLIC :: n ! Number of atoms
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! Positions (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v ! Velocities (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: f ! Non-bonded forces (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: g ! Spring forces (3,n)
 
-  REAL, PARAMETER :: sigma = 1.0 ! LJ diameter (unit of length)
-  REAL, PARAMETER :: epslj = 1.0 ! LJ well depth (unit of energy)
+  ! Private data
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: r_old, r_new               ! Old, new positions (3,n)
+  LOGICAL, DIMENSION(:),   ALLOCATABLE :: move, moved                ! Iterative flags (n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: rij, rij_old, rij_new, vij ! Bond vectors etc (3,n-1)
+  REAL,    DIMENSION(:),   ALLOCATABLE :: rijsq, lambda, rhs, rhsold ! Squared bond lengths, constraint equation terms (n-1)
+  REAL,    DIMENSION(:),   ALLOCATABLE :: dd, dd_tmp                 ! Diagonal part of constraint matrix (n-1)
+  REAL,    DIMENSION(:),   ALLOCATABLE :: dl, dl_tmp                 ! Sub-diagonal part of constraint matrix (n-2)
+  REAL,    DIMENSION(:),   ALLOCATABLE :: du, du_tmp                 ! Super-diagonal part of constraint matrix (n-2)
 
-  ! all masses are unity
-  ! all bond lengths are the same
-  ! no periodic boundary conditions
+  ! All masses are unity
+  ! All bond lengths are the same
+  ! No periodic boundary conditions
 
 CONTAINS
 
   SUBROUTINE introduction ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
-    WRITE ( unit=output_unit, fmt='(a)'           ) 'WCA shifted Lennard-Jones potential'
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ',     sigma    
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Well depth, epsilon = ', epslj    
+    WRITE ( unit=output_unit, fmt='(a)' ) 'WCA shifted Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'No periodic boundaries'   
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'    
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1'   
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Atomic mass m = 1'   
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! unit for standard output
+    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays
-    ALLOCATE ( r(3,n), v(3,n), f(3,n), f_spring(3,n), r_old(3,n), r_new(3,n) )
-    ALLOCATE ( moving(n), moved(n) )
+    ALLOCATE ( r(3,n), v(3,n), f(3,n), g(3,n), r_old(3,n), r_new(3,n) )
+    ALLOCATE ( move(n), moved(n) )
     ALLOCATE ( rij(3,n-1), rij_old(3,n-1), rij_new(3,n-1), vij(3,n-1) )
     ALLOCATE ( rijsq(n-1), lambda(n-1), rhs(n-1), rhsold(n-1) )
     ALLOCATE ( dd(n-1), dd_tmp(n-1) )
@@ -57,8 +59,8 @@ CONTAINS
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
-    DEALLOCATE ( r, v, f, f_spring, r_old, r_new )
-    DEALLOCATE ( moving, moved )
+    DEALLOCATE ( r, v, f, g, r_old, r_new )
+    DEALLOCATE ( move, moved )
     DEALLOCATE ( rij, rij_old, rij_new, vij )
     DEALLOCATE ( rijsq, lambda, rhs, rhsold )
     DEALLOCATE ( dd, dd_tmp )
@@ -66,87 +68,98 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   SUBROUTINE force ( pot )
-    REAL, INTENT(out) :: pot          ! total potential energy
+    REAL, INTENT(out) :: pot ! total potential energy
 
     ! Calculates shifted WCA LJ potential for atomic chain (omitting bonded neighbours)
     ! The Lennard-Jones energy and sigma parameters are taken to be epsilon = 1, sigma = 1
-    ! Forces are calculated in the same units
+    ! Positions are assumed to be in these units
+    ! Forces are calculated in the same units and stored in the array f
     ! NO periodic boundaries
 
     INTEGER            :: i, j
-    REAL               :: rij_sq, sr2, sr6, sr12, potij
+    REAL               :: rij_sq, sr2, sr6, sr12, potij, virij
     REAL, PARAMETER    :: r_cut_sq = 2.0**(1.0/3.0) ! minimum of LJ potential
     REAL, DIMENSION(3) :: rij, fij
 
-    f     = 0.0
-    pot   = 0.0
+    f   = 0.0
+    pot = 0.0
 
     DO i = 1, n - 2 ! Begin outer loop over atoms, stopping 2 short of the end
 
        DO j = i + 2, n ! Begin inner loop over atoms omitting nearest neighbour
 
-          rij(:) = r(:,i) - r(:,j)           ! separation vector
-          rij_sq = SUM ( rij**2 )            ! squared separation
+          rij(:) = r(:,i) - r(:,j) ! separation vector
+          rij_sq = SUM ( rij**2 )  ! squared separation
 
-          IF ( rij_sq < r_cut_sq ) THEN
+          IF ( rij_sq < r_cut_sq ) THEN ! Test within cutoff
 
              sr2    = 1.0 / rij_sq
              sr6    = sr2 ** 3
              sr12   = sr6 ** 2
-             potij  = sr12 - sr6 + 0.25 ! shifted potential
-             pot    = pot + potij
-             fij    = rij * (2.0*sr12 - sr6) / rij_sq
+             potij  = sr12 - sr6           ! Cut (but not shifted) LJ potential
+             virij  = potij + sr12         ! WCA LJ pair virial
+             potij  = potij + 0.25         ! WCA LJ pair potential
+             pot    = pot + potij          ! Accumulate total potential
+             fij    = rij * virij / rij_sq ! Pair forces
              f(:,i) = f(:,i) + fij
              f(:,j) = f(:,j) - fij
 
-          END IF
+          END IF ! End test within cutoff
 
        END DO ! End inner loop over atoms
 
     END DO ! End outer loop over atoms
 
     ! Multiply results by numerical factors
-    f      = f   * 24.0
-    pot    = pot * 4.0
+    f   = f   * 24.0
+    pot = pot * 4.0
 
   END SUBROUTINE force
 
-  SUBROUTINE spring ( k_spring, bond, pot_spring )
-    REAL, INTENT(in)  :: k_spring   ! spring force constant
-    REAL, INTENT(in)  :: bond       ! spring bond length
-    REAL, INTENT(out) :: pot_spring ! total spring potential energy
+  SUBROUTINE spring ( k_spring, bond, pot_h )
+    REAL, INTENT(in)  :: k_spring ! spring force constant
+    REAL, INTENT(in)  :: bond     ! spring bond length
+    REAL, INTENT(out) :: pot_h    ! total harmonic spring potential energy
 
     ! Calculates bond spring potential for atomic chain
     ! NO periodic boundaries
 
     INTEGER            :: i, j
     REAL               :: rij_sq, rij_mag, potij
-    REAL, DIMENSION(3) :: rij, fij
+    REAL, DIMENSION(3) :: rij, gij
 
-    f_spring   = 0.0
-    pot_spring = 0.0
+    g     = 0.0
+    pot_h = 0.0
 
     DO i = 1, n - 1 ! Begin outer loop over bonds
-       j = i+1
+       j = i+1 ! Nearest neighbour
 
-       rij(:) = r(:,i) - r(:,j)  ! separation vector
-       rij_sq = SUM ( rij**2 )   ! squared separation
-       rij_mag = SQRT ( rij_sq ) ! separation
+       rij(:)  = r(:,i) - r(:,j) ! Separation vector
+       rij_sq  = SUM ( rij**2 )  ! Squared separation
+       rij_mag = SQRT ( rij_sq ) ! Separation
 
-       potij         = 0.5*k_spring*(rij_mag-bond)**2 ! spring potential
-       pot_spring    = pot_spring + potij
-       fij           = rij * k_spring*(bond-rij_mag)/rij_mag
-       f_spring(:,i) = f_spring(:,i) + fij
-       f_spring(:,j) = f_spring(:,j) - fij
+       potij  = (rij_mag-bond) ** 2 ! Spring potential without numerical factor
+       pot_h  = pot_h + potij
+       gij    = rij * ( bond - rij_mag ) / rij_mag ! Spring force without numerical factor
+       g(:,i) = g(:,i) + gij
+       g(:,j) = g(:,j) - gij
 
     END DO ! End outer loop over bonds
 
+    ! Multiply results by numerical factors
+    pot_h = pot_h * 0.5 * k_spring
+    g     = g * k_spring
+
   END SUBROUTINE spring
 
-  SUBROUTINE rattle_a ( dt, bond ) ! first part of velocity Verlet algorithm with constraints
+  SUBROUTINE rattle_a ( dt, bond ) ! First part of velocity Verlet algorithm with constraints
     IMPLICIT NONE
-    REAL, INTENT(in) :: dt, bond
+    REAL, INTENT(in) :: dt   ! Time step
+    REAL, INTENT(in) :: bond ! Bond length (the same throughout the chain)
 
+    ! This subroutine iteratively adjusts the positions stored in the array r
+    ! and the velocities stored in the array v, to satisfy the bond constraints
+    
     REAL, DIMENSION(3) :: rij, rij_old, dr
     LOGICAL            :: done
     REAL               :: diffsq, dot, g
@@ -155,72 +168,79 @@ CONTAINS
     REAL,    PARAMETER :: tol = 1.0e-9,  tol2 = 2.0 * tol, dot_tol = 1.0e-9
     INTEGER, PARAMETER :: iter_max = 500
 
-    r_old = r            ! save, since constraints act along the old vectors
+    r_old = r            ! Save, since constraints act along the old vectors
+
     v = v + 0.5 * dt * f ! Kick half-step
     r = r + dt * v       ! Drift step
 
-    iter      = 0
-    done      = .FALSE.
-    moving(:) = .FALSE.
-    moved(:)  = .TRUE.
+    iter     = 0
+    done     = .FALSE.
+    moved(:) = .TRUE. ! Ensures that we look at each bond at least once
 
-    DO ! iterative loop
+    DO ! Iterative loop until done
 
        IF ( done ) EXIT ! done is equivalent to .not.any ( moved )
 
-       done = .TRUE.
+       done    = .TRUE.
+       move(:) = .FALSE.
 
-       DO i = 1, n-1 ! loop over each constraint in turn
-          j = i + 1
+       DO i = 1, n-1 ! Loop over each constraint in turn
+          j = i + 1 ! Partner atom in this constraint
 
-          IF ( moved(i) .OR. moved(j) ) THEN ! test whether need to re-examine ij
+          IF ( moved(i) .OR. moved(j) ) THEN ! Test whether need to re-examine ij
 
-             rij = r(:,i) - r(:,j)             ! current bond vector
-             diffsq = bond**2 - SUM ( rij**2 ) ! amount by which constraint is violated
+             rij = r(:,i) - r(:,j)             ! Current bond vector
+             diffsq = bond**2 - SUM ( rij**2 ) ! Amount by which constraint is violated
 
-             IF ( ABS ( diffsq ) > tol2*bond**2 ) THEN ! test whether constraint already satisfied
+             IF ( ABS ( diffsq ) > tol2*bond**2 ) THEN ! Test whether constraint not already satisfied
 
-                rij_old = r_old(:,i) - r_old(:,j)
-                dot = DOT_PRODUCT ( rij_old, rij )
+                rij_old = r_old(:,i) - r_old(:,j) ! Old vector determines direction of constraint force
+
+                dot = DOT_PRODUCT ( rij_old, rij ) ! This should be of the order of bond**2
+
                 IF ( dot < dot_tol * bond**2 ) THEN
                    WRITE ( unit=error_unit, fmt='(a,3f15.5)' ) 'Constraint failure', dot, dot_tol, bond**2
                    STOP 'Error in rattle_a'
                 END IF
 
-                ! in the following formulae, inverse masses are all unity
-                g      = diffsq / ( 4.0 * dot ) 
-                dr     = rij_old * g      ! position adjustment
-                r(:,i) = r(:,i) + dr      ! adjust i position
-                r(:,j) = r(:,j) - dr      ! adjust j position
-                v(:,i) = v(:,i) + dr / dt ! adjust i velocity
-                v(:,j) = v(:,j) - dr / dt ! adjust j velocity
-                moving(i)  = .TRUE.       ! flag that we moved i
-                moving(j)  = .TRUE.       ! flag that we moved j
-                done = .FALSE.            ! flag that we moved something
+                ! In the following formulae, inverse masses are all unity
+                g       = diffsq / ( 4.0 * dot ) 
+                dr      = rij_old * g      ! Position adjustment
+                r(:,i)  = r(:,i) + dr      ! Adjust i position
+                r(:,j)  = r(:,j) - dr      ! Adjust j position
+                v(:,i)  = v(:,i) + dr / dt ! Adjust i velocity
+                v(:,j)  = v(:,j) - dr / dt ! Adjust j velocity
+                move(i) = .TRUE.           ! Flag that we moved i
+                move(j) = .TRUE.           ! Flag that we moved j
+                done    = .FALSE.          ! Flag that we moved something
 
-             END IF ! end test whether constraint already satisfied
+             END IF ! End test whether constraint not already satisfied
 
-          END IF ! end test whether need to re-examine ij
+          END IF ! End test whether need to re-examine ij
 
-       END DO ! end loop over each constraint in turn
+       END DO ! End loop over each constraint in turn
 
-       ! prepare for next iteration
-       moved(:)  = moving(:)
-       moving(:) = .FALSE.
-       iter = iter + 1
+       ! Prepare for next iteration
+       moved(:) = move(:)
+       iter     = iter + 1
        IF ( iter > iter_max ) THEN
           WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Too many iterations', iter, iter_max
           STOP 'Error in rattle_a'
        END IF
 
-    END DO ! end of iterative loop
+    END DO ! End iterative loop until done
 
   END SUBROUTINE rattle_a
 
-  SUBROUTINE rattle_b ( dt, bond, wc ) ! second part of velocity Verlet with constraints
+  SUBROUTINE rattle_b ( dt, bond, wc ) ! Second part of velocity Verlet with constraints
     IMPLICIT NONE
-    REAL, INTENT(in)  :: dt, bond
-    REAL, INTENT(out) :: wc ! constraint contribution to virial
+    REAL, INTENT(in)  :: dt   ! Time step
+    REAL, INTENT(in)  :: bond ! Bond length (the same throughout the chain)
+    REAL, INTENT(out) :: wc   ! Constraint contribution to virial
+
+    ! This subroutine iteratively adjusts the velocities stored in the array v
+    ! to satisfy the time derivatives of the bond constraints
+    ! Also returns constraint contribution to virial
 
     REAL, DIMENSION(3) :: rij, vij, dv
     LOGICAL            :: done
@@ -231,63 +251,62 @@ CONTAINS
 
     v = v + 0.5 * dt * f ! Kick half-step
 
-    iter      = 0
-    done      = .FALSE.
-    moving(:) = .FALSE.
-    moved(:)  = .TRUE.
-    wc        = 0.0
+    iter     = 0
+    done     = .FALSE.
+    moved(:) = .TRUE.
+    wc       = 0.0
 
-    DO ! iterative loop
+    DO ! Iterative loop until done
 
        IF ( done ) EXIT
 
-       done = .TRUE.
+       done    = .TRUE.
+       move(:) = .FALSE.
 
-       DO i = 1, n-1 ! loop over constraints
-          j = i + 1
+       DO i = 1, n-1 ! Loop over constraints
+          j = i + 1 ! Partner atom for this constraint
 
-          IF ( moved(i) .OR. moved(j) ) THEN ! test whether need to re-examine ij
+          IF ( moved(i) .OR. moved(j) ) THEN ! Test whether need to re-examine ij
              vij = v(:,i) - v(:,j)
              rij = r(:,i) - r(:,j)
              dot = DOT_PRODUCT ( rij, vij )
 
-             ! in the following formulae, inverse masses are all unity
+             ! In the following formulae, inverse masses are all unity
              g  = -dot / ( 2.0 * bond**2 )
 
-             IF ( ABS ( g ) > tol ) THEN ! test whether constraint already satisfied
+             IF ( ABS ( g ) > tol ) THEN ! Test whether constraint already satisfied
 
-                wc = wc + g * bond**2 ! contribution to virial
-                dv = rij * g          ! velocity adjustment
-                v(:,i) = v(:,i) + dv  ! adjust velocity i
-                v(:,j) = v(:,j) - dv  ! adjust velocity j
-                moving(i) = .TRUE.    ! flag that we moved i
-                moving(j) = .TRUE.    ! flag that we moved j
-                done = .FALSE.        ! flag that we moved something
+                wc      = wc + g * bond**2 ! Contribution to virial
+                dv      = rij * g          ! Velocity adjustment
+                v(:,i)  = v(:,i) + dv      ! Adjust velocity i
+                v(:,j)  = v(:,j) - dv      ! Adjust velocity j
+                move(i) = .TRUE.           ! Flag that we moved i
+                move(j) = .TRUE.           ! Flag that we moved j
+                done    = .FALSE.          ! Flag that we moved something
 
-             END IF ! end test whether constraint already satisfied
+             END IF ! End test whether constraint already satisfied
 
-          END IF ! end test whether need to re-examine ij
+          END IF ! End test whether need to re-examine ij
 
-       END DO ! end loop over constraints
+       END DO ! End loop over constraints
 
-       moved(:)  = moving(:)
-       moving(:) = .FALSE.
-
-       iter = iter + 1
+       ! Prepare for next iteration
+       moved(:) = move(:)
+       iter     = iter + 1
        IF ( iter > iter_max ) THEN
           WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Too many iterations', iter, iter_max
           STOP 'Error in rattle_b'
        END IF
 
-    END DO ! end iterative loop
+    END DO ! End iterative loop until done
 
-    wc = wc / (0.5*dt) / 3.0 ! scale factors for virial
+    wc = wc / (0.5*dt) / 3.0 ! Scale factors for virial
 
   END SUBROUTINE rattle_b
 
   FUNCTION worst_bond ( bond ) RESULT ( diff_max )
-    REAL, INTENT(in) :: bond
-    REAL             :: diff_max
+    REAL             :: diff_max ! Returns max amount by which constraint is violated
+    REAL, INTENT(in) :: bond     ! Bond length (the same throughout the chain)
 
     INTEGER            :: i
     REAL               :: diff
@@ -295,27 +314,34 @@ CONTAINS
 
     diff_max = 0.0
     DO i = 1, n-1
-       rij = r(:,i) - r(:,i+1)          ! current bond vector
-       diff = SQRT( SUM(rij**2) ) -bond ! amount by which constraint is violated
-       diff_max = MAX ( diff_max, diff )
+       rij      = r(:,i) - r(:,i+1)          ! Current bond vector
+       diff     = SQRT( SUM(rij**2) ) - bond ! Amount by which constraint is violated
+       diff_max = MAX ( diff_max, diff )     ! Find maximum
     END DO
   END FUNCTION worst_bond
 
-  SUBROUTINE milcshake_a ( dt, bond )
-    REAL, INTENT(in) :: dt, bond
+  SUBROUTINE milcshake_a ( dt, bond ) ! First part of velocity Verlet algorithm with constraints
+    REAL, INTENT(in) :: dt   ! Time step
+    REAL, INTENT(in) :: bond ! Bond length (the same throughout the chain)
 
-    INTEGER :: i, iter
-    REAL    :: max_error
-    LOGICAL :: done, info
+    ! This subroutine iteratively adjusts the positions stored in the array r
+    ! and the velocities stored in the array v, to satisfy the bond constraints
+    ! using a tri-diagonal solver: here we use dgtsv from LAPACK.
+    ! See AG Bailey, CP Lowe, and AP Sutton, J Comput Phys, 227, 8949 (2008)
+    ! and AG Bailey, CP Lowe, and AP Sutton, Comput Phys Commun, 180, 594 (2009)
+
+    INTEGER            :: i, iter
+    REAL               :: max_error
+    LOGICAL            :: info
     REAL,    PARAMETER :: tol = 1.0e-9
     INTEGER, PARAMETER :: iter_max = 500
 
-    v = v + 0.5 * dt * f ! Kick half-step
-    r_new = r + dt * v   ! Drift step
+    v     = v + 0.5 * dt * f ! Kick half-step
+    r_new = r + dt * v       ! Drift step
 
     ! Old and new (non-constrained) bond vectors
-    rij_old(:,1:n-1) = r(:,1:n-1)-r(:,2:n)
-    rij_new(:,1:n-1) = r_new(:,1:n-1)-r_new(:,2:n)
+    rij_old(:,1:n-1) = r(:,1:n-1) - r(:,2:n)
+    rij_new(:,1:n-1) = r_new(:,1:n-1) - r_new(:,2:n)
 
     ! Elements of tridiagonal matrix
     ! In this example, all masses are equal to unity
@@ -335,15 +361,16 @@ CONTAINS
 
     ! Set up rhs of constraint equation
     rijsq(:)  = SUM ( rij_new(:,:)**2, dim=1 )
-    max_error = MAXVAL ( ABS(rijsq-bond**2) )/( 2.0*bond**2 )
     rhs(:)    = bond**2 - rijsq(:)
     rhsold(:) = rhs(:)
 
     iter = 0
-    done = .FALSE.
 
-    DO ! iterative loop
-       IF ( done ) EXIT 
+    DO ! Iterative loop until done
+
+       ! Test for done
+       max_error = MAXVAL ( ABS ( rijsq - bond**2 ) ) / ( 2.0*bond**2 )
+       IF ( max_error <= tol ) EXIT 
 
        ! Reset tridiagonal elements (may have been over-written by solver)
        dl_tmp(:) = dl(:)
@@ -360,23 +387,20 @@ CONTAINS
        r(:,n) = r_new(:,n) - lambda(n-1)*rij_old(:,n-1)
 
        ! New bond vectors
-       rij(:,1:n-1) = r(:,1:n-1)-r(:,2:n)
+       rij(:,1:n-1) = r(:,1:n-1) - r(:,2:n)
 
        ! Prepare for next iteration
        rijsq(:)  = SUM ( rij(:,:)**2, dim=1 ) 
        rhs(:)    = bond**2 - rijsq(:) + rhsold(:)  
        rhsold(:) = rhs(:)               
 
-       max_error = MAXVAL ( ABS(rijsq-bond**2) )/( 2.0*bond**2 )
-       done      = ( max_error <= tol )                                
-
        iter = iter + 1
-       IF ( iter > iter_max ) then
+       IF ( iter > iter_max ) THEN
           WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Too many iterations', iter, iter_max
           STOP 'Error in milcshake_a'
        END IF
 
-    END DO
+    END DO ! End iterative loop until done
 
     ! Effect of constraints on velocities
     v(:,1) = v(:,1) + lambda(1)*rij_old(:,1)/dt
@@ -387,9 +411,17 @@ CONTAINS
 
   END SUBROUTINE milcshake_a
 
-  SUBROUTINE milcshake_b ( dt, bond, wc )
-    REAL, INTENT(in)  :: dt, bond
-    REAL, INTENT(out) :: wc
+  SUBROUTINE milcshake_b ( dt, bond, wc ) ! Second part of velocity Verlet algorithm with constraints
+    REAL, INTENT(in) :: dt   ! Time step
+    REAL, INTENT(in) :: bond ! Bond length (the same throughout the chain)
+    REAL, INTENT(out) :: wc  ! Constraint contribution to virial
+
+    ! This subroutine adjusts the velocities stored in the array v
+    ! to satisfy the time derivatives of the bond constraints
+    ! using a tri-diagonal solver: here we use dgtsv from LAPACK.
+    ! See AG Bailey, CP Lowe, and AP Sutton, J Comput Phys, 227, 8949 (2008)
+    ! and AG Bailey, CP Lowe, and AP Sutton, Comput Phys Commun, 180, 594 (2009)
+    ! Also returns constraint contribution to virial
 
     INTEGER :: i
     LOGICAL :: info

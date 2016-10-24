@@ -15,7 +15,7 @@ PROGRAM md_chain_nve_lj
 
   ! Takes in a configuration of atoms in a linear chain (positions, velocities)
   ! NO periodic boundary conditions, no box
-  ! Conducts molecular dynamics with constraints (RATTLE or MILCSHAKE)
+  ! Conducts molecular dynamics with constraints (RATTLE or MILC-SHAKE)
   ! Uses no special neighbour lists
 
   ! Reads several variables and options from standard input using a namelist nml
@@ -29,13 +29,14 @@ PROGRAM md_chain_nve_lj
   ! The model is defined in md_module
 
   ! Most important variables
-  REAL :: dt         ! time step
-  REAL :: bond       ! bond length
-  REAL :: pot        ! total potential energy
-  REAL :: kin        ! total kinetic energy
-  REAL :: temp_kinet ! kinetic temperature (LJ sigma=1 units, to be averaged)
-  REAL :: energy     ! total energy per atom (LJ sigma=1 units, to be averaged)
-  REAL :: wc         ! constraint virial (not used in this example)
+  REAL :: dt   ! Time step
+  REAL :: bond ! Bond length
+  REAL :: pot  ! Total potential energy
+  REAL :: wc   ! Constraint virial (not used in this example)
+
+  ! Quantities to be averaged
+  REAL :: tk ! Temperature (kinetic)
+  REAL :: en ! Internal energy per atom
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
 
@@ -53,6 +54,8 @@ PROGRAM md_chain_nve_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_chain'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE ensemble, chain molecule'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Uses a potential shifted to vanish smoothly at cutoff, no LRC'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'No periodic boundaries'
   CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
 
@@ -94,10 +97,11 @@ PROGRAM md_chain_nve_lj
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r, v ) ! Second call gets r and v
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
 
+  ! Calculate initial values and forces
   CALL force ( pot )
   call calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temp-Kinet' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N', 'T (kin)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -112,7 +116,7 @@ PROGRAM md_chain_nve_lj
 
         ! Calculate all variables for this step
         call calculate ( )
-        CALL blk_add ( [energy,temp_kinet] )
+        CALL blk_add ( [en,tk] )
 
      END DO ! End loop over steps
 
@@ -140,14 +144,27 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    kin        = 0.5*SUM(v**2)
-    energy     = ( pot + kin ) / REAL ( n )
-    temp_kinet = 2.0 * kin / REAL ( 2*(n-1) ) ! NB degrees of freedom = 3(n-1) - (n-1)
+    ! This routine calculates the properties of interest from total values
+    ! and optionally writes them out (e.g. at the start and end of the run)
+    ! In this example we simulate using a specified potential (e.g. WCA LJ)
+    ! which goes to zero smoothly at the cutoff to highlight energy conservation
+    ! so long-range corrections for cut-and-shift versions do not arise
+
+    REAL    :: kin  ! total kinetic energy
+    INTEGER :: free ! Number of degrees of freedom
+
+    kin = 0.5*SUM(v**2)
+    en  = ( pot + kin ) / REAL ( n )
+
+    free = 3 * n                     ! Three degrees of freedom per atom
+    free = free - (n-1)              ! Subtract n-1 constraints
+    free = free - 6                  ! Correct for angular and linear momentum conservation
+    tk   = 2.0 * kin / REAL ( free ) ! Kinetic temperature
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Total energy', energy
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'Temp-kinet',   temp_kinet
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'E/N',     en
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'T (kin)', tk
     END IF
 
   END SUBROUTINE calculate
