@@ -30,23 +30,27 @@ PROGRAM bd_nvt_lj
   ! The model is defined in md_module
 
   ! Most important variables
-  REAL :: box         ! box length
-  REAL :: density     ! density
-  REAL :: dt          ! time step
-  REAL :: r_cut       ! potential cutoff distance
-  REAL :: pot         ! total potential energy
-  REAL :: pot_sh      ! total shifted potential energy
-  REAL :: vir         ! total virial
-  REAL :: lap         ! total Laplacian
-  REAL :: temperature ! temperature (specified)
-  REAL :: pres_virial ! virial pressure (to be averaged)
-  REAL :: temp_kinet  ! kinetic temperature (to be averaged)
-  REAL :: temp_config ! configurational temperature (to be averaged)
-  REAL :: energy      ! total energy per atom (to be averaged)
-  REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
-  REAL :: gamma       ! friction coefficient
+  REAL :: box         ! Box length
+  REAL :: density     ! Density
+  REAL :: dt          ! Time step
+  REAL :: r_cut       ! Potential cutoff distance
+  REAL :: cut         ! Total cut (but not shifted) potential energy
+  REAL :: pot         ! Total cut-and-shifted potential energy
+  REAL :: vir         ! Total virial
+  REAL :: lap         ! Total Laplacian
+  REAL :: temperature ! Temperature (specified)
+  REAL :: gamma       ! Friction coefficient
+
+  ! Quantities to be averaged
+  REAL :: en_s    ! Internal energy (cut-and-shifted ) per atom
+  REAL :: p_s     ! Pressure (cut-and-shifted)
+  REAL :: en_f    ! Internal energy (full, including LRC) per atom
+  REAL :: p_f     ! Pressure (full, including LRC)
+  REAL :: tk      ! Kinetic temperature
+  REAL :: tc      ! Configurational temperature
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
+  LOGICAL :: overlap
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -96,10 +100,16 @@ PROGRAM bd_nvt_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
+  ! Initial forces, potential, etc plus overlap check
+  CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
+  IF ( overlap ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
+     STOP 'Error in bd_nvt_lj'
+  END IF
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temp-kinet', 'Temp-config', 'Virial Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N (cut&shift)', 'P (cut&shift)', &
+       &            'E/N (full)', 'P (full)', 'T (kin)', 'T (con)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -108,16 +118,21 @@ PROGRAM bd_nvt_lj
      DO stp = 1, nstep ! Begin loop over steps
 
         ! BAOAB algorithm
-        CALL b_propagator ( dt/2.0 )                      ! B kick half-step
-        CALL a_propagator ( dt/2.0 )                      ! A drift half-step
-        CALL o_propagator ( dt )                          ! O random velocities and friction step
-        CALL a_propagator ( dt/2.0 )                      ! A drift half-step
-        CALL force ( box, r_cut, pot, pot_sh, vir, lap )  ! Force evaluation
-        CALL b_propagator ( dt/2.0 )                      ! B kick half-step
+        CALL b_propagator ( dt/2.0 ) ! B kick half-step
+        CALL a_propagator ( dt/2.0 ) ! A drift half-step
+        CALL o_propagator ( dt )     ! O random velocities and friction step
+        CALL a_propagator ( dt/2.0 ) ! A drift half-step
 
-        ! Calculate all variables for this step
+        CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
+        IF ( overlap ) THEN
+           WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
+           STOP 'Error in bd_nvt_lj'
+        END IF
+
+        CALL b_propagator ( dt/2.0 ) ! B kick half-step
+
         CALL calculate ( )
-        CALL blk_add ( [energy,energy_sh,temp_kinet,temp_config,pres_virial] )
+        CALL blk_add ( [en_s,p_s,en_f,p_f,tk,tc] )
 
      END DO ! End loop over steps
 
@@ -129,7 +144,11 @@ PROGRAM bd_nvt_lj
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
+  CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
+  IF ( overlap ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
+     STOP 'Error in bd_nvt_lj'
+  END IF
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
@@ -176,26 +195,30 @@ CONTAINS
   END SUBROUTINE o_propagator
 
   SUBROUTINE calculate ( string )
-    USE md_module, ONLY : energy_lrc, pressure_lrc
+    USE md_module, ONLY : potential_lrc, pressure_lrc
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
     REAL :: kin
 
-    kin         = 0.5*SUM(v**2)
-    energy      = ( pot + kin ) / REAL ( n ) + energy_lrc ( density, r_cut )
-    energy_sh   = ( pot_sh + kin ) / REAL ( n )
-    temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-    temp_config = SUM ( f**2 ) / lap
-    pres_virial = density * temperature + vir / box**3 + pressure_lrc ( density, r_cut )
+    kin = 0.5*SUM(v**2)
+    tk  = 2.0 * kin / REAL ( 3*n )
+
+    en_s = ( pot + kin ) / REAL ( n )
+    en_f = ( cut + kin ) / REAL ( n ) + potential_lrc ( density, r_cut )
+    p_s  = density * temperature + vir / box**3
+    p_f  = p_s + pressure_lrc ( density, r_cut )
+
+    tc = SUM(f**2) / lap
 
     IF ( PRESENT ( string ) ) THEN ! output required
        WRITE ( unit=output_unit, fmt='(a)'           ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Energy',          energy
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Shifted energy',  energy_sh
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-kinet',      temp_kinet
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-config',     temp_config
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure', pres_virial
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut&shift)', en_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)',   p_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)',      en_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',        p_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)',         tk
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',         tc
     END IF
 
   END SUBROUTINE calculate

@@ -33,23 +33,30 @@ PROGRAM md_lj_mts
   ! The model is defined in md_module
 
   ! Most important variables
-  REAL :: box         ! box length
-  REAL :: density     ! density
-  REAL :: dt          ! time step (smallest)
-  REAL :: kin         ! total kinetic energy
-  REAL :: pres_virial ! virial pressure (to be averaged)
-  REAL :: temp_kinet  ! kinetic temperature (to be averaged)
-  REAL :: energy      ! total energy per atom (to be averaged)
-  REAL :: lambda      ! healing length for switch function
+  REAL :: box     ! Box length
+  REAL :: density ! Density
+  REAL :: dt      ! Time step (smallest)
+  REAL :: lambda  ! Healing length for switch function
 
-  INTEGER, PARAMETER        :: k_max = 3   ! number of shells
-  REAL,    DIMENSION(k_max) :: r_cut       ! cutoff distance for each shell
-  REAL,    DIMENSION(k_max) :: pot         ! total potential energy for each shell
-  REAL,    DIMENSION(k_max) :: vir         ! total virial for each shell
-  INTEGER, DIMENSION(k_max) :: n_mts       ! successive ratios of number of steps for each shell
+  INTEGER, PARAMETER        :: k_max = 3 ! Number of shells
+  REAL,    DIMENSION(k_max) :: r_cut     ! Cutoff distance for each shell
+  REAL,    DIMENSION(k_max) :: pot       ! Total cut-and-shifted potential energy for each shell
+  REAL,    DIMENSION(k_max) :: cut       ! Total cut (but not shifted) potential energy for each shell
+  REAL,    DIMENSION(k_max) :: vir       ! Total virial for each shell
+  REAL,    DIMENSION(k_max) :: lap       ! Total Laplacian for each shell
+  INTEGER, DIMENSION(k_max) :: n_mts     ! Successive ratios of number of steps for each shell
+
+  ! Quantities to be averaged
+  REAL :: en_s ! Internal energy (cut-and-shifted) per atom
+  REAL :: p_s  ! Pressure (cut-and-shifted)
+  REAL :: en_f ! Internal energy (full, including LRC) per atom
+  REAL :: p_f  ! Pressure (full, including LRC)
+  REAL :: tk   ! Kinetic temperature
+  REAL :: tc   ! Configurational temperature
 
   INTEGER :: blk, stp1, stp2, stp3, nstep, nblock, k, ioerr
   REAL    :: pairs
+  LOGICAL :: overlap
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -127,19 +134,18 @@ PROGRAM md_lj_mts
 
   r(:,:) = r(:,:) - ANINT ( r(:,:) / box ) * box ! Periodic boundaries
 
-  ! Calculate forces and pot, vir contributions for each shell
+  ! Calculate initial forces and pot, vir contributions for each shell
   DO k = 1, k_max
-     CALL force ( box, r_cut, lambda, k, pot(k), vir(k) )
+     CALL force ( box, r_cut, lambda, k, pot(k), cut(k), vir(k), lap(k), overlap )
+     IF ( overlap ) THEN
+        WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
+        STOP 'Error in md_lj_mts'
+     END IF
   END DO
-  kin         = 0.5*SUM(v**2)
-  energy      = ( SUM(pot) + kin ) / REAL ( n )
-  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-  pres_virial = density * temp_kinet + SUM(vir) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial total energy',    energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial temp-kinet',      temp_kinet
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial virial pressure', pres_virial
+  CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temp-Kinet', 'Virial Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N (cut&shift)', 'P (cut&shift)', &
+       &            'E/N (full)', 'P (full)', 'T (kin)', 'T (con)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -149,39 +155,53 @@ PROGRAM md_lj_mts
 
      DO stp3 = 1, nstep ! Begin loop over steps
 
-        ! Outer shell 3: a single step of size n_mts(3) * n_mts(2) * dt
-        v(:,:) = v(:,:) + 0.5 * n_mts(3) * n_mts(2) * dt * f(:,:,3) ! Kick half-step (outer shell)
+        ! Outer shell 3: a single step of size n_mts(3)*n_mts(2)*dt
 
-        DO stp2 = 1, n_mts(3) ! Middle shell 2: n_mts(3) steps of size n_mts(2) * dt
+        CALL kick_propagator ( 0.5*n_mts(3)*n_mts(2)*dt, 3 ) ! Kick half-step (outer shell)
 
-           v(:,:) = v(:,:) + 0.5 * n_mts(2) * dt * f(:,:,2) ! Kick half-step (middle shell)
+        DO stp2 = 1, n_mts(3) ! Middle shell 2: n_mts(3) steps of size n_mts(2)*dt
 
-           DO stp1 = 1, n_mts(2) ! Inner shell 1: n_mts(3) * n_mts(2) steps of size dt
+           CALL kick_propagator ( 0.5*n_mts(2)*dt, 2 ) ! Kick half-step (middle shell)
 
-              v(:,:) = v(:,:) + 0.5 * dt * f(:,:,1)                ! Kick half-step (inner shell)
-              r(:,:) = r(:,:) + dt * v(:,:)                        ! Drift step
-              r(:,:) = r(:,:) - ANINT ( r(:,:)/box ) * box         ! Periodic boundaries
-              CALL force ( box, r_cut, lambda, 1, pot(1), vir(1) ) ! Force evaluation (inner shell)
-              v(:,:) = v(:,:) + 0.5 * dt * f(:,:,1)                ! Kick half-step (inner shell)
+           DO stp1 = 1, n_mts(2) ! Inner shell 1: n_mts(3)*n_mts(2) steps of size dt
+
+              CALL kick_propagator ( 0.5*dt, 1 ) ! Kick half-step (inner shell)
+
+              CALL drift_propagator ( dt )                 ! Drift step
+              r(:,:) = r(:,:) - ANINT ( r(:,:)/box ) * box ! Periodic boundaries
+
+              CALL force ( box, r_cut, lambda, 1, pot(1), cut(1), vir(1), lap(1), overlap )
+              IF ( overlap ) THEN
+                 WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
+                 STOP 'Error in md_lj_mts'
+              END IF
+
+              CALL kick_propagator ( 0.5*dt, 1 ) ! Kick half-step (inner shell)
 
            END DO ! End inner shell 1
 
-           CALL force ( box, r_cut, lambda, 2, pot(2), vir(2) ) ! Force evaluation (middle shell)
-           v(:,:) = v(:,:) + 0.5 * n_mts(2) * dt * f(:,:,2)     ! Kick half-step (middle shell)
+           CALL force ( box, r_cut, lambda, 2, pot(2), cut(2), vir(2), lap(2), overlap )
+           IF ( overlap ) THEN ! Highly unlikely for middle shell
+              WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
+              STOP 'Highly unlikely error in md_lj_mts'
+           END IF
+
+           CALL kick_propagator ( 0.5*n_mts(2)*dt, 2 ) ! Kick half-step (middle shell)
 
         END DO ! End middle shell 2
 
-        CALL force ( box, r_cut, lambda, 3, pot(3), vir(3) )        ! Force evaluation (outer shell)
-        v(:,:) = v(:,:) + 0.5 * n_mts(3) * n_mts(2) * dt * f(:,:,3) ! Kick half-step (outer shell)
+        CALL force ( box, r_cut, lambda, 3, pot(3), cut(3), vir(3), lap(3), overlap )
+        IF ( overlap ) THEN ! Extremely unlikely for outer shell
+           WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
+           STOP 'Extremely unlikely error in md_lj_mts'
+        END IF
+
+        CALL kick_propagator ( 0.5*n_mts(3)*n_mts(2)*dt, 3 ) ! Kick half-step (outer shell)
+
         ! End outer shell 3
 
-        kin         = 0.5*SUM(v**2)
-        energy      = ( SUM(pot) + kin ) / REAL ( n )
-        temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-        pres_virial = density * temp_kinet + SUM(vir) / box**3
-
-        ! Calculate all variables for this step
-        CALL blk_add ( [energy,temp_kinet,pres_virial] )
+        CALL calculate ( )
+        CALL blk_add ( [en_s,p_s,en_f,p_f,tk,tc] )
 
      END DO ! End loop over steps
 
@@ -194,21 +214,72 @@ PROGRAM md_lj_mts
   CALL run_end ( output_unit )
 
   DO k = 1, k_max
-     CALL force ( box, r_cut, lambda, k, pot(k), vir(k) )
+     CALL force ( box, r_cut, lambda, k, pot(k), cut(k), vir(k), lap(k), overlap )
+     IF ( overlap ) THEN
+        WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
+        STOP 'Error in md_lj_mts'
+     END IF
   END DO
-  kin         = 0.5*SUM(v**2)
-  energy      = ( SUM(pot) + kin ) / REAL ( n )
-  temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-  pres_virial = density * temp_kinet + SUM(vir) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final total energy',    energy
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final temp-kinet',      temp_kinet
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final virial pressure', pres_virial
+  CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r, v )
 
   CALL deallocate_arrays
   CALL conclusion ( output_unit )
+
+CONTAINS
+
+  SUBROUTINE kick_propagator ( t, k )
+    IMPLICIT NONE
+    REAL,    INTENT(in) :: t ! Timestep (typically half the current timestep)
+    INTEGER, INTENT(in) :: k ! Force array shell
+
+    v(:,:) = v(:,:) + t * f(:,:,k)
+
+  END SUBROUTINE kick_propagator
+
+  SUBROUTINE drift_propagator ( t )
+    IMPLICIT NONE
+    REAL, INTENT(in) :: t ! Timestep (typically dt)
+
+    r(:,:) = r(:,:) + t * v(:,:) 
+
+  END SUBROUTINE drift_propagator
+
+  SUBROUTINE calculate ( string ) 
+    USE md_module, ONLY : potential_lrc, pressure_lrc, hessian
+    IMPLICIT NONE
+    CHARACTER (len=*), INTENT(in), OPTIONAL :: string
+
+    ! This routine calculates variables of interest and (optionally) writes them out
+
+    REAL :: fsq, beta, kin
+
+    kin = 0.5*SUM(v**2)
+    tk  = 2.0 * kin / REAL ( 3*(n-1) )
+
+    ! Sum potential terms and virial over shells to get totals
+    en_s = ( SUM(pot) + kin ) / REAL ( n ) 
+    en_f = ( SUM(cut) + kin ) / REAL ( n ) + potential_lrc ( density, r_cut(k_max) )
+    p_s  = density * tk + SUM(vir) / box**3
+    p_f  = p_s + pressure_lrc ( density, r_cut(k_max) )
+
+    fsq  = SUM ( SUM(f,dim=3)**2 ) ! Sum forces over shells before squaring
+    beta = ( SUM(lap) / fsq ) - 2.0*hessian ( box, r_cut(k_max) ) / (fsq**2) ! include 1/N Hessian correction
+    tc   = 1.0 / beta
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut&shift)', en_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)',   p_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)',      en_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',        p_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)',         tk
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',         tc
+    END IF
+
+  END SUBROUTINE calculate
 
 END PROGRAM md_lj_mts
 

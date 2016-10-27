@@ -35,6 +35,7 @@ MODULE md_module
 CONTAINS
 
   SUBROUTINE introduction ( output_unit )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)' ) 'WCA shifted Lennard-Jones potential'
@@ -45,11 +46,13 @@ CONTAINS
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion ( output_unit )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays
+    IMPLICIT NONE
     ALLOCATE ( r(3,n), v(3,n), f(3,n), g(3,n), r_old(3,n), r_new(3,n) )
     ALLOCATE ( move(n), moved(n) )
     ALLOCATE ( rij(3,n-1), rij_old(3,n-1), rij_new(3,n-1), vij(3,n-1) )
@@ -59,6 +62,7 @@ CONTAINS
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
+    IMPLICIT NONE
     DEALLOCATE ( r, v, f, g, r_old, r_new )
     DEALLOCATE ( move, moved )
     DEALLOCATE ( rij, rij_old, rij_new, vij )
@@ -68,6 +72,7 @@ CONTAINS
   END SUBROUTINE deallocate_arrays
 
   SUBROUTINE force ( pot )
+    IMPLICIT NONE
     REAL, INTENT(out) :: pot ! total potential energy
 
     ! Calculates shifted WCA LJ potential for atomic chain (omitting bonded neighbours)
@@ -117,6 +122,7 @@ CONTAINS
   END SUBROUTINE force
 
   SUBROUTINE spring ( k_spring, bond, pot_h )
+    IMPLICIT NONE
     REAL, INTENT(in)  :: k_spring ! spring force constant
     REAL, INTENT(in)  :: bond     ! spring bond length
     REAL, INTENT(out) :: pot_h    ! total harmonic spring potential energy
@@ -159,7 +165,7 @@ CONTAINS
 
     ! This subroutine iteratively adjusts the positions stored in the array r
     ! and the velocities stored in the array v, to satisfy the bond constraints
-    
+
     REAL, DIMENSION(3) :: rij, rij_old, dr
     LOGICAL            :: done
     REAL               :: diffsq, dot, g
@@ -305,6 +311,7 @@ CONTAINS
   END SUBROUTINE rattle_b
 
   FUNCTION worst_bond ( bond ) RESULT ( diff_max )
+    IMPLICIT NONE
     REAL             :: diff_max ! Returns max amount by which constraint is violated
     REAL, INTENT(in) :: bond     ! Bond length (the same throughout the chain)
 
@@ -321,6 +328,7 @@ CONTAINS
   END FUNCTION worst_bond
 
   SUBROUTINE milcshake_a ( dt, bond ) ! First part of velocity Verlet algorithm with constraints
+    IMPLICIT NONE
     REAL, INTENT(in) :: dt   ! Time step
     REAL, INTENT(in) :: bond ! Bond length (the same throughout the chain)
 
@@ -412,6 +420,7 @@ CONTAINS
   END SUBROUTINE milcshake_a
 
   SUBROUTINE milcshake_b ( dt, bond, wc ) ! Second part of velocity Verlet algorithm with constraints
+    IMPLICIT NONE
     REAL, INTENT(in) :: dt   ! Time step
     REAL, INTENT(in) :: bond ! Bond length (the same throughout the chain)
     REAL, INTENT(out) :: wc  ! Constraint contribution to virial

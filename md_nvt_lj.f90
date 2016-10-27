@@ -32,30 +32,34 @@ PROGRAM md_nvt_lj
   ! The model is defined in md_module
 
   ! Most important variables
-  REAL :: box         ! box length
-  REAL :: density     ! density
-  REAL :: dt          ! time step
-  REAL :: r_cut       ! potential cutoff distance
-  REAL :: temperature ! specified temperature
-  REAL :: g           ! number of degrees of freedom
-  REAL :: conserved   ! conserved energy-like quantity
-  REAL :: tau         ! thermostat time scale
-  REAL :: pot         ! total potential energy
-  REAL :: pot_sh      ! total shifted potential energy
-  REAL :: vir         ! total virial
-  REAL :: lap         ! total Laplacian
-  REAL :: pres_virial ! virial pressure (to be averaged)
-  REAL :: temp_kinet  ! kinetic temperature (to be averaged)
-  REAL :: temp_config ! configurational temperature (to be averaged)
-  REAL :: energy      ! total energy per atom (to be averaged)
-  REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
+  REAL :: box         ! Box length
+  REAL :: density     ! Density
+  REAL :: dt          ! Time step
+  REAL :: r_cut       ! Potential cutoff distance
+  REAL :: temperature ! Specified temperature
+  REAL :: g           ! Number of degrees of freedom
+  REAL :: tau         ! Thermostat time scale
+  REAL :: cut         ! Total cut (but not shifted) potential energy
+  REAL :: pot         ! Total cut-and-shifted potential energy
+  REAL :: vir         ! Total virial
+  REAL :: lap         ! Total Laplacian
 
   INTEGER, PARAMETER    :: m = 3 ! number of Nose-Hoover chain variables
   REAL,    DIMENSION(m) :: q     ! thermal inertias
   REAL,    DIMENSION(m) :: eta   ! thermal coordinates (needed only to calculate conserved quantity)
   REAL,    DIMENSION(m) :: p_eta ! thermal momenta
 
+  ! Quantities to be averaged
+  REAL :: en_s    ! Internal energy (cut-and-shifted ) per atom
+  REAL :: p_s     ! Pressure (cut-and-shifted)
+  REAL :: en_f    ! Internal energy (full, including LRC) per atom
+  REAL :: p_f     ! Pressure (full, including LRC)
+  REAL :: tk      ! Kinetic temperature
+  REAL :: tc      ! Configurational temperature
+  REAL :: cn      ! Conserved energy-like quantity per atom
+
   INTEGER :: blk, stp, nstep, nblock, ioerr
+  LOGICAL :: overlap
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -115,11 +119,16 @@ PROGRAM md_nvt_lj
   CALL random_normals ( 0.0, SQRT(temperature), p_eta(:)  )
   p_eta(:) = p_eta(:) * SQRT(q(:))
 
-  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
+  ! Initial forces, potential, etc plus overlap check
+  CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
+  IF ( overlap ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
+     STOP 'Error in md_nvt_lj'
+  END IF
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Conserved', 'Energy', 'Shifted Energy', &
-       &                                  'Temp-Kinet', 'Temp-Config', 'Virial Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N (cut&shift)', 'P (cut&shift)', &
+       &            'E/N (full)', 'P (full)',  'T (kin)', 'T (con)', 'Cons/N' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -127,23 +136,29 @@ PROGRAM md_nvt_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        CALL u4 ( dt/4.0, m, 1 )
-        CALL u3 ( dt/2.0 )
-        CALL u4 ( dt/4.0, 1, m )
+        CALL u4_propagator ( dt/4.0, m, 1 )
+        CALL u3_propagator ( dt/2.0 )
+        CALL u4_propagator ( dt/4.0, 1, m )
 
-        CALL u2 ( dt/2.0 )
-        CALL u1 ( dt )
-        CALL force ( box, r_cut, pot, pot_sh, vir, lap )
-        CALL u2 ( dt/2.0 )
+        CALL u2_propagator ( dt/2.0 )
+        CALL u1_propagator ( dt )
 
-        CALL u4 ( dt/4.0, m, 1 )
-        CALL u3 ( dt/2.0 )
-        CALL u4 ( dt/4.0, 1, m )
+        CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
+        IF ( overlap ) THEN
+           WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
+           STOP 'Error in md_nvt_lj'
+        END IF
+
+        CALL u2_propagator ( dt/2.0 )
+
+        CALL u4_propagator ( dt/4.0, m, 1 )
+        CALL u3_propagator ( dt/2.0 )
+        CALL u4_propagator ( dt/4.0, 1, m )
 
         CALL calculate ( )
 
         ! Calculate all variables for this step
-        CALL blk_add ( [conserved,energy,energy_sh,temp_kinet,temp_config,pres_virial] )
+        CALL blk_add ( [en_s,p_s,en_f,p_f,tk,tc,cn] )
 
      END DO ! End loop over steps
 
@@ -155,7 +170,11 @@ PROGRAM md_nvt_lj
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
+  CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
+  IF ( overlap ) THEN ! should never happen
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
+     STOP 'Error in md_nvt_lj'
+  END IF
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
@@ -166,36 +185,36 @@ PROGRAM md_nvt_lj
 
 CONTAINS
 
-  SUBROUTINE u1 ( t ) ! U1: velocity Verlet drift step propagator
+  SUBROUTINE u1_propagator ( t ) ! U1: velocity Verlet drift step propagator
     IMPLICIT NONE
-    REAL, INTENT(in) :: t ! time over which to propagate (typically dt)
+    REAL, INTENT(in) :: t ! Time over which to propagate (typically dt)
 
-    r(:,:) = r(:,:) + t * v(:,:) / box  ! positions in box=1 units
-    r(:,:) = r(:,:) - ANINT ( r(:,:) )  ! periodic boundaries
+    r(:,:) = r(:,:) + t * v(:,:) / box  ! Positions in box=1 units
+    r(:,:) = r(:,:) - ANINT ( r(:,:) )  ! Periodic boundaries
 
-  END SUBROUTINE u1
+  END SUBROUTINE u1_propagator
 
-  SUBROUTINE u2 ( t ) ! U2: velocity Verlet kick step propagator
+  SUBROUTINE u2_propagator ( t ) ! U2: velocity Verlet kick step propagator
     IMPLICIT NONE
-    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
+    REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
 
     v(:,:) = v(:,:) + t * f(:,:)
 
-  END SUBROUTINE u2
+  END SUBROUTINE u2_propagator
 
-  SUBROUTINE u3 ( t ) ! U3: thermostat propagator
+  SUBROUTINE u3_propagator ( t ) ! U3: thermostat propagator
     IMPLICIT NONE
-    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
+    REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
 
     v(:,:) = v(:,:) * EXP ( -t * p_eta(1) / q(1) )
     eta(:) = eta(:) + t * p_eta(:) / q(:)
 
-  END SUBROUTINE u3
+  END SUBROUTINE u3_propagator
 
-  SUBROUTINE u4 ( t, j_start, j_stop ) ! U4: thermostat propagator
+  SUBROUTINE u4_propagator ( t, j_start, j_stop ) ! U4: thermostat propagator
     IMPLICIT NONE
-    REAL,    INTENT(in) :: t               ! time over which to propagate (typically dt/4)
-    INTEGER, INTENT(in) :: j_start, j_stop ! order in which to tackle variables
+    REAL,    INTENT(in) :: t               ! Time over which to propagate (typically dt/4)
+    INTEGER, INTENT(in) :: j_start, j_stop ! Order in which to tackle variables
 
     INTEGER         :: j, j_stride
     REAL            :: gj, x, c
@@ -207,56 +226,68 @@ CONTAINS
        j_stride = 1
     END IF
 
-    DO j = j_start, j_stop, j_stride ! loop over each momentum in turn
+    DO j = j_start, j_stop, j_stride ! Loop over each momentum in turn
 
-       IF ( j == 1 ) THEN ! the driver Gj for p_eta(1) is different
+       IF ( j == 1 ) THEN ! The driver Gj for p_eta(1) is different
           gj = SUM(v**2) - g*temperature
        ELSE
           gj = ( p_eta(j-1)**2 / q(j-1) ) - temperature
        END IF
 
-       IF ( j == m ) THEN ! the equation for p_eta(M) is different
+       IF ( j == m ) THEN ! The equation for p_eta(M) is different
+
           p_eta(j)  = p_eta(j) + t * gj
+
        ELSE
+
           x = t * p_eta(j+1)/q(j+1)
-          IF ( x < 0.001 ) THEN ! guard against small values
+
+          IF ( x < 0.001 ) THEN ! Guard against small values
              c = 1.0 + x * ( c1 + x * ( c2 + x * c3 ) ) ! Taylor series to order 3
           ELSE
              c = (1.0-EXP(-x))/x
-          END IF ! end guard against small values
+          END IF ! End guard against small values
+
           p_eta(j) = p_eta(j)*EXP(-x) + t * gj * c
+
        END IF
 
-    END DO ! end loop over each momentum in turn
+    END DO ! End loop over each momentum in turn
 
-  END SUBROUTINE u4
+  END SUBROUTINE u4_propagator
 
   SUBROUTINE calculate ( string )
-    USE md_module, ONLY : energy_lrc, pressure_lrc
+    USE md_module, ONLY : potential_lrc, pressure_lrc
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
     ! This routine calculates variables of interest and (optionally) writes them out
 
     REAL :: kin
-    
-    kin         = 0.5*SUM(v**2)
-    conserved   = pot_sh + kin + SUM(0.5*p_eta**2/q) + temperature*(g*eta(1)+SUM(eta(2:m)))
-    conserved   = conserved / REAL(n)
-    temp_kinet  = 2.0 * kin / g
-    temp_config = SUM(f**2) / lap
-    energy      = ( pot + kin ) / REAL ( n ) + energy_lrc ( density, r_cut )
-    energy_sh   = ( pot_sh + kin ) / REAL ( n )
-    pres_virial = density * temperature + vir / box**3 + pressure_lrc ( density, r_cut )
+
+    kin = 0.5*SUM(v**2)
+    tk  = 2.0 * kin / g
+
+    en_s = ( pot + kin ) / REAL ( n )
+    en_f = ( cut + kin ) / REAL ( n ) + potential_lrc ( density, r_cut )
+    p_s  = density * temperature + vir / box**3
+    p_f  = p_s + pressure_lrc ( density, r_cut )
+
+    tc = SUM(f**2) / lap
+
+    cn = pot + kin + SUM(0.5*p_eta**2/q)
+    cn = cn + temperature * ( g*eta(1) + SUM(eta(2:m)) )
+    cn = cn / REAL(n)
 
     IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Conserved quantity', conserved
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Total energy',       energy
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Shifted energy',     energy_sh
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-kinet',         temp_kinet
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-config',        temp_config
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure',    pres_virial
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut&shift)', en_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)',   p_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)',      en_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',        p_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)',         tk
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',         tc
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Cons/N',          cn
     END IF
 
   END SUBROUTINE calculate

@@ -11,13 +11,10 @@ PROGRAM md_nvt_lj_le
 
   IMPLICIT NONE
 
-  ! MPA TODO: double check this program!!!
-  
   ! Takes in a configuration of atoms (positions, velocities)
   ! Cubic periodic boundary conditions, with Lees-Edwards shear
   ! Conducts molecular dynamics, SLLOD algorithm, with isokinetic thermostat
   ! Refs: Pan et al J Chem Phys 122 094114 (2005)
-  ! Uses no special neighbour lists
 
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
@@ -31,22 +28,27 @@ PROGRAM md_nvt_lj_le
   ! The model is defined in md_module
 
   ! Most important variables
-  REAL :: box         ! box length
-  REAL :: density     ! density
-  REAL :: dt          ! time step
-  REAL :: strain_rate ! strain_rate (velocity gradient) dv_x/dr_y
-  REAL :: strain      ! strain (integrated velocity gradient) dr_x/dr_y
-  REAL :: r_cut       ! potential cutoff distance
-  REAL :: pot         ! total potential energy
-  REAL :: pot_sh      ! total shifted potential energy
-  REAL :: vir         ! total virial
-  REAL :: pres_virial ! virial pressure (to be averaged)
-  REAL :: temp_kinet  ! kinetic temperature (to be averaged)
-  REAL :: energy      ! total energy per atom (to be averaged)
-  REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
+  REAL :: box         ! Box length
+  REAL :: density     ! Density
+  REAL :: dt          ! Time step
+  REAL :: strain_rate ! Strain_rate (velocity gradient) dv_x/dr_y
+  REAL :: strain      ! Strain (integrated velocity gradient) dr_x/dr_y
+  REAL :: r_cut       ! Potential cutoff distance
+  REAL :: pot         ! Total cut-and-shifted potential energy
+  REAL :: cut         ! Total cut (but not shifted) potential energy
+  REAL :: vir         ! Total virial
+  REAL :: lap         ! Total Laplacian
+
+  ! Quantities to be averaged
+  REAL :: en_s ! Internal energy (cut-and-shifted) per atom
+  REAL :: p_s  ! Pressure (cut-and-shifted)
+  REAL :: en_f ! Internal energy (full, including LRC) per atom
+  REAL :: p_f  ! Pressure (full, including LRC)
+  REAL :: tk   ! Kinetic temperature
+  REAL :: tc   ! Configurational temperature
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
-  REAL    :: c1, c2, alpha, beta, e, h, d_strain, dt_factor, prefactor
+  LOGICAL :: overlap
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -80,7 +82,6 @@ PROGRAM md_nvt_lj_le
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Strain rate',               strain_rate
 
-  ! For simplicity we assume that input configuration has strain = 0
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
@@ -97,11 +98,16 @@ PROGRAM md_nvt_lj_le
   r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain ! Extra correction (box=1 units)
   r(:,:) = r(:,:) - ANINT ( r(:,:) )          ! Periodic boundaries (box=1 units)
 
-  CALL force ( box, r_cut, strain, pot, pot_sh, vir )
-
+  ! Initial forces, potential, etc plus overlap check
+  CALL force ( box, r_cut, strain, pot, cut, vir, lap, overlap )
+  IF ( overlap ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
+     STOP 'Error in md_nvt_lj_le'
+  END IF
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temp-Kinet', 'Virial Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N (cut&shift)', 'P (cut&shift)', &
+       &            'E/N (full)', 'P (full)', 'T (kin)', 'T (con)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -111,52 +117,22 @@ PROGRAM md_nvt_lj_le
 
         ! Isokinetic SLLOD algorithm (Pan et al)
 
-        ! Operator A for half a step
-        d_strain = 0.5 * dt * strain_rate            ! change in strain (dimensionless)
-        r(1,:)   = r(1,:) + d_strain * r(2,:)        ! Extra strain term
-        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:) / box  ! Drift half-step (positions in box=1 units)
-        strain   = strain + d_strain                 ! Advance boundaries
+        CALL a_propagator  ( dt/2.0)
+        CALL b1_propagator ( dt/2.0 )
 
-        r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain   ! Extra correction (box=1 units)
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )            ! Periodic boundaries (box=1 units)
+        CALL force ( box, r_cut, strain, pot, cut, vir, lap, overlap )
+        IF ( overlap ) THEN
+           WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
+           STOP 'Error in md_nvt_lj_le'
+        END IF
 
-        ! Operator B1 for half a step
-        d_strain = 0.5*dt * strain_rate
-        c1       = d_strain * SUM ( v(1,:)*v(2,:) ) / SUM ( v(:,:)**2 )
-        c2       = ( d_strain**2 ) * SUM ( v(2,:)**2 ) / SUM ( v(:,:)**2 )
-        v(1,:)   = v(1,:) - d_strain*v(2,:)
-        v(:,:)   = v(:,:) / SQRT ( 1.0 - 2.0*c1 + c2 )
-        
-        CALL force ( box, r_cut, strain, pot, pot_sh, vir ) ! Force evaluation
-
-        ! Operator B2 for a full step
-        alpha     = SUM ( f(:,:)*v(:,:) ) / SUM ( v(:,:)**2 )
-        beta      = SQRT ( SUM ( f(:,:)**2 ) / SUM ( v(:,:)**2 ) )
-        h         = ( alpha + beta ) / ( alpha - beta )
-        e         = EXP ( -beta * dt )
-        dt_factor = ( 1 + h - e - h / e ) / ( ( 1 - h ) * beta )
-        prefactor = ( 1 - h ) / ( e - h / e )
-        v(:,:)    = prefactor * ( v(:,:) + dt_factor * f(:,:) )
-
-        ! Operator B1 for half a step
-        d_strain = 0.5*dt * strain_rate
-        c1       = d_strain * SUM ( v(1,:)*v(2,:) ) / SUM ( v(:,:)**2 )
-        c2       = (d_strain**2 ) * SUM ( v(2,:)**2 ) / SUM ( v(:,:)**2 )
-        v(1,:)   = v(1,:) - d_strain*v(2,:)
-        v(:,:)   = v(:,:) / SQRT ( 1.0 - 2.0*c1 + c2 )
-
-        ! Operator A for half a step
-        d_strain = 0.5 * dt * strain_rate           ! change in strain (dimensionless)
-        r(1,:)   = r(1,:) + d_strain * r(2,:)       ! Extra strain term
-        r(:,:)   = r(:,:) + 0.5 * dt * v(:,:) / box ! Drift half-step (positions in box=1 units)
-        strain   = strain + d_strain                ! Advance boundaries
-
-        r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain   ! Extra correction (box=1 units)
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )            ! Periodic boundaries (box=1 units)
+        CALL b2_propagator ( dt )
+        CALL b1_propagator ( dt/2.0 )
+        CALL a_propagator  ( dt/2.0 )
 
         ! Calculate all variables for this step
         CALL calculate ( )
-        CALL blk_add ( [energy,energy_sh,temp_kinet,pres_virial] )
+        CALL blk_add ( [en_s,p_s,en_f,p_f,tk,tc] )
 
      END DO ! End loop over steps
 
@@ -168,7 +144,11 @@ PROGRAM md_nvt_lj_le
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, r_cut, strain, pot, pot_sh, vir )
+  CALL force ( box, r_cut, strain, pot, cut, vir, lap, overlap )
+  IF ( overlap ) THEN ! should never happen
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
+     STOP 'Error in md_nvt_lj_le'
+  END IF
   CALL calculate ( 'Final values' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
@@ -179,27 +159,84 @@ PROGRAM md_nvt_lj_le
 
 CONTAINS
 
+  SUBROUTINE a_propagator ( t ) ! A propagator
+    IMPLICIT NONE
+    REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
+
+    REAL :: x
+
+    x = t * strain_rate ! Change in strain (dimensionless)
+
+    r(1,:) = r(1,:) + x * r(2,:)        ! Extra strain term
+    r(:,:) = r(:,:) + t * v(:,:) / box  ! Drift half-step (positions in box=1 units)
+    strain = strain + x                 ! Advance strain and hence boundaries
+
+    r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain ! Extra PBC correction (box=1 units)
+    r(:,:) = r(:,:) - ANINT ( r(:,:) )          ! Periodic boundaries (box=1 units)
+
+  END SUBROUTINE a_propagator
+
+  SUBROUTINE b1_propagator ( t ) ! B1 propagator
+    IMPLICIT NONE
+    REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
+
+    REAL :: x, c1, c2
+    
+    x = t * strain_rate ! Change in strain (dimensionless)
+
+    c1 = x * SUM ( v(1,:)*v(2,:) ) / SUM ( v(:,:)**2 )
+    c2 = ( x**2 ) * SUM ( v(2,:)**2 ) / SUM ( v(:,:)**2 )
+
+    v(1,:) = v(1,:) - x*v(2,:)
+    v(:,:) = v(:,:) / SQRT ( 1.0 - 2.0*c1 + c2 )
+
+  END SUBROUTINE b1_propagator
+
+  SUBROUTINE b2_propagator ( t ) ! B2 propagator
+    IMPLICIT NONE
+    REAL, INTENT(in) :: t ! Time over which to propagate (typically dt)
+
+    REAL :: alpha, beta, h, e, dt_factor, prefactor
+    
+    alpha = SUM ( f(:,:)*v(:,:) ) / SUM ( v(:,:)**2 )
+    beta  = SQRT ( SUM ( f(:,:)**2 ) / SUM ( v(:,:)**2 ) )
+    h     = ( alpha + beta ) / ( alpha - beta )
+    e     = EXP ( -beta * t )
+
+    dt_factor = ( 1 + h - e - h / e ) / ( ( 1 - h ) * beta )
+    prefactor = ( 1 - h ) / ( e - h / e )
+
+    v(:,:) = prefactor * ( v(:,:) + dt_factor * f(:,:) )
+
+  END SUBROUTINE b2_propagator
+
   SUBROUTINE calculate ( string ) 
-    USE md_module, ONLY : energy_lrc, pressure_lrc
+    USE md_module, ONLY : potential_lrc, pressure_lrc
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
     ! This routine calculates variables of interest and (optionally) writes them out
 
     REAL :: kin
-    
-    kin         = 0.5*SUM(v**2)
-    energy      = ( pot + kin ) / REAL ( n ) + energy_lrc ( density, r_cut )
-    energy_sh   = ( pot_sh + kin ) / REAL ( n )
-    temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-    pres_virial = density * temp_kinet + vir / box**3 + pressure_lrc ( density, r_cut )
+
+    kin = 0.5*SUM(v**2) ! NB v(:,:) are taken to be peculiar velocities
+    tk  = 2.0 * kin / REAL ( 3*(n-1) )
+
+    en_s = ( pot + kin ) / REAL ( n )
+    en_f = ( cut + kin ) / REAL ( n ) + potential_lrc ( density, r_cut )
+    p_s  = density * tk + vir / box**3
+    p_f  = p_s + pressure_lrc ( density, r_cut )
+
+    tc = SUM(f**2) / lap
 
     IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Total energy',    energy
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Shifted energy',  energy_sh
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-kinet',      temp_kinet
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure', pres_virial
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut&shift)', en_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)',   p_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)',      en_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',        p_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)',         tk
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',         tc
     END IF
 
   END SUBROUTINE calculate

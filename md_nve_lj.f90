@@ -28,21 +28,25 @@ PROGRAM md_nve_lj
   ! The model is defined in md_module
 
   ! Most important variables
-  REAL :: box         ! box length
-  REAL :: density     ! density
-  REAL :: dt          ! time step
-  REAL :: r_cut       ! potential cutoff distance
-  REAL :: pot         ! total potential energy
-  REAL :: pot_sh      ! total shifted potential energy
-  REAL :: vir         ! total virial
-  REAL :: lap         ! total Laplacian
-  REAL :: pres_virial ! virial pressure (to be averaged)
-  REAL :: temp_kinet  ! kinetic temperature (to be averaged)
-  REAL :: temp_config ! configurational temperature (to be averaged)
-  REAL :: energy      ! total energy per atom (to be averaged)
-  REAL :: energy_sh   ! total shifted energy per atom (to be averaged)
+  REAL :: box     ! Box length
+  REAL :: density ! Density
+  REAL :: dt      ! Time step
+  REAL :: r_cut   ! Potential cutoff distance
+  REAL :: pot     ! Total cut-and-shifted potential energy
+  REAL :: cut     ! Total cut (but not shifted) potential energy
+  REAL :: vir     ! Total virial
+  REAL :: lap     ! Total Laplacian
+
+  ! Quantities to be averaged
+  REAL :: en_s ! Internal energy (cut-and-shifted) per atom
+  REAL :: p_s  ! Pressure (cut-and-shifted)
+  REAL :: en_f ! Internal energy (full, including LRC) per atom
+  REAL :: p_f  ! Pressure (full, including LRC)
+  REAL :: tk   ! Kinetic temperature
+  REAL :: tc   ! Configurational temperature
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
+  LOGICAL :: overlap
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -57,10 +61,10 @@ PROGRAM md_nve_lj
   CALL time_stamp ( output_unit )
 
   ! Set sensible default run parameters for testing
-  nblock      = 10
-  nstep       = 1000
-  r_cut       = 2.5
-  dt          = 0.005
+  nblock = 10
+  nstep  = 1000
+  r_cut  = 2.5
+  dt     = 0.005
 
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
@@ -87,10 +91,16 @@ PROGRAM md_nve_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
+  ! Initial forces, potential, etc plus overlap check
+  CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
+  IF ( overlap ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
+     STOP 'Error in md_nve_lj'
+  END IF
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Shifted Energy', 'Temp-kinet', 'Temp-config', 'Virial Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N (cut&shift)', 'P (cut&shift)', &
+       &            'E/N (full)', 'P (full)', 'T (kin)', 'T (con)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -99,15 +109,21 @@ PROGRAM md_nve_lj
      DO stp = 1, nstep ! Begin loop over steps
 
         ! Velocity Verlet algorithm
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)              ! Kick half-step
-        r(:,:) = r(:,:) + dt * v(:,:) / box              ! Drift step (positions in box=1 units)
-        r(:,:) = r(:,:) - ANINT ( r(:,:) )               ! Periodic boundaries
-        CALL force ( box, r_cut, pot, pot_sh, vir, lap ) ! Force evaluation
-        v(:,:) = v(:,:) + 0.5 * dt * f(:,:)              ! Kick half-step
+        v(:,:) = v(:,:) + 0.5 * dt * f(:,:) ! Kick half-step
 
-        ! Calculate all variables for this step
+        r(:,:) = r(:,:) + dt * v(:,:) / box ! Drift step (positions in box=1 units)
+        r(:,:) = r(:,:) - ANINT ( r(:,:) )  ! Periodic boundaries
+
+        CALL force ( box, r_cut, pot, cut, vir, lap, overlap ) ! Force evaluation
+        IF ( overlap ) THEN
+           WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
+           STOP 'Error in md_nve_lj'
+        END IF
+
+        v(:,:) = v(:,:) + 0.5 * dt * f(:,:) ! Kick half-step
+
         CALL calculate ( )
-        CALL blk_add ( [energy,energy_sh,temp_kinet,temp_config,pres_virial] )
+        CALL blk_add ( [en_s,p_s,en_f,p_f,tk,tc] )
 
      END DO ! End loop over steps
 
@@ -119,7 +135,11 @@ PROGRAM md_nve_lj
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, r_cut, pot, pot_sh, vir, lap )
+  CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
+  IF ( overlap ) THEN ! should never happen
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
+     STOP 'Error in md_nve_lj'
+  END IF
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
@@ -131,30 +151,35 @@ PROGRAM md_nve_lj
 CONTAINS
 
   SUBROUTINE calculate ( string ) 
-    USE md_module, ONLY : energy_lrc, pressure_lrc, hessian
+    USE md_module, ONLY : potential_lrc, pressure_lrc, hessian
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
     ! This routine calculates variables of interest and (optionally) writes them out
 
-    REAL    :: fsq, beta, kin
+    REAL :: fsq, beta, kin
 
-    kin         = 0.5*SUM(v**2)
-    energy      = ( pot + kin ) / REAL ( n ) + energy_lrc ( density, r_cut )
-    energy_sh   = ( pot_sh + kin ) / REAL ( n )
-    temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-    fsq         = SUM ( f**2 )
-    beta        = (lap/fsq) - 2.0*hessian(box,r_cut) / (fsq**2) ! include 1/N Hessian correction
-    temp_config = 1.0 / beta
-    pres_virial = density * temp_kinet + vir / box**3 + pressure_lrc ( density, r_cut )
+    kin = 0.5*SUM(v**2)
+    tk  = 2.0 * kin / REAL ( 3*(n-1) )
+
+    en_s = ( pot + kin ) / REAL ( n ) ! This quantity should be conserved
+    en_f = ( cut + kin ) / REAL ( n ) + potential_lrc ( density, r_cut )
+    p_s  = density * tk + vir / box**3
+    p_f  = p_s + pressure_lrc ( density, r_cut )
+
+    fsq  = SUM ( f**2 )
+    beta = lap / fsq                                ! Usual expression for inverse temperature
+    beta = beta - 2.0*hessian(box,r_cut) / (fsq**2) ! Include 1/N Hessian correction
+    tc   = 1.0 / beta
 
     IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Total energy',    energy
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Shifted energy',  energy_sh
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-kinet',      temp_kinet
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-config',     temp_config
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure', pres_virial
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut&shift)', en_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)',   p_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)',      en_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',        p_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)',         tk
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',         tc
     END IF
 
   END SUBROUTINE calculate
