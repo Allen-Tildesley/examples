@@ -9,7 +9,7 @@ PROGRAM mc_nvt_poly_lj
   USE maths_module,     ONLY : metropolis, random_rotate_quaternion, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_1, potential, n, r, e, &
-       &                       potential_type, OPERATOR(+), OPERATOR(-)
+       &                       potential_type
 
   IMPLICIT NONE
 
@@ -42,7 +42,7 @@ PROGRAM mc_nvt_poly_lj
   REAL :: p_s     ! pressure (cut & shifted potential)
   REAL :: en_s    ! internal energy per molecule (cut & shifted potential)
 
-  ! Composite interaction = pot_s & vir & overlap variables
+  ! Composite interaction = pot & vir & overlap variables
   TYPE(potential_type) :: total, partial_old, partial_new
 
   INTEGER              :: blk, stp, i, nstep, nblock, moves, ioerr
@@ -98,7 +98,7 @@ PROGRAM mc_nvt_poly_lj
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  ! Calculate total values of pot_s etc and check for overlap
+  ! Calculate total values of pot etc and check for overlap
   total = potential ( box, r_cut )
   IF ( total%overlap ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
@@ -133,8 +133,8 @@ PROGRAM mc_nvt_poly_lj
 
            IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
 
-              delta = partial_new%pot_s - partial_old%pot_s ! Use cut-and-shifted potential
-              delta = delta / temperature                   ! Divide by temperature
+              delta = partial_new%pot - partial_old%pot ! Use cut-and-shifted potential
+              delta = delta / temperature               ! Divide by temperature
 
               IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
                  total  = total + partial_new - partial_old ! Update potential energy
@@ -147,9 +147,8 @@ PROGRAM mc_nvt_poly_lj
 
         END DO ! End loop over atoms
 
-        m_ratio  = REAL(moves) / REAL(n)
+        m_ratio = REAL(moves) / REAL(n)
 
-        ! Calculate all variables for this step
         CALL calculate ( )
         CALL blk_add ( [m_ratio,en_s,p_s] )
 
@@ -190,12 +189,12 @@ CONTAINS
     ! In this example we simulate using the cut-and-shifted potential only
     ! The values of < p_s >, < en_s > and density should be consistent (for this potential)
     ! There are no long-range or delta corrections
-    ! The value of the cut (but not shifted) potential pot_c is not used, in this example
+    ! The value of the cut (but not shifted) potential is not used, in this example
     
-    en_s = total%pot_s / REAL ( n )    ! PE per molecule
+    en_s = total%pot / REAL ( n )      ! PE per molecule
     en_s = en_s + 3.0 * temperature    ! Add ideal gas contribution KE/N assuming nonlinear molecules 
-    p_s  = total%vir / box**3          ! Virial contribution to P
-    p_s  = p_s + density * temperature ! Add ideal gas contribution to P
+    p_s  = total%vir / box**3          ! Virial contribution to P_s
+    p_s  = p_s + density * temperature ! Add ideal gas contribution to P_s
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)'           ) string

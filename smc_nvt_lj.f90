@@ -9,7 +9,7 @@ PROGRAM smc_nvt_lj
   USE maths_module,     ONLY : random_normals, metropolis
   USE smc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       force, force_1, r, r_old, zeta, v, move, n, &
-       &                       potential_type, OPERATOR(+), OPERATOR(-)
+       &                       potential_type
 
   IMPLICIT NONE
 
@@ -46,11 +46,12 @@ PROGRAM smc_nvt_lj
   ! Quantities to be averaged
   real :: m_ratio ! Acceptance ratio for moves
   REAL :: en_s    ! Internal energy per atom for simulated, cut-and-shifted, potential
-  REAL :: en      ! Internal energy per atom for full potential with LRC
+  REAL :: en_f    ! Internal energy per atom for full potential with LRC
   REAL :: p_s     ! Pressure for simulated, cut-and-shifted, potential
-  REAL :: p       ! Pressure for full potential with LRC
+  REAL :: p_f     ! Pressure for full potential with LRC
+  real :: tc      ! Configurational temperature
 
-  ! Composite interaction = forces & pot & vir & overlap variables
+  ! Composite interaction = forces & pot & cut & vir & lap & overlap variables
   TYPE(potential_type) :: total, total_old, partial_old, partial_new
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
@@ -126,8 +127,8 @@ PROGRAM smc_nvt_lj
   END IF
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move Ratio', &
-       &            'E/N (cut&shift)', 'P (cut&shift)', 'E/N (full)', 'P (full)' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'Move Ratio', 'E/N (cut&shift)', 'P (cut&shift)', &
+       &            'E/N (full)', 'P (full)', 'T (con)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -142,7 +143,7 @@ PROGRAM smc_nvt_lj
            n_move = 0
            DO i = 1, n ! Loop over atoms
               r_old(:,i)  = r(:,i)                    ! Store old position of this atom
-              partial_old = force_1 ( i, box, r_cut ) ! Old force and pot_s etc for this atom
+              partial_old = force_1 ( i, box, r_cut ) ! Old force and pot etc for this atom
 
               IF ( partial_old%overlap ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
@@ -154,7 +155,7 @@ PROGRAM smc_nvt_lj
               v(:,i)      = v(:,i) + 0.5 * dt * partial_old%f(:,i) ! Kick half-step for one atom with old force
               r(:,i)      = r(:,i) + dt * v(:,i) / box             ! Drift step (positions in box=1 units)
               r(:,i)      = r(:,i) - ANINT ( r(:,i) )              ! Periodic boundaries (box=1 units)
-              partial_new = force_1 ( i, box, r_cut )              ! New force and pot_s etc for this atom
+              partial_new = force_1 ( i, box, r_cut )              ! New force and pot etc for this atom
 
               IF ( partial_new%overlap ) THEN ! Test for overlap
                  r(:,i) = r_old(:,i) ! Restore position: this move is rejected
@@ -162,9 +163,9 @@ PROGRAM smc_nvt_lj
                  v(:,i)  = v(:,i) + 0.5 * dt * partial_new%f(:,i) ! Kick half-step for one atom with new force
                  kin_new = 0.5*SUM(v(:,i)**2)                     ! New kinetic energy of this atom
 
-                 delta = partial_new%pot_s - partial_old%pot_s ! Cut-and-shifted potential
-                 delta = delta + kin_new - kin_old             ! Include kinetic energy change
-                 delta = delta / temperature                   ! Divide by temperature
+                 delta = partial_new%pot - partial_old%pot ! Cut-and-shifted potential
+                 delta = delta + kin_new - kin_old         ! Include kinetic energy change
+                 delta = delta / temperature               ! Divide by temperature
 
                  IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
                     total = total + partial_new - partial_old ! Update total values
@@ -205,9 +206,9 @@ PROGRAM smc_nvt_lj
               END WHERE
               kin_new = 0.5*SUM(v**2) ! New kinetic energy
 
-              delta = total%pot_s - total_old%pot_s ! Cut-and-shifted potential
-              delta = delta + kin_new - kin_old     ! Include kinetic energy change
-              delta = delta / temperature           ! Divide by temperature
+              delta = total%pot - total_old%pot ! Cut-and-shifted potential
+              delta = delta + kin_new - kin_old ! Include kinetic energy change
+              delta = delta / temperature       ! Divide by temperature
 
               IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
                  m_ratio  = 1.0 ! Set move counter
@@ -223,7 +224,7 @@ PROGRAM smc_nvt_lj
 
         ! Calculate all variables for this step
         CALL calculate ( )
-        CALL blk_add ( [m_ratio,en_s,p_s,en,p] )
+        CALL blk_add ( [m_ratio,en_s,p_s,en_f,p_f,tc] )
 
      END DO ! End loop over steps
 
@@ -258,24 +259,27 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
-    en_s = total%pot_s / REAL ( n ) ! PE/N for cut-and-shifted potential
+    en_s = total%pot / REAL ( n )   ! PE/N for cut-and-shifted potential
     en_s = en_s + 1.5 * temperature ! Add ideal gas contribution KE/N to give E_s/N
 
-    en = total%pot_c / REAL ( n )              ! PE/N for cut (but not shifted) potential
-    en = en + 1.5 * temperature                ! Add ideal gas contribution KE/N
-    en = en + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E/N
+    en_f = total%cut / REAL ( n )                  ! PE/N for cut (but not shifted) potential
+    en_f = en_f + 1.5 * temperature                ! Add ideal gas contribution KE/N
+    en_f = en_f + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E_f/N
 
     p_s = total%vir / box**3          ! Virial contribution to P
     p_s = p_s + density * temperature ! Add ideal gas contribution to give P_s
 
-    p = p_s + pressure_lrc ( density, r_cut ) ! Add long-range contribution to give P
+    p_f = p_s + pressure_lrc ( density, r_cut ) ! Add long-range contribution to give P_f
+
+    tc = SUM ( total%f(:,1:n)**2 ) / total%lap
 
     IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut&shift)', en_s
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)',   p_s
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)',      en
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',        p
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)',      en_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',        p_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',         tc
     END IF
 
   END SUBROUTINE calculate

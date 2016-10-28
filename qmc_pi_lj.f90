@@ -9,7 +9,7 @@ PROGRAM qmc_pi_lj
   USE maths_module,     ONLY : metropolis, random_translate_vector
   USE qmc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_1, spring_1, potential, spring, n, p, r, &
-       &                       potential_type, OPERATOR(+), OPERATOR(-)
+       &                       potential_type
 
   IMPLICIT NONE
 
@@ -35,17 +35,17 @@ PROGRAM qmc_pi_lj
   ! The model is defined in qmc_module
 
   ! Most important variables
-  REAL :: box         ! box length
+  REAL :: box         ! Box length
   REAL :: lambda      ! de Boer length
-  REAL :: density     ! density
-  REAL :: dr_max      ! maximum MC displacement
-  REAL :: temperature ! specified temperature
-  REAL :: r_cut       ! potential cutoff distance
+  REAL :: density     ! Density
+  REAL :: dr_max      ! Maximum MC displacement
+  REAL :: temperature ! Specified temperature
+  REAL :: r_cut       ! Potential cutoff distance
 
   ! Quantities to be averaged
-  REAL :: m_ratio ! acceptance ratio of moves
+  REAL :: m_ratio ! Acceptance ratio of moves
   REAL :: en_c    ! Internal energy per atom for simulated, cut, potential
-  REAL :: en      ! Internal energy per atom for full potential with LRC
+  REAL :: en_f    ! Internal energy per atom for full potential with LRC
 
   ! Composite interaction = pot & overlap variables
   TYPE(potential_type) :: total, partial_old, partial_new
@@ -163,7 +163,7 @@ PROGRAM qmc_pi_lj
 
                  partial_new_spring = spring_1 ( rik, i, k, box, k_spring ) ! New atom quantum potential
 
-                 delta =         partial_new%pot_c  - partial_old%pot_c  ! Change in classical cut (but not shifted) potential
+                 delta =         partial_new%pot    - partial_old%pot    ! Change in classical cut (but not shifted) potential
                  delta = delta + partial_new_spring - partial_old_spring ! Add change in quantum potential
                  delta = delta / temperature                             ! Divide by temperature
 
@@ -184,7 +184,7 @@ PROGRAM qmc_pi_lj
 
         ! Calculate all variables for this step
         CALL calculate ( )
-        CALL blk_add ( [m_ratio,en_c,en] )
+        CALL blk_add ( [m_ratio,en_c,en_f] )
 
      END DO ! End loop over steps
 
@@ -236,19 +236,19 @@ CONTAINS
     ! In this example we simulate using the cut (but not shifted) potential
     ! The values of < en_c > and < density > should be consistent (for this potential)
     ! For comparison, long-range corrections are also applied to give
-    ! an estimate of < en > for the full (uncut) potential
-    ! The value of the cut-and-shifted potential pot_s is not used, in this example
+    ! an estimate of < en_f > for the full (uncut) potential
+    ! The value of the cut-and-shifted potential is not used, in this example
 
     REAL :: kin
 
-    kin   = 1.5 * n * p * temperature                        ! Kinetic energy
-    en_c  = ( kin + total%pot_c - total_spring ) / REAL(n)   ! Total energy per atom (cut but not shifted)
-    en    = en_c + potential_lrc ( density, r_cut )          ! Add long-range contribution to PE/N
+    kin  = 1.5 * n * p * temperature                    ! Kinetic energy
+    en_c = ( kin + total%pot - total_spring ) / REAL(n) ! Total energy per atom (cut but not shifted)
+    en_f = en_c + potential_lrc ( density, r_cut )      ! Add long-range contribution to PE/N
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut)',  en_c
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en_f
     END IF
 
   END SUBROUTINE calculate

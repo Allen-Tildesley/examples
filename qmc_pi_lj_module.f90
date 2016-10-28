@@ -20,40 +20,31 @@ MODULE qmc_module
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! j-range and l-range options
 
   ! Public derived type
-  PUBLIC :: potential_type
-  TYPE potential_type ! A composite variable for interaction energies comprising
-     REAL    :: pot_c   ! the potential energy cut at r_cut and
-     REAL    :: pot_s   ! the potential energy cut and shifted to 0 at r_cut, and
+  TYPE, PUBLIC :: potential_type ! A composite variable for interaction energies comprising
+     REAL    :: pot     ! the cut (but not shifted) potential energy and
      LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+   CONTAINS
+     PROCEDURE :: add_potential_type
+     PROCEDURE :: subtract_potential_type
+     GENERIC   :: OPERATOR(+) => add_potential_type
+     GENERIC   :: OPERATOR(-) => subtract_potential_type
   END TYPE potential_type
-
-  PUBLIC :: OPERATOR (+)
-  INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_potential_type
-  END INTERFACE OPERATOR (+)
-
-  PUBLIC :: OPERATOR (-)
-  INTERFACE OPERATOR (-)
-     MODULE PROCEDURE subtract_potential_type
-  END INTERFACE OPERATOR (-)
 
 CONTAINS
 
   FUNCTION add_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)             :: c    ! Result is the sum of the two inputs
-    TYPE(potential_type), INTENT(in) :: a, b
-    c%pot_c   = a%pot_c    +   b%pot_c
-    c%pot_s   = a%pot_s    +   b%pot_s
+    TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
+    CLASS(potential_type), INTENT(in) :: a, b
+    c%pot     = a%pot      +   b%pot
     c%overlap = a%overlap .OR. b%overlap
   END FUNCTION add_potential_type
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)             :: c    ! Result is the difference of the two inputs
-    TYPE(potential_type), INTENT(in) :: a, b
-    c%pot_c   = a%pot_c    -   b%pot_c
-    c%pot_s   = a%pot_s    -   b%pot_s
+    TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
+    CLASS(potential_type), INTENT(in) :: a, b
+    c%pot     = a%pot      -   b%pot
     c%overlap = a%overlap .OR. b%overlap ! this is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
 
@@ -62,7 +53,7 @@ CONTAINS
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential'
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Cut and optionally shifted'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Cut (but not shifted)'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'   
     WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1' 
 
@@ -106,10 +97,9 @@ CONTAINS
     REAL, INTENT(in)     :: box   ! Simulation box length
     REAL, INTENT(in)     :: r_cut ! Potential cutoff distance
 
-    ! total%pot_c is the nonbonded cut (not shifted) classical potential energy for whole system
-    ! total%pot_s is the nonbonded cut-and-shifted classical potential energy for whole system
+    ! total%pot is the nonbonded cut (not shifted) classical potential energy for whole system
     ! total%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this flag is .true., the values of total%pot_c etc should not be used
+    ! If this flag is .true., the values of total%pot etc should not be used
     ! Actual calculation is performed by function potential_1
 
     TYPE(potential_type) :: partial ! Atomic contribution to total
@@ -124,7 +114,7 @@ CONTAINS
        STOP 'Error in potential'
     END IF
 
-    total = potential_type ( pot_c=0.0, pot_s=0.0, overlap=.FALSE. ) ! Initialize
+    total = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
 
     DO k = 1, p ! Loop over ring polymers
        DO i = 1, n - 1 ! Loop over atoms within polymer
@@ -154,10 +144,9 @@ CONTAINS
     REAL,               INTENT(in) :: r_cut   ! Potential cutoff distance
     INTEGER, OPTIONAL,  INTENT(in) :: j_range ! Optional partner index range
 
-    ! partial%pot_c is the nonbonded cut (not shifted) classical potential energy of atom rik with a set of other atoms
-    ! partial%pot_s is the nonbonded cut-and-shifted classical potential energy of atom rik with a set of other atoms
+    ! partial%pot is the nonbonded cut (not shifted) classical potential energy of atom rik with a set of other atoms
     ! partial%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this is .true., the values of partial%pot_c etc should not be used
+    ! If this is .true., the value of partial%pot should not be used
     ! The coordinates in rik are not necessarily identical with those in r(:,i,k)
     ! The partner atoms always have the same polymer index k
     ! The optional argument j_range restricts partner indices to j>i, or j<i
@@ -165,7 +154,7 @@ CONTAINS
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
-    INTEGER            :: j, j1, j2, ncut
+    INTEGER            :: j, j1, j2
     REAL               :: r_cut_box, r_cut_box_sq, box_sq
     REAL               :: sr2, sr6, r_ik_jk_sq, potij
     REAL, DIMENSION(3) :: r_ik_jk
@@ -201,8 +190,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    partial = potential_type ( pot_c=0.0, pot_s=0.0, overlap=.FALSE. ) ! Initialize
-    ncut = 0
+    partial = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Loop over selected range of partners
 
@@ -225,24 +213,15 @@ CONTAINS
           sr6   = sr2**3
           potij = sr6**2 - sr6 ! LJ potential (cut but not shifted)
 
-          partial%pot_c = partial%pot_c + potij
-
-          ncut = ncut + 1
+          partial%pot = partial%pot + potij
 
        END IF ! End check with range
 
     END DO ! End loop over selected range of partners
 
-    ! Calculate shifted potential
-    sr2   = 1.0 / r_cut**2 ! in sigma=1 units
-    sr6   = sr2**3
-    potij = sr6**2 - sr6
-    partial%pot_s = partial%pot_c - REAL ( ncut ) * potij
-
     ! Include numerical factors
-    partial%pot_c   = partial%pot_c * 4.0 / REAL ( p ) ! Classical potentials are weaker by a factor p
-    partial%pot_s   = partial%pot_s * 4.0 / REAL ( p ) ! Classical potentials are weaker by a factor p
-    partial%overlap = .FALSE.                          ! No overlaps detected (redundant, but for clarity)
+    partial%pot     = partial%pot * 4.0 / REAL ( p ) ! Classical potentials are weaker by a factor p
+    partial%overlap = .FALSE.                        ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential_1
 

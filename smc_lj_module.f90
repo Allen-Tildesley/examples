@@ -12,12 +12,12 @@ MODULE smc_module
   PUBLIC :: force, force_1, potential_lrc, pressure_lrc
 
   ! Public data
-  INTEGER,                              PUBLIC :: n     ! number of atoms
-  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r     ! positions (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r_old ! old positions (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v     ! velocities (3,n)
-  REAL,    DIMENSION(:),   ALLOCATABLE, PUBLIC :: zeta  ! random numbers (n)
-  LOGICAL, DIMENSION(:,:), ALLOCATABLE, PUBLIC :: move  ! mask for multi-atom moves (3,n)
+  INTEGER,                              PUBLIC :: n     ! Number of atoms
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r     ! Positions (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r_old ! Old positions (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v     ! Velocities (3,n)
+  REAL,    DIMENSION(:),   ALLOCATABLE, PUBLIC :: zeta  ! Random numbers (n)
+  LOGICAL, DIMENSION(:,:), ALLOCATABLE, PUBLIC :: move  ! Mask for multi-atom moves (3,n)
 
   ! Private data
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
@@ -26,46 +26,43 @@ MODULE smc_module
   ! At the time of writing gfortran, and some other compilers, do not implement
   ! parameterized derived types (part of the Fortran 2003 standard);
   ! hence the rather clumsy use of the n_max parameter here.
-  PUBLIC :: potential_type
   INTEGER, PARAMETER :: n_max = 256 
-  TYPE potential_type ! A composite variable for interactions comprising
-     REAL                     :: pot_s   ! the cut-and-shifted potential energy and
-     REAL                     :: pot_c   ! the cut (but not shifted) potential energy and
+  TYPE, PUBLIC :: potential_type ! A composite variable for interactions comprising
+     REAL                     :: pot     ! the cut-and-shifted potential energy and
+     REAL                     :: cut     ! the cut (but not shifted) potential energy and
      REAL                     :: vir     ! the virial and
+     REAL                     :: lap     ! the Laplacian
      REAL, DIMENSION(3,n_max) :: f       ! the forces and
-     LOGICAL                  :: overlap ! a flag indicating overlap (i.e. pot_s too high to use)
+     LOGICAL                  :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+   CONTAINS
+     PROCEDURE :: add_potential_type
+     PROCEDURE :: subtract_potential_type
+     GENERIC   :: OPERATOR(+) => add_potential_type
+     GENERIC   :: OPERATOR(-) => subtract_potential_type
   END TYPE potential_type
-
-  PUBLIC :: OPERATOR (+)
-  INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_potential_type
-  END INTERFACE OPERATOR (+)
-
-  PUBLIC :: OPERATOR (-)
-  INTERFACE OPERATOR (-)
-     MODULE PROCEDURE subtract_potential_type
-  END INTERFACE OPERATOR (-)
 
 CONTAINS
 
   FUNCTION add_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)             :: c    ! Result is the sum of the two inputs
-    TYPE(potential_type), INTENT(in) :: a, b
-    c%pot_s   = a%pot_s    +   b%pot_s
-    c%pot_c   = a%pot_c    +   b%pot_c
+    TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
+    CLASS(potential_type), INTENT(in) :: a, b
+    c%pot     = a%pot      +   b%pot
+    c%cut     = a%cut      +   b%cut
     c%vir     = a%vir      +   b%vir
+    c%lap     = a%lap      +   b%lap
     c%f       = a%f        +   b%f
     c%overlap = a%overlap .OR. b%overlap
   END FUNCTION add_potential_type
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)             :: c    ! Result is the difference of the two inputs
-    TYPE(potential_type), INTENT(in) :: a, b
-    c%pot_s   = a%pot_s    -   b%pot_s
-    c%pot_c   = a%pot_c    -   b%pot_c
+    TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
+    CLASS(potential_type), INTENT(in) :: a, b
+    c%pot     = a%pot      -   b%pot
+    c%cut     = a%cut      -   b%cut
     c%vir     = a%vir      -   b%vir
+    c%lap     = a%lap      -   b%lap
     c%f       = a%f        -   b%f
     c%overlap = a%overlap .OR. b%overlap ! meaningless but inconsequential
   END FUNCTION subtract_potential_type
@@ -75,7 +72,8 @@ CONTAINS
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential'
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Cut and optionally shifted'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Cut-and-shifted version for SMC dynamics'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Cut (but not shifted) version also calculated'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'   
     WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1' 
 
@@ -120,22 +118,24 @@ CONTAINS
 
   FUNCTION force ( box, r_cut ) RESULT ( total )
     IMPLICIT NONE
-    TYPE(potential_type) :: total ! Returns composite of forces, pot, vir and overlap
+    TYPE(potential_type) :: total ! Returns composite of forces, pot, vir etc
     REAL, INTENT(in)     :: box   ! Simulation box length
     REAL, INTENT(in)     :: r_cut ! Potential cutoff distance
 
-    ! total%pot_s is the cut-and-shifted potential energy for whole system
-    ! total%pot_c is the cut (but not shifted) version of the above
-    ! total%vir is the corresponding virial for whole system
+    ! total%pot is the total cut-and-shifted potential energy for whole system
+    ! total%cut is the total cut (but not shifted) version of the above
+    ! total%vir is the total virial for whole system
+    ! total%lap is the total Laplacian for whole system
     ! total%f contains the forces on all the atoms
     ! total%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this flag is .true., the values of total%pot_s etc should not be used
+    ! If this flag is .true., the values of total%pot etc should not be used
     ! Actual calculation is performed by function force_1
 
     INTEGER              :: i
     TYPE(potential_type) :: partial ! atomic contributions to total
 
-    total = potential_type ( f=0.0, pot_s=0.0, pot_c=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
+    ! Initialize
+    total = potential_type ( f=0.0, pot=0.0, cut=0.0, vir=0.0, lap=0.0, overlap=.FALSE. )
 
     DO i = 1, n - 1 ! Begin loop over atoms
 
@@ -155,18 +155,19 @@ CONTAINS
 
   FUNCTION force_1 ( i, box, r_cut, j_range ) RESULT ( partial )
     IMPLICIT NONE
-    TYPE(potential_type)          :: partial ! Returns composite of forces, pot, overlap etc for one atom
+    TYPE(potential_type)          :: partial ! Returns composite of forces, pot etc for one atom
     INTEGER,           INTENT(in) :: i       ! Index of atom of interest
     REAL,              INTENT(in) :: box     ! Simulation box length
     REAL,              INTENT(in) :: r_cut   ! Potential cutoff distance
     INTEGER, OPTIONAL, INTENT(in) :: j_range ! Optional partner index range
 
-    ! partial%pot_s is the cut-and-shifted potential energy of atom i with a set of other atoms
-    ! partial%pot_c is the cut (but not shifted) version of the above
+    ! partial%pot is the cut-and-shifted potential energy of atom i with a set of other atoms
+    ! partial%cut is the cut (but not shifted) version of the above
     ! partial%vir is the corresponding virial of atom i
+    ! partial%lap is the corresponding Laplacian of atom i
     ! partial%f contains the force on i and the reaction forces on all other atoms due to i
     ! partial%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this is .true., the values of partial%pot_s etc should not be used
+    ! If this is .true., the values of partial%pot etc should not be used
     ! The optional argument j_range restricts partner indices to j>i, or j<i
 
     ! It is assumed that positions are in units where box = 1
@@ -175,7 +176,7 @@ CONTAINS
 
     INTEGER            :: j, j1, j2, ncut
     REAL               :: r_cut_box, r_cut_box_sq, box_sq
-    REAL               :: rij_sq, sr2, sr6, sr12, potij, virij
+    REAL               :: rij_sq, sr2, sr6, sr12, cutij, virij, lapij
     REAL, DIMENSION(3) :: rij, fij
     REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
 
@@ -200,7 +201,8 @@ CONTAINS
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
 
-    partial = potential_type ( f=0.0, pot_s=0.0, pot_c=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
+    ! Initialize
+    partial = potential_type ( f=0.0, pot=0.0, cut=0.0, vir=0.0, lap=0.0, overlap=.FALSE. )
     ncut    = 0
 
     DO j = j1, j2 ! Begin loop over atoms
@@ -213,9 +215,9 @@ CONTAINS
 
        IF ( rij_sq < r_cut_box_sq ) THEN ! Check within cutoff
 
-          rij_sq  = rij_sq * box_sq ! now in sigma=1 units
-          rij(:)  = rij(:) * box    ! now in sigma=1 units
-          sr2     = 1.0 / rij_sq
+          rij_sq = rij_sq * box_sq ! Now in sigma=1 units
+          rij(:) = rij(:) * box    ! Now in sigma=1 units
+          sr2    = 1.0 / rij_sq
 
           IF ( sr2 > sr2_overlap ) THEN
              partial%overlap = .TRUE. ! Overlap detected
@@ -224,16 +226,17 @@ CONTAINS
 
           sr6   = sr2 ** 3
           sr12  = sr6 ** 2
-          potij = sr12 - sr6 ! LJ potential (cut but not shifted)
-          virij = potij + sr12
-          fij   = rij * virij / rij_sq
+          cutij = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
+          virij = cutij + sr12                  ! LJ pair virial
+          lapij = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
+          fij   = rij * virij / rij_sq          ! LJ pair force
 
-          partial%pot_c  = partial%pot_c  + potij
+          partial%cut    = partial%cut    + cutij
           partial%vir    = partial%vir    + virij
+          partial%lap    = partial%lap    + lapij
           partial%f(:,i) = partial%f(:,i) + fij
           partial%f(:,j) = partial%f(:,j) - fij
-
-          ncut = ncut + 1
+          ncut           = ncut           + 1
 
        END IF ! End check within cutoff
 
@@ -243,21 +246,22 @@ CONTAINS
     sr2   = 1.0 / r_cut**2 ! in sigma=1 units
     sr6   = sr2 ** 3
     sr12  = sr6 **2
-    potij = sr12 - sr6
-    partial%pot_s = partial%pot_c - real ( ncut ) * potij
+    cutij = sr12 - sr6
+    partial%pot = partial%cut - REAL ( ncut ) * cutij
 
     ! Multiply results by numerical factors
-    partial%f       = partial%f * 24.0
-    partial%pot_s   = partial%pot_s * 4.0
-    partial%pot_c   = partial%pot_c * 4.0
+    partial%f       = partial%f   * 24.0
+    partial%pot     = partial%pot * 4.0
+    partial%cut     = partial%cut * 4.0
     partial%vir     = partial%vir * 24.0 / 3.0
+    partial%lap     = partial%lap * 24.0 * 2.0
     partial%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION force_1
 
   FUNCTION potential_lrc ( density, r_cut )
     IMPLICIT NONE
-    REAL                :: potential_lrc ! Returns long-range energy/atom
+    REAL                :: potential_lrc ! Returns long-range energy/atom correction
     REAL,    INTENT(in) :: density       ! Number density N/V
     REAL,    INTENT(in) :: r_cut         ! Cutoff distance
 
@@ -267,8 +271,7 @@ CONTAINS
     REAL            :: sr3
     REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
 
-    sr3 = 1.0 / r_cut**3
-
+    sr3           = 1.0 / r_cut**3
     potential_lrc = pi * ( (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3 ) * density
 
   END FUNCTION potential_lrc
@@ -285,8 +288,7 @@ CONTAINS
     REAL            :: sr3
     REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
 
-    sr3 = 1.0 / r_cut**3
-
+    sr3          = 1.0 / r_cut**3
     pressure_lrc = pi * ( (32.0/9.0) * sr3**3  - (16.0/3.0) * sr3 ) * density**2
 
   END FUNCTION pressure_lrc

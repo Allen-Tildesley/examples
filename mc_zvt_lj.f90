@@ -10,7 +10,7 @@ PROGRAM mc_zvt_lj
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_1, potential, &
        &                       move, create, destroy, n, r, &
-       &                       potential_type, OPERATOR(+), OPERATOR(-)
+       &                       potential_type
 
   IMPLICIT NONE
 
@@ -46,9 +46,10 @@ PROGRAM mc_zvt_lj
   REAL :: d_ratio ! Acceptance ratio of destruction attempts
   REAL :: density ! Density
   REAL :: en_c    ! Internal energy per atom for simulated, cut, potential
-  REAL :: en      ! Internal energy per atom for full potential with LRC
+  REAL :: en_f    ! Internal energy per atom for full potential with LRC
   REAL :: p_c     ! Pressure for simulated, cut, potential
-  REAL :: p       ! Pressure for full potential with LRC
+  REAL :: p_f     ! Pressure for full potential with LRC
+  REAL :: tc      ! Configurational temperature
 
   ! Composite interaction = pot & vir & overlap variables
   TYPE(potential_type) :: total, partial_old, partial_new
@@ -123,7 +124,7 @@ PROGRAM mc_zvt_lj
   CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Create ratio', 'Destroy ratio', &
-       &            'Density', 'E/N (cut)', 'P (cut)', 'E/N (full)', 'P (full)' ] )
+       &            'Density', 'E/N (cut)', 'P (cut)', 'E/N (full)', 'P (full)', 'T (con)' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -164,8 +165,8 @@ PROGRAM mc_zvt_lj
 
               IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
 
-                 delta = partial_new%pot_c - partial_old%pot_c ! Use cut (but not shifted) potential
-                 delta = delta / temperature                   ! Divide by temperature
+                 delta = partial_new%pot - partial_old%pot ! Use cut (but not shifted) potential
+                 delta = delta / temperature               ! Divide by temperature
 
                  IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
                     total = total + partial_new - partial_old ! Update total values
@@ -191,7 +192,7 @@ PROGRAM mc_zvt_lj
 
               IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
 
-                 delta = partial_new%pot_c / temperature                  ! Use cut (not shifted) potential
+                 delta = partial_new%pot / temperature                    ! Use cut (not shifted) potential
                  delta = delta - LOG ( activity * box**3 / REAL ( n+1 ) ) ! Activity term for creation
 
                  IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
@@ -215,7 +216,7 @@ PROGRAM mc_zvt_lj
                  STOP 'Error in mc_zvt_lj'
               END IF
 
-              delta = -partial_old%pot_c / temperature                    ! Use cut (not shifted) potential
+              delta = -partial_old%pot / temperature                      ! Use cut (not shifted) potential
               delta = delta - LOG ( REAL ( n ) / ( activity * box**3 )  ) ! Activity term for destruction
 
               IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
@@ -246,9 +247,8 @@ PROGRAM mc_zvt_lj
            d_ratio = 0.0
         END IF
 
-        ! Calculate all variables for this step
         CALL calculate ( )
-        CALL blk_add ( [m_ratio,c_ratio,d_ratio,density,en_c,p_c,en,p] )
+        CALL blk_add ( [m_ratio,c_ratio,d_ratio,density,en_c,p_c,en_f,p_f,tc] )
 
      END DO ! End loop over steps
 
@@ -279,7 +279,7 @@ PROGRAM mc_zvt_lj
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE mc_module, ONLY : potential_lrc, pressure_lrc, pressure_delta
+    USE mc_module, ONLY : potential_lrc, pressure_lrc, pressure_delta, force_sq
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
@@ -288,25 +288,28 @@ CONTAINS
     ! In this example we simulate using the cut (but not shifted) potential
     ! The values of < p_c >,  < en_c > and < density > should be consistent (for this potential)
     ! For comparison, long-range corrections are also applied to give
-    ! estimates of < en > and < p > for the full (uncut) potential
-    ! The value of the cut-and-shifted potential pot_s is not used, in this example
+    ! estimates of < en_f > and < p_f > for the full (uncut) potential
+    ! The value of the cut-and-shifted potential is not used, in this example
 
     density = REAL(n) / box**3                        ! Number density N/V
-    en_c    = total%pot_c / REAL ( n )                ! PE/N for cut (but not shifted) potential
+
+    en_c    = total%pot / REAL ( n )                  ! PE/N for cut (but not shifted) potential
     en_c    = en_c + 1.5 * temperature                ! Add ideal gas contribution KE/N to give E_c/N
-    en      = en_c + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E/N estimate
+    en_f    = en_c + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E_f/N estimate
+
     p_c     = total%vir / box**3                      ! Virial contribution to P_c
     p_c     = p_c + density * temperature             ! Add ideal gas contribution to P_c
-    p       = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P
-    p_c     = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P)
+    p_f     = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P_f
+    p_c     = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P_f)
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)'           ) string
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',    density
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut)',  en_c
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut)',    p_c
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',   p
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',   p_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',    tc
     END IF
 
   END SUBROUTINE calculate

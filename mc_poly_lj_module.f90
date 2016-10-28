@@ -28,42 +28,33 @@ MODULE mc_module
   REAL, PARAMETER :: diameter = 2.0 * SQRT ( MAXVAL ( SUM(db**2,dim=1) ) ) ! Molecular diameter
 
   ! Public derived type
-  PUBLIC :: potential_type
-  TYPE potential_type   ! A composite variable for interactions comprising
-     REAL    :: pot_c   ! the potential energy cut at r_cut and
-     REAL    :: pot_s   ! the potential energy cut and shifted to 0 at r_cut, and
+  TYPE, PUBLIC :: potential_type   ! A composite variable for interactions comprising
+     REAL    :: pot     ! the potential energy cut and shifted to 0 at r_cut, and
      REAL    :: vir     ! the virial and
-     LOGICAL :: overlap ! a flag indicating overlap (i.e. pot_s too high to use)
+     LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+   CONTAINS
+     PROCEDURE :: add_potential_type
+     PROCEDURE :: subtract_potential_type
+     GENERIC   :: OPERATOR(+) => add_potential_type
+     GENERIC   :: OPERATOR(-) => subtract_potential_type
   END TYPE potential_type
-
-  PUBLIC :: OPERATOR (+)
-  INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_potential_type
-  END INTERFACE OPERATOR (+)
-
-  PUBLIC :: OPERATOR (-)
-  INTERFACE OPERATOR (-)
-     MODULE PROCEDURE subtract_potential_type
-  END INTERFACE OPERATOR (-)
 
 CONTAINS
 
   FUNCTION add_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)             :: c    ! Result is the sum of the two inputs
-    TYPE(potential_type), INTENT(in) :: a, b
-    c%pot_c   = a%pot_c    +   b%pot_c
-    c%pot_s   = a%pot_s    +   b%pot_s
+    TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
+    CLASS(potential_type), INTENT(in) :: a, b
+    c%pot     = a%pot      +   b%pot
     c%vir     = a%vir      +   b%vir
     c%overlap = a%overlap .OR. b%overlap
   END FUNCTION add_potential_type
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)             :: c    ! Result is the difference of the two inputs
-    TYPE(potential_type), INTENT(in) :: a, b
-    c%pot_c   = a%pot_c    -   b%pot_c
-    c%pot_s   = a%pot_s    -   b%pot_s
+    TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
+    CLASS(potential_type), INTENT(in) :: a, b
+    c%pot     = a%pot      -   b%pot
     c%vir     = a%vir      -   b%vir
     c%overlap = a%overlap .OR. b%overlap ! this is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
@@ -121,15 +112,14 @@ CONTAINS
 
   FUNCTION potential ( box, r_cut ) RESULT ( total )
     IMPLICIT NONE
-    TYPE(potential_type) :: total ! Returns a composite of pot, vir and overlap
+    TYPE(potential_type) :: total ! Returns a composite of pot, vir etc
     REAL, INTENT(in)     :: box   ! Simulation box length
     REAL, INTENT(in)     :: r_cut ! Potential cutoff distance
 
-    ! total%pot_c is the nonbonded cut (not shifted) potential energy for whole system
-    ! total%pot_s is the nonbonded cut-and-shifted potential energy for whole system
+    ! total%pot is the nonbonded cut-and-shifted potential energy for whole system
     ! total%vir is the corresponding virial for whole system
     ! total%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this flag is .true., the values of total%pot_c etc should not be used
+    ! If this flag is .true., the values of total%pot etc should not be used
     ! Actual calculation is performed by function potential_1
 
     TYPE(potential_type) :: partial ! Molecular contribution to total
@@ -140,7 +130,7 @@ CONTAINS
        STOP 'Error in potential'
     END IF
 
-    total = potential_type ( pot_c=0.0, pot_s=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
+    total = potential_type ( pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1
 
@@ -162,7 +152,7 @@ CONTAINS
   FUNCTION potential_1 ( ri, ei, i, box, r_cut, j_range ) RESULT ( partial )
     USE maths_module, ONLY : q_to_a
     IMPLICIT NONE
-    TYPE(potential_type)                :: partial ! Returns a composite of pot, vir and overlap for given molecule
+    TYPE(potential_type)                :: partial ! Returns a composite of pot, vir etc for given molecule
     REAL,    DIMENSION(3),   INTENT(in) :: ri      ! Coordinates of molecule of interest
     REAL,    DIMENSION(0:3), INTENT(in) :: ei      ! Quaternion of molecule of interest
     INTEGER,                 INTENT(in) :: i       ! Index of molecule of interest
@@ -170,11 +160,10 @@ CONTAINS
     REAL,                    INTENT(in) :: r_cut   ! Potential cutoff distance
     INTEGER, OPTIONAL,       INTENT(in) :: j_range ! Optional partner index range
 
-    ! partial%pot_c is the nonbonded cut (but not shifted) potential energy of molecule ri,ei with a set of other molecules
-    ! partial%pot_s is the nonbonded cut-and-shifted potential energy of molecule ri,ei with a set of other molecules
+    ! partial%pot is the nonbonded cut-and-shifted potential energy of molecule ri,ei with a set of other molecules
     ! partial%vir is the corresponding virial of molecule ri,ei
     ! partial%overlap is a flag indicating overlap (potential too high) to avoid overflow
-    ! If this is .true., the values of partial%pot_c etc should not be used
+    ! If this is .true., the values of partial%pot etc should not be used
     ! The coordinates in ri and ei are not necessarily identical with those in r(:,i) and e(:,i)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
 
@@ -182,9 +171,9 @@ CONTAINS
     ! Results are in LJ units where sigma = 1, epsilon = 1
     ! Note that this is the shifted LJ potential
 
-    INTEGER               :: j, j1, j2, a, b, ncut
+    INTEGER               :: j, j1, j2, a, b
     REAL                  :: rm_cut_box, rm_cut_box_sq, r_cut_sq
-    REAL                  :: sr2, sr6, sr12, rij_sq, rab_sq, potab, virab
+    REAL                  :: sr2, sr6, sr12, rij_sq, rab_sq, potab, virab, pot_cut
     REAL, DIMENSION(3)    :: rij, rab, fab
     REAL, DIMENSION(3,na) :: di, dj
     REAL, DIMENSION(3,3)  :: ai, aj
@@ -220,8 +209,13 @@ CONTAINS
     rm_cut_box_sq = rm_cut_box**2              ! squared
     r_cut_sq      = r_cut**2                   ! Potential cutoff squared in sigma=1 units
 
-    partial = potential_type ( pot_c=0.0, pot_s=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
-    ncut    = 0
+    ! Calculate potential at cutoff
+    sr2     = 1.0 / r_cut_sq ! in sigma=1 units
+    sr6     = sr2**3
+    sr12    = sr6**2
+    pot_cut = sr12 - sr6
+
+    partial = potential_type ( pot=0.0, vir=0.0, overlap=.FALSE. ) ! Initialize
 
     ! Compute all space-fixed atom vectors for molecule i
     ai = q_to_a ( ei ) ! Rotation matrix for i
@@ -239,7 +233,7 @@ CONTAINS
 
        IF ( rij_sq < rm_cut_box_sq ) THEN ! Test within molecular cutoff
 
-          rij = rij * box ! now in sigma = 1 units
+          rij = rij * box ! Now in sigma = 1 units
 
           ! Compute all space-fixed atom vectors for molecule j
           aj = q_to_a ( e(:,j) ) ! Rotation matrix for j
@@ -260,19 +254,17 @@ CONTAINS
 
                    IF ( sr2 > sr2_overlap ) THEN
                       partial%overlap = .TRUE. ! Overlap detected
-                      RETURN                    ! Return immediately
+                      RETURN                   ! Return immediately
                    END IF
 
                    sr6   = sr2**3
                    sr12  = sr6**2
-                   potab = sr12 - sr6           ! LJ potential (cut but not shifted)
-                   virab = potab + sr12         ! atom-atom virial
-                   fab   = rab * virab / rab_sq ! atom-atom force
+                   potab = sr12 - sr6 - pot_cut ! LJ atom-atom pair potential (cut-and-shifted)
+                   virab = potab + sr12         ! LJ atom-atom pair virial
+                   fab   = rab * virab / rab_sq ! LJ atom-atom pair force
 
-                   partial%pot_c = partial%pot_c + potab                    ! Contribution to molecular potential
-                   partial%vir   = partial%vir   + DOT_PRODUCT ( rij, fab ) ! Contribution to molecular virial
-
-                   ncut           = ncut + 1                                ! Count interactions
+                   partial%pot = partial%pot + potab                    ! Contribution to molecular potential
+                   partial%vir = partial%vir + DOT_PRODUCT ( rij, fab ) ! Contribution to molecular virial
 
                 END IF ! End test within potential cutoff
 
@@ -284,16 +276,8 @@ CONTAINS
 
     END DO ! End loop over selected range of partner molecules
 
-    ! Calculate shifted potential
-    sr2   = 1.0 / r_cut_sq ! in sigma=1 units
-    sr6   = sr2**3
-    sr12  = sr6**2
-    potab = sr12 - sr6
-    partial%pot_s = partial%pot_c - REAL ( ncut ) * potab
-
     ! Include numerical factors
-    partial%pot_c   = partial%pot_c * 4.0
-    partial%pot_s   = partial%pot_s * 4.0
+    partial%pot     = partial%pot * 4.0
     partial%vir     = partial%vir * 24.0 / 3.0
     partial%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
