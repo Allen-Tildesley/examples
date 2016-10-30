@@ -49,7 +49,7 @@ CONTAINS
     c%pot_c   = a%pot_c    +   b%pot_c
     c%pot_s   = a%pot_s    +   b%pot_s
     c%vir     = a%vir      +   b%vir
-    c%overlap = a%overlap .OR. b%overlap
+    c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
@@ -59,7 +59,7 @@ CONTAINS
     c%pot_c   = a%pot_c    -   b%pot_c
     c%pot_s   = a%pot_s    -   b%pot_s
     c%vir     = a%vir      -   b%vir
-    c%overlap = a%overlap .OR. b%overlap ! this is meaningless, but inconsequential
+    c%ovr = a%ovr .OR. b%ovr ! this is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
 
   SUBROUTINE introduction ( output_unit )
@@ -114,7 +114,7 @@ CONTAINS
     ! total%pot_c is the nonbonded cut (not shifted) potential energy for whole system
     ! total%pot_s is the nonbonded cut-and-shifted potential energy for whole system
     ! total%vir is the corresponding virial for whole system
-    ! total%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! total%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this flag is .true., the values of total%pot_c etc should not be used
     ! Actual calculation is performed by function potential_1
 
@@ -132,8 +132,8 @@ CONTAINS
 
        partial = potential_1 ( r(:,i), i, box, r_cut, gt )
 
-       IF ( partial%overlap ) THEN
-          total%overlap = .TRUE. ! Overlap detected
+       IF ( partial%ovr ) THEN
+          total%ovr = .TRUE. ! Overlap detected
           RETURN                 ! Return immediately
        END IF
 
@@ -141,7 +141,7 @@ CONTAINS
 
     END DO
 
-    total%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    total%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential
 
@@ -157,7 +157,7 @@ CONTAINS
     ! partial%pot_c is the nonbonded cut (not shifted) potential energy of atom ri with a set of other atoms
     ! partial%pot_s is the nonbonded cut-and-shifted potential energy of atom ri with a set of other atoms
     ! partial%vir is the corresponding virial of atom ri
-    ! partial%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! partial%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this is .true., the values of partial%pot_c etc should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
@@ -214,7 +214,7 @@ CONTAINS
           sr2    = 1.0 / rij_sq    ! (sigma/rij)**2
 
           IF ( sr2 > sr2_overlap ) THEN
-             partial%overlap = .TRUE. ! Overlap detected
+             partial%ovr = .TRUE. ! Overlap detected
              RETURN                ! Return immediately
           END IF
 
@@ -243,7 +243,7 @@ CONTAINS
     partial%pot_c   = partial%pot_c * 4.0
     partial%pot_s   = partial%pot_s * 4.0
     partial%vir     = partial%vir   * 24.0 / 3.0
-    partial%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    partial%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential_1
 

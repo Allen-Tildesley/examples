@@ -51,7 +51,7 @@ PROGRAM smc_nvt_lj
   REAL :: p_f     ! Pressure for full potential with LRC
   real :: tc      ! Configurational temperature
 
-  ! Composite interaction = forces & pot & cut & vir & lap & overlap variables
+  ! Composite interaction = forces & pot & cut & vir & lap & ovr variables
   TYPE(potential_type) :: total, total_old, partial_old, partial_new
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
@@ -121,7 +121,7 @@ PROGRAM smc_nvt_lj
 
   ! First calculation of total system properties and check for overlap
   total = force ( box, r_cut )
-  IF ( total%overlap ) THEN
+  IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in smc_nvt_lj'
   END IF
@@ -145,7 +145,7 @@ PROGRAM smc_nvt_lj
               r_old(:,i)  = r(:,i)                    ! Store old position of this atom
               partial_old = force_1 ( i, box, r_cut ) ! Old force and pot etc for this atom
 
-              IF ( partial_old%overlap ) THEN ! should never happen
+              IF ( partial_old%ovr ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in smc_nvt_lj'
               END IF
@@ -157,7 +157,7 @@ PROGRAM smc_nvt_lj
               r(:,i)      = r(:,i) - ANINT ( r(:,i) )              ! Periodic boundaries (box=1 units)
               partial_new = force_1 ( i, box, r_cut )              ! New force and pot etc for this atom
 
-              IF ( partial_new%overlap ) THEN ! Test for overlap
+              IF ( partial_new%ovr ) THEN ! Test for overlap
                  r(:,i) = r_old(:,i) ! Restore position: this move is rejected
               ELSE
                  v(:,i)  = v(:,i) + 0.5 * dt * partial_new%f(:,i) ! Kick half-step for one atom with new force
@@ -196,7 +196,7 @@ PROGRAM smc_nvt_lj
            END WHERE
            total = force ( box, r_cut ) ! New force and potential etc
 
-           IF ( total%overlap ) THEN ! Test for overlap
+           IF ( total%ovr ) THEN ! Test for overlap
               r       = r_old     ! Restore positions: this move is rejected
               total   = total_old ! Restore old totals
               m_ratio = 0.0       ! Set move counter
@@ -240,7 +240,7 @@ PROGRAM smc_nvt_lj
 
   ! Double check book-keeping for totals, and final overlap
   total = force ( box, r_cut )
-  IF ( total%overlap ) THEN ! should never happen
+  IF ( total%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in smc_nvt_lj'
   END IF

@@ -52,7 +52,7 @@ PROGRAM mc_nvt_lj_re
   REAL :: p_f     ! Pressure for full potential with LRC
   REAL :: tc      ! Configurational temperature
 
-  ! Composite interaction = pot & vir & overlap variables
+  ! Composite interaction = pot & vir & ovr variables
   TYPE(potential_type) :: total, partial_old, partial_new
 
   REAL, DIMENSION(:), ALLOCATABLE :: every_temperature, every_beta, every_dr_max
@@ -153,7 +153,7 @@ PROGRAM mc_nvt_lj_re
 
   ! Initial energy and overlap check
   total = potential ( box, r_cut )
-  IF ( total%overlap ) THEN
+  IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_lj_re'
   END IF
@@ -174,7 +174,7 @@ PROGRAM mc_nvt_lj_re
 
            partial_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial etc
 
-           IF ( partial_old%overlap ) THEN ! should never happen
+           IF ( partial_old%ovr ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_lj_re'
            END IF
@@ -184,7 +184,7 @@ PROGRAM mc_nvt_lj_re
 
            partial_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
 
-           IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
+           IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
 
               delta = partial_new%pot - partial_old%pot ! Use cut (but not shifted) potential
               delta = delta / temperature
@@ -270,7 +270,7 @@ PROGRAM mc_nvt_lj_re
 
   ! Double-check book-keeping for totals, and overlap
   total = potential ( box, r_cut )
-  IF ( total%overlap ) THEN ! should never happen
+  IF ( total%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_lj_re'
   END IF
@@ -305,12 +305,12 @@ CONTAINS
     en_c = en_c + 1.5 * temperature                ! Add ideal gas contribution KE/N to give E_c/N
     en_f = en_c + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E/N estimate
 
-    p_c  = total%vir / box**3                      ! Virial contribution to P_c
-    p_c  = p_c + density * temperature             ! Add ideal gas contribution to P_c
-    p_f  = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P_f
-    p_c  = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P_f)
+    p_c = total%vir / box**3                      ! Virial contribution to P_c
+    p_c = p_c + density * temperature             ! Add ideal gas contribution to P_c
+    p_f = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P_f
+    p_c = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P_f)
 
-    tc   = force_sq ( box, r_cut ) / total%lap     ! Configurational temperature
+    tc = force_sq ( box, r_cut ) / total%lap ! Configurational temperature
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)'           ) string

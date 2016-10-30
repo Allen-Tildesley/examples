@@ -54,7 +54,7 @@ PROGRAM mc_npt_lj
   REAL :: en_f    ! Internal energy per atom for full potential with LRC
   real :: tc      ! Configurational temperature
 
-  ! Composite interaction = pot & vir & overlap variables
+  ! Composite interaction = pot & vir & ovr variables
   TYPE(potential_type) :: total, total_new, partial_old, partial_new
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
@@ -111,7 +111,7 @@ PROGRAM mc_npt_lj
 
   ! Initial energy and overlap check
   total = potential ( box, r_cut ) 
-  IF ( total%overlap ) THEN
+  IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_npt_lj'
   END IF
@@ -132,7 +132,7 @@ PROGRAM mc_npt_lj
 
            partial_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial etc
 
-           IF ( partial_old%overlap ) THEN ! should never happen
+           IF ( partial_old%ovr ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_npt_lj'
            END IF
@@ -142,7 +142,7 @@ PROGRAM mc_npt_lj
 
            partial_new = potential_1 ( ri, i, box, r_cut ) ! New atom potential, virial etc
 
-           IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
+           IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
 
               delta = partial_new%pot - partial_old%pot ! Use cut (but not shifted) potential
               delta = delta / temperature
@@ -168,7 +168,7 @@ PROGRAM mc_npt_lj
 
         total_new = potential ( box_new, r_cut ) ! New total energy, virial etc
 
-        IF ( .NOT. total_new%overlap ) THEN ! Test for non-overlapping configuration
+        IF ( .NOT. total_new%ovr ) THEN ! Test for non-overlapping configuration
 
            delta = total_new%pot - total%pot                  ! Use cut (but not shifted) potential
            delta = delta + pressure * ( box_new**3 - box**3 ) ! Add PV term
@@ -200,7 +200,7 @@ PROGRAM mc_npt_lj
 
   ! Double-check book-keeping for totals, and overlap
   total = potential ( box, r_cut )
-  IF ( total%overlap ) THEN ! should never happen
+  IF ( total%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_npt_lj'
   END IF
@@ -228,18 +228,18 @@ CONTAINS
     ! estimates of < en_f > and < p_f > for the full (uncut) potential
     ! The value of the cut-and-shifted potential is not used, in this example
     
-    density = REAL(n) / box**3                        ! Number density N/V
+    density = REAL(n) / box**3 ! Number density N/V
 
-    en_c    = total%pot / REAL ( n )                  ! PE/N for cut (but not shifted) potential
-    en_c    = en_c + 1.5 * temperature                ! Add ideal gas contribution KE/N to give E_c/N
-    en_f    = en_c + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E_f/N estimate
+    en_c = total%pot / REAL ( n )                  ! PE/N for cut (but not shifted) potential
+    en_c = en_c + 1.5 * temperature                ! Add ideal gas contribution KE/N to give E_c/N
+    en_f = en_c + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E_f/N estimate
 
-    p_c     = total%vir / box**3                      ! Virial contribution to P_c
-    p_c     = p_c + density * temperature             ! Add ideal gas contribution to P_c
-    p_f     = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P_f
-    p_c     = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P_f)
+    p_c = total%vir / box**3                      ! Virial contribution to P_c
+    p_c = p_c + density * temperature             ! Add ideal gas contribution to P_c
+    p_f = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P_f
+    p_c = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P_f)
 
-    tc      = force_sq ( box, r_cut ) / total%lap     ! Configurational temperature
+    tc = force_sq ( box, r_cut ) / total%lap ! Configurational temperature
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)'           ) string

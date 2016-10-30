@@ -23,10 +23,10 @@ MODULE mc_module
 
   ! Public derived type
   TYPE, PUBLIC :: potential_type   ! A composite variable for interactions comprising
-     REAL    :: pot     ! the potential energy cut at r_cut and
-     REAL    :: vir     ! the virial and
-     REAL    :: lap     ! the Laplacian and
-     LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+     REAL    :: pot ! the potential energy cut at r_cut and
+     REAL    :: vir ! the virial and
+     REAL    :: lap ! the Laplacian and
+     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
    CONTAINS
      PROCEDURE :: add_potential_type
      PROCEDURE :: subtract_potential_type
@@ -40,20 +40,20 @@ CONTAINS
     IMPLICIT NONE
     TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
     CLASS(potential_type), INTENT(in) :: a, b
-    c%pot     = a%pot      +   b%pot
-    c%vir     = a%vir      +   b%vir
-    c%lap     = a%lap      +   b%lap
-    c%overlap = a%overlap .OR. b%overlap
+    c%pot = a%pot  +   b%pot
+    c%vir = a%vir  +   b%vir
+    c%lap = a%lap  +   b%lap
+    c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
     TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
     CLASS(potential_type), INTENT(in) :: a, b
-    c%pot     = a%pot      -   b%pot
-    c%vir     = a%vir      -   b%vir
-    c%lap     = a%lap      -   b%lap
-    c%overlap = a%overlap .OR. b%overlap ! this is meaningless, but inconsequential
+    c%pot = a%pot  -   b%pot
+    c%vir = a%vir  -   b%vir
+    c%lap = a%lap  -   b%lap
+    c%ovr = a%ovr .OR. b%ovr ! This is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
 
   SUBROUTINE introduction ( output_unit )
@@ -108,7 +108,7 @@ CONTAINS
     ! total%pot is the nonbonded cut (not shifted) potential energy for whole system
     ! total%vir is the corresponding virial for whole system
     ! total%lap is the corresponding Laplacian for whole system
-    ! total%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! total%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this flag is .true., the values of total%pot etc should not be used
     ! Actual calculation is performed by function potential_1
 
@@ -120,22 +120,22 @@ CONTAINS
        STOP 'Error in potential'
     END IF
 
-    total = potential_type ( pot=0.0, vir=0.0, lap=0.0, overlap=.FALSE. ) ! Initialize
+    total = potential_type ( pot=0.0, vir=0.0, lap=0.0, ovr=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1
 
        partial = potential_1 ( r(:,i), i, box, r_cut, gt )
 
-       IF ( partial%overlap ) THEN
-          total%overlap = .TRUE. ! Overlap detected
-          RETURN                 ! Return immediately
+       IF ( partial%ovr ) THEN
+          total%ovr = .TRUE. ! Overlap detected
+          RETURN             ! Return immediately
        END IF
 
        total = total + partial
 
     END DO
 
-    total%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    total%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential
 
@@ -151,7 +151,7 @@ CONTAINS
     ! partial%pot is the nonbonded cut (not shifted) potential energy of atom ri with a set of other atoms
     ! partial%vir is the corresponding virial of atom ri
     ! partial%lap is the corresponding Laplacian of atom ri
-    ! partial%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! partial%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this is .true., the values of partial%pot etc should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
@@ -191,7 +191,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    partial = potential_type ( pot=0.0, vir=0.0, lap=0.0, overlap=.FALSE. ) ! Initialize
+    partial = potential_type ( pot=0.0, vir=0.0, lap=0.0, ovr=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Loop over selected range of partners
 
@@ -203,12 +203,12 @@ CONTAINS
 
        IF ( rij_sq < r_cut_box_sq ) THEN ! Check within range
 
-          rij_sq = rij_sq * box_sq ! now in sigma=1 units
+          rij_sq = rij_sq * box_sq ! Now in sigma=1 units
           sr2    = 1.0 / rij_sq    ! (sigma/rij)**2
 
           IF ( sr2 > sr2_overlap ) THEN
-             partial%overlap = .TRUE. ! Overlap detected
-             RETURN                   ! Return immediately
+             partial%ovr = .TRUE. ! Overlap detected
+             RETURN               ! Return immediately
           END IF
 
           sr6   = sr2**3
@@ -226,10 +226,10 @@ CONTAINS
     END DO ! End loop over selected range of partners
 
     ! Include numerical factors
-    partial%pot     = partial%pot * 4.0
-    partial%vir     = partial%vir * 24.0 / 3.0
-    partial%lap     = partial%lap * 24.0 * 2.0
-    partial%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    partial%pot = partial%pot * 4.0
+    partial%vir = partial%vir * 24.0 / 3.0
+    partial%lap = partial%lap * 24.0 * 2.0
+    partial%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential_1
 
@@ -278,8 +278,7 @@ CONTAINS
 
     END DO ! End outer loop over atoms
 
-    ! Multiply results by numerical factors
-    f   = f * 24.0
+    f   = f * 24.0 ! Numerical factor
     fsq = SUM ( f**2 )
 
   END FUNCTION force_sq

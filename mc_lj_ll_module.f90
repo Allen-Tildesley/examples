@@ -6,8 +6,8 @@ MODULE mc_module
   ! for mc_lj_module.f90 which should work in our constant-NVT and zVT programs.
   ! However, we have adopted a simple approach of setting up the list structure,
   ! by calling initialize_list (in allocate_arrays) and make_list (in potential),
-  ! just once at the start of the run. Consequently some small modifications would be
-  ! needed to make it work with the constant-NPT program, since the box length varies.
+  ! just once at the start of the run. Consequently some modifications would be
+  ! needed to make it work with the constant-NPT program, with varying box length.
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
@@ -31,10 +31,10 @@ MODULE mc_module
 
   ! Public derived type
   TYPE, PUBLIC :: potential_type ! A composite variable for interactions comprising
-     REAL    :: pot     ! the potential energy cut at r_cut, and
-     REAL    :: vir     ! the virial and
-     REAL    :: lap     ! the Laplacian and
-     LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+     REAL    :: pot ! the potential energy cut (but not shifted) at r_cut, and
+     REAL    :: vir ! the virial and
+     REAL    :: lap ! the Laplacian and
+     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
    CONTAINS
      PROCEDURE :: add_potential_type
      PROCEDURE :: subtract_potential_type
@@ -48,20 +48,20 @@ CONTAINS
     IMPLICIT NONE
     TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
     CLASS(potential_type), INTENT(in) :: a, b
-    c%pot     = a%pot      +   b%pot
-    c%vir     = a%vir      +   b%vir
-    c%lap     = a%lap      +   b%lap
-    c%overlap = a%overlap .OR. b%overlap
+    c%pot = a%pot  +   b%pot
+    c%vir = a%vir  +   b%vir
+    c%lap = a%lap  +   b%lap
+    c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
     TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
     CLASS(potential_type), INTENT(in) :: a, b
-    c%pot     = a%pot      -   b%pot
-    c%vir     = a%vir      -   b%vir
-    c%lap     = a%lap      -   b%lap
-    c%overlap = a%overlap .OR. b%overlap ! this is meaningless, but inconsequential
+    c%pot = a%pot  -   b%pot
+    c%vir = a%vir  -   b%vir
+    c%lap = a%lap  -   b%lap
+    c%ovr = a%ovr .OR. b%ovr ! This is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
 
   SUBROUTINE introduction ( output_unit )
@@ -116,14 +116,14 @@ CONTAINS
   FUNCTION potential ( box, r_cut ) RESULT ( total )
     USE link_list_module, ONLY : make_list
     IMPLICIT NONE
-    TYPE(potential_type) :: total ! Returns a composite of pot, vir and overlap
+    TYPE(potential_type) :: total ! Returns a composite of pot, vir etc
     REAL, INTENT(in)     :: box   ! Simulation box length
     REAL, INTENT(in)     :: r_cut ! Potential cutoff
 
     ! total%pot is the nonbonded cut (not shifted) potential energy for whole system
     ! total%vir is the corresponding virial for whole system
     ! total%lap is the corresponding Laplacian for whole system
-    ! total%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! total%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this flag is .true., the values of total%pot etc should not be used
     ! Actual calculation is performed by function potential_1
 
@@ -139,7 +139,7 @@ CONTAINS
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
-       STOP 'Error in potential'
+       STOP 'Impossible error in potential'
     END IF
 
     IF ( first_call ) THEN
@@ -148,22 +148,22 @@ CONTAINS
        first_call = .FALSE.
     END IF
 
-    total = potential_type ( pot=0.0, vir=0.0, lap=0.0, overlap=.FALSE. ) ! Initialize
+    total = potential_type ( pot=0.0, vir=0.0, lap=0.0, ovr=.FALSE. ) ! Initialize
 
     DO i = 1, n-1
 
        partial = potential_1 ( r(:,i), i, box, r_cut, gt )
 
-       IF ( partial%overlap ) THEN
-          total%overlap = .TRUE. ! Overlap detected
-          RETURN                 ! Return immediately
+       IF ( partial%ovr ) THEN
+          total%ovr = .TRUE. ! Overlap detected
+          RETURN             ! Return immediately
        END IF
 
        total = total + partial
 
     END DO
 
-    total%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    total%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential
 
@@ -180,7 +180,7 @@ CONTAINS
     ! partial%pot is the nonbonded cut (not shifted) potential energy of atom ri with a set of other atoms
     ! partial%vir is the corresponding virial of atom ri
     ! partial%lap is the corresponding Laplacian of atom ri
-    ! partial%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! partial%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this is .true., the value of partial%pot should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
     ! The optional argument j_range restricts partner indices to "half" which is
@@ -215,7 +215,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    partial = potential_type ( pot=0.0, vir=0.0, lap=0.0, overlap=.FALSE. ) ! Initialize
+    partial = potential_type ( pot=0.0, vir=0.0, lap=0.0, ovr=.FALSE. ) ! Initialize
 
     jj = 0
 
@@ -236,8 +236,8 @@ CONTAINS
           sr2    = 1.0 / rij_sq       ! (sigma/rij)**2
 
           IF ( sr2 > sr2_overlap ) THEN
-             partial%overlap = .TRUE. ! Overlap detected
-             RETURN                   ! Return immediately
+             partial%ovr = .TRUE. ! Overlap detected
+             RETURN               ! Return immediately
           END IF
 
           sr6   = sr2**3
@@ -255,10 +255,10 @@ CONTAINS
     END DO ! End loop until no more entries in j_list
 
     ! Numerical factors
-    partial%pot     = partial%pot * 4.0
-    partial%vir     = partial%vir * 24.0 / 3.0
-    partial%lap     = partial%lap * 24.0 * 2.0
-    partial%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
+    partial%pot = partial%pot * 4.0
+    partial%vir = partial%vir * 24.0 / 3.0
+    partial%lap = partial%lap * 24.0 * 2.0
+    partial%ovr = .FALSE. ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION potential_1
 
@@ -318,8 +318,7 @@ CONTAINS
 
     END DO ! End outer loop over i
 
-    ! Multiply results by numerical factors
-    f   = f   * 24.0
+    f   = f * 24.0 ! Numerical factor
     fsq = SUM ( f**2 )
 
   END FUNCTION force_sq
@@ -327,17 +326,18 @@ CONTAINS
   SUBROUTINE get_neighbours ( i, ci, half )
     USE link_list_module, ONLY : sc, list, head
     IMPLICIT NONE
-    INTEGER,               INTENT(in) :: i    ! atom whose neighbours are required
-    INTEGER, DIMENSION(3), INTENT(in) :: ci   ! cell of atom of interest
-    LOGICAL,               INTENT(in) :: half ! determining the range of neighbours searched
+    INTEGER,               INTENT(in) :: i    ! Atom whose neighbours are required
+    INTEGER, DIMENSION(3), INTENT(in) :: ci   ! Cell of atom of interest
+    LOGICAL,               INTENT(in) :: half ! Determining the range of neighbours searched
 
     ! This routine uses the link-list cell structure to fill out the array j_list
     ! with possible neighbours of atom i, padding with zeroes
     ! If half==.false., all 27 cells are searched.
     ! If half==.true., only the i-cell, and 13 neighbour cells, are searched
     ! and moreover, in the i-cell, we only look down-list making use of list(i)
-    ! There is a subtlety here: if half==.true. we assume that ci(:)==c(:,i)
+    ! There is a subtlety: if half==.true. we assume that ri(:)==r(:,i), hence ci(:)==c(:,i)
     ! Generally, if half==.false., ri and ci might be very different to r(:,i) and c(:,i)
+    ! but in that case we make no use of list(i)
 
     ! We have a cubic cell lattice
     ! Set up vectors to each cell in the 3x3x3 neighbourhood of a given cell
@@ -374,9 +374,9 @@ CONTAINS
        cj(:) = MODULO ( cj(:), sc ) ! Periodic boundary correction
 
        IF ( k == 0 .AND. half ) THEN
-          j = list(i) ! check down-list from i in i-cell
+          j = list(i) ! Check down-list from i in i-cell
        ELSE
-          j = head(cj(1),cj(2),cj(3)) ! check entire j-cell
+          j = head(cj(1),cj(2),cj(3)) ! Check entire j-cell
        END IF
 
        DO ! Begin loop over j atoms in list

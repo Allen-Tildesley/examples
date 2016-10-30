@@ -124,6 +124,7 @@ CONTAINS
   END FUNCTION lcg
 
   FUNCTION random_integer ( k1, k2 ) RESULT ( k )
+    IMPLICIT NONE
     INTEGER             :: k      ! Returns a uniformly distributed random integer
     INTEGER, INTENT(in) :: k1, k2 ! in range [k1,k2] inclusive
 
@@ -142,6 +143,7 @@ CONTAINS
   END FUNCTION random_integer
 
   FUNCTION random_normal ( mean, std ) RESULT ( r )
+    IMPLICIT NONE
     REAL             :: r    ! Returns a normally-distributed random number with
     REAL, INTENT(in) :: mean ! specified mean and
     REAL, INTENT(in) :: std  ! specified standard deviation
@@ -170,10 +172,11 @@ CONTAINS
 
   END FUNCTION random_normal
 
-  SUBROUTINE random_normals_1 ( mean, std, r ) ! Returns vector of normal random numbers, all with
-    REAL,               INTENT(in)  :: mean    ! specified mean and 
-    REAL,               INTENT(in)  :: std     ! specified standard deviation
-    REAL, DIMENSION(:), INTENT(out) :: r       ! Output argument
+  SUBROUTINE random_normals_1 ( mean, std, r ) ! Normal random numbers
+    IMPLICIT NONE
+    REAL,               INTENT(in)  :: mean ! Specified mean and 
+    REAL,               INTENT(in)  :: std  ! specified standard deviation, used to return
+    REAL, DIMENSION(:), INTENT(out) :: r    ! vector of normal random numbers
 
     INTEGER :: i
 
@@ -183,10 +186,11 @@ CONTAINS
 
   END SUBROUTINE random_normals_1
 
-  SUBROUTINE random_normals_2 ( mean, std, r ) ! Returns array of normal random numbers, all with
-    REAL,                 INTENT(in)  :: mean  ! specified mean and 
-    REAL,                 INTENT(in)  :: std   ! specified standard deviation
-    REAL, DIMENSION(:,:), INTENT(out) :: r     ! Output argument
+  SUBROUTINE random_normals_2 ( mean, std, r ) ! Normal random numbers
+    IMPLICIT NONE
+    REAL,                 INTENT(in)  :: mean  ! Specified mean and 
+    REAL,                 INTENT(in)  :: std   ! specified standard deviation, used to return
+    REAL, DIMENSION(:,:), INTENT(out) :: r     ! array of normal random numbers
 
     INTEGER :: i, j
 
@@ -198,7 +202,8 @@ CONTAINS
 
   END SUBROUTINE random_normals_2
 
-  FUNCTION pick_r ( w ) RESULT ( k )
+  FUNCTION pick_r ( w ) RESULT ( k ) ! Pick amongst options with real weights
+    IMPLICIT NONE
     INTEGER                        :: k ! Returns one of the options with probability proportional to
     REAL, DIMENSION(:), INTENT(in) :: w ! the supplied weights
 
@@ -217,7 +222,8 @@ CONTAINS
 
   END FUNCTION pick_r
 
-  FUNCTION pick_i ( w ) RESULT ( k )
+  FUNCTION pick_i ( w ) RESULT ( k ) ! Pick amongst options with integer weights
+    IMPLICIT NONE
     INTEGER                           :: k ! Returns one of the options with probability proportional to
     INTEGER, DIMENSION(:), INTENT(in) :: w ! the supplied weights
 
@@ -238,6 +244,7 @@ CONTAINS
   END FUNCTION pick_i
 
   FUNCTION random_vector_1 () RESULT ( e ) ! 1st alternative algorithm
+    IMPLICIT NONE
     REAL, DIMENSION(3) :: e ! Returns a uniformly sampled unit vector
 
     ! The vector is chosen uniformly within the cube surrounding the unit sphere
@@ -259,6 +266,7 @@ CONTAINS
   END FUNCTION random_vector_1
 
   FUNCTION random_vector_2 () RESULT ( e ) ! 2nd alternative algorithm
+    IMPLICIT NONE
     REAL, DIMENSION(3) :: e ! Returns a uniformly sampled unit vector
 
     ! The polar angles are chosen from the correct distribution
@@ -283,6 +291,7 @@ CONTAINS
   END FUNCTION random_vector_2
 
   FUNCTION random_vector_3 () RESULT ( e ) ! 3rd alternative algorithm
+    IMPLICIT NONE
     REAL, DIMENSION(3) :: e ! Returns a uniformly sampled unit vector
 
     REAL, DIMENSION(2) :: zeta
@@ -301,6 +310,7 @@ CONTAINS
   END FUNCTION random_vector_3
 
   FUNCTION random_perpendicular_vector ( old ) RESULT ( e )
+    IMPLICIT NONE
     REAL, DIMENSION(3)             :: e   ! Returns a uniformly sampled unit vector perpendicular to
     REAL, DIMENSION(3), INTENT(in) :: old ! the old vector 
 
@@ -326,7 +336,8 @@ CONTAINS
 
   END FUNCTION random_perpendicular_vector
 
-  FUNCTION random_translate_vector ( dr_max, old ) result ( r )
+  FUNCTION random_translate_vector ( dr_max, old ) RESULT ( r )
+    IMPLICIT NONE
     REAL, DIMENSION(3)             :: r      ! Returns a vector translated by a
     REAL,               INTENT(in) :: dr_max ! maximum displacement relative to
     REAL, DIMENSION(3), INTENT(in) :: old    ! the old vector
@@ -342,6 +353,7 @@ CONTAINS
   END FUNCTION random_translate_vector
   
   FUNCTION random_rotate_vector_1 ( angle_max, old ) RESULT ( e ) ! 1st alternative algorithm
+    IMPLICIT NONE
     REAL, DIMENSION(3)             :: e         ! Returns a unit vector rotated by a
     REAL,               INTENT(in) :: angle_max ! maximum angle (in radians) relative to
     REAL, DIMENSION(3), INTENT(in) :: old       ! the old vector
@@ -365,6 +377,7 @@ CONTAINS
   END FUNCTION random_rotate_vector_1
 
   FUNCTION random_rotate_vector_2 ( angle_max, old ) RESULT ( e ) ! 2nd alternative algorithm
+    IMPLICIT NONE
     REAL, DIMENSION(3)             :: e         ! Returns a unit vector rotated by a
     REAL,               INTENT(in) :: angle_max ! maximum angle (in radians) relative to
     REAL, DIMENSION(3), INTENT(in) :: old       ! the old vector
@@ -392,6 +405,7 @@ CONTAINS
   END FUNCTION random_rotate_vector_2
 
   FUNCTION random_rotate_vector_3 ( angle_max, old ) RESULT ( e ) ! 3rd alternative algorithm
+    IMPLICIT NONE
     REAL, DIMENSION(3)             :: e         ! Returns a unit vector rotated by a
     REAL,               INTENT(in) :: angle_max ! maximum angle (in radians) relative to
     REAL, DIMENSION(3), INTENT(in) :: old       ! the old vector
@@ -421,6 +435,7 @@ CONTAINS
   END FUNCTION random_rotate_vector_3
 
   FUNCTION random_rotate_vector_4 ( angle_max, old ) RESULT ( e ) ! 4th alternative algorithm
+    IMPLICIT NONE
     REAL, DIMENSION(3)             :: e         ! Returns a unit vector rotated by a
     REAL, INTENT(in)               :: angle_max ! maximum angle (in radians) relative to
     REAL, DIMENSION(3), INTENT(in) :: old       ! the old vector
@@ -448,6 +463,7 @@ CONTAINS
   END FUNCTION random_rotate_vector_4
 
   FUNCTION random_quaternion () RESULT ( e )
+    IMPLICIT NONE
     REAL, DIMENSION(0:3) :: e ! Returns a uniformly sampled unit quaternion
 
     REAL, DIMENSION(2) :: zeta
@@ -477,6 +493,7 @@ CONTAINS
   END FUNCTION random_quaternion
 
   FUNCTION random_rotate_quaternion ( angle_max, old ) RESULT ( e )
+    IMPLICIT NONE
     REAL, DIMENSION(0:3)             :: e         ! Returns a unit quaternion rotated by a
     REAL,                 INTENT(in) :: angle_max ! maximum angle (in radians) relative to
     REAL, DIMENSION(0:3), INTENT(in) :: old       ! the old quaternion
@@ -497,20 +514,21 @@ CONTAINS
 
   END FUNCTION random_rotate_quaternion
 
-  FUNCTION metropolis ( delta ) ! Conduct Metropolis test, with safeguards
-    LOGICAL          :: metropolis
-    REAL, INTENT(in) :: delta
+  FUNCTION metropolis ( delta ) RESULT ( accept ) ! Conduct Metropolis test, with safeguards
+    IMPLICIT NONE
+    LOGICAL          :: accept ! Returns decision
+    REAL, INTENT(in) :: delta  ! Negative of argument of exponential
 
     REAL            :: zeta
     REAL, PARAMETER :: exponent_guard = 75.0
 
-    IF ( delta > exponent_guard ) THEN ! too high, reject without evaluating
-       metropolis = .FALSE.
-    ELSE IF ( delta < 0.0 ) THEN ! downhill, accept without evaluating
-       metropolis = .TRUE.
+    IF ( delta > exponent_guard ) THEN ! Too high, reject without evaluating
+       accept = .FALSE.
+    ELSE IF ( delta < 0.0 ) THEN ! Downhill, accept without evaluating
+       accept = .TRUE.
     ELSE
-       CALL RANDOM_NUMBER ( zeta )     ! Uniform random number in range (0,1)
-       metropolis = EXP(-delta) > zeta ! Metropolis test
+       CALL RANDOM_NUMBER ( zeta ) ! Uniform random number in range (0,1)
+       accept = EXP(-delta) > zeta ! Metropolis test
     END IF
 
   END FUNCTION metropolis
@@ -518,6 +536,7 @@ CONTAINS
   ! Low level mathematical operations and string manipulation
 
   FUNCTION rotate_vector ( angle, axis, old ) RESULT ( e )
+    IMPLICIT NONE
     REAL, DIMENSION(3)             :: e     ! Returns a vector rotated by a
     REAL,               INTENT(in) :: angle ! specified rotation angle (in radians) about a
     REAL, DIMENSION(3), INTENT(in) :: axis  ! specified rotation axis relative to
@@ -542,6 +561,7 @@ CONTAINS
   END FUNCTION rotate_vector
 
   FUNCTION rotate_quaternion ( angle, axis, old ) RESULT ( e )
+    IMPLICIT NONE
     REAL, DIMENSION(0:3)             :: e     ! Returns a quaternion rotated by a
     REAL,                 INTENT(in) :: angle ! specified rotation angle (in radians) about a
     REAL, DIMENSION(3),   INTENT(in) :: axis  ! specified rotation axis relative to
@@ -566,6 +586,7 @@ CONTAINS
   END FUNCTION rotate_quaternion
 
   FUNCTION quatmul ( a, b ) RESULT ( c )
+    IMPLICIT NONE
     REAL, DIMENSION(0:3)             :: c    ! Returns quaternion product of
     REAL, DIMENSION(0:3), INTENT(in) :: a, b ! two supplied quaternions
 
@@ -577,6 +598,7 @@ CONTAINS
   END FUNCTION quatmul
 
   FUNCTION cross_product ( a, b ) RESULT ( c )
+    IMPLICIT NONE
     REAL, DIMENSION(3)             :: c    ! Returns vector cross product of
     REAL, DIMENSION(3), INTENT(in) :: a, b ! two supplied vectors
     c(1) = a(2)*b(3) - a(3)*b(2)
@@ -584,9 +606,10 @@ CONTAINS
     c(3) = a(1)*b(2) - a(2)*b(1)
   END FUNCTION cross_product
 
-  FUNCTION outer_product_2 ( a, b ) RESULT (c)
-    REAL, DIMENSION(:),              INTENT(IN)   :: a, b ! Given two supplied vectors,
-    REAL, DIMENSION(SIZE(a),SIZE(b))              :: c    ! returns their rank-2 outer product
+  FUNCTION outer_product_2 ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL, DIMENSION(:),              INTENT(IN) :: a, b ! Given two supplied vectors,
+    REAL, DIMENSION(SIZE(a),SIZE(b))            :: c    ! returns their rank-2 outer product
 
     INTEGER :: i, j
 
@@ -602,6 +625,7 @@ CONTAINS
   END FUNCTION outer_product_2
 
   FUNCTION outer_product_3 ( a, b, c ) RESULT (d)
+    IMPLICIT NONE
     REAL, DIMENSION(:),                      INTENT(IN) :: a, b, c ! Given three supplied vectors,
     REAL, DIMENSION(SIZE(a),SIZE(b),SIZE(c))            :: d       ! returns their rank-3 outer product
 
@@ -618,8 +642,9 @@ CONTAINS
   END FUNCTION outer_product_3
 
   FUNCTION lowercase ( oldstring ) RESULT ( newstring )
-    CHARACTER(len=*),             INTENT(in)    :: oldstring ! Given a supplied string,
-    CHARACTER(len=LEN(oldstring))               :: newstring ! returns a copy converted to lowercase
+    IMPLICIT NONE
+    CHARACTER(len=*),             INTENT(in) :: oldstring ! Given a supplied string,
+    CHARACTER(len=LEN(oldstring))            :: newstring ! returns a copy converted to lowercase
 
     INTEGER :: i, k 
 
@@ -639,6 +664,7 @@ CONTAINS
   ! Order parameter routines
 
   FUNCTION translational_order ( r, k ) RESULT ( order )
+    IMPLICIT NONE
     REAL                                          :: order ! Returns a translational order parameter from
     REAL,    DIMENSION(:,:), INTENT(in)           :: r     ! a set of molecular position vectors (3,n), and a
     INTEGER, DIMENSION(3),   INTENT(in), OPTIONAL :: k     ! lattice reciprocal vector (integer)
@@ -688,6 +714,7 @@ CONTAINS
   END FUNCTION translational_order
 
   FUNCTION orientational_order ( e ) RESULT ( order )
+    IMPLICIT NONE
     REAL                             :: order ! Returns a crystal orientational order parameter from
     REAL, DIMENSION(:,:), INTENT(in) :: e     ! a set of molecular orientation vectors (3,n)
 
@@ -731,6 +758,7 @@ CONTAINS
   END FUNCTION orientational_order
 
   FUNCTION nematic_order ( e ) RESULT ( order )
+    IMPLICIT NONE
     REAL                             :: order ! Returns a nematic orientational order parameter from
     REAL, DIMENSION(:,:), INTENT(in) :: e     ! a set of molecular orientation vectors (3,n)
 
@@ -781,6 +809,7 @@ CONTAINS
   END FUNCTION nematic_order
 
   FUNCTION q_to_a ( q ) RESULT ( a )
+    IMPLICIT NONE
     REAL, DIMENSION(3,3)             :: a ! Returns a 3x3 rotation matrix calculated from
     REAL, DIMENSION(0:3), INTENT(in) :: q ! a supplied quaternion
 
@@ -794,7 +823,7 @@ CONTAINS
 
     REAL :: norm
 
-    norm = SUM ( q**2 ) ! Axis squared length
+    norm = SUM ( q**2 ) ! Quaternion squared length
     IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in q_to_a' ! Should never happen
 
     ! Write out row by row, for clarity

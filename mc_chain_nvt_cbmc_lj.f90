@@ -26,11 +26,11 @@ PROGRAM mc_chain_nvt_cbmc_lj
   ! The model is defined in mc_module
 
   ! Most important variables
-  REAL    :: temperature   ! Temperature (specified, in units of well depth)
-  REAL    :: bond          ! Intramolecular bond length
-  REAL    :: k_spring      ! Strength of intramolecular bond springs
-  INTEGER :: m_max         ! Maximum atoms in regrow
-  INTEGER :: k_max         ! Number of random tries per atom in regrow
+  REAL    :: temperature ! Temperature (specified, in units of well depth)
+  REAL    :: bond        ! Intramolecular bond length
+  REAL    :: k_spring    ! Strength of intramolecular bond springs
+  INTEGER :: m_max       ! Maximum atoms in regrow
+  INTEGER :: k_max       ! Number of random tries per atom in regrow
 
   ! Quantities for averaging
   REAL :: m_ratio ! Acceptance ratio for regrowth moves
@@ -102,15 +102,14 @@ PROGRAM mc_chain_nvt_cbmc_lj
            m_ratio = 0.0
         END IF
 
-        ! Calculate all variables for this step
         CALL calculate()
         CALL blk_add ( [m_ratio,pe,r_g] )
 
      END DO ! End loop over steps
 
      CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk         ! number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, bond, r ) ! save configuration
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk         ! Number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, bond, r ) ! Save configuration
 
   END DO ! End loop over blocks
 
@@ -136,7 +135,7 @@ CONTAINS
 
     total = potential ( ) ! Calculate nonbonded potential with overlap flag
 
-    IF ( total%overlap ) THEN ! Overlap test (might happen with initial configuration)
+    IF ( total%ovr ) THEN ! Overlap test (might happen with initial configuration)
        WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
        STOP 'Error in mc_chain_nvt_cbmc_lj/calculate'
     END IF ! End overlap test

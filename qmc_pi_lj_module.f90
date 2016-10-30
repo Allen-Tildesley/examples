@@ -12,17 +12,17 @@ MODULE qmc_module
   PUBLIC :: potential_1, potential, spring_1, spring, potential_lrc
 
   ! Public data
-  INTEGER,                                PUBLIC :: n ! number of atoms
-  INTEGER,                                PUBLIC :: p ! number of beads
-  REAL,    DIMENSION(:,:,:), ALLOCATABLE, PUBLIC :: r ! positions (3,n,p)
+  INTEGER,                                PUBLIC :: n ! Number of atoms
+  INTEGER,                                PUBLIC :: p ! Number of beads
+  REAL,    DIMENSION(:,:,:), ALLOCATABLE, PUBLIC :: r ! Positions (3,n,p)
 
   ! Private data
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! j-range and l-range options
 
   ! Public derived type
   TYPE, PUBLIC :: potential_type ! A composite variable for interaction energies comprising
-     REAL    :: pot     ! the cut (but not shifted) potential energy and
-     LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+     REAL    :: pot ! the cut (but not shifted) potential energy and
+     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
    CONTAINS
      PROCEDURE :: add_potential_type
      PROCEDURE :: subtract_potential_type
@@ -36,16 +36,16 @@ CONTAINS
     IMPLICIT NONE
     TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
     CLASS(potential_type), INTENT(in) :: a, b
-    c%pot     = a%pot      +   b%pot
-    c%overlap = a%overlap .OR. b%overlap
+    c%pot = a%pot  +   b%pot
+    c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
     TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
     CLASS(potential_type), INTENT(in) :: a, b
-    c%pot     = a%pot      -   b%pot
-    c%overlap = a%overlap .OR. b%overlap ! this is meaningless, but inconsequential
+    c%pot = a%pot  -   b%pot
+    c%ovr = a%ovr .OR. b%ovr ! This is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
 
   SUBROUTINE introduction ( output_unit )
@@ -93,12 +93,12 @@ CONTAINS
 
   FUNCTION potential ( box, r_cut ) RESULT ( total )
     IMPLICIT NONE
-    TYPE(potential_type) :: total ! Returns a composite of pot and overlap
+    TYPE(potential_type) :: total ! Returns a composite of pot and ovr
     REAL, INTENT(in)     :: box   ! Simulation box length
     REAL, INTENT(in)     :: r_cut ! Potential cutoff distance
 
     ! total%pot is the nonbonded cut (not shifted) classical potential energy for whole system
-    ! total%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! total%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this flag is .true., the values of total%pot etc should not be used
     ! Actual calculation is performed by function potential_1
 
@@ -114,16 +114,16 @@ CONTAINS
        STOP 'Error in potential'
     END IF
 
-    total = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
+    total = potential_type ( pot=0.0, ovr=.FALSE. ) ! Initialize
 
     DO k = 1, p ! Loop over ring polymers
        DO i = 1, n - 1 ! Loop over atoms within polymer
 
           partial = potential_1 ( r(:,i,k), i, k, box, r_cut, gt )
 
-          IF ( partial%overlap ) THEN
-             total%overlap = .TRUE. ! Overlap detected
-             RETURN                 ! Return immediately
+          IF ( partial%ovr ) THEN
+             total%ovr = .TRUE. ! Overlap detected
+             RETURN             ! Return immediately
           END IF
 
           total = total + partial
@@ -131,13 +131,13 @@ CONTAINS
        END DO ! End loop over atoms within polymer
     END DO ! End loop over ring polymers
 
-    total%overlap = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    total%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential
 
   FUNCTION potential_1 ( rik, i, k, box, r_cut, j_range ) RESULT ( partial )
     IMPLICIT NONE
-    TYPE(potential_type)           :: partial ! Returns a composite of pot and overlap for given atom
+    TYPE(potential_type)           :: partial ! Returns a composite of pot and ovr for given atom
     REAL, DIMENSION(3), INTENT(in) :: rik     ! Coordinates of atom of interest
     INTEGER,            INTENT(in) :: i, k    ! Index and polymer id of atom of interest
     REAL,               INTENT(in) :: box     ! Simulation box length
@@ -145,7 +145,7 @@ CONTAINS
     INTEGER, OPTIONAL,  INTENT(in) :: j_range ! Optional partner index range
 
     ! partial%pot is the nonbonded cut (not shifted) classical potential energy of atom rik with a set of other atoms
-    ! partial%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! partial%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this is .true., the value of partial%pot should not be used
     ! The coordinates in rik are not necessarily identical with those in r(:,i,k)
     ! The partner atoms always have the same polymer index k
@@ -190,7 +190,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    partial = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
+    partial = potential_type ( pot=0.0, ovr=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Loop over selected range of partners
 
@@ -206,8 +206,8 @@ CONTAINS
           sr2        = 1.0 / r_ik_jk_sq    ! (sigma/rikjk)**2
 
           IF ( sr2 > sr2_overlap ) THEN
-             partial%overlap = .TRUE. ! Overlap detected
-             RETURN                   ! Return immediately
+             partial%ovr = .TRUE. ! Overlap detected
+             RETURN               ! Return immediately
           END IF
 
           sr6   = sr2**3
@@ -220,8 +220,8 @@ CONTAINS
     END DO ! End loop over selected range of partners
 
     ! Include numerical factors
-    partial%pot     = partial%pot * 4.0 / REAL ( p ) ! Classical potentials are weaker by a factor p
-    partial%overlap = .FALSE.                        ! No overlaps detected (redundant, but for clarity)
+    partial%pot = partial%pot * 4.0 / REAL ( p ) ! Classical potentials are weaker by a factor p
+    partial%ovr = .FALSE.                        ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential_1
 

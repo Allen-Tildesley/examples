@@ -42,12 +42,12 @@ PROGRAM bd_nvt_lj
   REAL :: gamma       ! Friction coefficient
 
   ! Quantities to be averaged
-  REAL :: en_s    ! Internal energy (cut-and-shifted ) per atom
-  REAL :: p_s     ! Pressure (cut-and-shifted)
-  REAL :: en_f    ! Internal energy (full, including LRC) per atom
-  REAL :: p_f     ! Pressure (full, including LRC)
-  REAL :: tk      ! Kinetic temperature
-  REAL :: tc      ! Configurational temperature
+  REAL :: en_s ! Internal energy (cut-and-shifted ) per atom
+  REAL :: p_s  ! Pressure (cut-and-shifted)
+  REAL :: en_f ! Internal energy (full, including LRC) per atom
+  REAL :: p_f  ! Pressure (full, including LRC)
+  REAL :: tk   ! Kinetic temperature
+  REAL :: tc   ! Configurational temperature
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
   LOGICAL :: overlap
@@ -162,8 +162,10 @@ CONTAINS
   SUBROUTINE a_propagator ( t ) ! A propagator (drift)
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
+
     r(:,:) = r(:,:) + t * v(:,:) / box ! positions in box=1 units
     r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! periodic boundaries (box=1 units)
+
   END SUBROUTINE a_propagator
 
   SUBROUTINE b_propagator ( t ) ! B propagator (kick)

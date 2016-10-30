@@ -18,10 +18,10 @@ PROGRAM cluster
   ! Stoddard J Comp Phys, 27, 291, 1977
   ! This simple algorithm does not scale well to large n
 
-  INTEGER                              :: n    ! number of atoms
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: r    ! positions (3,n)
-  INTEGER, DIMENSION(:),   ALLOCATABLE :: list ! (n)
-  INTEGER, DIMENSION(:),   ALLOCATABLE :: done ! (n)
+  INTEGER                              :: n    ! Number of atoms
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: r    ! Positions (3,n)
+  INTEGER, DIMENSION(:),   ALLOCATABLE :: list ! Linked list array (n)
+  INTEGER, DIMENSION(:),   ALLOCATABLE :: done ! Indicates assignment to cluster (n)
 
   CHARACTER(len=7), PARAMETER :: filename = 'cnf.inp'
   REAL                        :: rcl, rcl_sq, box
@@ -121,8 +121,9 @@ PROGRAM cluster
 CONTAINS
 
   FUNCTION in_range ( j, k )
-    LOGICAL             :: in_range
-    INTEGER, INTENT(in) :: j, k
+    IMPLICIT NONE
+    LOGICAL             :: in_range ! Returns indicator of whether pair is in-range or not
+    INTEGER, INTENT(in) :: j, k     ! Supplied pair of atom indices
 
     REAL, DIMENSION(3) :: rjk
     REAL               :: rjk_sq

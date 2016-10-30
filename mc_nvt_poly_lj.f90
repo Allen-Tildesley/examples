@@ -30,19 +30,19 @@ PROGRAM mc_nvt_poly_lj
   ! The model is defined in mc_module
 
   ! Most important variables
-  REAL :: box         ! box length
-  REAL :: density     ! density (of molecules)
-  REAL :: dr_max      ! maximum MC translational displacement
-  REAL :: de_max      ! maximum MC rotational displacement
-  REAL :: temperature ! specified temperature
-  REAL :: r_cut       ! potential cutoff distance
+  REAL :: box         ! Box length
+  REAL :: density     ! Density (of molecules)
+  REAL :: dr_max      ! Maximum MC translational displacement
+  REAL :: de_max      ! Maximum MC rotational displacement
+  REAL :: temperature ! Specified temperature
+  REAL :: r_cut       ! Potential cutoff distance
 
   ! Quantities to be averaged
-  REAL :: m_ratio ! acceptance ratio of moves
-  REAL :: p_s     ! pressure (cut & shifted potential)
-  REAL :: en_s    ! internal energy per molecule (cut & shifted potential)
+  REAL :: m_ratio ! Acceptance ratio of moves
+  REAL :: p_s     ! Pressure (cut-and-shifted potential)
+  REAL :: en_s    ! Internal energy per molecule (cut-and-shifted potential)
 
-  ! Composite interaction = pot & vir & overlap variables
+  ! Composite interaction = pot & vir & ovr variables
   TYPE(potential_type) :: total, partial_old, partial_new
 
   INTEGER              :: blk, stp, i, nstep, nblock, moves, ioerr
@@ -100,7 +100,7 @@ PROGRAM mc_nvt_poly_lj
 
   ! Calculate total values of pot etc and check for overlap
   total = potential ( box, r_cut )
-  IF ( total%overlap ) THEN
+  IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF
@@ -120,7 +120,7 @@ PROGRAM mc_nvt_poly_lj
 
            partial_old = potential_1 ( r(:,i), e(:,i), i, box, r_cut ) ! Old molecule potential, virial, etc
 
-           IF ( partial_old%overlap ) THEN ! should never happen
+           IF ( partial_old%ovr ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
               STOP 'Error in mc_nvt_poly_lj'
            END IF
@@ -131,7 +131,7 @@ PROGRAM mc_nvt_poly_lj
 
            partial_new = potential_1 ( ri, ei, i, box, r_cut ) ! New molecule potential, virial etc
 
-           IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
+           IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
 
               delta = partial_new%pot - partial_old%pot ! Use cut-and-shifted potential
               delta = delta / temperature               ! Divide by temperature
@@ -166,7 +166,7 @@ PROGRAM mc_nvt_poly_lj
 
   ! Double-check book-keeping for totals, and overlap
   total = potential ( box, r_cut )
-  IF ( total%overlap ) THEN ! should never happen
+  IF ( total%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_nvt_poly_lj'
   END IF

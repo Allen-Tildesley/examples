@@ -47,11 +47,11 @@ PROGRAM qmc_pi_lj
   REAL :: en_c    ! Internal energy per atom for simulated, cut, potential
   REAL :: en_f    ! Internal energy per atom for full potential with LRC
 
-  ! Composite interaction = pot & overlap variables
+  ! Composite interaction = pot & ovr variables
   TYPE(potential_type) :: total, partial_old, partial_new
 
   INTEGER            :: blk, stp, i, k, nstep, nblock, moves, ioerr
-  REAL               :: total_spring, partial_old_spring, partial_new_spring, delta, k_spring
+  REAL               :: total_spr, partial_old_spr, partial_new_spr, delta, k_spring
   REAL, DIMENSION(3) :: rik
 
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -124,11 +124,11 @@ PROGRAM qmc_pi_lj
 
   ! Calculate classical LJ and quantum spring potential energies & check overlap
   total = potential ( box, r_cut )
-  IF ( total%overlap ) THEN
+  IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
-  total_spring = spring ( box, k_spring )
+  total_spr = spring ( box, k_spring )
   CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'E/N (cut)', 'E/N (full)' ] )
@@ -147,31 +147,31 @@ PROGRAM qmc_pi_lj
 
               partial_old = potential_1 ( r(:,i,k), i, k, box, r_cut ) ! Old atom classical potential etc
 
-              IF ( partial_old%overlap ) THEN ! should never happen
+              IF ( partial_old%ovr ) THEN ! should never happen
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
                  STOP 'Error in qmc_pi_lj'
               END IF
 
-              partial_old_spring = spring_1 ( r(:,i,k), i, k, box, k_spring ) ! Old atom quantum potential
+              partial_old_spr = spring_1 ( r(:,i,k), i, k, box, k_spring ) ! Old atom quantum potential
 
               rik(:) = random_translate_vector ( dr_max/box, r(:,i,k) ) ! Trial move to new position (in box=1 units) 
               rik(:) = rik(:) - ANINT ( rik(:) )                        ! Periodic boundary correction
 
               partial_new = potential_1 ( rik, i, k, box, r_cut ) ! New atom classical potential etc
 
-              IF ( .NOT. partial_new%overlap ) THEN ! Test for non-overlapping configuration
+              IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
 
-                 partial_new_spring = spring_1 ( rik, i, k, box, k_spring ) ! New atom quantum potential
+                 partial_new_spr = spring_1 ( rik, i, k, box, k_spring ) ! New atom quantum potential
 
-                 delta =         partial_new%pot    - partial_old%pot    ! Change in classical cut (but not shifted) potential
-                 delta = delta + partial_new_spring - partial_old_spring ! Add change in quantum potential
-                 delta = delta / temperature                             ! Divide by temperature
+                 delta =         partial_new%pot - partial_old%pot ! Change in classical cut (but not shifted) potential
+                 delta = delta + partial_new_spr - partial_old_spr ! Add change in quantum potential
+                 delta = delta / temperature                       ! Divide by temperature
 
                  IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                    total        = total        + partial_new        - partial_old        ! Update classical total values
-                    total_spring = total_spring + partial_new_spring - partial_old_spring ! Update quantum system potential
-                    r(:,i,k)     = rik                                                    ! Update position
-                    moves        = moves + 1                                              ! Increment move counter
+                    total     = total     + partial_new     - partial_old     ! Update classical total values
+                    total_spr = total_spr + partial_new_spr - partial_old_spr ! Update quantum system potential
+                    r(:,i,k)  = rik                                           ! Update position
+                    moves     = moves + 1                                     ! Increment move counter
                  END IF ! End accept Metropolis test
 
               END IF ! End test for non-overlapping configuration
@@ -206,11 +206,11 @@ PROGRAM qmc_pi_lj
 
   ! Final double-check on book-keeping for totals, and overlap
   total = potential ( box, r_cut )
-  IF ( total%overlap ) THEN ! this should never happen
+  IF ( total%ovr ) THEN ! this should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in qmc_pi_lj'
   END IF
-  total_spring = spring ( box, k_spring )
+  total_spr = spring ( box, k_spring )
   CALL calculate ( 'Final check' )
 
   ! Write each ring polymer to a unique file
@@ -241,9 +241,9 @@ CONTAINS
 
     REAL :: kin
 
-    kin  = 1.5 * n * p * temperature                    ! Kinetic energy
-    en_c = ( kin + total%pot - total_spring ) / REAL(n) ! Total energy per atom (cut but not shifted)
-    en_f = en_c + potential_lrc ( density, r_cut )      ! Add long-range contribution to PE/N
+    kin  = 1.5 * n * p * temperature                 ! Kinetic energy
+    en_c = ( kin + total%pot - total_spr ) / REAL(n) ! Total energy per atom (cut but not shifted)
+    en_f = en_c + potential_lrc ( density, r_cut )   ! Add long-range contribution to PE/N
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string

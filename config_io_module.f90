@@ -8,16 +8,18 @@ MODULE config_io_module
   IMPLICIT NONE
   PRIVATE
 
-  ! I/O routines
+  ! Public routines
   PUBLIC :: read_cnf_atoms, write_cnf_atoms, read_cnf_mols, write_cnf_mols
 
 CONTAINS
-  
+
   SUBROUTINE read_cnf_atoms ( filename, n, box, r, v ) ! Read in atomic configuration
-    CHARACTER(len=*),               INTENT(in)    :: filename
-    INTEGER,                        INTENT(inout) :: n
-    REAL,                           INTENT(out)   :: box
-    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: r, v
+    IMPLICIT NONE
+    CHARACTER(len=*),               INTENT(in)    :: filename ! Supplied filename
+    INTEGER,                        INTENT(inout) :: n        ! Number of atoms
+    REAL,                           INTENT(out)   :: box      ! Simulation box length (assumed cubic)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: r        ! Atomic positions (3,n)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: v        ! Atomic velocities (3,n)
 
     INTEGER :: cnf_unit, ioerr, i
 
@@ -93,11 +95,12 @@ CONTAINS
   END SUBROUTINE read_cnf_atoms
 
   SUBROUTINE write_cnf_atoms ( filename, n, box, r, v ) ! Write out atomic configuration
-    CHARACTER(len=*),               INTENT(in) :: filename
-    INTEGER,                        INTENT(in) :: n
-    REAL,                           INTENT(in) :: box
-    REAL, DIMENSION(:,:),           INTENT(in) :: r
-    REAL, DIMENSION(:,:), OPTIONAL, INTENT(in) :: v
+    IMPLICIT NONE
+    CHARACTER(len=*),               INTENT(in) :: filename ! Supplied filename
+    INTEGER,                        INTENT(in) :: n        ! Number of atoms
+    REAL,                           INTENT(in) :: box      ! Simulation box length (assumed cubic)
+    REAL, DIMENSION(:,:),           INTENT(in) :: r        ! Atomic positions (3,n)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(in) :: v        ! Atomic velocities
 
     INTEGER :: cnf_unit, ioerr, i
 
@@ -141,10 +144,14 @@ CONTAINS
   END SUBROUTINE write_cnf_atoms
 
   SUBROUTINE read_cnf_mols ( filename, n, box, r, e, v, w ) ! Read in molecular configuration
-    CHARACTER(len=*),               INTENT(in)    :: filename
-    INTEGER,                        INTENT(inout) :: n
-    REAL,                           INTENT(out)   :: box
-    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: r, e, v, w
+    IMPLICIT NONE
+    CHARACTER(len=*),               INTENT(in)    :: filename ! Supplied filename
+    INTEGER,                        INTENT(inout) :: n        ! Number of molecules
+    REAL,                           INTENT(out)   :: box      ! Simulation box length (assumed cubic)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: r        ! Molecular positions (3,n)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: e        ! Orientation vectors (3,n) or quaternions (0:3,n)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: v        ! Molecular velocities (3,n)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: w        ! Angular velocities (3,n)
 
     INTEGER :: cnf_unit, ioerr, i
 
@@ -173,7 +180,7 @@ CONTAINS
     ! The first call of this routine is used just to get n and box
     ! The second call attempts to read in the atomic positions, orientations and optionally velocities, angular velocities
     ! Expected format is one line per atom containing either r(:,i), e(:,i), v(:,i), w(:,i)  or just r(:,i), e(:,i)
-    ! The first dimension of the e array can be 3 (vector) or 4 (quaternion)
+    ! The first dimension of the e array can be 3 elements (vector) or 4 elements (quaternion)
 
     IF ( PRESENT ( r ) ) THEN
 
@@ -238,11 +245,14 @@ CONTAINS
   END SUBROUTINE read_cnf_mols
 
   SUBROUTINE write_cnf_mols ( filename, n, box, r, e, v, w ) ! Write out molecular configuration
-    CHARACTER(len=*),               INTENT(in) :: filename
-    INTEGER,                        INTENT(in) :: n
-    REAL,                           INTENT(in) :: box
-    REAL, DIMENSION(:,:),           INTENT(in) :: r, e
-    REAL, DIMENSION(:,:), OPTIONAL, INTENT(in) :: v, w
+    IMPLICIT NONE
+    CHARACTER(len=*),               INTENT(in) :: filename ! Supplied filename
+    INTEGER,                        INTENT(in) :: n        ! Number of molecules
+    REAL,                           INTENT(in) :: box      ! Simulation box length (assumed cubic)
+    REAL, DIMENSION(:,:),           INTENT(in) :: r        ! Molecular positions (3,n)
+    REAL, DIMENSION(:,:),           INTENT(in) :: e        ! Orientation vectors (3,n) or quaternions (0:3,n)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(in) :: v        ! Molecular velocities (3,n)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(in) :: w        ! Angular velocities (3,n)
 
     INTEGER :: cnf_unit, ioerr, i
 

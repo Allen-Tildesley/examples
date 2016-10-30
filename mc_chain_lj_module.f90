@@ -21,37 +21,31 @@ MODULE mc_module
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
 
   ! Public derived type
-  PUBLIC :: potential_type
-  TYPE potential_type ! A composite variable for interactions comprising
-     REAL    :: pot     ! the potential energy and
-     LOGICAL :: overlap ! a flag indicating overlap (i.e. pot too high to use)
+  TYPE, PUBLIC :: potential_type ! A composite variable for interactions comprising
+     REAL    :: pot ! the potential energy and
+     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
+   CONTAINS
+     PROCEDURE :: add_potential_type
+     PROCEDURE :: subtract_potential_type
+     GENERIC   :: OPERATOR(+) => add_potential_type
+     GENERIC   :: OPERATOR(-) => subtract_potential_type
   END TYPE potential_type
-
-  PUBLIC :: OPERATOR (+)
-  INTERFACE OPERATOR (+)
-     MODULE PROCEDURE add_potential_type
-  END INTERFACE OPERATOR (+)
-
-  PUBLIC :: OPERATOR (-)
-  INTERFACE OPERATOR (-)
-     MODULE PROCEDURE subtract_potential_type
-  END INTERFACE OPERATOR (-)
 
 CONTAINS
 
   FUNCTION add_potential_type ( a, b ) RESULT (c)
-    TYPE(potential_type)             :: c    ! Result is the sum of the two inputs
-    TYPE(potential_type), INTENT(in) :: a, b
-    c%pot     = a%pot       +  b%pot
-    c%overlap = a%overlap .OR. b%overlap
+    TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
+    CLASS(potential_type), INTENT(in) :: a, b
+    c%pot = a%pot   +  b%pot
+    c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)             :: c    ! Result is the difference of the two inputs
-    TYPE(potential_type), INTENT(in) :: a, b
-    c%pot     = a%pot       -  b%pot
-    c%overlap = a%overlap .OR. b%overlap ! this is meaningless, but inconsequential
+    TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
+    CLASS(potential_type), INTENT(in) :: a, b
+    c%pot = a%pot   -  b%pot
+    c%ovr = a%ovr .OR. b%ovr ! This is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
 
   SUBROUTINE introduction ( output_unit )
@@ -167,7 +161,7 @@ CONTAINS
           r_try(:,k) = r(:,i-1) + d * random_vector()    ! Trial position in random direction from i-1
           partial    = potential_1 ( r_try(:,k), i, lt ) ! Nonbonded interactions with earlier atoms
 
-          IF ( partial%overlap ) THEN                  ! Overlap test
+          IF ( partial%ovr ) THEN                      ! Overlap test
              w(k) = 0.0                                ! Store weight for this try (zero)
           ELSE                                         ! Safe to calculate weight
              w(k) = EXP ( -partial%pot / temperature ) ! Store weight for this try (Boltzmann factor)
@@ -217,7 +211,7 @@ CONTAINS
        r_try(:,1) = r(:,i)
        partial    = potential_1 ( r_try(:,1), i, lt ) ! Nonbonded energy with earlier atoms
 
-       IF ( partial%overlap ) THEN                  ! Overlap test
+       IF ( partial%ovr ) THEN                      ! Overlap test
           w(1) = 0.0                                ! Current weight is zero; should not happen
        ELSE                                         ! Safe to calculate weight
           w(1) = EXP ( -partial%pot / temperature ) ! Current weight given by Boltzmann factor
@@ -231,7 +225,7 @@ CONTAINS
           r_try(:,k) = r(:,i-1) + d * random_vector ( )  ! Trial position in random direction from i-1
           partial    = potential_1 ( r_try(:,k), i, lt ) ! Nonbonded interactions with earlier atoms
 
-          IF ( partial%overlap ) THEN                  ! Overlap test
+          IF ( partial%ovr ) THEN                      ! Overlap test
              w(k) = 0.0                                ! Store weight for this try (zero)
           ELSE                                         ! Safe to calculate weight
              w(k) = EXP ( -partial%pot / temperature ) ! Store weight for this try (Boltzmann factor)
@@ -268,10 +262,10 @@ CONTAINS
 
   FUNCTION potential ( ) RESULT ( total )
     IMPLICIT NONE
-    TYPE(potential_type) :: total ! Returns a composite of pot and overlap
+    TYPE(potential_type) :: total ! Returns a composite of pot and ovr
 
     ! total%pot is the nonbonded potential energy for whole system
-    ! total%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! total%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this flag is .true., the value of total%pot should not be used
     ! Actual calculation is performed by function potential_1
 
@@ -283,18 +277,18 @@ CONTAINS
        STOP 'Impossible error in potential'
     END IF
 
-    total = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
+    total = potential_type ( pot=0.0, ovr=.FALSE. ) ! Initialize
 
     DO i = 1, n - 1
        partial = potential_1 ( r(:,i), i, gt )
-       IF ( partial%overlap ) THEN
-          total%overlap = .TRUE. ! Overlap detected
-          RETURN                 ! Return immediately
+       IF ( partial%ovr ) THEN
+          total%ovr = .TRUE. ! Overlap detected
+          RETURN             ! Return immediately
        END IF
        total = total + partial
     END DO
 
-    total%overlap = .FALSE. ! No overlaps detected (redundant but for clarity)
+    total%ovr = .FALSE. ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION potential
 
@@ -306,7 +300,7 @@ CONTAINS
     INTEGER, OPTIONAL,  INTENT(in)  :: j_range ! Optional partner index range
 
     ! partial%pot is the nonbonded potential energy of atom ri with a set of other atoms
-    ! partial%overlap is a flag indicating overlap (potential too high) to avoid overflow
+    ! partial%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this is .true., the value of partial%pot should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
@@ -341,7 +335,7 @@ CONTAINS
        j2 = n
     END IF
 
-    partial = potential_type ( pot=0.0, overlap=.FALSE. ) ! Initialize
+    partial = potential_type ( pot=0.0, ovr=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Loop over selected range of partners
 
@@ -352,8 +346,8 @@ CONTAINS
        sr2    = 1.0 / rij_sq   ! (sigma/rij)**2
 
        IF ( sr2 > sr2_overlap ) THEN
-          partial%overlap = .TRUE. ! Overlap detected
-          RETURN                   ! Return immediately
+          partial%ovr = .TRUE. ! Overlap detected
+          RETURN               ! Return immediately
        END IF
 
        sr6   = sr2**3
@@ -364,8 +358,8 @@ CONTAINS
 
     END DO ! End loop over selected range of partners
 
-    partial%pot     = partial%pot * 4.0 ! Numerical factor
-    partial%overlap = .FALSE.           ! No overlaps detected (redundant but for clarity)
+    partial%pot = partial%pot * 4.0 ! Numerical factor
+    partial%ovr = .FALSE.           ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION potential_1
 

@@ -10,9 +10,11 @@ MODULE averages_module
   PRIVATE
 
   ! Calculation of averages with output to output_unit
+
+  ! Public routines
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add, time_stamp
 
-  ! These variables (run averages etc) are only accessed within this module
+  ! Private data
   INTEGER,                                     SAVE :: nvariables, col_width, line_width
   CHARACTER(len=:), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
   REAL,             DIMENSION(:), ALLOCATABLE, SAVE :: blk_averages, run_averages, run_errors
@@ -26,6 +28,7 @@ CONTAINS
   SUBROUTINE time_stamp ( output_unit )
     IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit
+
     CHARACTER(len=8)    :: date
     CHARACTER(len=10)   :: time
     REAL                :: cpu
@@ -39,6 +42,7 @@ CONTAINS
   END SUBROUTINE time_stamp
 
   SUBROUTINE run_begin ( names ) ! Set up averaging variables based on supplied names
+    IMPLICIT NONE
     CHARACTER(len=*), DIMENSION(:), INTENT(in) :: names
 
     INTEGER          :: i
@@ -76,11 +80,15 @@ CONTAINS
   END SUBROUTINE run_begin
 
   SUBROUTINE blk_begin ! Zero averaging variables at start of each block
+    IMPLICIT NONE
+
     blk_norm     = 0.0
     blk_averages = 0.0
+
   END SUBROUTINE blk_begin
 
   SUBROUTINE blk_add ( variables ) ! Increment block-average variables
+    IMPLICIT NONE
     REAL, DIMENSION(:), INTENT(in) :: variables
 
     IF ( SIZE(variables) /= nvariables ) THEN ! Check for inconsistency in calling program
@@ -90,9 +98,11 @@ CONTAINS
 
     blk_averages = blk_averages + variables ! Increment block averages
     blk_norm     = blk_norm + 1.0           ! Increment block normalizer
+
   END SUBROUTINE blk_add
 
   SUBROUTINE blk_end ( blk, output_unit ) ! Write out block averages
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: blk, output_unit
 
     LOGICAL, SAVE :: first_call = .TRUE.
@@ -117,6 +127,7 @@ CONTAINS
   END SUBROUTINE blk_end
 
   SUBROUTINE run_end ( output_unit ) ! Write out run averages
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit
 
     run_averages = run_averages / run_norm          ! Normalize run averages

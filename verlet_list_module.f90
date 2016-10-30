@@ -7,26 +7,30 @@ MODULE verlet_list_module
   IMPLICIT NONE
   PRIVATE
 
+  ! Public routines
   PUBLIC :: initialize_list, finalize_list, make_list
-  PUBLIC :: point, list
 
   ! The initialize_list routine reads the value of r_list_factor
   ! from standard input using a NAMELIST nml_list
   ! Leave namelist empty to accept supplied default
   ! It is assumed that all positions and displacements are divided by box
   ! r_list_box is set to r_cut_box*r_list_factor
-  
-  INTEGER                                         :: nl         ! size of list
-  REAL                                            :: r_list_box ! list range parameter / box length
-  REAL                                            :: r_skin_box ! list skin parameter / box_length
-  REAL,    DIMENSION(:,:), ALLOCATABLE            :: r_save     ! saved positions for list (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE            :: dr         ! displacements (3,n)
-  INTEGER, DIMENSION(:),   ALLOCATABLE, PROTECTED :: point      ! index to neighbour list (n)
-  INTEGER, DIMENSION(:),   ALLOCATABLE, PROTECTED :: list       ! Verlet neighbour list (nl)
+
+  ! Public data
+  INTEGER, DIMENSION(:), ALLOCATABLE, PUBLIC, PROTECTED :: point ! index to neighbour list (n)
+  INTEGER, DIMENSION(:), ALLOCATABLE, PUBLIC, PROTECTED :: list  ! Verlet neighbour list (nl)
+
+  ! Private data
+  INTEGER                           :: nl         ! Size of list
+  REAL                              :: r_list_box ! List range parameter / box length
+  REAL                              :: r_skin_box ! List skin parameter / box_length
+  REAL, DIMENSION(:,:), ALLOCATABLE :: r_save     ! Saved positions for list (3,n)
+  REAL, DIMENSION(:,:), ALLOCATABLE :: dr         ! Displacements (3,n)
 
 CONTAINS
 
   SUBROUTINE initialize_list ( n, r_cut_box )
+    IMPLICIT NONE
     INTEGER, INTENT(in) :: n         ! number of particles
     REAL,    INTENT(in) :: r_cut_box ! r_cut / box
 
@@ -36,7 +40,7 @@ CONTAINS
     REAL, PARAMETER :: pi = 4.0*ATAN(1.0)
     NAMELIST /nml_list/ r_list_factor
 
-        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list based on r_cut/box =', r_cut_box
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list based on r_cut/box =', r_cut_box
 
     ! Sensible default for r_list_factor
     r_list_factor = 1.2
@@ -64,15 +68,20 @@ CONTAINS
     ! Estimate list size based on density + 10 per cent
     nl = CEILING ( 1.1*(4.0*pi/3.0)*(r_list_box**3)*REAL(n*(n-1)) / 2.0 )
     WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'Verlet list size = ', nl
+
     ALLOCATE ( r_save(3,n), dr(3,n), point(n), list(nl) )
+
   END SUBROUTINE initialize_list
 
   SUBROUTINE finalize_list
+    IMPLICIT NONE
+
     DEALLOCATE ( r_save, dr, point, list )
+
   END SUBROUTINE finalize_list
-  
+
   SUBROUTINE resize_list ! reallocates list array, somewhat larger
-    
+    IMPLICIT NONE
     INTEGER, DIMENSION(:), ALLOCATABLE :: tmp
     INTEGER                            :: nl_new
 
@@ -89,6 +98,7 @@ CONTAINS
   END SUBROUTINE resize_list
 
   SUBROUTINE make_list ( n, r )
+    IMPLICIT NONE
     INTEGER,                 INTENT(in) :: n
     REAL,    DIMENSION(3,n), INTENT(in) :: r
 
@@ -99,10 +109,10 @@ CONTAINS
     LOGICAL, SAVE :: first_call = .TRUE.
 
     IF ( .NOT. first_call ) THEN
-       dr = r - r_save                             ! displacement since last list update
-       dr = dr - ANINT ( dr )                      ! periodic boundaries in box=1 units
-       dr_sq_max = MAXVAL ( SUM(dr**2,dim=1) )     ! squared maximum displacement
-       IF ( 4.0*dr_sq_max < r_skin_box**2 ) RETURN ! no need to make list
+       dr = r - r_save                             ! Displacement since last list update
+       dr = dr - ANINT ( dr )                      ! Periodic boundaries in box=1 units
+       dr_sq_max = MAXVAL ( SUM(dr**2,dim=1) )     ! Squared maximum displacement
+       IF ( 4.0*dr_sq_max < r_skin_box**2 ) RETURN ! No need to make list
     END IF
 
     first_call = .FALSE.
