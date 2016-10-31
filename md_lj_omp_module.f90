@@ -239,11 +239,11 @@ CONTAINS
 
   END FUNCTION pressure_lrc
 
-  FUNCTION hessian ( box, r_cut ) RESULT ( hes )
+  FUNCTION hessian ( box, r_cut ) RESULT ( total_hes )
     IMPLICIT NONE
-    REAL             :: hes   ! Returns the total Hessian
-    REAL, INTENT(in) :: box   ! Simulation box length
-    REAL, INTENT(in) :: r_cut ! Potential cutoff distance
+    REAL             :: total_hes ! Returns the total Hessian
+    REAL, INTENT(in) :: box       ! Simulation box length
+    REAL, INTENT(in) :: r_cut     ! Potential cutoff distance
 
     ! Calculates Hessian function (for 1/N correction to config temp)
     ! This routine is only needed in a constant-energy ensemble
@@ -260,13 +260,14 @@ CONTAINS
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
 
-    hes = 0.0
+    total_hes = 0.0
 
     ! Similar comments apply here as for the double loop in the force routine
 
     !$omp parallel do &
-    !$omp& default(shared), private(i,j,rij,fij,rij_sq,ff,rf,sr2,sr6,sr8,sr10,v1,v2) &
-    !$omp& reduction(+:hes) &
+    !$omp& default(none), private(i,j,rij,fij,rij_sq,ff,rf,sr2,sr6,sr8,sr10,v1,v2), &
+    !$omp& shared(n,r,f,r_cut_box_sq,box_sq,box), &
+    !$omp& reduction(+:total_hes), &
     !$omp& schedule(static,1)
     DO i = 1, n - 1 ! Begin outer loop over atoms
 
@@ -290,7 +291,8 @@ CONTAINS
              sr10 = sr8 * sr2
              v1   = 24.0 * ( 1.0 - 2.0 * sr6 ) * sr8
              v2   = 96.0 * ( 7.0 * sr6 - 2.0 ) * sr10
-             hes  = hes + v1 * ff + v2 * rf**2
+
+             total_hes = total_hes + v1 * ff + v2 * rf**2
 
           END IF ! End check within cutoff
 
