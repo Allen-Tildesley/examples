@@ -18,9 +18,33 @@ MODULE md_module
   REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v ! Velocities (3,n)
   REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: f ! Forces (3,n)
 
+  ! Private data
   REAL, SAVE :: wall_time
 
+  ! Public derived type
+  TYPE, PUBLIC :: potential_type ! A composite variable for interactions comprising
+     REAL    :: cut ! the potential energy cut (but not shifted) at r_cut and
+     REAL    :: pot ! the potential energy cut-and-shifted at r_cut and
+     REAL    :: vir ! the virial and
+     REAL    :: lap ! the Laplacian and
+     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
+   CONTAINS
+     PROCEDURE :: add_potential_type
+     GENERIC   :: OPERATOR(+) => add_potential_type
+  END TYPE potential_type
+
 CONTAINS
+
+  FUNCTION add_potential_type ( a, b ) RESULT (c)
+    IMPLICIT NONE
+    TYPE(potential_type)              :: c    ! Result is the sum of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
+    c%cut = a%cut  +   b%cut
+    c%pot = a%pot  +   b%pot
+    c%vir = a%vir  +   b%vir
+    c%lap = a%lap  +   b%lap
+    c%ovr = a%ovr .OR. b%ovr
+  END FUNCTION add_potential_type
 
   SUBROUTINE introduction ( output_unit )
     IMPLICIT NONE
@@ -70,52 +94,68 @@ CONTAINS
 
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE force ( box, r_cut, pot, cut, vir, lap, overlap )
+  SUBROUTINE force ( box, r_cut, total )
     IMPLICIT NONE
-    REAL,    INTENT(in)  :: box     ! Simulation box length
-    REAL,    INTENT(in)  :: r_cut   ! Potential cutoff distance
-    REAL,    INTENT(out) :: pot     ! Cut-and-shifted total potential energy
-    REAL,    INTENT(out) :: cut     ! Cut (but not shifted) total potential energy
-    REAL,    INTENT(out) :: vir     ! Total virial
-    REAL,    INTENT(out) :: lap     ! Total Laplacian
-    LOGICAL, INTENT(out) :: overlap ! Warning flag that there is an overlap
+    REAL,                 INTENT(in)  :: box   ! Simulation box length
+    REAL,                 INTENT(in)  :: r_cut ! Potential cutoff distance
+    TYPE(potential_type), INTENT(out) :: total ! Composite of pot, vir, lap etc
 
-    ! Calculates forces in array f, and also pot, cut etc  
-    ! If overlap is set to .true., the forces etc should not be used
+    ! total%pot is the nonbonded cut-and-shifted potential energy for whole system
+    ! total%cut is the nonbonded cut (but not shifted) potential energy for whole system
+    ! total%vir is the corresponding virial
+    ! total%lap is the corresponding Laplacian
+    ! total%ovr is a warning flag that there is an overlap
+    ! This routine also calculates forces and stores them in the array f
+    ! Forces are derived from pot, not cut (which has a discontinuity)
+    ! If total%ovr is set to .true., the forces etc should not be used
+
     ! It is assumed that positions are in units where box = 1
     ! Forces are calculated in units where sigma = 1 and epsilon = 1
 
-    INTEGER            :: i, j, ncut
+    INTEGER            :: i, j
     REAL               :: r_cut_box, r_cut_box_sq, box_sq, rij_sq
-    REAL               :: sr2, sr6, sr12, cutij, virij, lapij
+    REAL               :: sr2, sr6, sr12, pot_cut
+    REAL               :: pair_cut, total_cut
+    REAL               :: pair_pot, total_pot
+    REAL               :: pair_vir, total_vir
+    REAL               :: pair_lap, total_lap
+    LOGICAL            :: pair_ovr, total_ovr
     REAL, DIMENSION(3) :: rij, fij
-    REAL, PARAMETER    :: sr2_overlap = 1.8 ! Overlap threshold
+    REAL, PARAMETER    :: sr2_ovr = 1.77 ! Overlap threshold (pot > 100)
 
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
 
-    ! Initialize (redundant: all these, except pot, are initialized in reduction clause)
-    f       = 0.0
-    pot     = 0.0
-    cut     = 0.0
-    vir     = 0.0
-    lap     = 0.0
-    overlap = .FALSE.
-    ncut    = 0
+    ! Calculate potential at cutoff
+    sr2     = 1.0 / r_cut**2 ! in sigma=1 units
+    sr6     = sr2 ** 3
+    sr12    = sr6 **2
+    pot_cut = sr12 - sr6 ! Without numerical factor 4
 
+    ! Initialize (redundant, since these variables should be initialized in the reduction clause)
+    total_cut = 0.0
+    total_pot = 0.0
+    total_vir = 0.0
+    total_lap = 0.0
+    total_ovr = .false.
+    f         = 0.0
+    
     ! Each thread must use its own private copies of most of the variables
-    ! The shared variables, n, r_cut_box_sq, box, box_sq, are never changed
+    ! The shared variables, n, r, r_cut_box_sq, box, box_sq, pot_cut are never changed
     ! The reduction variables are private, separately accumulated in each thread,
     ! and then added together to give global totals at the end
+    ! They are automatically initialized to zero at the start of the loop
     ! The schedule(static,1) attempts to share the i-loop iterations between threads
     ! fairly evenly, given the i-dependence of the work in the inner j-loop
     ! Feel free to experiment with this
 
     !$omp parallel do &
-    !$omp& default(shared), private(i,j,rij,rij_sq,sr2,sr6,sr12,cutij,virij,lapij,fij) &
-    !$omp& reduction(+:cut,vir,lap,ncut,f), reduction(.or.:overlap) &
+    !$omp& default(none), private(i,j,rij,rij_sq,sr2,sr6,sr12,pair_cut,pair_pot,pair_vir,pair_lap,pair_ovr,fij), &
+    !$omp& shared(n,r,r_cut_box_sq,box,box_sq,pot_cut), &
+    !$omp& reduction(+:total_cut,total_pot,total_vir,total_lap,f), reduction(.or.:total_ovr), &
     !$omp& schedule(static,1)
+
     DO i = 1, n - 1 ! Begin outer loop over atoms
 
        DO j = i + 1, n ! Begin inner loop over atoms
@@ -126,25 +166,27 @@ CONTAINS
 
           IF ( rij_sq < r_cut_box_sq ) THEN
 
-             rij_sq = rij_sq * box_sq ! Now in sigma=1 units
-             rij(:) = rij(:) * box    ! Now in sigma=1 units
-             sr2    = 1.0 / rij_sq
+             rij_sq   = rij_sq * box_sq ! Now in sigma=1 units
+             rij(:)   = rij(:) * box    ! Now in sigma=1 units
+             sr2      = 1.0 / rij_sq    ! (sigma/rij)**2
+             pair_ovr = sr2 > sr2_ovr   ! Overlap if too close
 
-             IF ( sr2 > sr2_overlap ) overlap = .TRUE. ! Overlap detected
+             sr6      = sr2 ** 3
+             sr12     = sr6 ** 2
+             pair_cut = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
+             pair_vir = pair_cut + sr12               ! LJ pair virial
+             pair_pot = pair_cut - pot_cut            ! LJ pair potential (cut-and-shifted)
+             pair_lap = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
+             fij      = rij * pair_vir * sr2          ! LJ pair forces
 
-             sr6   = sr2 ** 3
-             sr12  = sr6 ** 2
-             cutij = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
-             virij = cutij + sr12                  ! LJ pair virial
-             lapij = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
-             fij   = rij * virij / rij_sq          ! LJ pair forces
+             total_cut = total_cut  +   pair_cut
+             total_pot = total_pot  +   pair_pot
+             total_vir = total_vir  +   pair_vir
+             total_lap = total_lap  +   pair_lap
+             total_ovr = total_ovr .or. pair_ovr
 
-             cut    = cut    + cutij
-             vir    = vir    + virij
-             lap    = lap    + lapij
              f(:,i) = f(:,i) + fij
              f(:,j) = f(:,j) - fij
-             ncut   = ncut   + 1
 
           END IF
 
@@ -152,19 +194,14 @@ CONTAINS
 
     END DO ! End outer loop over atoms
 
-    ! Calculate shifted potential
-    sr2   = 1.0 / r_cut**2 ! in sigma=1 units
-    sr6   = sr2**3
-    sr12  = sr6**2
-    cutij = sr12 - sr6
-    pot   = cut - REAL ( ncut ) * cutij
-
     ! Multiply results by numerical factors
-    f   = f   * 24.0
-    cut = cut * 4.0
-    pot = pot * 4.0
-    vir = vir * 24.0 / 3.0
-    lap = lap * 24.0 * 2.0
+    f         = f         * 24.0       ! 24*epsilon
+    total_cut = total_cut * 4.0        ! 4*epsilon
+    total_pot = total_pot * 4.0        ! 4*epsilon
+    total_vir = total_vir * 24.0 / 3.0 ! 24*epsilon and divide virial by 3
+    total_lap = total_lap * 24.0 * 2.0 ! 24*epsilon and factor 2 for ij and ji
+
+    total = potential_type ( cut=total_cut, pot=total_pot, vir=total_vir, lap=total_lap, ovr=total_ovr )
 
   END SUBROUTINE force
 

@@ -28,21 +28,35 @@ MODULE md_module
   REAL,    DIMENSION(:),   ALLOCATABLE :: dl, dl_tmp                 ! Sub-diagonal part of constraint matrix (n-2)
   REAL,    DIMENSION(:),   ALLOCATABLE :: du, du_tmp                 ! Super-diagonal part of constraint matrix (n-2)
 
-  ! All masses are unity
-  ! All bond lengths are the same
-  ! No periodic boundary conditions
+  ! Public derived type
+  TYPE, PUBLIC :: potential_type ! A composite variable for interactions comprising
+     REAL    :: pot ! the potential energy cut-and-shifted at r_cut and
+     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
+   CONTAINS
+     PROCEDURE :: add_potential_type
+     GENERIC   :: OPERATOR(+) => add_potential_type
+  END TYPE potential_type
 
 CONTAINS
+
+  FUNCTION add_potential_type ( a, b ) RESULT (c)
+    IMPLICIT NONE
+    TYPE(potential_type)              :: c    ! Result is the sum of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
+    c%pot = a%pot  +   b%pot
+    c%ovr = a%ovr .OR. b%ovr
+  END FUNCTION add_potential_type
 
   SUBROUTINE introduction ( output_unit )
     IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
-    WRITE ( unit=output_unit, fmt='(a)' ) 'WCA shifted Lennard-Jones potential'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'WCA shifted Lennard-Jones chain'
     WRITE ( unit=output_unit, fmt='(a)' ) 'No periodic boundaries'   
     WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'    
     WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1'   
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Atomic mass m = 1'   
+    WRITE ( unit=output_unit, fmt='(a)' ) 'All atomic masses the same m = 1'   
+    WRITE ( unit=output_unit, fmt='(a)' ) 'All bond lengths the same'   
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion ( output_unit )
@@ -71,41 +85,48 @@ CONTAINS
     DEALLOCATE ( dl, dl_tmp, du, du_tmp )
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE force ( pot )
+  SUBROUTINE force ( total )
     IMPLICIT NONE
-    REAL, INTENT(out) :: pot ! total potential energy
+    TYPE(potential_type), INTENT(out) :: total ! Composite of pot, ovr
 
-    ! Calculates shifted WCA LJ potential for atomic chain (omitting bonded neighbours)
+    ! total%pot is the nonbonded WCA LJ potential energy for atomic chain (omitting bonded neighbours)
+    ! total%ovr is a warning flag that there is an overlap
     ! The Lennard-Jones energy and sigma parameters are taken to be epsilon = 1, sigma = 1
     ! Positions are assumed to be in these units
     ! Forces are calculated in the same units and stored in the array f
-    ! NO periodic boundaries
+    ! NO box, NO periodic boundaries
 
-    INTEGER            :: i, j
-    REAL               :: rij_sq, sr2, sr6, sr12, potij, virij
-    REAL, PARAMETER    :: r_cut_sq = 2.0**(1.0/3.0) ! minimum of LJ potential
-    REAL, DIMENSION(3) :: rij, fij
+    INTEGER              :: i, j
+    REAL                 :: rij_sq, sr2, sr6, sr12, pair_vir
+    REAL, PARAMETER      :: r_cut_sq = 2.0**(1.0/3.0) ! minimum of LJ potential
+    REAL, DIMENSION(3)   :: rij, fij
+    REAL, PARAMETER      :: sr2_ovr = 1.77 ! Overlap threshold (pot > 100)
+    TYPE(potential_type) :: pair
 
-    f   = 0.0
-    pot = 0.0
+    ! Initialize
+    f     = 0.0
+    total = potential_type (  pot=0.0, ovr=.FALSE. )
 
     DO i = 1, n - 2 ! Begin outer loop over atoms, stopping 2 short of the end
 
        DO j = i + 2, n ! Begin inner loop over atoms omitting nearest neighbour
 
-          rij(:) = r(:,i) - r(:,j) ! separation vector
-          rij_sq = SUM ( rij**2 )  ! squared separation
+          rij(:) = r(:,i) - r(:,j) ! Separation vector
+          rij_sq = SUM ( rij**2 )  ! Squared separation
 
           IF ( rij_sq < r_cut_sq ) THEN ! Test within cutoff
 
-             sr2    = 1.0 / rij_sq
-             sr6    = sr2 ** 3
-             sr12   = sr6 ** 2
-             potij  = sr12 - sr6           ! Cut (but not shifted) LJ potential
-             virij  = potij + sr12         ! WCA LJ pair virial
-             potij  = potij + 0.25         ! WCA LJ pair potential
-             pot    = pot + potij          ! Accumulate total potential
-             fij    = rij * virij / rij_sq ! Pair forces
+             sr2      = 1.0 / rij_sq  ! (sigma/rij)**2
+             pair%ovr = sr2 > sr2_ovr ! Overlap if too close
+
+             sr6      = sr2 ** 3
+             sr12     = sr6 ** 2
+             pair%pot = sr12 - sr6           ! Cut (but not shifted) LJ potential
+             pair_vir = pair%pot + sr12      ! WCA LJ pair virial
+             pair%pot = pair%pot + 0.25      ! WCA LJ pair potential
+             fij      = rij * pair_vir * sr2 ! WCA LJ Pair forces
+
+             total  = total  + pair
              f(:,i) = f(:,i) + fij
              f(:,j) = f(:,j) - fij
 
@@ -116,45 +137,49 @@ CONTAINS
     END DO ! End outer loop over atoms
 
     ! Multiply results by numerical factors
-    f   = f   * 24.0
-    pot = pot * 4.0
+    f         = f         * 24.0 ! 24*epsilon
+    total%pot = total%pot * 4.0  ! 4*epsilon
 
   END SUBROUTINE force
 
-  SUBROUTINE spring ( k_spring, bond, pot_h )
+  SUBROUTINE spring ( k_spring, bond, total_spr )
     IMPLICIT NONE
-    REAL, INTENT(in)  :: k_spring ! spring force constant
-    REAL, INTENT(in)  :: bond     ! spring bond length
-    REAL, INTENT(out) :: pot_h    ! total harmonic spring potential energy
+    REAL, INTENT(in)  :: k_spring  ! Spring force constant
+    REAL, INTENT(in)  :: bond      ! Spring bond length
+    REAL, INTENT(out) :: total_spr ! Total harmonic spring potential energy
 
     ! Calculates bond spring potential for atomic chain
-    ! NO periodic boundaries
+    ! Forces are also calculated and stored in the array g
+    ! NO box, NO periodic boundaries
 
     INTEGER            :: i, j
-    REAL               :: rij_sq, rij_mag, potij
+    REAL               :: rij_sq, rij_mag, pair_pot
     REAL, DIMENSION(3) :: rij, gij
 
-    g     = 0.0
-    pot_h = 0.0
+    ! Initialize
+    g         = 0.0
+    total_spr = 0.0
 
-    DO i = 1, n - 1 ! Begin outer loop over bonds
+    DO i = 1, n - 1 ! Begin loop over bonds
        j = i+1 ! Nearest neighbour
 
        rij(:)  = r(:,i) - r(:,j) ! Separation vector
        rij_sq  = SUM ( rij**2 )  ! Squared separation
        rij_mag = SQRT ( rij_sq ) ! Separation
 
-       potij  = (rij_mag-bond) ** 2 ! Spring potential without numerical factor
-       pot_h  = pot_h + potij
-       gij    = rij * ( bond - rij_mag ) / rij_mag ! Spring force without numerical factor
+       pair_pot = (rij_mag-bond) ** 2                ! Spring pair potential without numerical factor
+       gij      = rij * ( bond - rij_mag ) / rij_mag ! Spring pair force without numerical factor
+
+       total_spr = total_spr + pair_pot
+
        g(:,i) = g(:,i) + gij
        g(:,j) = g(:,j) - gij
 
-    END DO ! End outer loop over bonds
+    END DO ! End loop over bonds
 
     ! Multiply results by numerical factors
-    pot_h = pot_h * 0.5 * k_spring
-    g     = g * k_spring
+    total_spr = total_spr * 0.5 * k_spring
+    g         = g * k_spring
 
   END SUBROUTINE spring
 
@@ -316,14 +341,15 @@ CONTAINS
     REAL, INTENT(in) :: bond     ! Bond length (the same throughout the chain)
 
     INTEGER            :: i
-    REAL               :: diff
+    REAL               :: diff, rij_mag
     REAL, DIMENSION(3) :: rij
 
     diff_max = 0.0
     DO i = 1, n-1
-       rij      = r(:,i) - r(:,i+1)          ! Current bond vector
-       diff     = SQRT( SUM(rij**2) ) - bond ! Amount by which constraint is violated
-       diff_max = MAX ( diff_max, diff )     ! Find maximum
+       rij      = r(:,i) - r(:,i+1)      ! Current bond vector
+       rij_mag  = SQRT( SUM(rij**2) )    ! Current bond length
+       diff     = ABS ( rij_mag - bond ) ! Absolute amount by which constraint is violated
+       diff_max = MAX ( diff_max, diff ) ! Find maximum
     END DO
   END FUNCTION worst_bond
 

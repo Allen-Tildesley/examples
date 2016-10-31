@@ -43,8 +43,8 @@ CONTAINS
 
   FUNCTION add_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
-    CLASS(potential_type), INTENT(in) :: a, b
+    TYPE(potential_type)              :: c    ! Result is the sum of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  +   b%pot
     c%vir = a%vir  +   b%vir
     c%ovr = a%ovr .OR. b%ovr
@@ -52,8 +52,8 @@ CONTAINS
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
-    CLASS(potential_type), INTENT(in) :: a, b
+    TYPE(potential_type)              :: c    ! Result is the difference of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  -   b%pot
     c%vir = a%vir  -   b%vir
     c%ovr = a%ovr .OR. b%ovr ! This is meaningless, but inconsequential
@@ -173,11 +173,12 @@ CONTAINS
 
     INTEGER               :: j, j1, j2, a, b
     REAL                  :: rm_cut_box, rm_cut_box_sq, r_cut_sq
-    REAL                  :: sr2, sr6, sr12, rij_sq, rab_sq, potab, virab, pot_cut
+    REAL                  :: sr2, sr6, sr12, rij_sq, rab_sq, virab, pot_cut
     REAL, DIMENSION(3)    :: rij, rab, fab
     REAL, DIMENSION(3,na) :: di, dj
     REAL, DIMENSION(3,3)  :: ai, aj
-    REAL, PARAMETER       :: sr2_overlap = 1.8 ! overlap threshold
+    REAL, PARAMETER       :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
+    TYPE(potential_type)  :: pair
 
     IF ( SIZE(r,dim=2)  /= n ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
@@ -250,21 +251,23 @@ CONTAINS
 
                 IF ( rab_sq < r_cut_sq ) THEN ! Test within potential cutoff 
 
-                   sr2 = 1.0 / rab_sq    ! (sigma/rab)**2
+                   sr2      = 1.0 / rab_sq  ! (sigma/rab)**2
+                   pair%ovr = sr2 > sr2_ovr ! Overlap if too close
 
-                   IF ( sr2 > sr2_overlap ) THEN
+                   IF ( pair%ovr ) THEN
                       partial%ovr = .TRUE. ! Overlap detected
                       RETURN               ! Return immediately
                    END IF
 
-                   sr6   = sr2**3
-                   sr12  = sr6**2
-                   potab = sr12 - sr6 - pot_cut ! LJ atom-atom pair potential (cut-and-shifted)
-                   virab = potab + sr12         ! LJ atom-atom pair virial
-                   fab   = rab * virab / rab_sq ! LJ atom-atom pair force
+                   sr6      = sr2**3
+                   sr12     = sr6**2
+                   pair%pot = sr12 - sr6               ! LJ atom-atom pair potential (cut but not shifted)
+                   virab    = pair%pot + sr12          ! LJ atom-atom pair virial
+                   pair%pot = pair%pot - pot_cut       ! LJ atom-atom pair potential (cut-and-shifted)
+                   fab      = rab * virab * sr2        ! LJ atom-atom pair force
+                   pair%vir = DOT_PRODUCT ( rij, fab ) ! Contribution to molecular virial
 
-                   partial%pot = partial%pot + potab                    ! Contribution to molecular potential
-                   partial%vir = partial%vir + DOT_PRODUCT ( rij, fab ) ! Contribution to molecular virial
+                   partial = partial + pair
 
                 END IF ! End test within potential cutoff
 
@@ -277,9 +280,9 @@ CONTAINS
     END DO ! End loop over selected range of partner molecules
 
     ! Include numerical factors
-    partial%pot = partial%pot * 4.0
-    partial%vir = partial%vir * 24.0 / 3.0
-    partial%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    partial%pot = partial%pot * 4.0        ! 4*epsilon
+    partial%vir = partial%vir * 24.0 / 3.0 ! 24*epsilon and divide virial by 3
+    partial%ovr = .FALSE.                  ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential_1
 

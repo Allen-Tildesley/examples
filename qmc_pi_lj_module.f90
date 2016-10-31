@@ -34,16 +34,16 @@ CONTAINS
 
   FUNCTION add_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
-    CLASS(potential_type), INTENT(in) :: a, b
+    TYPE(potential_type)              :: c    ! Result is the sum of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  +   b%pot
     c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
-    CLASS(potential_type), INTENT(in) :: a, b
+    TYPE(potential_type)              :: c    ! Result is the difference of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  -   b%pot
     c%ovr = a%ovr .OR. b%ovr ! This is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
@@ -154,11 +154,12 @@ CONTAINS
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
-    INTEGER            :: j, j1, j2
-    REAL               :: r_cut_box, r_cut_box_sq, box_sq
-    REAL               :: sr2, sr6, r_ik_jk_sq, potij
-    REAL, DIMENSION(3) :: r_ik_jk
-    REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
+    INTEGER              :: j, j1, j2
+    REAL                 :: r_cut_box, r_cut_box_sq, box_sq
+    REAL                 :: sr2, sr6, r_ik_jk_sq
+    REAL, DIMENSION(3)   :: r_ik_jk
+    REAL, PARAMETER      :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
+    TYPE(potential_type) :: pair
 
     IF ( n /= SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r, n=', n, SIZE(r,dim=2)
@@ -204,16 +205,17 @@ CONTAINS
 
           r_ik_jk_sq = r_ik_jk_sq * box_sq ! now in sigma=1 units
           sr2        = 1.0 / r_ik_jk_sq    ! (sigma/rikjk)**2
+          pair%ovr   = sr2 > sr2_ovr       ! Overlap if too close
 
-          IF ( sr2 > sr2_overlap ) THEN
+          IF ( pair%ovr ) THEN
              partial%ovr = .TRUE. ! Overlap detected
              RETURN               ! Return immediately
           END IF
 
-          sr6   = sr2**3
-          potij = sr6**2 - sr6 ! LJ potential (cut but not shifted)
+          sr6      = sr2**3
+          pair%pot = sr6**2 - sr6 ! LJ potential (cut but not shifted)
 
-          partial%pot = partial%pot + potij
+          partial = partial + pair
 
        END IF ! End check with range
 
@@ -344,8 +346,7 @@ CONTAINS
     REAL            :: sr3
     REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
 
-    sr3 = 1.0 / r_cut**3
-
+    sr3           = 1.0 / r_cut**3
     potential_lrc = pi * ( (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3 ) * density
 
   END FUNCTION potential_lrc

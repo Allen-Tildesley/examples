@@ -33,13 +33,13 @@ MODULE mc_module
      GENERIC   :: OPERATOR(+) => add_potential_type
      GENERIC   :: OPERATOR(-) => subtract_potential_type
   END TYPE potential_type
-  
+
 CONTAINS
 
   FUNCTION add_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
-    CLASS(potential_type), INTENT(in) :: a, b
+    TYPE(potential_type)              :: c    ! Result is the sum of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  +   b%pot
     c%vir = a%vir  +   b%vir
     c%lap = a%lap  +   b%lap
@@ -48,8 +48,8 @@ CONTAINS
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
-    CLASS(potential_type), INTENT(in) :: a, b
+    TYPE(potential_type)              :: c    ! Result is the difference of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  -   b%pot
     c%vir = a%vir  -   b%vir
     c%lap = a%lap  -   b%lap
@@ -159,11 +159,12 @@ CONTAINS
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
-    INTEGER            :: j, j1, j2
-    REAL               :: r_cut_box, r_cut_box_sq, box_sq
-    REAL               :: sr2, sr6, sr12, rij_sq, potij, virij, lapij
-    REAL, DIMENSION(3) :: rij
-    REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
+    INTEGER              :: j, j1, j2
+    REAL                 :: r_cut_box, r_cut_box_sq, box_sq
+    REAL                 :: sr2, sr6, sr12, rij_sq
+    REAL, DIMENSION(3)   :: rij
+    REAL, PARAMETER      :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
+    TYPE(potential_type) :: pair
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
@@ -203,33 +204,32 @@ CONTAINS
 
        IF ( rij_sq < r_cut_box_sq ) THEN ! Check within range
 
-          rij_sq = rij_sq * box_sq ! Now in sigma=1 units
-          sr2    = 1.0 / rij_sq    ! (sigma/rij)**2
+          rij_sq   = rij_sq * box_sq ! Now in sigma=1 units
+          sr2      = 1.0 / rij_sq    ! (sigma/rij)**2
+          pair%ovr = sr2 > sr2_ovr   ! Overlap if too close
 
-          IF ( sr2 > sr2_overlap ) THEN
+          IF ( pair%ovr ) THEN
              partial%ovr = .TRUE. ! Overlap detected
              RETURN               ! Return immediately
           END IF
 
-          sr6   = sr2**3
-          sr12  = sr6**2
-          potij = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
-          virij = potij + sr12                  ! LJ pair virial
-          lapij = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
+          sr6      = sr2**3
+          sr12     = sr6**2
+          pair%pot = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
+          pair%vir = pair%pot + sr12               ! LJ pair virial
+          pair%lap = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
 
-          partial%pot = partial%pot + potij 
-          partial%vir = partial%vir + virij 
-          partial%lap = partial%lap + lapij 
+          partial = partial + pair 
 
        END IF ! End check within range
 
     END DO ! End loop over selected range of partners
 
     ! Include numerical factors
-    partial%pot = partial%pot * 4.0
-    partial%vir = partial%vir * 24.0 / 3.0
-    partial%lap = partial%lap * 24.0 * 2.0
-    partial%ovr = .FALSE. ! No overlaps detected (redundant, but for clarity)
+    partial%pot = partial%pot * 4.0        ! 4*epsilon
+    partial%vir = partial%vir * 24.0 / 3.0 ! 24*epsilon and divide virial by 3
+    partial%lap = partial%lap * 24.0 * 2.0 ! 24*epsilon and factor 2 for ij and ji
+    partial%ovr = .FALSE.                  ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential_1
 
@@ -250,8 +250,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
 
-    ! Initialize
-    f = 0.0
+    f = 0.0 ! Initialize
 
     DO i = 1, n - 1 ! Begin outer loop over atoms
 
@@ -268,7 +267,7 @@ CONTAINS
              sr2    = 1.0 / rij_sq
              sr6    = sr2 ** 3
              sr12   = sr6 ** 2
-             fij    = rij * (2.0*sr12 - sr6) / rij_sq ! LJ pair forces
+             fij    = rij * (2.0*sr12 - sr6) *sr2 ! LJ pair forces
              f(:,i) = f(:,i) + fij
              f(:,j) = f(:,j) - fij
 
@@ -278,8 +277,8 @@ CONTAINS
 
     END DO ! End outer loop over atoms
 
-    f   = f * 24.0 ! Numerical factor
-    fsq = SUM ( f**2 )
+    f   = f * 24.0     ! Numerical factor 24*epsilon
+    fsq = SUM ( f**2 ) ! Result
 
   END FUNCTION force_sq
 

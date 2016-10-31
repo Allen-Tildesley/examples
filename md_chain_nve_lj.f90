@@ -8,8 +8,8 @@ PROGRAM md_chain_nve_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : lowercase
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, r, v, n, &
-       &                       worst_bond, milcshake_a, milcshake_b, rattle_a, rattle_b
+       &                       force, worst_bond, r, v, n, potential_type, &
+       &                       milcshake_a, milcshake_b, rattle_a, rattle_b
 
   IMPLICIT NONE
 
@@ -31,12 +31,14 @@ PROGRAM md_chain_nve_lj
   ! Most important variables
   REAL :: dt   ! Time step
   REAL :: bond ! Bond length
-  REAL :: pot  ! Total potential energy
   REAL :: wc   ! Constraint virial (not used in this example)
 
   ! Quantities to be averaged
   REAL :: tk ! Temperature (kinetic)
   REAL :: en ! Internal energy per atom
+
+  ! Composite interaction = pot & ovr variables
+  TYPE(potential_type) :: total
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
 
@@ -46,8 +48,8 @@ PROGRAM md_chain_nve_lj
   CHARACTER(len=10)           :: constraints
 
   ! Define procedure pointers with interfaces like those of rattle_a and rattle_b
-  PROCEDURE(rattle_a), pointer :: move_a => null()
-  PROCEDURE(rattle_b), pointer :: move_b => null()
+  PROCEDURE(rattle_a), POINTER :: move_a => NULL()
+  PROCEDURE(rattle_b), POINTER :: move_b => NULL()
 
   NAMELIST /nml/ nblock, nstep, dt, constraints
 
@@ -87,7 +89,7 @@ PROGRAM md_chain_nve_lj
      WRITE ( unit=error_unit, fmt='(a,a)' ) 'Unrecognized constraint method ', constraints
      STOP 'Error in md_chain'
   END IF
-  
+
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond ) ! First call is just to get n and bond
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',          n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length (in sigma units)', bond
@@ -98,8 +100,12 @@ PROGRAM md_chain_nve_lj
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
 
   ! Calculate initial values and forces
-  CALL force ( pot )
-  call calculate ( 'Initial values' )
+  CALL force ( total )
+  IF ( total%ovr ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
+     STOP 'Error in md_chain_nve_lj'
+  END IF
+  CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'E/N', 'T (kin)' ] )
 
@@ -109,13 +115,18 @@ PROGRAM md_chain_nve_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        ! Velocity Verlet algorithm
         CALL move_a ( dt, bond )     ! RATTLE/MILCSHAKE part A
-        CALL force ( pot )           ! Force evaluation
+
+        CALL force ( total )         ! Force evaluation
+        IF ( total%ovr ) THEN
+           WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
+           STOP 'Error in md_chain_nve_lj'
+        END IF
+
         CALL move_b ( dt, bond, wc ) ! RATTLE/MILCSHAKE part B
 
         ! Calculate all variables for this step
-        call calculate ( )
+        CALL calculate ( )
         CALL blk_add ( [en,tk] )
 
      END DO ! End loop over steps
@@ -128,8 +139,12 @@ PROGRAM md_chain_nve_lj
 
   CALL run_end ( output_unit )
 
-  CALL force ( pot )
-  call calculate ( 'Final values' )
+  CALL force ( total )
+  IF ( total%ovr ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
+     STOP 'Error in md_chain_nve_lj'
+  END IF
+  CALL calculate ( 'Final values' )
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
   CALL time_stamp ( output_unit )
 
@@ -150,16 +165,16 @@ CONTAINS
     ! which goes to zero smoothly at the cutoff to highlight energy conservation
     ! so long-range corrections for cut-and-shift versions do not arise
 
-    REAL    :: kin  ! total kinetic energy
+    REAL    :: kin  ! Total kinetic energy
     INTEGER :: free ! Number of degrees of freedom
 
-    kin = 0.5*SUM(v**2)
-    en  = ( pot + kin ) / REAL ( n )
-
+    kin  = 0.5*SUM(v**2)
     free = 3 * n                     ! Three degrees of freedom per atom
     free = free - (n-1)              ! Subtract n-1 constraints
     free = free - 6                  ! Correct for angular and linear momentum conservation
     tk   = 2.0 * kin / REAL ( free ) ! Kinetic temperature
+
+    en  = ( total%pot + kin ) / REAL ( n ) ! total%pot is the total LJ nonbonded energy
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string

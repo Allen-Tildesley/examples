@@ -17,7 +17,30 @@ MODULE md_module
   REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v ! Velocities (3,n)
   REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: f ! Forces (3,n)
 
+  ! Public derived type
+  TYPE, PUBLIC :: potential_type ! A composite variable for interactions comprising
+     REAL    :: cut ! the potential energy cut (but not shifted) at r_cut and
+     REAL    :: pot ! the potential energy cut-and-shifted at r_cut and
+     REAL    :: vir ! the virial and
+     REAL    :: lap ! the Laplacian and
+     LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
+   CONTAINS
+     PROCEDURE :: add_potential_type
+     GENERIC   :: OPERATOR(+) => add_potential_type
+  END TYPE potential_type
+
 CONTAINS
+
+  FUNCTION add_potential_type ( a, b ) RESULT (c)
+    IMPLICIT NONE
+    TYPE(potential_type)              :: c    ! Result is the sum of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
+    c%cut = a%cut  +   b%cut
+    c%pot = a%pot  +   b%pot
+    c%vir = a%vir  +   b%vir
+    c%lap = a%lap  +   b%lap
+    c%ovr = a%ovr .OR. b%ovr
+  END FUNCTION add_potential_type
 
   SUBROUTINE introduction ( output_unit )
     IMPLICIT NONE
@@ -68,29 +91,30 @@ CONTAINS
 
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE force ( box, r_cut, pot, cut, vir, lap, overlap )
+  SUBROUTINE force ( box, r_cut, total )
     USE link_list_module, ONLY : make_list, sc, head, list
     IMPLICIT NONE
-    REAL,    INTENT(in)  :: box     ! Simulation box length
-    REAL,    INTENT(in)  :: r_cut   ! Potential cutoff distance
-    REAL,    INTENT(out) :: pot     ! Cut-and-shifted total potential energy
-    REAL,    INTENT(out) :: cut     ! Cut (but not shifted) total potential energy
-    REAL,    INTENT(out) :: vir     ! Total virial
-    REAL,    INTENT(out) :: lap     ! Total Laplacian
-    LOGICAL, INTENT(out) :: overlap ! Warning flag that there is an overlap
+    REAL,                 INTENT(in)  :: box   ! Simulation box length
+    REAL,                 INTENT(in)  :: r_cut ! Potential cutoff distance
+    TYPE(potential_type), INTENT(out) :: total ! Composite of pot, vir, lap etc
 
-    ! Calculates forces in array f, and also pot, cut etc  
-    ! If overlap is set to .true., the forces etc should not be used
-    ! It is assumed that positions are in units where box = 1
-    ! Forces are calculated in units where sigma = 1 and epsilon = 1
+    ! total%pot is the nonbonded cut-and-shifted potential energy for whole system
+    ! total%cut is the nonbonded cut (but not shifted) potential energy for whole system
+    ! total%vir is the corresponding virial
+    ! total%lap is the corresponding Laplacian
+    ! total%ovr is a warning flag that there is an overlap
+    ! This routine also calculates forces and stores them in the array f
+    ! Forces are derived from pot, not cut (which has a discontinuity)
+    ! If total%ovr is set to .true., the forces etc should not be used
     ! Uses link lists
 
-    INTEGER               :: i, j, ncut, ci1, ci2, ci3, k
+    INTEGER               :: i, j, ci1, ci2, ci3, k
     INTEGER, DIMENSION(3) :: ci, cj
     REAL                  :: r_cut_box, r_cut_box_sq, box_sq, rij_sq
-    REAL                  :: sr2, sr6, sr12, cutij, virij, lapij
+    REAL                  :: sr2, sr6, sr12, pot_cut
     REAL,    DIMENSION(3) :: rij, fij
-    REAL,    PARAMETER    :: sr2_overlap = 1.8 ! Overlap threshold
+    REAL,    PARAMETER    :: sr2_ovr = 1.77 ! Overlap threshold (pot > 100)
+    TYPE(potential_type)  :: pair
 
     ! Set up vectors to half the cells in neighbourhood of 3x3x3 cells in cubic lattice
     ! The cells are chosen so that if (d1,d2,d3) appears, then (-d1,-d2,-d3) does not.
@@ -106,17 +130,18 @@ CONTAINS
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
 
+    ! Calculate potential at cutoff
+    sr2     = 1.0 / r_cut**2 ! in sigma=1 units
+    sr6     = sr2 ** 3
+    sr12    = sr6 **2
+    pot_cut = sr12 - sr6 ! Without numerical factor 4
+
     r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundary conditions in box=1 units
     CALL make_list ( n, r )
 
     ! Initialize
-    f       = 0.0
-    pot     = 0.0
-    cut     = 0.0
-    vir     = 0.0
-    lap     = 0.0
-    overlap = .FALSE.
-    ncut    = 0
+    f     = 0.0
+    total = potential_type (  pot=0.0, cut=0.0, vir=0.0, lap=0.0, ovr=.FALSE. )
 
     ! Triple loop over cells
     DO ci1 = 0, sc-1
@@ -153,25 +178,22 @@ CONTAINS
 
                       IF ( rij_sq < r_cut_box_sq ) THEN ! Check within cutoff
 
-                         rij_sq = rij_sq * box_sq ! Now in sigma=1 units
-                         rij(:) = rij(:) * box    ! Now in sigma=1 units
-                         sr2    = 1.0 / rij_sq
+                         rij_sq   = rij_sq * box_sq ! Now in sigma=1 units
+                         rij(:)   = rij(:) * box    ! Now in sigma=1 units
+                         sr2      = 1.0 / rij_sq    ! (sigma/rij)**2
+                         pair%ovr = sr2 > sr2_ovr   ! Overlap if too close
 
-                         IF ( sr2 > sr2_overlap ) overlap = .TRUE. ! Overlap detected
+                         sr6      = sr2 ** 3
+                         sr12     = sr6 ** 2
+                         pair%cut = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
+                         pair%vir = pair%cut + sr12               ! LJ pair virial
+                         pair%pot = pair%cut - pot_cut            ! LJ pair potential (cut-and-shifted)
+                         pair%lap = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
+                         fij      = rij * pair%vir * sr2          ! LJ pair forces
 
-                         sr6   = sr2 ** 3
-                         sr12  = sr6 ** 2
-                         cutij = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
-                         virij = cutij + sr12                  ! LJ pair virial
-                         lapij = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
-                         fij   = rij * virij / rij_sq          ! LJ pair forces
-
-                         cut    = cut    + cutij
-                         vir    = vir    + virij
-                         lap    = lap    + lapij
+                         total  = total  + pair
                          f(:,i) = f(:,i) + fij
                          f(:,j) = f(:,j) - fij
-                         ncut   = ncut   + 1
 
                       END IF ! End check within cutoff
 
@@ -188,19 +210,12 @@ CONTAINS
     END DO
     ! End triple loop over cells
 
-    ! Calculate shifted potential
-    sr2   = 1.0 / r_cut**2 ! in sigma=1 units
-    sr6   = sr2 ** 3
-    sr12  = sr6 **2
-    cutij = sr12 - sr6
-    pot   = cut - REAL ( ncut ) * cutij
-
     ! Multiply results by numerical factors
-    f   = f   * 24.0
-    cut = cut * 4.0
-    pot = pot * 4.0
-    vir = vir * 24.0 / 3.0
-    lap = lap * 24.0 * 2.0
+    f         = f         * 24.0       ! 24*epsilon
+    total%cut = total%cut * 4.0        ! 4*epsilon
+    total%pot = total%pot * 4.0        ! 4*epsilon
+    total%vir = total%vir * 24.0 / 3.0 ! 24*epsilon and divide virial by 3
+    total%lap = total%lap * 24.0 * 2.0 ! 24*epsilon and factor 2 for ij and ji
 
   END SUBROUTINE force
 
@@ -216,7 +231,7 @@ CONTAINS
     REAL            :: sr3
     REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
 
-    sr3        = 1.0 / r_cut**3
+    sr3           = 1.0 / r_cut**3
     potential_lrc = pi * ( (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3 ) * density
 
   END FUNCTION potential_lrc

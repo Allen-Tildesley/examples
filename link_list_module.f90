@@ -8,13 +8,13 @@ MODULE link_list_module
 
   ! Public routines
   PUBLIC :: initialize_list, finalize_list, make_list, check_list
-  PUBLIC :: move_in_list, create_in_list, destroy_in_list, c_index
+  PUBLIC :: move_in_list, create_in_list, destroy_in_list, c_index, neighbours
 
   ! Public (protected) data
-  INTEGER,                                PROTECTED, PUBLIC :: sc   ! dimensions of head array
-  INTEGER, DIMENSION(:,:,:), ALLOCATABLE, PROTECTED, PUBLIC :: head ! head(0:sc-1,0:sc-1,0:sc-1)
-  INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED, PUBLIC :: list ! list(n)
-  INTEGER, DIMENSION(:,:),   ALLOCATABLE, PROTECTED, PUBLIC :: c    ! c(3,n) 3D cell index of each atom
+  INTEGER,                                PROTECTED, PUBLIC :: sc     ! dimensions of head array
+  INTEGER, DIMENSION(:,:,:), ALLOCATABLE, PROTECTED, PUBLIC :: head   ! head(0:sc-1,0:sc-1,0:sc-1)
+  INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED, PUBLIC :: list   ! list(n)
+  INTEGER, DIMENSION(:,:),   ALLOCATABLE, PROTECTED, PUBLIC :: c      ! c(3,n) 3D cell index of each atom
 
 CONTAINS
 
@@ -181,5 +181,89 @@ CONTAINS
     ! End triple loop over cells
 
   END SUBROUTINE check_list
+
+  FUNCTION neighbours ( n, i, ci, half ) RESULT ( j_list )
+    IMPLICIT NONE
+    INTEGER,               INTENT(in) :: n      ! Number of atoms
+    INTEGER,               INTENT(in) :: i      ! Atom whose neighbours are required
+    INTEGER, DIMENSION(3), INTENT(in) :: ci     ! Cell of atom of interest
+    LOGICAL,               INTENT(in) :: half   ! Determining the range of neighbours searched
+    INTEGER, DIMENSION(n)             :: j_list ! Resulting list of indices
+
+    ! This routine uses the link-list cell structure to fill out the array j_list
+    ! with possible neighbours of atom i, padding with zeroes
+    ! If half==.false., all 27 cells around, and including, ci, are searched.
+    ! If half==.true., only cell ci, and 13 of the neighbour cells, are searched
+    ! and moreover, in ci, we only look down-list making use of list(i)
+    ! There is a subtlety: using list(i) assumes that our interest is in the cells that
+    ! are neighbours of c(:,i), i.e. that ci(:)==c(:,i), and we check for this explicitly.
+    ! In other words, we assume that atom i has not moved since list was constructed.
+    ! If half==.false., particle i might be in a very different position, and ci might be
+    ! very different to c(:,i) but in that case we make no use of list(i), in normal use
+
+    ! We have a cubic cell lattice
+    ! Set up vectors to each cell in the 3x3x3 neighbourhood of a given cell
+    ! To work properly, these are listed with inversion symmetry about (0,0,0)
+    INTEGER,                      PARAMETER :: nk = 13 
+    INTEGER, DIMENSION(3,-nk:nk), PARAMETER :: d = RESHAPE( [ &
+         &   -1,-1,-1,    0,-1,-1,    1,-1,-1, &
+         &   -1, 1,-1,    0, 1,-1,    1, 1,-1, &
+         &   -1, 0,-1,    1, 0,-1,    0, 0,-1, &
+         &    0,-1, 0,    1,-1, 0,   -1,-1, 0, &
+         &   -1, 0, 0,    0, 0, 0,    1, 0, 0, &
+         &    1, 1, 0,   -1, 1, 0,    0, 1, 0, &
+         &    0, 0, 1,   -1, 0, 1,    1, 0, 1, &
+         &   -1,-1, 1,    0,-1, 1,    1,-1, 1, &
+         &   -1, 1, 1,    0, 1, 1,    1, 1, 1    ], [ 3, 2*nk+1 ] )
+
+    INTEGER               :: k1, k2, k, j, nj
+    INTEGER, DIMENSION(3) :: cj
+
+    IF ( half ) THEN ! Check half neighbour cells and j downlist from i in current cell
+       k1 = 0
+       k2 = nk
+       IF ( ANY ( ci(:) /= c(:,i) ) ) THEN ! should never happen
+          WRITE ( unit=error_unit, fmt='(a,6i15)' ) 'Cell mismatch ', ci(:), c(:,i)
+          STOP 'Error in get_neighbours'
+       END IF
+    ELSE ! Check every atom other than i in all cells
+       k1 = -nk
+       k2 =  nk
+    END IF
+
+    j_list = 0 ! Initialize with zero values everywhere
+    nj     = 0 ! Next position in list to be filled
+
+    DO k = k1, k2 ! Begin loop over neighbouring cells
+
+       cj(:) = ci(:) + d(:,k)       ! Neighbour cell index
+       cj(:) = MODULO ( cj(:), sc ) ! Periodic boundary correction
+
+       IF ( k == 0 .AND. half ) THEN
+          j = list(i) ! Check down-list from i in i-cell
+       ELSE
+          j = head(cj(1),cj(2),cj(3)) ! Check entire j-cell
+       END IF
+
+       DO ! Begin loop over j atoms in list
+
+          IF ( j == 0 ) EXIT  ! Exhausted list
+          IF ( j == i ) CYCLE ! Skip self
+
+          nj = nj + 1 ! Increment count of j atoms
+
+          IF ( nj >= n ) THEN ! Check more than n-1 neighbours (should never happen)
+             WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Neighbour error for j_list', nj, n
+             STOP 'Impossible error in get_neighbours'
+          END IF ! End check more than n-1 neighbours
+
+          j_list(nj) = j       ! Store new j atom
+          j          = list(j) ! Next atom in j cell
+
+       END DO ! End loop over j atoms in list
+
+    END DO ! End loop over neighbouring cells 
+
+  END FUNCTION neighbours
 
 END MODULE link_list_module

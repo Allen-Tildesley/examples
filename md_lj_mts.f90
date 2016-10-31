@@ -7,7 +7,7 @@ PROGRAM md_lj_mts
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, r, v, f, n
+       &                       force, r, v, f, n, potential_type
 
   IMPLICIT NONE
 
@@ -40,10 +40,6 @@ PROGRAM md_lj_mts
 
   INTEGER, PARAMETER        :: k_max = 3 ! Number of shells
   REAL,    DIMENSION(k_max) :: r_cut     ! Cutoff distance for each shell
-  REAL,    DIMENSION(k_max) :: pot       ! Total cut-and-shifted potential energy for each shell
-  REAL,    DIMENSION(k_max) :: cut       ! Total cut (but not shifted) potential energy for each shell
-  REAL,    DIMENSION(k_max) :: vir       ! Total virial for each shell
-  REAL,    DIMENSION(k_max) :: lap       ! Total Laplacian for each shell
   INTEGER, DIMENSION(k_max) :: n_mts     ! Successive ratios of number of steps for each shell
 
   ! Quantities to be averaged
@@ -54,9 +50,11 @@ PROGRAM md_lj_mts
   REAL :: tk   ! Kinetic temperature
   REAL :: tc   ! Configurational temperature
 
+  ! Composite interaction = pot & cut & vir & lap & ovr variables for each shell
+  TYPE(potential_type), DIMENSION(k_max) :: total
+
   INTEGER :: blk, stp1, stp2, stp3, nstep, nblock, k, ioerr
   REAL    :: pairs
-  LOGICAL :: overlap
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -136,8 +134,8 @@ PROGRAM md_lj_mts
 
   ! Calculate initial forces and pot, vir contributions for each shell
   DO k = 1, k_max
-     CALL force ( box, r_cut, lambda, k, pot(k), cut(k), vir(k), lap(k), overlap )
-     IF ( overlap ) THEN
+     CALL force ( box, r_cut, lambda, k, total(k) )
+     IF ( total(k)%ovr ) THEN
         WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
         STOP 'Error in md_lj_mts'
      END IF
@@ -170,8 +168,8 @@ PROGRAM md_lj_mts
               CALL drift_propagator ( dt )                 ! Drift step
               r(:,:) = r(:,:) - ANINT ( r(:,:)/box ) * box ! Periodic boundaries
 
-              CALL force ( box, r_cut, lambda, 1, pot(1), cut(1), vir(1), lap(1), overlap )
-              IF ( overlap ) THEN
+              CALL force ( box, r_cut, lambda, 1, total(1) )
+              IF ( total(1)%ovr ) THEN
                  WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
                  STOP 'Error in md_lj_mts'
               END IF
@@ -180,8 +178,8 @@ PROGRAM md_lj_mts
 
            END DO ! End inner shell 1
 
-           CALL force ( box, r_cut, lambda, 2, pot(2), cut(2), vir(2), lap(2), overlap )
-           IF ( overlap ) THEN ! Highly unlikely for middle shell
+           CALL force ( box, r_cut, lambda, 2, total(2) )
+           IF ( total(2)%ovr ) THEN ! Highly unlikely for middle shell
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
               STOP 'Highly unlikely error in md_lj_mts'
            END IF
@@ -190,8 +188,8 @@ PROGRAM md_lj_mts
 
         END DO ! End middle shell 2
 
-        CALL force ( box, r_cut, lambda, 3, pot(3), cut(3), vir(3), lap(3), overlap )
-        IF ( overlap ) THEN ! Extremely unlikely for outer shell
+        CALL force ( box, r_cut, lambda, 3, total(3) )
+        IF ( total(3)%ovr ) THEN ! Extremely unlikely for outer shell
            WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
            STOP 'Extremely unlikely error in md_lj_mts'
         END IF
@@ -214,8 +212,8 @@ PROGRAM md_lj_mts
   CALL run_end ( output_unit )
 
   DO k = 1, k_max
-     CALL force ( box, r_cut, lambda, k, pot(k), cut(k), vir(k), lap(k), overlap )
-     IF ( overlap ) THEN
+     CALL force ( box, r_cut, lambda, k, total(k) )
+     IF ( total(k)%ovr ) THEN
         WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
         STOP 'Error in md_lj_mts'
      END IF
@@ -260,13 +258,15 @@ CONTAINS
     tk  = 2.0 * kin / REAL ( 3*(n-1) )
 
     ! Sum potential terms and virial over shells to get totals
-    en_s = ( SUM(pot) + kin ) / REAL ( n ) 
-    en_f = ( SUM(cut) + kin ) / REAL ( n ) + potential_lrc ( density, r_cut(k_max) )
-    p_s  = density * tk + SUM(vir) / box**3
-    p_f  = p_s + pressure_lrc ( density, r_cut(k_max) )
+    en_s = ( SUM ( total(:)%pot ) + kin ) / REAL ( n )    ! total(k)%pot is the total cut-and-shifted PE for shell k
+    en_f = ( SUM ( total(:)%cut ) + kin ) / REAL ( n )    ! total(k)%cut is the total cut (but not shifted) PE for shell k
+    en_f = en_f + potential_lrc ( density, r_cut(k_max) ) ! Add LRC
+    p_s  = density * tk + SUM ( total(:)%vir ) / box**3   ! total(k)%vir is the total virial for shell k
+    p_f  = p_s + pressure_lrc ( density, r_cut(k_max) )   ! Add LRC
 
-    fsq  = SUM ( SUM(f,dim=3)**2 ) ! Sum forces over shells before squaring
-    beta = ( SUM(lap) / fsq ) - 2.0*hessian ( box, r_cut(k_max) ) / (fsq**2) ! include 1/N Hessian correction
+    fsq  = SUM ( SUM(f,dim=3)**2 )                             ! Sum forces over shells before squaring
+    beta = SUM ( total(:)%lap ) / fsq                          ! total(k)%lap is the total Laplacian for shell k
+    beta = beta - 2.0*hessian ( box, r_cut(k_max) ) / (fsq**2) ! Include 1/N Hessian correction
     tc   = 1.0 / beta
 
     IF ( PRESENT ( string ) ) THEN

@@ -169,7 +169,7 @@ CONTAINS
     REAL               :: r_cut_box, r_cut_box_sq, box_sq
     REAL               :: sr2, sr6, sr12, rij_sq, potij, virij
     REAL, DIMENSION(3) :: rij
-    REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
+    REAL, PARAMETER    :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
@@ -213,7 +213,7 @@ CONTAINS
           rij_sq = rij_sq * box_sq ! now in sigma=1 units
           sr2    = 1.0 / rij_sq    ! (sigma/rij)**2
 
-          IF ( sr2 > sr2_overlap ) THEN
+          IF ( sr2 > sr2_ovr ) THEN
              partial%ovr = .TRUE. ! Overlap detected
              RETURN                ! Return immediately
           END IF

@@ -7,7 +7,7 @@ PROGRAM md_npt_lj
   USE maths_module,     ONLY : random_normal, random_normals
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, r, v, f, n
+       &                       force, r, v, f, n, potential_type
 
   IMPLICIT NONE
 
@@ -44,10 +44,6 @@ PROGRAM md_npt_lj
   REAL :: eps         ! Strain
   REAL :: p_eps       ! Strain momentum 
   REAL :: box0        ! Initial box length 
-  REAL :: cut         ! Total cut (but not shifted) potential energy
-  REAL :: pot         ! Total cut-and-shifted potential energy
-  REAL :: vir         ! Total virial
-  REAL :: lap         ! Total Laplacian
 
   INTEGER, PARAMETER    :: m = 3      ! Number of Nose-Hoover chain variables
   REAL,    DIMENSION(m) :: q          ! Thermal inertias
@@ -67,8 +63,10 @@ PROGRAM md_npt_lj
   REAL :: tc      ! Configurational temperature
   REAL :: cn      ! Conserved energy-like quantity per atom
 
+  ! Composite interaction = pot & cut & vir & lap & ovr variables
+  TYPE(potential_type) :: total
+
   INTEGER :: blk, stp, nstep, nblock, ioerr
-  LOGICAL :: overlap
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -141,8 +139,8 @@ PROGRAM md_npt_lj
   p_eps = random_normal ( 0.0, SQRT(temperature*w_eps) ) ! strain momentum
 
   ! Initial forces, potential, etc plus overlap check
-  CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
-  IF ( overlap ) THEN
+  CALL force ( box, r_cut, total )
+  IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in md_npt_lj'
   END IF
@@ -166,8 +164,8 @@ PROGRAM md_npt_lj
 
         CALL u1_propagator  ( dt )
 
-        CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
-        IF ( overlap ) THEN
+        CALL force ( box, r_cut, total )
+        IF ( total%ovr ) THEN
            WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
            STOP 'Error in md_npt_lj'
         END IF
@@ -192,8 +190,8 @@ PROGRAM md_npt_lj
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
-  IF ( overlap ) THEN ! should never happen
+  CALL force ( box, r_cut, total )
+  IF ( total%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in md_npt_lj'
   END IF
@@ -263,7 +261,7 @@ CONTAINS
     REAL :: alpha, pv
 
     alpha = 1.0 + 3.0 / g
-    pv    = alpha * SUM(v**2) / 3.0 + vir
+    pv    = alpha * SUM(v**2) / 3.0 + total%vir ! total%vir is the total virial
     p_eps = p_eps + ( pv - pressure*box**3 ) * t
 
   END SUBROUTINE u2p_propagator
@@ -375,14 +373,16 @@ CONTAINS
 
     density = REAL(n) / box**3
 
-    en_s = ( pot + kin ) / REAL ( n )
-    en_f = ( cut + kin ) / REAL ( n ) + potential_lrc ( density, r_cut )
-    p_s  = density * temperature + vir / box**3
-    p_f  = p_s + pressure_lrc ( density, r_cut )
+    en_s = ( total%pot + kin ) / REAL ( n )        ! total%pot is the total cut-and-shifted PE
+    en_f = ( total%cut + kin ) / REAL ( n )        ! total%cut is the total cut (but not shifted) PE
+    en_f = en_f + potential_lrc ( density, r_cut ) ! Add LRC
 
-    tc = SUM(f**2) / lap
+    p_s  = density * temperature + total%vir / box**3 ! total%vir is the total virial
+    p_f  = p_s + pressure_lrc ( density, r_cut )      ! Add LRC
 
-    cn = pot + kin + SUM(0.5*p_eta**2/q) + SUM(0.5*p_eta_baro**2/q_baro) + 0.5*p_eps**2/w_eps
+    tc = SUM(f**2) / total%lap ! total%lap is the total Laplacian
+
+    cn = total%pot + kin + SUM(0.5*p_eta**2/q) + SUM(0.5*p_eta_baro**2/q_baro) + 0.5*p_eps**2/w_eps
     cn = cn + temperature * ( g*eta(1) + SUM(eta(2:m)) + SUM(eta_baro) )
     cn = cn / REAL(n)
 

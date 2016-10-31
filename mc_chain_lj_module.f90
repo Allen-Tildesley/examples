@@ -34,16 +34,16 @@ MODULE mc_module
 CONTAINS
 
   FUNCTION add_potential_type ( a, b ) RESULT (c)
-    TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
-    CLASS(potential_type), INTENT(in) :: a, b
+    TYPE(potential_type)              :: c    ! Result is the sum of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot   +  b%pot
     c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
-    CLASS(potential_type), INTENT(in) :: a, b
+    TYPE(potential_type)              :: c    ! Result is the difference of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot   -  b%pot
     c%ovr = a%ovr .OR. b%ovr ! This is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
@@ -308,10 +308,11 @@ CONTAINS
     ! Coordinates are assumed to be in LJ units where sigma = 1, no periodic boundaries
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
-    INTEGER            :: j, j1, j2
-    REAL               :: sr2, sr6, sr12, rij_sq, potij
-    REAL, DIMENSION(3) :: rij
-    REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
+    INTEGER              :: j, j1, j2
+    REAL                 :: sr2, sr6, sr12, rij_sq
+    REAL, DIMENSION(3)   :: rij
+    REAL, PARAMETER      :: sr2_ovr = 1.77 ! Overlap threshold (pot > 100)
+    TYPE(potential_type) :: pair
 
     IF ( n > SIZE(r,dim=2) ) THEN ! Should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
@@ -341,24 +342,25 @@ CONTAINS
 
        IF ( ABS(j-i) <= 1 ) CYCLE ! Skip self and bonded neighbours
 
-       rij(:) = ri(:) - r(:,j) ! Separation vector
-       rij_sq = SUM ( rij**2 ) ! Squared separation
-       sr2    = 1.0 / rij_sq   ! (sigma/rij)**2
+       rij(:)   = ri(:) - r(:,j) ! Separation vector
+       rij_sq   = SUM ( rij**2 ) ! Squared separation
+       sr2      = 1.0 / rij_sq   ! (sigma/rij)**2
+       pair%ovr = sr2 > sr2_ovr  ! Overlap if too close
 
-       IF ( sr2 > sr2_overlap ) THEN
+       IF ( pair%ovr ) THEN
           partial%ovr = .TRUE. ! Overlap detected
           RETURN               ! Return immediately
        END IF
 
-       sr6   = sr2**3
-       sr12  = sr6**2
-       potij = sr12 - sr6 ! LJ potential (neither cut nor shifted)
+       sr6      = sr2**3
+       sr12     = sr6**2
+       pair%pot = sr12 - sr6 ! LJ pair potential (neither cut nor shifted)
 
-       partial%pot = partial%pot + potij
+       partial = partial + pair
 
     END DO ! End loop over selected range of partners
 
-    partial%pot = partial%pot * 4.0 ! Numerical factor
+    partial%pot = partial%pot * 4.0 ! Numerical factor of 4*epsilon
     partial%ovr = .FALSE.           ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION potential_1

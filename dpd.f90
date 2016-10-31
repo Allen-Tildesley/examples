@@ -8,13 +8,13 @@ PROGRAM dpd
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : lowercase
   USE dpd_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, make_ij, lowe, shardlow, r, v, f, n
+       &                       force, lowe, shardlow, r, v, f, n, potential_type
 
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms (positions, velocities)
   ! Cubic periodic boundary conditions
-  ! Conducts dissipative dynamics using Shardlow or Lowe-Andersen algorithm
+  ! Conducts dissipative particle dynamics using Shardlow or Lowe-Andersen algorithm
   ! Uses no special neighbour lists
 
   ! Reads several variables and options from standard input using a namelist nml
@@ -33,20 +33,21 @@ PROGRAM dpd
   ! They also give the approximate pressure as rho*kT + alpha*a*rho**2 where alpha=0.101
 
   ! Most important variables
-  REAL :: box         ! box length
-  REAL :: density     ! density
-  REAL :: a           ! force strength parameter
-  REAL :: dt          ! time step
-  REAL :: gamma       ! thermalization rate (inverse time)
-  REAL :: pot         ! total potential energy
-  REAL :: kin         ! total kinetic energy
-  REAL :: vir         ! total virial
-  REAL :: lap         ! Laplacian
-  REAL :: temperature ! temperature (specified)
-  REAL :: pres_virial ! virial pressure (to be averaged)
-  REAL :: temp_kinet  ! kinetic temperature (to be averaged)
-  REAL :: temp_config ! configurational temperature (to be averaged)
-  REAL :: energy      ! total energy per atom (to be averaged)
+  REAL :: box         ! Box length
+  REAL :: density     ! Density
+  REAL :: a           ! Force strength parameter
+  REAL :: dt          ! Time step
+  REAL :: gamma       ! Thermalization rate (inverse time)
+  REAL :: temperature ! Temperature (specified)
+
+  ! Quantities to be averaged
+  REAL :: p  ! Pressure
+  REAL :: en ! Internal energy per atom
+  REAL :: tk ! Kinetic temperature
+  REAL :: tc ! Configurational temperature
+
+  ! Composite interaction = pot & vir & lap variables
+  TYPE(potential_type) :: total
 
   REAL, PARAMETER :: alpha = 0.101 ! constant in approximate equation of state
 
@@ -111,7 +112,7 @@ PROGRAM dpd
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
   density = REAL(n) / box**3
-  a       = a * temperature / density ! scale force strength accordingly
+  a       = a * temperature / density ! Scale force strength accordingly
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',          density
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Force strength a', a
 
@@ -122,11 +123,11 @@ PROGRAM dpd
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  CALL make_ij ( box ) ! construct initial list of pairs within range
-  CALL force ( box, a, pot, vir, lap )
+  ! Initial energy etc
+  CALL force ( box, a, total )
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Energy', 'Temp-kinet', 'Temp-config', 'Virial Pressure' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N', 'T (kin)', 'T (con)', 'P' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -138,27 +139,27 @@ PROGRAM dpd
         CALL thermalize ( box, temperature, gamma*dt )
 
         ! Velocity Verlet step
-        CALL kick_propagator ( dt/2.0 )      ! Kick half-step
-        CALL drift_propagator ( dt )         ! Drift step 
-        CALL make_ij ( box )                 ! Construct list of pairs within range
-        CALL force ( box, a, pot, vir, lap ) ! Force evaluation
-        CALL kick_propagator ( dt/2.0 )      ! Kick half-step
+        CALL kick_propagator ( dt/2.0 ) ! Kick half-step
+        CALL drift_propagator ( dt )    ! Drift step 
+        CALL force ( box, a, total )    ! Force evaluation
+        CALL kick_propagator ( dt/2.0 ) ! Kick half-step
 
         ! Calculate all variables for this step
         CALL calculate ( )
-        CALL blk_add ( [energy,temp_kinet,temp_config,pres_virial] )
+        CALL blk_add ( [en,tk,tc,p] )
 
      END DO ! End loop over steps
 
      CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! save configuration
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! Number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! Save configuration
 
   END DO ! End loop over blocks      
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, a, pot, vir, lap )
+  ! Final energy etc
+  CALL force ( box, a, total )
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
@@ -183,7 +184,7 @@ CONTAINS
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt)
 
-    r(:,:) = r(:,:) + t * v(:,:) / box ! (positions in box=1 units)
+    r(:,:) = r(:,:) + t * v(:,:) / box ! Positions in box=1 units
     r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   END SUBROUTINE drift_propagator
@@ -192,18 +193,28 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    kin         = 0.5*SUM(v**2)
-    energy      = ( pot + kin ) / REAL ( n )
-    temp_kinet  = 2.0 * kin / REAL ( 3*(n-1) )
-    temp_config = SUM(f**2) / lap
-    pres_virial = density * temperature + vir / box**3
+    ! This routine calculates the properties of interest from total values
+    ! and optionally writes them out (e.g. at the start and end of the run)
+    ! The DPD potential is short ranged, zero at, and beyond, r_cut
+    ! so issues of shifted potentials and long-range corrections do not arise
 
-    IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Total energy',    energy
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-kinet',      temp_kinet
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temp-config',     temp_config
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Virial pressure', pres_virial
+    REAL :: kin
+
+    kin = 0.5*SUM(v**2)
+    tk  = 2.0 * kin / REAL ( 3*(n-1) )
+
+    en = ( total%pot + kin ) / REAL ( n ) ! total%pot is the total PE
+
+    p = density * temperature + total%vir / box**3 ! total%vir is the total virial
+
+    tc = SUM(f**2) / total%lap ! total%lap is the total Laplacian
+
+    IF ( PRESENT ( string ) ) THEN ! Output required
+       WRITE ( unit=output_unit, fmt='(a)'           ) string
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N',     en
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)', tk
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)', tc
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P',       p
     END IF
 
   END SUBROUTINE calculate

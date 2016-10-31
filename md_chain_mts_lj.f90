@@ -7,7 +7,7 @@ PROGRAM md_chain_mts_lj
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, spring, worst_bond, r, v, f, g, n
+       &                       force, spring, worst_bond, r, v, f, g, n, potential_type
   IMPLICIT NONE
 
   ! Takes in a configuration of atoms in a linear chain (positions, velocities)
@@ -26,16 +26,18 @@ PROGRAM md_chain_mts_lj
   ! The model is defined in md_module
 
   ! Most important variables
-  INTEGER :: n_mts    ! Number of small steps per large step
-  REAL    :: dt       ! Time step (smallest)
-  REAL    :: bond     ! Bond length
-  REAL    :: k_spring ! Bond spring constant
-  REAL    :: pot      ! Total LJ potential energy
-  REAL    :: pot_h    ! Total spring harmonic potential energy
+  INTEGER :: n_mts     ! Number of small steps per large step
+  REAL    :: dt        ! Time step (smallest)
+  REAL    :: bond      ! Bond length
+  REAL    :: k_spring  ! Bond spring constant
+  REAL    :: total_spr ! Total spring harmonic potential energy
 
   ! Quantities to be averaged
   REAL :: tk ! temperature (kinetic)
   REAL :: en ! internal energy per atom
+
+  ! Composite interaction = pot & ovr variables
+  TYPE(potential_type) :: total
 
   INTEGER :: blk, stp, nstep, nblock, stp_mts, ioerr
 
@@ -84,8 +86,12 @@ PROGRAM md_chain_mts_lj
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
 
   ! Initial calculation of forces f, spring forces g, and potential energies
-  CALL force ( pot )
-  CALL spring ( k_spring, bond, pot_h )
+  CALL force ( total )
+  IF ( total%ovr ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
+     STOP 'Error in md_chain_mts_lj'
+  END IF
+  CALL spring ( k_spring, bond, total_spr )
   CALL calculate ( 'Initial values' )
 
   CALL run_begin ( [ CHARACTER(len=15) :: 'E/N', 'T (kin)' ] )
@@ -97,17 +103,24 @@ PROGRAM md_chain_mts_lj
      DO stp = 1, nstep ! Begin loop over steps
 
         ! Single time step of length n_mts*dt
+
         v = v + 0.5 * REAL(n_mts) * dt * f  ! Kick half-step (long) with nonbonded forces f
 
         DO stp_mts = 1, n_mts ! Loop over n_mts steps of length dt
-           v = v + 0.5 * dt * g                  ! Kick half-step (short) with spring forces g
-           r = r + dt * v                        ! Drift step (short)
-           CALL spring ( k_spring, bond, pot_h ) ! Evaluate spring forces g and potential
-           v = v + 0.5 * dt * g                  ! Kick half-step (short) with spring forces g
+           v = v + 0.5 * dt * g                      ! Kick half-step (short) with spring forces g
+           r = r + dt * v                            ! Drift step (short)
+           CALL spring ( k_spring, bond, total_spr ) ! Evaluate spring forces g and potential
+           v = v + 0.5 * dt * g                      ! Kick half-step (short) with spring forces g
         END DO ! End loop over n_mts steps of length dt
 
-        CALL force ( pot ) ! Evaluate nonbonded forces f and potential
+        CALL force ( total ) ! Evaluate nonbonded forces f and potential
+        IF ( total%ovr ) THEN
+           WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
+           STOP 'Error in md_chain_mts_lj'
+        END IF
+
         v = v + 0.5 * REAL(n_mts) * dt * f ! Kick half-step (long) with nonbonded forces f
+
         ! End single time step of length n_mts*dt
 
         ! Calculate all variables for this step
@@ -148,12 +161,14 @@ CONTAINS
     REAL    :: kin  ! Total kinetic energy
     INTEGER :: free ! Number of degrees of freedom
 
-    kin = 0.5*SUM(v**2)
-    en  = ( pot + pot_h + kin ) / REAL ( n ) ! E/N = nonbonded + spring + kinetic energy
-
+    kin  = 0.5*SUM(v**2)
     free = 3 * n                     ! Three degrees of freedom per atom
     free = free - 6                  ! Correct for angular and linear momentum conservation
     tk   = 2.0 * kin / REAL ( free ) ! Kinetic temperature
+
+    en = total%pot            ! total%pot is total LJ nonbonded energy
+    en = en + total_spr + kin ! add total spring energy and kinetic energy to give E
+    en = en / REAL ( n )      ! E/N
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string

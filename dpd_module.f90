@@ -7,22 +7,42 @@ MODULE dpd_module
   IMPLICIT NONE
   PRIVATE
 
-  PUBLIC :: n, r, v, f
+  ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: force, make_ij, lowe, shardlow
+  PUBLIC :: force, lowe, shardlow
 
-  INTEGER                              :: n  ! Number of atoms
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: r  ! Positions (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: v  ! Velocities (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: f  ! Forces (3,n)
+  ! Public data
+  INTEGER,                              PUBLIC :: n  ! Number of atoms
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r  ! Positions (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v  ! Velocities (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: f  ! Forces (3,n)
 
+  ! Private data
   INTEGER                              :: nl ! List size
   INTEGER, DIMENSION(:,:), ALLOCATABLE :: ij ! List of ij pairs within range (2,nl)
   INTEGER                              :: np ! Number of pairs within range
 
   REAL, PARAMETER :: r_cut = 1.0  ! Cutoff distance (unit of length)
 
+  ! Public derived type
+  TYPE, PUBLIC :: potential_type ! A composite variable for interactions comprising
+     REAL    :: pot ! the potential energy and
+     REAL    :: vir ! the virial and
+     REAL    :: lap ! the Laplacian
+   CONTAINS
+     PROCEDURE :: add_potential_type
+     GENERIC   :: OPERATOR(+) => add_potential_type
+  END TYPE potential_type
+
 CONTAINS
+
+  FUNCTION add_potential_type ( a, b ) RESULT (c)
+    TYPE(potential_type)              :: c    ! Result is the sum of 
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
+    c%pot = a%pot + b%pot
+    c%vir = a%vir + b%vir
+    c%lap = a%lap + b%lap
+  END FUNCTION add_potential_type
 
   SUBROUTINE introduction ( output_unit )
     IMPLICIT NONE
@@ -105,57 +125,62 @@ CONTAINS
 
   END SUBROUTINE make_ij
 
-  SUBROUTINE force ( box, a, pot, vir, lap )
+  SUBROUTINE force ( box, a, total )
     IMPLICIT NONE
-    REAL, INTENT(in)  :: box ! Simulation box length
-    REAL, INTENT(in)  :: a   ! Force strength parameter
-    REAL, INTENT(out) :: pot ! Total potential energy
-    REAL, INTENT(out) :: vir ! Virial
-    REAL, INTENT(out) :: lap ! Laplacian
+    REAL,                 INTENT(in)  :: box   ! Simulation box length
+    REAL,                 INTENT(in)  :: a     ! Force strength parameter
+    TYPE(potential_type), INTENT(out) :: total ! Composite of pot, vir, lap
 
-    ! Calculates potential (pot), virial (vir), Laplacian (lap)
-    ! Also calculates forces and stores them in the array f
+    ! total%pot is the nonbonded potential energy for whole system
+    ! total%vir is the corresponding virial
+    ! total%lap is the corresponding Laplacian
+    ! This routine also calculates forces and stores them in the array f
 
     ! It is assumed that positions in the array r are in units where box = 1
-    ! and that the array ij contains a list of all np pairs within range
 
     ! Forces are calculated in units where r_cut = 1
 
-    INTEGER            :: p, i, j
-    REAL               :: rij_sq, rij_mag, wij
-    REAL, DIMENSION(3) :: rij, fij, rij_hat
+    INTEGER              :: p, i, j
+    REAL                 :: rij_sq, rij_mag, wij
+    REAL, DIMENSION(3)   :: rij, fij, rij_hat
+    TYPE(potential_type) :: pair
 
-    f   = 0.0
-    pot = 0.0
-    vir = 0.0
-    lap = 0.0
+    CALL make_ij ( box ) ! Generate randomized list of pairs within range
+
+    ! Initialize
+    f     = 0.0
+    total = potential_type ( pot=0.0, vir=0.0, lap=0.0 )
 
     DO p = 1, np ! Loop over all pairs within range
        i = ij(1,p)
        j = ij(2,p)
 
-       rij(:)  = r(:,i) - r(:,j)           ! separation vector
-       rij(:)  = rij(:) - ANINT ( rij(:) ) ! periodic boundary conditions in box=1 units
-       rij(:)  = rij(:) * box              ! now in r_cut=1 units
-       rij_sq  = SUM ( rij**2 )            ! squared separation
-       IF ( rij_sq > 1.0 ) CYCLE           ! this should never happen
-       rij_mag = SQRT ( rij_sq )           ! separation distance
-       wij     = 1.0 - rij_mag             ! weight function
-       rij_hat = rij / rij_mag             ! unit separation vector
-       pot     = pot + 0.5 * wij**2        ! potential
-       vir     = vir + wij * rij_mag       ! virial
-       lap     = lap + (3.0-2.0/rij_mag)   ! Laplacian
-       fij     = wij * rij_hat(:)
-       f(:,i)  = f(:,i) + fij
-       f(:,j)  = f(:,j) - fij
+       rij(:)  = r(:,i) - r(:,j)           ! Separation vector
+       rij(:)  = rij(:) - ANINT ( rij(:) ) ! Periodic boundary conditions in box=1 units
+       rij(:)  = rij(:) * box              ! Now in r_cut=1 units
+       rij_sq  = SUM ( rij**2 )            ! Squared separation
+       IF ( rij_sq > 1.0 ) CYCLE           ! This should never happen if the list is correct
+
+       rij_mag = SQRT ( rij_sq ) ! Separation distance
+       wij     = 1.0 - rij_mag   ! Weight function
+       rij_hat = rij / rij_mag   ! Unit separation vector
+
+       pair%pot = 0.5 * wij**2      ! Pair potential
+       pair%vir = wij * rij_mag     ! Pair virial
+       pair%lap = (3.0-2.0/rij_mag) ! Pair Laplacian
+       fij      = wij * rij_hat(:)  ! Pair force
+
+       total  = total + pair
+       f(:,i) = f(:,i) + fij
+       f(:,j) = f(:,j) - fij
 
     END DO ! End loop over all pairs within range
 
     ! Multiply results by numerical factors
-    pot = pot * a
-    vir = vir * a / 3.0
-    lap = lap * a * 2.0
-    f   = f   * a
+    total%pot = total%pot * a
+    total%vir = total%vir * a / 3.0
+    total%lap = total%lap * a * 2.0
+    f         = f * a
 
   END SUBROUTINE force
 
@@ -170,33 +195,40 @@ CONTAINS
 
     ! It is assumed that positions in the array r are in units where box = 1
     ! and that the array ij contains a list of all np pairs within range
+    ! In this example, we call make_ij in the force routine,
+    ! which is itself called immediately after position updates
 
     INTEGER            :: i, j, p
-    REAL               :: rij_sq, rij_mag, zeta, v_par
+    REAL               :: rij_sq, rij_mag, zeta, v_old, v_std, v_new
     REAL, DIMENSION(3) :: rij, vij, rij_hat
 
+    v_std = SQRT(2.0*temperature) ! Standard deviation for relative velocity distribution
+
     DO p = 1, np ! Loop over all pairs within range
+
        CALL RANDOM_NUMBER ( zeta )
+
        IF ( zeta < gamma_step ) THEN ! Select pair with desired probability
+
           i = ij(1,p)
           j = ij(2,p)
 
-          ! Choose Gaussian random number with desired standard deviation
-          zeta    = random_normal ( 0.0, SQRT(2.0*temperature) )
+          rij(:)  = r(:,i) - r(:,j)           ! Separation vector (box=1 units)
+          rij(:)  = rij(:) - ANINT ( rij(:) ) ! Periodic boundary conditions
+          rij(:)  = rij(:) * box              ! now in r_cut=1 units
+          rij_sq  = SUM ( rij(:)**2 )         ! Squared separation
+          rij_mag = SQRT ( rij_sq )           ! Magnitude of separation
+          rij_hat = rij / rij_mag             ! Unit separation vector
+          vij     = v(:,i) - v(:,j)           ! Relative velocity vector
+          v_old   = DOT_PRODUCT(vij,rij_hat)  ! Projection of vij along separation
 
-          rij(:)  = r(:,i) - r(:,j)
-          rij(:)  = rij(:) - ANINT ( rij(:) )
-          rij(:)  = rij(:) * box ! now in r_cut=1 units
-          rij_sq  = SUM ( rij(:)**2 )
-          rij_mag = SQRT ( rij_sq )
-          rij_hat = rij / rij_mag
-          vij     = v(:,i) - v(:,j)
-          v_par   = DOT_PRODUCT(vij,rij_hat)
-          vij     = 0.5 * ( zeta - v_par ) * rij_hat(:) ! change in velocity
-          v(:,i) = v(:,i) + vij
-          v(:,j) = v(:,j) - vij
+          v_new  = random_normal(0.0,v_std)       ! New projection of vij along separation
+          vij    = ( v_new - v_old ) * rij_hat(:) ! Change in relative velocity
+          v(:,i) = v(:,i) + 0.5 * vij             ! New i-velocity
+          v(:,j) = v(:,j) - 0.5 * vij             ! New j-velocity
 
        END IF ! End select pair with desired probability
+
     END DO ! End loop over all pairs within range
 
   END SUBROUTINE lowe
@@ -212,42 +244,47 @@ CONTAINS
 
     ! It is assumed that positions in the array r are in units where box = 1
     ! and that the array ij contains a list of all np pairs within range
+    ! In this example, we call make_ij in the force routine,
+    ! which is itself called immediately after position updates
 
     INTEGER            :: i, j, p
-    REAL               :: rij_sq, rij_mag, sqrt_gamma_step, prob, sqrt_prob, zeta, v_par, wij
+    REAL               :: rij_sq, rij_mag, sqrt_gamma_step, prob, sqrt_prob, v_new, v_old, v_std, wij
     REAL, DIMENSION(3) :: rij, vij, rij_hat
 
     sqrt_gamma_step = SQRT(gamma_step)
+    v_std = SQRT(2.0*temperature) ! Standard deviation for relative velocity distribution
 
     DO p = 1, np ! Loop over all pairs within range
+
        i = ij(1,p)
        j = ij(2,p)
 
-       zeta  = random_normal ( 0.0, SQRT(2.0*temperature) ) ! normal with desired standard deviation
+       v_new = random_normal ( 0.0, v_std )
 
-       rij(:)    = r(:,i) - r(:,j)
-       rij(:)    = rij(:) - ANINT ( rij(:) )
-       rij(:)    = rij(:) * box ! now in r_cut=1 units
-       rij_sq    = SUM ( rij(:)**2 )
-       rij_mag   = SQRT ( rij_sq )
-       rij_hat   = rij / rij_mag
-       wij       = 1.0 - rij_mag         ! weight function
+       rij(:)    = r(:,i) - r(:,j)           ! Separation vector (box=1 units)
+       rij(:)    = rij(:) - ANINT ( rij(:) ) ! Periodic boundary conditions
+       rij(:)    = rij(:) * box              ! now in r_cut=1 units
+       rij_sq    = SUM ( rij(:)**2 )         ! Squared separation
+       rij_mag   = SQRT ( rij_sq )           ! Magnitude of separation
+       rij_hat   = rij / rij_mag             ! Unit separation vector
+
+       wij       = 1.0 - rij_mag         ! Weight function
        sqrt_prob = sqrt_gamma_step * wij ! sqrt of p-factor
        prob      = sqrt_prob**2          ! p-factor
 
        ! First half step
-       vij(:) = v(:,i) - v(:,j)
-       v_par  = DOT_PRODUCT ( vij(:), rij_hat(:) )
-       vij(:) = 0.5 * ( sqrt_prob*zeta - prob*v_par ) * rij_hat(:) ! change in velocity
-       v(:,i) = v(:,i) + vij(:)
-       v(:,j) = v(:,j) - vij(:)
+       vij(:) = v(:,i) - v(:,j)                               ! Relative velocity vector
+       v_old  = DOT_PRODUCT ( vij(:), rij_hat(:) )            ! Projection of vij along separation
+       vij(:) = ( sqrt_prob*v_new - prob*v_old ) * rij_hat(:) ! Change in relative velocity
+       v(:,i) = v(:,i) + 0.5 * vij(:)                         ! Change in i-velocity
+       v(:,j) = v(:,j) - 0.5 * vij(:)                         ! Change in j-velocity
 
        ! Second half step
-       vij(:) = v(:,i) - v(:,j)
-       v_par  = DOT_PRODUCT ( vij, rij_hat )
-       vij(:) = 0.5 * ( sqrt_prob*zeta - prob*v_par ) * rij_hat(:) / (1.0+prob) ! change in velocity
-       v(:,i) = v(:,i) + vij(:)
-       v(:,j) = v(:,j) - vij(:)
+       vij(:) = v(:,i) - v(:,j)                                            ! Relative velocity vector
+       v_old  = DOT_PRODUCT ( vij, rij_hat )                               ! Projection of vij along separation
+       vij(:) = ( sqrt_prob*v_new - prob*v_old ) * rij_hat(:) / (1.0+prob) ! Change in relative velocity
+       v(:,i) = v(:,i) + 0.5 * vij(:)                                      ! Change in i-velocity
+       v(:,j) = v(:,j) - 0.5 * vij(:)                                      ! Change in j-velocity
 
     END DO ! End loop over all pairs within range
 

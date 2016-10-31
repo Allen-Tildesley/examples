@@ -8,7 +8,7 @@ PROGRAM bd_nvt_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : random_normals
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, r, v, f, n
+       &                       force, r, v, f, n, potential_type
 
   IMPLICIT NONE
 
@@ -34,10 +34,6 @@ PROGRAM bd_nvt_lj
   REAL :: density     ! Density
   REAL :: dt          ! Time step
   REAL :: r_cut       ! Potential cutoff distance
-  REAL :: cut         ! Total cut (but not shifted) potential energy
-  REAL :: pot         ! Total cut-and-shifted potential energy
-  REAL :: vir         ! Total virial
-  REAL :: lap         ! Total Laplacian
   REAL :: temperature ! Temperature (specified)
   REAL :: gamma       ! Friction coefficient
 
@@ -49,8 +45,10 @@ PROGRAM bd_nvt_lj
   REAL :: tk   ! Kinetic temperature
   REAL :: tc   ! Configurational temperature
 
+  ! Composite interaction = pot & cut & vir & lap & ovr variables
+  TYPE(potential_type) :: total
+
   INTEGER :: blk, stp, nstep, nblock, ioerr
-  LOGICAL :: overlap
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
@@ -101,8 +99,8 @@ PROGRAM bd_nvt_lj
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   ! Initial forces, potential, etc plus overlap check
-  CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
-  IF ( overlap ) THEN
+  CALL force ( box, r_cut, total )
+  IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in bd_nvt_lj'
   END IF
@@ -123,8 +121,8 @@ PROGRAM bd_nvt_lj
         CALL o_propagator ( dt )     ! O random velocities and friction step
         CALL a_propagator ( dt/2.0 ) ! A drift half-step
 
-        CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
-        IF ( overlap ) THEN
+        CALL force ( box, r_cut, total )
+        IF ( total%ovr ) THEN
            WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
            STOP 'Error in bd_nvt_lj'
         END IF
@@ -144,8 +142,8 @@ PROGRAM bd_nvt_lj
 
   CALL run_end ( output_unit )
 
-  CALL force ( box, r_cut, pot, cut, vir, lap, overlap )
-  IF ( overlap ) THEN
+  CALL force ( box, r_cut, total )
+  IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in bd_nvt_lj'
   END IF
@@ -206,12 +204,14 @@ CONTAINS
     kin = 0.5*SUM(v**2)
     tk  = 2.0 * kin / REAL ( 3*n )
 
-    en_s = ( pot + kin ) / REAL ( n )
-    en_f = ( cut + kin ) / REAL ( n ) + potential_lrc ( density, r_cut )
-    p_s  = density * temperature + vir / box**3
-    p_f  = p_s + pressure_lrc ( density, r_cut )
+    en_s = ( total%pot + kin ) / REAL ( n )        ! total%pot is the total cut-and-shifted PE
+    en_f = ( total%cut + kin ) / REAL ( n )        ! total%cut is the total cut (but not shifted) PE
+    en_f = en_f + potential_lrc ( density, r_cut ) ! Add LRC
 
-    tc = SUM(f**2) / lap
+    p_s = density * temperature + total%vir / box**3 ! total%vir is the total virial
+    p_f = p_s + pressure_lrc ( density, r_cut )      ! Add LRC
+
+    tc = SUM(f**2) / total%lap ! total%lap is the total Laplacian
 
     IF ( PRESENT ( string ) ) THEN ! output required
        WRITE ( unit=output_unit, fmt='(a)'           ) string

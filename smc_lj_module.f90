@@ -178,7 +178,7 @@ CONTAINS
     REAL               :: r_cut_box, r_cut_box_sq, box_sq
     REAL               :: rij_sq, sr2, sr6, sr12, cutij, virij, lapij
     REAL, DIMENSION(3) :: rij, fij
-    REAL, PARAMETER    :: sr2_overlap = 1.8 ! overlap threshold
+    REAL, PARAMETER    :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
 
     IF ( PRESENT ( j_range ) ) THEN
        SELECT CASE ( j_range )
@@ -219,7 +219,7 @@ CONTAINS
           rij(:) = rij(:) * box    ! Now in sigma=1 units
           sr2    = 1.0 / rij_sq
 
-          IF ( sr2 > sr2_overlap ) THEN
+          IF ( sr2 > sr2_ovr ) THEN
              partial%ovr = .TRUE. ! Overlap detected
              RETURN               ! Return immediately
           END IF

@@ -7,8 +7,7 @@ PROGRAM mc_nvt_lj
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
   USE maths_module,     ONLY : metropolis, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       potential_1, potential, move, n, r, &
-       &                       potential_type
+       &                       potential_1, potential, move, n, r, potential_type
 
   IMPLICIT NONE
 
@@ -202,7 +201,7 @@ CONTAINS
 
     tc = force_sq ( box, r_cut ) / total%lap ! Configurational temperature
 
-    IF ( PRESENT ( string ) ) THEN
+    IF ( PRESENT ( string ) ) THEN ! Output required
        WRITE ( unit=output_unit, fmt='(a)'           ) string
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut)',  en_c
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut)',    p_c

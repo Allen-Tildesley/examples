@@ -24,8 +24,8 @@ MODULE mc_module
   REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! Positions (3,n)
 
   ! Private data
-  INTEGER, DIMENSION(:),   ALLOCATABLE :: j_list ! List of j-neighbours (n)
   REAL,    DIMENSION(:,:), ALLOCATABLE :: f      ! Forces for force_sq calculation (3,n)
+  INTEGER, DIMENSION(:),   ALLOCATABLE :: j_list ! List of j-neighbours (n)
 
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
 
@@ -46,8 +46,8 @@ CONTAINS
 
   FUNCTION add_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)              :: c    ! Result is the sum of the two inputs
-    CLASS(potential_type), INTENT(in) :: a, b
+    TYPE(potential_type)              :: c    ! Result is the sum of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  +   b%pot
     c%vir = a%vir  +   b%vir
     c%lap = a%lap  +   b%lap
@@ -56,8 +56,8 @@ CONTAINS
 
   FUNCTION subtract_potential_type ( a, b ) RESULT (c)
     IMPLICIT NONE
-    TYPE(potential_type)              :: c    ! Result is the difference of the two inputs
-    CLASS(potential_type), INTENT(in) :: a, b
+    TYPE(potential_type)              :: c    ! Result is the difference of
+    CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  -   b%pot
     c%vir = a%vir  -   b%vir
     c%lap = a%lap  -   b%lap
@@ -91,7 +91,7 @@ CONTAINS
 
     REAL :: r_cut_box
 
-    ALLOCATE ( r(3,n), j_list(n), f(3,n) )
+    ALLOCATE ( r(3,n), f(3,n), j_list(n) )
 
     r_cut_box = r_cut / box
     IF ( r_cut_box > 0.5 ) THEN
@@ -108,7 +108,7 @@ CONTAINS
     USE link_list_module, ONLY : finalize_list
     IMPLICIT NONE
 
-    DEALLOCATE ( r, j_list, f )
+    DEALLOCATE ( r, f, j_list )
     CALL finalize_list
 
   END SUBROUTINE deallocate_arrays
@@ -168,7 +168,7 @@ CONTAINS
   END FUNCTION potential
 
   FUNCTION potential_1 ( ri, i, box, r_cut, j_range ) RESULT ( partial )
-    USE link_list_module, ONLY : c, c_index
+    USE link_list_module, ONLY : c, c_index, neighbours
     IMPLICIT NONE
     TYPE(potential_type)           :: partial ! Returns a composite of pot, vir etc for given atom
     REAL, DIMENSION(3), INTENT(in) :: ri      ! Coordinates of atom of interest
@@ -184,7 +184,7 @@ CONTAINS
     ! If this is .true., the value of partial%pot should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
     ! The optional argument j_range restricts partner indices to "half" which is
-    ! actually implemented in the get_neighbours routine
+    ! actually implemented in the neighbours routine
 
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
@@ -192,24 +192,26 @@ CONTAINS
     INTEGER               :: j, jj
     LOGICAL               :: half
     REAL                  :: r_cut_box, r_cut_box_sq, box_sq
-    REAL                  :: sr2, sr6, sr12, rij_sq, potij, virij, lapij
+    REAL                  :: sr2, sr6, sr12, rij_sq
     REAL,    DIMENSION(3) :: rij
     INTEGER, DIMENSION(3) :: ci
-    REAL, PARAMETER       :: sr2_overlap = 1.8 ! overlap threshold
+    REAL, PARAMETER       :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
+    TYPE(potential_type)  :: pair
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
        STOP 'Error in potential_1'
     END IF
 
+    ci = c_index ( ri ) ! Cell in which ri lies (not necessarily same as c(:,i))
+
     half = PRESENT ( j_range)
-    IF ( half ) THEN
-       ci = c_index ( ri ) ! Cell in which ri lies (not necessarily same as c(:,i))
-    ELSE
-       ci = c(:,i)
+    IF ( half .AND. ANY ( ci(:) /= c(:,i) ) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,6i15)' ) 'Cell mismatch ', ci(:), c(:,i)
+       STOP 'Error in potential_1'
     END IF
 
-    CALL get_neighbours ( i, ci, half ) ! Put neighbours in j_list
+    j_list = neighbours ( n, i, ci, half ) ! Put neighbours in j_list
 
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box**2
@@ -232,38 +234,37 @@ CONTAINS
 
        IF ( rij_sq < r_cut_box_sq ) THEN ! Check within range
 
-          rij_sq = rij_sq * box_sq    ! Now in sigma=1 units
-          sr2    = 1.0 / rij_sq       ! (sigma/rij)**2
+          rij_sq   = rij_sq * box_sq ! Now in sigma=1 units
+          sr2      = 1.0 / rij_sq    ! (sigma/rij)**2
+          pair%ovr = sr2 > sr2_ovr   ! Overlap if too close
 
-          IF ( sr2 > sr2_overlap ) THEN
+          IF ( pair%ovr ) THEN
              partial%ovr = .TRUE. ! Overlap detected
              RETURN               ! Return immediately
           END IF
 
-          sr6   = sr2**3
-          sr12  = sr6**2
-          potij = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
-          virij = potij + sr12                  ! LJ pair virial
-          lapij = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
+          sr6      = sr2**3
+          sr12     = sr6**2
+          pair%pot = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
+          pair%vir = pair%pot + sr12               ! LJ pair virial
+          pair%lap = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
 
-          partial%pot = partial%pot + potij    
-          partial%vir = partial%vir + virij 
-          partial%lap = partial%lap + lapij 
+          partial = partial + pair
 
        END IF ! End check within range
 
     END DO ! End loop until no more entries in j_list
 
     ! Numerical factors
-    partial%pot = partial%pot * 4.0
-    partial%vir = partial%vir * 24.0 / 3.0
-    partial%lap = partial%lap * 24.0 * 2.0
-    partial%ovr = .FALSE. ! No overlaps detected (redundant but for clarity)
+    partial%pot = partial%pot * 4.0        ! 4*epsilon
+    partial%vir = partial%vir * 24.0 / 3.0 ! 24*epsilon and divide virial by 3
+    partial%lap = partial%lap * 24.0 * 2.0 ! 24*epsilon and factor 2 for ij and ji
+    partial%ovr = .FALSE.                  ! No overlaps detected (redundant but for clarity)
 
   END FUNCTION potential_1
 
   FUNCTION force_sq ( box, r_cut ) RESULT ( fsq )
-    USE link_list_module, ONLY : c
+    USE link_list_module, ONLY : c, neighbours
     IMPLICIT NONE
     REAL             :: fsq   ! Returns total squared force
     REAL, INTENT(in) :: box   ! Simulation box length
@@ -286,7 +287,7 @@ CONTAINS
 
     DO i = 1, n-1 ! Outer loop over i
 
-       CALL get_neighbours ( i, c(:,i), half=.TRUE. ) ! Put neighbours in j_list
+       j_list = neighbours ( n, i, c(:,i), half=.TRUE. ) ! Put neighbours in j_list
 
        jj = 0
 
@@ -322,83 +323,6 @@ CONTAINS
     fsq = SUM ( f**2 )
 
   END FUNCTION force_sq
-
-  SUBROUTINE get_neighbours ( i, ci, half )
-    USE link_list_module, ONLY : sc, list, head
-    IMPLICIT NONE
-    INTEGER,               INTENT(in) :: i    ! Atom whose neighbours are required
-    INTEGER, DIMENSION(3), INTENT(in) :: ci   ! Cell of atom of interest
-    LOGICAL,               INTENT(in) :: half ! Determining the range of neighbours searched
-
-    ! This routine uses the link-list cell structure to fill out the array j_list
-    ! with possible neighbours of atom i, padding with zeroes
-    ! If half==.false., all 27 cells are searched.
-    ! If half==.true., only the i-cell, and 13 neighbour cells, are searched
-    ! and moreover, in the i-cell, we only look down-list making use of list(i)
-    ! There is a subtlety: if half==.true. we assume that ri(:)==r(:,i), hence ci(:)==c(:,i)
-    ! Generally, if half==.false., ri and ci might be very different to r(:,i) and c(:,i)
-    ! but in that case we make no use of list(i)
-
-    ! We have a cubic cell lattice
-    ! Set up vectors to each cell in the 3x3x3 neighbourhood of a given cell
-    ! To work properly, these are listed with inversion symmetry about (0,0,0)
-    INTEGER,                      PARAMETER :: nk = 13 
-    INTEGER, DIMENSION(3,-nk:nk), PARAMETER :: d = RESHAPE( [ &
-         &   -1,-1,-1,    0,-1,-1,    1,-1,-1, &
-         &   -1, 1,-1,    0, 1,-1,    1, 1,-1, &
-         &   -1, 0,-1,    1, 0,-1,    0, 0,-1, &
-         &    0,-1, 0,    1,-1, 0,   -1,-1, 0, &
-         &   -1, 0, 0,    0, 0, 0,    1, 0, 0, &
-         &    1, 1, 0,   -1, 1, 0,    0, 1, 0, &
-         &    0, 0, 1,   -1, 0, 1,    1, 0, 1, &
-         &   -1,-1, 1,    0,-1, 1,    1,-1, 1, &
-         &   -1, 1, 1,    0, 1, 1,    1, 1, 1    ], [ 3, 2*nk+1 ] )
-
-    INTEGER               :: k1, k2, k, j, nj
-    INTEGER, DIMENSION(3) :: cj
-
-    IF ( half ) THEN ! Check half neighbour cells and j downlist from i in current cell
-       k1 = 0
-       k2 = nk
-    ELSE ! Check every atom other than i in all cells
-       k1 = -nk
-       k2 =  nk
-    END IF
-
-    j_list = 0 ! Initialize with zero values everywhere
-    nj     = 0 ! Next position in list to be filled
-
-    DO k = k1, k2 ! Begin loop over neighbouring cells
-
-       cj(:) = ci(:) + d(:,k)       ! Neighbour cell index
-       cj(:) = MODULO ( cj(:), sc ) ! Periodic boundary correction
-
-       IF ( k == 0 .AND. half ) THEN
-          j = list(i) ! Check down-list from i in i-cell
-       ELSE
-          j = head(cj(1),cj(2),cj(3)) ! Check entire j-cell
-       END IF
-
-       DO ! Begin loop over j atoms in list
-
-          IF ( j == 0 ) EXIT  ! Exhausted list
-          IF ( j == i ) CYCLE ! Skip self
-
-          nj = nj + 1 ! Increment count of j atoms
-
-          IF ( nj >= n ) THEN ! Check more than n-1 neighbours (should never happen)
-             WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Neighbour error for j_list', nj, n
-             STOP 'Impossible error in get_neighbours'
-          END IF ! End check more than n-1 neighbours
-
-          j_list(nj) = j       ! Store new j atom
-          j          = list(j) ! Next atom in j cell
-
-       END DO ! End loop over j atoms in list
-
-    END DO ! End loop over neighbouring cells 
-
-  END SUBROUTINE get_neighbours
 
   FUNCTION potential_lrc ( density, r_cut )
     IMPLICIT NONE

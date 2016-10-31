@@ -144,7 +144,7 @@ CONTAINS
     r_cm = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
     r_g  = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
 
-    IF ( PRESENT ( string ) ) THEN ! output required
+    IF ( PRESENT ( string ) ) THEN ! Output required
        WRITE ( unit=output_unit, fmt='(a)'          ) string
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'PE', pe
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Rg', r_g
