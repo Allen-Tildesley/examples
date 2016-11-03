@@ -19,7 +19,7 @@ MODULE maths_module
   PUBLIC :: metropolis
 
   ! Public low-level mathematical routines and string operations
-  PUBLIC :: rotate_vector, rotate_quaternion, cross_product, outer_product, q_to_a, lowercase
+  PUBLIC :: rotate_vector, rotate_quaternion, cross_product, outer_product, q_to_a, lowercase, solve
 
   ! Public order parameter calculations
   PUBLIC :: orientational_order, translational_order, nematic_order
@@ -351,7 +351,7 @@ CONTAINS
     r(:) = old(:) + zeta * dr_max ! Move to new position
 
   END FUNCTION random_translate_vector
-  
+
   FUNCTION random_rotate_vector_1 ( angle_max, old ) RESULT ( e ) ! 1st alternative algorithm
     IMPLICIT NONE
     REAL, DIMENSION(3)             :: e         ! Returns a unit vector rotated by a
@@ -807,6 +807,42 @@ CONTAINS
     order = MAXVAL ( [ h*COS(psi/3.0), h*COS((psi+2.0*pi)/3.0), h*COS((psi+4.0*pi)/3.0) ] ) 
 
   END FUNCTION nematic_order
+
+  FUNCTION solve ( a, b ) RESULT ( x )
+    IMPLICIT NONE
+    REAL, DIMENSION(3)               :: x ! Returns a vector x, the solution of Ax=b where
+    REAL, DIMENSION(3,3), INTENT(in) :: a ! is a supplied 3x3 matrix A, and
+    REAL, DIMENSION(3),   INTENT(in) :: b ! is a supplied constant vector
+
+    ! Use Cramer's rule to solve 3x3 linear system
+
+    REAL                 :: d
+    REAL, DIMENSION(3,3) :: ai
+    INTEGER              :: i
+
+    d = determinant ( a )
+    IF ( ABS(d) < tol ) THEN
+       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Error, determinant zero ', d
+       STOP 'Error in solve'
+    END IF
+
+    DO i = 1, 3
+       ai      = a
+       ai(:,i) = b ! Replace i-th column of a
+       x(i)    = determinant ( ai ) / d
+    END DO
+  END FUNCTION solve
+
+  FUNCTION determinant ( a ) RESULT ( d )
+    IMPLICIT NONE
+    REAL                 :: d ! Returns determinant of
+    REAL, DIMENSION(3,3) :: a ! supplied 3x3 matrix
+
+    d =      a(1,1) * a(2,2) * a(3,3) - a(1,1) * a(2,3) * a(3,2) &
+         & + a(1,2) * a(2,3) * a(3,1) - a(2,2) * a(3,1) * a(1,3) &
+         & + a(2,1) * a(3,2) * a(1,3) - a(3,3) * a(1,2) * a(2,1)
+
+  END FUNCTION determinant
 
   FUNCTION q_to_a ( q ) RESULT ( a )
     IMPLICIT NONE

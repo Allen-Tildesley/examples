@@ -10,13 +10,14 @@ PROGRAM cluster
 
   ! Reads an atomic configuration with periodic boundary conditions from inp.cnf
   ! Defines a cluster by a critical separation rcl
-  ! Value of rcl read from standard input using a namelist nml (leave namelist empty to accept supplied default)
+  ! Value of rcl read from standard input using a namelist nml
+  ! Leave namelist empty to accept supplied default
+
   ! Produces a set of circular linked lists of clusters
   ! Input data in atomic (e.g. LJ sigma) units
   ! Program works in box = 1 units
-  ! Reference:
-  ! Stoddard J Comp Phys, 27, 291, 1977
-  ! This simple algorithm does not scale well to large n
+  ! Reference: SD Stoddard J Comp Phys, 27, 291 (1978)
+  ! This simple algorithm does not scale well to large N
 
   INTEGER                              :: n    ! Number of atoms
   REAL,    DIMENSION(:,:), ALLOCATABLE :: r    ! Positions (3,n)

@@ -16,8 +16,7 @@ PROGRAM initialize
   IMPLICIT NONE
 
   ! Reads several variables and options from standard input using a namelist nml
-  ! Either n or nc must be specified, otherwise there are supplied defaults
-  
+
   INTEGER            :: nc, ioerr
   REAL               :: temperature, inertia, density, box, bond
   LOGICAL            :: velocities, random_positions, random_orientations
@@ -31,17 +30,16 @@ PROGRAM initialize
        &         velocities, molecules, random_positions, random_orientations
 
   ! Default values
-  ! We must specify either n or nc but not both
-  n                   = -1
-  nc                  = -1
-  temperature         = 1.0
-  inertia             = 1.0
-  density             = 0.5
-  bond                = 1.0
-  velocities          = .FALSE.
+  n                   = 0       ! nc takes precedence unless n is explicitly specified
+  nc                  = 4       ! default is N = 4*(4**3) = 256 on a fcc lattice, a small system
+  temperature         = 1.0     ! should lie in the liquid region for density > 0.7 or so
+  inertia             = 1.0     ! only relevant for molecular systems
+  density             = 0.75    ! should lie in the liquid region for temperature > 0.9 or so
+  bond                = 1.0     ! only relevant for chains
+  velocities          = .FALSE. ! by default, produce positions for MC simulations
   molecules           = 'atoms' ! Options are 'atoms', 'chain', 'linear', 'nonlinear'
-  random_positions    = .FALSE.
-  random_orientations = .FALSE.
+  random_positions    = .FALSE. ! by default, arrange atoms on a lattice
+  random_orientations = .FALSE. ! by default, use predetermined molecular orientations
 
   READ ( unit=input_unit, nml=nml, iostat=ioerr ) ! namelist input
   IF ( ioerr /= 0 ) THEN
@@ -51,9 +49,9 @@ PROGRAM initialize
      STOP 'Error in initialize'
   END IF
 
-  IF ( n < 0 ) THEN
-     IF ( nc < 0 ) THEN
-        WRITE ( unit=error_unit, fmt='(a,2i15)') 'Must specify either n or nc', n, nc
+  IF ( n <= 0 ) THEN
+     IF ( nc <= 0 ) THEN
+        WRITE ( unit=error_unit, fmt='(a,2i15)') 'nc must be positive', nc
         STOP 'Error in initialize'
      ELSE
         WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'nc = ', nc
@@ -61,12 +59,7 @@ PROGRAM initialize
         WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'n = ', n
      END IF
   ELSE
-     IF ( nc < 0 ) THEN
-        WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'n = ', n
-     ELSE
-        WRITE ( unit=error_unit, fmt='(a,2i15)') 'Must specify either n or nc, not both', n, nc
-        STOP 'Error in initialize'
-     END IF
+     WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'n = ', n
   END IF
 
   IF ( INDEX(lowercase(molecules), 'chain') /= 0 ) THEN
@@ -102,7 +95,7 @@ PROGRAM initialize
         CALL initialize_chain_lattice ! unit bond length
      END IF
      IF ( velocities ) THEN
-        WRITE ( unit=output_unit, fmt='(a,f15.5)' ) 'Chain velocities at temperature', temperature
+        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Chain velocities at temperature', temperature
         CALL initialize_chain_velocities ( temperature )
      END IF
 
@@ -116,7 +109,7 @@ PROGRAM initialize
         CALL initialize_positions_lattice ! unit box
      END IF
      IF ( velocities ) THEN
-        WRITE ( unit=output_unit, fmt='(a,f15.5)' ) 'Velocities at temperature', temperature
+        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Velocities at temperature', temperature
         CALL initialize_velocities ( temperature )
      END IF
 
@@ -134,7 +127,7 @@ PROGRAM initialize
      END IF
 
      IF ( velocities ) THEN
-        WRITE ( unit=output_unit, fmt='(a,2f15.5)' ) 'Angular velocities at temperature, inertia', temperature, inertia
+        WRITE ( unit=output_unit, fmt='(a,t40,2f15.5)' ) 'Angular velocities at temperature, inertia', temperature, inertia
         CALL initialize_angular_velocities ( temperature, inertia )
      END IF
 
@@ -148,6 +141,8 @@ PROGRAM initialize
 
      ! Write out coordinates in same units as box
      box = ( REAL(n) / density ) ** ( 1.0/3.0 )
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',    density
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box length', box
      IF ( velocities ) THEN
         CALL write_cnf_atoms ( filename, n, box, box*r, v )
      ELSE
@@ -158,6 +153,7 @@ PROGRAM initialize
 
      ! We do not use periodic boundaries for this system
      ! Instead, use "box" variable to store bond length
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length', bond
      IF ( velocities ) THEN
         CALL write_cnf_atoms ( filename, n, bond, bond*r, v )
      ELSE
@@ -168,6 +164,8 @@ PROGRAM initialize
 
      ! Write out coordinates in same units as box
      box = ( REAL(n) / density ) ** ( 1.0/3.0 )
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',    density
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box length', box
      IF ( velocities ) THEN
         CALL write_cnf_mols ( filename, n, box, box*r, e, v, w )
      ELSE

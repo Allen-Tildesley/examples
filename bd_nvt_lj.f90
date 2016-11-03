@@ -21,10 +21,11 @@ PROGRAM bd_nvt_lj
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
 
-  ! Positions r are divided by box length after reading in, and we assume mass=1 throughout
+  ! Positions r are divided by box length after reading in
   ! However, input configuration, output configuration, most calculations, and all results 
   ! are given in simulation units defined by the model
   ! For example, for Lennard-Jones, sigma = 1, epsilon = 1
+  ! We assume mass m=1 throughout
 
   ! Despite the program name, there is nothing here specific to Lennard-Jones
   ! The model is defined in md_module
@@ -51,25 +52,28 @@ PROGRAM bd_nvt_lj
   INTEGER :: blk, stp, nstep, nblock, ioerr
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
-  CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
-  CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
+  CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
+  CHARACTER(len=3), PARAMETER :: out_tag    = 'out'
+  CHARACTER(len=3)            :: sav_tag    = 'sav' ! May be overwritten with block number
 
   NAMELIST /nml/ nblock, nstep, r_cut, dt, gamma, temperature
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'bd_nvt_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Brownian dynamics, constant-NVT ensemble'
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass m=1 throughout'
   CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 1000
+  nstep       = 5000
   r_cut       = 2.5
-  dt          = 0.005
+  dt          = 0.002
   gamma       = 1.0
-  temperature = 0.7
+  temperature = 1.0
 
+  ! Read run parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
@@ -77,6 +81,8 @@ PROGRAM bd_nvt_lj
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in bd_nvt_lj'
   END IF
+
+  ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
@@ -85,16 +91,14 @@ PROGRAM bd_nvt_lj
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',               temperature
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Ideal diffusion coefft',    temperature / gamma
 
+  ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
   density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
-
   CALL allocate_arrays ( box, r_cut )
-
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
-
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
@@ -106,16 +110,16 @@ PROGRAM bd_nvt_lj
   END IF
   CALL calculate ( 'Initial values' )
 
+  ! Initialize arrays for averaging and write column headings
   CALL run_begin ( [ CHARACTER(len=15) :: 'E/N (cut&shift)', 'P (cut&shift)', &
        &            'E/N (full)', 'P (full)', 'T (kin)', 'T (con)' ] )
-
+  
   DO blk = 1, nblock ! Begin loop over blocks
 
      CALL blk_begin
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        ! BAOAB algorithm
         CALL b_propagator ( dt/2.0 ) ! B kick half-step
         CALL a_propagator ( dt/2.0 ) ! A drift half-step
         CALL o_propagator ( dt )     ! O random velocities and friction step
@@ -129,18 +133,18 @@ PROGRAM bd_nvt_lj
 
         CALL b_propagator ( dt/2.0 ) ! B kick half-step
 
-        CALL calculate ( )
-        CALL blk_add ( [en_s,p_s,en_f,p_f,tk,tc] )
+        CALL calculate ( )                         ! Calculate instantaneous values
+        CALL blk_add ( [en_s,p_s,en_f,p_f,tk,tc] ) ! Accumulate block averages
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! save configuration
+     CALL blk_end ( blk, output_unit )                              ! Output block averages
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! Number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! Save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit )
+  CALL run_end ( output_unit ) ! Output run averages
 
   CALL force ( box, r_cut, total )
   IF ( total%ovr ) THEN
@@ -150,7 +154,7 @@ PROGRAM bd_nvt_lj
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
-  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
+  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v ) ! Write out final configuration
 
   CALL deallocate_arrays
   CALL conclusion ( output_unit )
@@ -159,22 +163,24 @@ CONTAINS
 
   SUBROUTINE a_propagator ( t ) ! A propagator (drift)
     IMPLICIT NONE
-    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
+    REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
 
-    r(:,:) = r(:,:) + t * v(:,:) / box ! positions in box=1 units
-    r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! periodic boundaries (box=1 units)
+    r(:,:) = r(:,:) + t * v(:,:) / box ! Positions in box=1 units
+    r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries (box=1 units)
 
   END SUBROUTINE a_propagator
 
   SUBROUTINE b_propagator ( t ) ! B propagator (kick)
     IMPLICIT NONE
-    REAL, INTENT(in) :: t ! time over which to propagate (typically dt/2)
+    REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
+
     v(:,:) = v(:,:) + t * f(:,:)
+
   END SUBROUTINE b_propagator
 
   SUBROUTINE o_propagator ( t ) ! O propagator (friction and random contributions)
     IMPLICIT NONE
-    REAL, INTENT(in) :: t ! time over which to propagate (typically dt)
+    REAL, INTENT(in) :: t ! Time over which to propagate (typically dt)
 
     REAL                 :: x, c
     REAL, DIMENSION(3,n) :: zeta
@@ -189,7 +195,7 @@ CONTAINS
     END IF
     c = SQRT ( c )
 
-    CALL random_normals ( 0.0, SQRT(temperature), zeta ) ! random momenta
+    CALL random_normals ( 0.0, SQRT(temperature), zeta ) ! Random momenta
     v = EXP(-x) * v + c * zeta
 
   END SUBROUTINE o_propagator
@@ -199,10 +205,12 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
+    ! This routine calculates variables of interest and (optionally) writes them out
+
     REAL :: kin
 
-    kin = 0.5*SUM(v**2)
-    tk  = 2.0 * kin / REAL ( 3*n )
+    kin = 0.5*SUM(v**2)            ! Total KE
+    tk  = 2.0 * kin / REAL ( 3*n ) ! Momentum is not conserved, hence 3N degrees of freedom
 
     en_s = ( total%pot + kin ) / REAL ( n )        ! total%pot is the total cut-and-shifted PE
     en_f = ( total%cut + kin ) / REAL ( n )        ! total%cut is the total cut (but not shifted) PE

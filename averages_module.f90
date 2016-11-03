@@ -9,8 +9,6 @@ MODULE averages_module
   IMPLICIT NONE
   PRIVATE
 
-  ! Calculation of averages with output to output_unit
-
   ! Public routines
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add, time_stamp
 
@@ -19,11 +17,9 @@ MODULE averages_module
   CHARACTER(len=:), DIMENSION(:), ALLOCATABLE, SAVE :: variable_names
   REAL,             DIMENSION(:), ALLOCATABLE, SAVE :: blk_averages, run_averages, run_errors
   REAL,                                        SAVE :: run_norm, blk_norm
-  CHARACTER(len=13),                           SAVE :: col_fmt = '(*(1x,f##.5))' ! width to be inserted
+  CHARACTER(len=:),               ALLOCATABLE, SAVE :: col_fmt
 
 CONTAINS
-  
-  ! Routines associated with quantities to be averaged and output
 
   SUBROUTINE time_stamp ( output_unit )
     IMPLICIT NONE
@@ -41,55 +37,66 @@ CONTAINS
 
   END SUBROUTINE time_stamp
 
-  SUBROUTINE run_begin ( names ) ! Set up averaging variables based on supplied names
+  SUBROUTINE run_begin ( names )
     IMPLICIT NONE
     CHARACTER(len=*), DIMENSION(:), INTENT(in) :: names
 
-    INTEGER          :: i
-    CHARACTER(len=2) :: ch_col_width
+    ! Set up averaging variables based on supplied array of names
+
+    INTEGER            :: i
+    CHARACTER(len=2)   :: ch_col_width       ! Column-width part of format string for columns
+    INTEGER, PARAMETER :: max_col_width = 30 ! Must be < 100 to fit in ch_col_width
+    INTEGER, PARAMETER :: min_col_width = 15 ! Must be large enough to allow sensible f##.5 format
+    INTEGER, PARAMETER :: col_one_width = 15 ! First column width for block number etc
 
     nvariables = SIZE ( names ) ! This is how we set the number of variables to average
-    
-    col_width = MAX ( 10, LEN(names) ) ! We don't allow columns to be too narrow
-    IF ( col_width > 99 ) THEN         ! or too large
+
+    col_width = MAX ( min_col_width, LEN(names) ) ! We don't allow columns to be too narrow
+
+    IF ( col_width > max_col_width ) THEN ! We don't allow columns to be too large
        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'col_width too large', col_width
        STOP 'Error in run_begin'
     END IF
 
-    ! Set up format string for columns
-    WRITE ( ch_col_width, fmt='(i2)' ) col_width
-    col_fmt(8:9) = ch_col_width
+    ! Set up format string for columns; in Fortran 2003 col_fmt is allocated automatically
+    WRITE ( ch_col_width, fmt='(i2)' ) col_width  ! Character string for ## part of f##.5
+    col_fmt = '(*(1x,f' // ch_col_width // '.5))' ! We assume that 5 dp will be sufficient
 
-    ! First column is 15 characters; allow one space between columns 
-    line_width = 15 + nvariables * ( col_width + 1 )
+    ! First column plus a column for each variable; allow one space between columns 
+    line_width = col_one_width + nvariables * ( col_width + 1 )
 
     ALLOCATE ( CHARACTER(col_width) :: variable_names(nvariables) )
     ALLOCATE ( blk_averages(nvariables) )
     ALLOCATE ( run_averages(nvariables) )
     ALLOCATE ( run_errors  (nvariables) )
 
+    ! Store variable names in tidied-up format
     variable_names = names
     DO i = 1, nvariables
        variable_names(i) = ADJUSTR ( variable_names(i) )
     END DO
 
+    ! Zero averages and error accumulators at start of run
     run_norm     = 0.0
     run_averages = 0.0
     run_errors   = 0.0
 
   END SUBROUTINE run_begin
 
-  SUBROUTINE blk_begin ! Zero averaging variables at start of each block
+  SUBROUTINE blk_begin
     IMPLICIT NONE
 
+    ! Zero averaging variables at start of each block
     blk_norm     = 0.0
     blk_averages = 0.0
 
   END SUBROUTINE blk_begin
 
-  SUBROUTINE blk_add ( variables ) ! Increment block-average variables
+  SUBROUTINE blk_add ( variables )
     IMPLICIT NONE
     REAL, DIMENSION(:), INTENT(in) :: variables
+
+    ! Increment block-average variables
 
     IF ( SIZE(variables) /= nvariables ) THEN ! Check for inconsistency in calling program
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Mismatched variable arrays', nvariables, SIZE(variables)
@@ -101,16 +108,24 @@ CONTAINS
 
   END SUBROUTINE blk_add
 
-  SUBROUTINE blk_end ( blk, output_unit ) ! Write out block averages
+  SUBROUTINE blk_end ( blk, output_unit )
     IMPLICIT NONE
     INTEGER, INTENT(in) :: blk, output_unit
 
+    ! Write out averages at end of every block
+
     LOGICAL, SAVE :: first_call = .TRUE.
 
-    blk_averages = blk_averages / blk_norm        ! Normalize block averages
+    IF ( blk_norm < 0.5 ) THEN ! Check for no accumulation; should never happen
+       WRITE ( unit=error_unit, fmt='(a,f15.5)' ) 'Block accumulation error', blk_norm
+       STOP 'Error in blk_end'
+    END IF ! End check for no accumulation
+
+    blk_averages = blk_averages / blk_norm ! Normalize block averages
+
     run_averages = run_averages + blk_averages    ! Increment run averages
     run_errors   = run_errors   + blk_averages**2 ! Increment error accumulators
-    run_norm     = run_norm + 1.0                 ! Increment run normalizer
+    run_norm     = run_norm     + 1.0             ! Increment run normalizer
 
     IF ( first_call ) THEN ! Write headings on first call
        WRITE ( unit=output_unit, fmt='(a)'                 ) REPEAT ( '=', line_width ) 
@@ -126,15 +141,26 @@ CONTAINS
 
   END SUBROUTINE blk_end
 
-  SUBROUTINE run_end ( output_unit ) ! Write out run averages
+  SUBROUTINE run_end ( output_unit )
     IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit
 
-    run_averages = run_averages / run_norm          ! Normalize run averages
-    run_errors       = run_errors / run_norm        ! Normalize error estimates
-    run_errors       = run_errors - run_averages**2 ! Compute fluctuations
+    ! Write out averages and error estimates at end of run
+    ! NB, these are the crudest possible error estimates, based on the wholly unjustified
+    ! assumption that the blocks are statistically independent
+    ! For a discussion of errors, see Chapter 8 and the error_calc.f90 example
+
+    IF ( run_norm < 0.5 ) THEN ! Check for no accumulation; should never happen
+       WRITE ( unit=error_unit, fmt='(a,f15.5)' ) 'Run accumulation error', run_norm
+       STOP 'Error in run_end'
+    END IF ! End check for no accumulation
+
+    run_averages = run_averages / run_norm      ! Normalize run averages
+    run_errors   = run_errors / run_norm        ! Normalize error estimates
+    run_errors   = run_errors - run_averages**2 ! Compute fluctuations of block averages
+
     WHERE ( run_errors > 0.0 ) ! Guard against roundoff
-       run_errors = SQRT ( run_errors / run_norm )  ! Normalize and get estimated errors
+       run_errors = SQRT ( run_errors / run_norm ) ! Normalize and get estimated errors
     END WHERE ! End guard against roundoff
 
     WRITE ( unit=output_unit, fmt='(a)'                  ) REPEAT('-', line_width )
@@ -144,7 +170,7 @@ CONTAINS
     WRITE ( unit=output_unit, fmt=col_fmt                ) run_errors
     WRITE ( unit=output_unit, fmt='(a)'                  ) REPEAT('=', line_width )
 
-    DEALLOCATE ( variable_names, blk_averages, run_averages, run_errors )
+    DEALLOCATE ( variable_names, blk_averages, run_averages, run_errors, col_fmt )
 
   END SUBROUTINE run_end
 
