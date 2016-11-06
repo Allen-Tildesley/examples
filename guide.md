@@ -2,7 +2,7 @@
 Here are some notes to assist in running the programs.
 
 ##Data Input
-Most of the Fortran codes use a **namelist** to input a few parameters from standard input.
+Most of the Fortran codes use a `namelist` to input a few parameters from standard input.
 This gives an easy way to specify default values in the program itself, and to use a 
 keyword-based syntax to specify values different from the default ones at run-time.
 The input file, or string, should usually begin with **&nml** and end with **/**.
