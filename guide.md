@@ -32,7 +32,10 @@ while for MD programs the cut-and-shifted potential (cs) is used.
 In all cases, an attempt is made to produce results without, and with, long-range corrections,
 the latter giving an estimate for the full potential (f).
 Differences between the different models are discussed in various places,
-see e.g. A Trokhymchuk, J Alejandre, _J Chem Phys,_ __111,__ 8510 (1999).
+see e.g. 
+
+* A Trokhymchuk, J Alejandre, _J Chem Phys,_ __111,__ 8510 (1999).
+
 Using their table V as a guide, we take the critical point to be roughly located at:
 
 LJ model                 | _T_ | &rho; | _P_
@@ -68,14 +71,18 @@ lies in the liquid region of the phase diagram for all these variants of the mod
 
 For comparison with MD runs, a wide range of simulation data for LJ with 
 _Rc_ = 2.5  &sigma; (cut-and-shifted, denoted cs below) is summarized by
+
 * M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)
+
 who present data (in Supplementary Information) and a fitted approximate 
 equation of state (which they also provide as a C++ program). 
 
 Approximate equations of state for the full LJ potential are available from
+
 * J Kolafa and I Nezbeda, _Fluid Phase Equil,_ __100,__ 1 (1994) 
 * M Mecke, A Muller, J Winkelmann, J Vrabec, J Fischer, R Span, W Wagner,
 _Int J Thermophys,_ __17,__ 391 (1996) and __19,__ 1493(E) (1998)
+
 Below we use the Kolafa & Nezbeda formulae (denoted f) and estimate the results
 for the cut-but-not-shifted potential (denoted c) using the same corrections as in the MC codes.
 
