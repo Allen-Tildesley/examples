@@ -11,7 +11,7 @@ change the parameters, typical input might be
 ```
 &nml nblock=20, nstep=1000, dt=0.001 /
 ```
-and the key/value pairs may be set out on different lines if you wish.
+and the `key=value` pairs may be set out on different lines if you wish.
 
 ##Initial Configuration
 Simulation runs require a starting configuration which can usually be prepared using
@@ -30,11 +30,11 @@ Differences between the different models are discussed in various places,
 see e.g. A Trokhymchuk, J Alejandre, J Chem Phys, 111, 8510 (1999).
 Using their table V as a guide, we take the critical point to be roughly located at:
 
-model                 | temperature | &rho; | pressure
------                 | ----------- | ------- | --------
-full, with LRC        | 1.31        | 0.31    | 0.13
-cut (but not shifted) | 1.19        | 0.32    | 0.11
-cut-and-shifted       | 1.08        | 0.32    | 0.09
+model                 | _T_ | &rho; | _P_
+-----                 | ---- | ---- | ----
+full, with LRC        | 1.31 | 0.31 | 0.13
+cut (but not shifted) | 1.19 | 0.32 | 0.11
+cut-and-shifted       | 1.08 | 0.32 | 0.09
 
 At any temperature below Tc, the liquid state is bounded below by the
 liquid-gas coexistence density, and using Tables II-IV of the same reference as a guide,
