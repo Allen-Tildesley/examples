@@ -31,7 +31,7 @@ model                 | temperature | density | pressure
 -----                 | ----------- | ------- | --------
 full, with LRC        | 1.31        | 0.31    | 0.13
 cut (but not shifted) | 1.19        | 0.32    | 0.11
-cut-and-shifted       ! 1.08        | 0.32    | 0.09
+cut-and-shifted       | 1.08        | 0.32    | 0.09
 
 At any temperature below Tc, the liquid state is bounded below by the
 liquid-gas coexistence density, and using Tables II-IV of the same reference as a guide,
@@ -41,19 +41,19 @@ model                 | temperature | density | pressure
 -----                 | ----------- | ------- | --------
 full, with LRC        | 0.8 | 0.793 | 0.005
 cut (but not shifted) | 0.8 | 0.765 | 0.008
-cut-and-shifted       ! 0.8 | 0.730 | 0.013
+cut-and-shifted       | 0.8 | 0.730 | 0.013
 
 model                 | temperature | density | pressure
 -----                 | ----------- | ------- | --------
 full, with LRC        | 0.9 | 0.746 | 0.012
 cut (but not shifted) | 0.9 | 0.714 | 0.020
-cut-and-shifted       ! 0.9 | 0.665 | 0.030
+cut-and-shifted       | 0.9 | 0.665 | 0.030
 
 model                 | temperature | density | pressure
 -----                 | ----------- | ------- | --------
 full, with LRC        | 1.0 | 0.695 | 0.026
 cut (but not shifted) | 1.0 | 0.652 | 0.036
-cut-and-shifted       ! 1.0 | 0.578 | 0.062
+cut-and-shifted       | 1.0 | 0.578 | 0.062
 
 For Lennard-Jones, the default state point (density=0.75 and temperature=1.0) 
 lies in the liquid region of the phase diagram for all these variants of the model. 
