@@ -20,6 +20,10 @@ The default parameters produce an FCC configuration of 256 atoms at reduced dens
 writing out just the positions (for an MC program) to a file `cnf.inp`.
 If the parameter `velocities=.true.` is supplied, then positions and velocities are
 written to the file, corresponding to a reduced temperature _T_ = 1.0.
+The file may then be copied to the directory in which the run is carried out.
+Typically, runs produce a final configuration `cnf.out`
+(which may be renamed to `cnf.inp` as a starting point for further runs)
+and intermediate configurations `cnf.001`, `cnf.002` during the run.
 
 ##State points for different Lennard-Jones models
 For most of the examples, we use a cutoff of _Rc_ = 2.5 &sigma;.
