@@ -5,17 +5,20 @@ Here are some notes to assist in running the programs.
 Most of the Fortran codes use a `namelist` to input a few parameters from standard input.
 This gives an easy way to specify default values in the program itself, and to use a 
 keyword-based syntax to specify values different from the default ones at run-time.
-The input file, or string, should usually begin with **&nml** and end with **/**.
-As a minimum, the program will expect to read **&nml /** (an empty list), but to
-change the parameters, typical input might be **&nml nblock=20, nstep=1000, dt=0.001 /**,
+The input file, or string, should usually begin with `&nml` and end with `/`.
+As a minimum, the program will expect to read `&nml /` (an empty list), but to
+change the parameters, typical input might be 
+```
+&nml nblock=20, nstep=1000, dt=0.001 /
+```
 and the key/value pairs may be set out on different lines if you wish.
 
 ##Initial Configuration
 Simulation runs require a starting configuration which can usually be prepared using
-the **initialize** program (in **build_initialize/**).
+the `initialize` program (in `build_initialize/`).
 The default parameters produce an FCC configuration of 256 atoms at reduced density 0.75,
-writing out just the positions (for an MC program) to a file **cnf.inp**.
-If the parameter **velocities=.true.** is supplied, then positions and velocities are
+writing out just the positions (for an MC program) to a file `cnf.inp`.
+If the parameter `velocities=.true.` is supplied, then positions and velocities are
 written to the file, corresponding to a reduced temperature 1.0.
 
 ##State points for different Lennard-Jones models
@@ -27,7 +30,7 @@ Differences between the different models are discussed in various places,
 see e.g. A Trokhymchuk, J Alejandre, J Chem Phys, 111, 8510 (1999).
 Using their table V as a guide, we take the critical point to be roughly located at:
 
-model                 | temperature | density | pressure
+model                 | temperature | &rho; | pressure
 -----                 | ----------- | ------- | --------
 full, with LRC        | 1.31        | 0.31    | 0.13
 cut (but not shifted) | 1.19        | 0.32    | 0.11
