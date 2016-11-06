@@ -39,12 +39,12 @@ PROGRAM bd_nvt_lj
   REAL :: gamma       ! Friction coefficient
 
   ! Quantities to be averaged
-  REAL :: en_s ! Internal energy (cut-and-shifted ) per atom
-  REAL :: p_s  ! Pressure (cut-and-shifted)
-  REAL :: en_f ! Internal energy (full, including LRC) per atom
-  REAL :: p_f  ! Pressure (full, including LRC)
-  REAL :: tk   ! Kinetic temperature
-  REAL :: tc   ! Configurational temperature
+  REAL :: e_s ! Internal energy (cut-and-shifted ) per atom
+  REAL :: p_s ! Pressure (cut-and-shifted)
+  REAL :: e_f ! Internal energy (full, including LRC) per atom
+  REAL :: p_f ! Pressure (full, including LRC)
+  REAL :: t_k ! Kinetic temperature
+  REAL :: t_c ! Configurational temperature
 
   ! Composite interaction = pot & cut & vir & lap & ovr variables
   TYPE(potential_type) :: total
@@ -111,8 +111,8 @@ PROGRAM bd_nvt_lj
   CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N (cut&shift)', 'P (cut&shift)', &
-       &            'E/N (full)', 'P (full)', 'T (kin)', 'T (con)' ] )
+  CALL run_begin ( [ CHARACTER(len=15) :: 'E (cut&shift)', 'P (cut&shift)', &
+       &            'E (full)', 'P (full)', 'T (kin)', 'T (con)' ] )
   
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -133,8 +133,8 @@ PROGRAM bd_nvt_lj
 
         CALL b_propagator ( dt/2.0 ) ! B kick half-step
 
-        CALL calculate ( )                         ! Calculate instantaneous values
-        CALL blk_add ( [en_s,p_s,en_f,p_f,tk,tc] ) ! Accumulate block averages
+        CALL calculate ( )                       ! Calculate instantaneous values
+        CALL blk_add ( [e_s,p_s,e_f,p_f,t_k,t_c] ) ! Accumulate block averages
 
      END DO ! End loop over steps
 
@@ -210,25 +210,25 @@ CONTAINS
     REAL :: kin
 
     kin = 0.5*SUM(v**2)            ! Total KE
-    tk  = 2.0 * kin / REAL ( 3*n ) ! Momentum is not conserved, hence 3N degrees of freedom
+    t_k = 2.0 * kin / REAL ( 3*n ) ! Momentum is not conserved, hence 3N degrees of freedom
 
-    en_s = ( total%pot + kin ) / REAL ( n )        ! total%pot is the total cut-and-shifted PE
-    en_f = ( total%cut + kin ) / REAL ( n )        ! total%cut is the total cut (but not shifted) PE
-    en_f = en_f + potential_lrc ( density, r_cut ) ! Add LRC
+    e_s = ( total%pot + kin ) / REAL ( n )       ! total%pot is the total cut-and-shifted PE
+    e_f = ( total%cut + kin ) / REAL ( n )       ! total%cut is the total cut (but not shifted) PE
+    e_f = e_f + potential_lrc ( density, r_cut ) ! Add LRC
 
     p_s = density * temperature + total%vir / box**3 ! total%vir is the total virial
     p_f = p_s + pressure_lrc ( density, r_cut )      ! Add LRC
 
-    tc = SUM(f**2) / total%lap ! total%lap is the total Laplacian
+    t_c = SUM(f**2) / total%lap ! total%lap is the total Laplacian
 
     IF ( PRESENT ( string ) ) THEN ! output required
        WRITE ( unit=output_unit, fmt='(a)'           ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut&shift)', en_s
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)',   p_s
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)',      en_f
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',        p_f
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)',         tk
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',         tc
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E (cut&shift)', e_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)', p_s
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E (full)',      e_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',      p_f
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)',       t_k
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',       t_c
     END IF
 
   END SUBROUTINE calculate

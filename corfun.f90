@@ -23,31 +23,31 @@ PROGRAM corfun
   ! Advantage can be taken of the fact that the data is real, but for clarity
   ! we just use the complex FFT with imaginary parts of the data set to zero
 
-  REAL :: m     ! memory function coefficients
-  REAL :: kappa ! memory function decay rates
-  REAL :: zeta  ! random numbers
+  REAL :: m     ! Memory function coefficients
+  REAL :: kappa ! Memory function decay rates
   REAL :: s     ! GLE auxiliary variables
-  REAL :: delta ! time step
-  REAL :: vt    ! velocity at time t
+  REAL :: delta ! Time step
+  REAL :: vt    ! Velocity at time t
 
-  REAL,    DIMENSION(:), ALLOCATABLE :: v     ! stored velocities (nstep)
-  REAL,    DIMENSION(:), ALLOCATABLE :: v0    ! stored velocity origins (n0)
-  INTEGER, DIMENSION(:), ALLOCATABLE :: t0    ! times of origins (n0)
-  REAL,    DIMENSION(:), ALLOCATABLE :: c     ! velocity correlation function (direct method) (0:nt)
-  REAL,    DIMENSION(:), ALLOCATABLE :: c_fft ! velocity correlation function (FFT method) (0:nt)
-  REAL,    DIMENSION(:), ALLOCATABLE :: n     ! normalizing function (0:nt)
+  REAL,    DIMENSION(:), ALLOCATABLE :: v     ! Stored velocities (nstep)
+  REAL,    DIMENSION(:), ALLOCATABLE :: v0    ! Stored velocity origins (n0)
+  INTEGER, DIMENSION(:), ALLOCATABLE :: t0    ! Times of origins (n0)
+  REAL,    DIMENSION(:), ALLOCATABLE :: c     ! Velocity correlation function (direct method) (0:nt)
+  REAL,    DIMENSION(:), ALLOCATABLE :: c_fft ! Velocity correlation function (FFT method) (0:nt)
+  REAL,    DIMENSION(:), ALLOCATABLE :: n     ! Normalizing function (0:nt)
 
-  INTEGER :: nt              ! number of timesteps to correlate
-  INTEGER :: nstep           ! number of timesteps in run
-  INTEGER :: nequil          ! number of equilibration timesteps
-  INTEGER :: n0              ! number of time origins to store
-  INTEGER :: origin_interval ! interval for time origins
-  INTEGER :: dt              ! time difference
-  INTEGER :: t               ! time (equivalent to step number in file)
+  INTEGER :: nt              ! Number of timesteps to correlate
+  INTEGER :: nstep           ! Number of timesteps in run
+  INTEGER :: nequil          ! Number of equilibration timesteps
+  INTEGER :: n0              ! Number of time origins to store
+  INTEGER :: origin_interval ! Interval for time origins
+  INTEGER :: dt              ! Time difference
+  INTEGER :: t               ! Time (equivalent to step number in file)
   LOGICAL :: full
   INTEGER :: k, mk, nk
   INTEGER :: unit, ioerr
-  REAL    :: temperature, stddev, cpu_1, cpu_2, cpu_3, cpu_4, x, e, b, d
+  REAL    :: temperature, stddev, x, e, b, d
+  REAL    :: cpu_1, cpu_2, cpu_3, cpu_4
 
   INTEGER(C_INT)                                       :: fft_len  ! the number of points for FFT
   COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_inp  ! data to be transformed (0:fft_len-1)
@@ -61,12 +61,12 @@ PROGRAM corfun
 
   ! Example default values
   ! Agreement (to numerical precision) of direct and FFT methods is expected if origin_interval=1
-  nt              = 1000  ! max time for correlation function
+  nt              = 1000  ! Max time for correlation function
   origin_interval = 1     ! This could reasonably be increased to 10 or 20 to improve efficiency
-  nstep           = 2**20 ! number of steps, about a million for example
-  nequil          = 10000 ! number of equilibration timesteps
-  delta           = 0.01  ! timestep for simulation
-  temperature     = 1.0   ! temperature for simulation
+  nstep           = 2**20 ! Number of steps, about a million for example
+  nequil          = 10000 ! Number of equilibration timesteps
+  delta           = 0.01  ! Timestep for simulation
+  temperature     = 1.0   ! Temperature for simulation
 
   ! Namelist from standard input
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
@@ -78,17 +78,17 @@ PROGRAM corfun
   END IF
 
   n0 = nt / origin_interval + 1
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'number of steps in run = ',    nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'equilibration steps = ',       nequil
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'max correlation time nt = ',   nt
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'origin interval = ',           origin_interval
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'number of time origins n0 = ', n0
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'time step delta = ',           delta
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'temperature = ',               temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps in run = ',    nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Equilibration steps = ',       nequil
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Max correlation time nt = ',   nt
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Origin interval = ',           origin_interval
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of time origins n0 = ', n0
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step delta = ',           delta
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature = ',               temperature
 
   ALLOCATE ( v(nstep), v0(n0), t0(n0) )
   ALLOCATE ( c(0:nt), c_fft(0:nt), n(0:nt) )
-  fft_len = 2*nstep ! actual length of data
+  fft_len = 2*nstep ! Actual length of FFT data
   ALLOCATE ( fft_inp(0:fft_len-1), fft_out(0:fft_len-1) )
 
   ! The memory function model is defined here
@@ -99,8 +99,8 @@ PROGRAM corfun
   ! (0.25,4.0) (overdamped)
   m     = 1.0
   kappa = 1.0
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'm ',     m
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'kappa ', kappa
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'm = ',     m
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'kappa = ', kappa
 
   ! Coefficients used in algorithm
   x = delta*kappa
@@ -123,13 +123,16 @@ PROGRAM corfun
   vt = 0.0
   s  = 0.0
 
-  DO t = -nequil, nstep ! include an equilibration period
+  DO t = -nequil, nstep ! Loop including an equilibration period
+
+     ! Velocity Verlet type algorithm for vt and auxiliary variable s
+     vt = vt + 0.5 * delta * s
+     s  = e * s - d * m * vt + b * SQRT(m) * random_normal ( 0.0, stddev )
      vt = vt + 0.5*delta*s
-     zeta = random_normal ( 0.0, stddev )
-     s    = e*s - d*m*vt + b*SQRT(m)*zeta
-     vt   = vt + 0.5*delta*s
-     IF ( t > 0 ) v(t) = vt ! store velocities
-  END DO
+
+     IF ( t > 0 ) v(t) = vt ! Store velocities, after equilibration
+
+  END DO ! End loop including an equilibration period
 
   CALL CPU_TIME ( cpu_2 )
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'CPU time to generate data = ', cpu_2-cpu_1
@@ -138,7 +141,7 @@ PROGRAM corfun
 
   c(:) = 0.0
   n(:) = 0.0
-  mk   = 0 ! storage location of time origin
+  mk   = 0 ! Storage location of time origin
   full = .FALSE.
 
   DO t = 1, nstep ! Main loop correlating data
@@ -147,27 +150,36 @@ PROGRAM corfun
         mk = mk + 1
         IF ( mk > n0 ) THEN
            full = .TRUE.
-           mk = mk - n0 ! overwrite older values
+           mk = mk - n0 ! Overwrite older values
         END IF
-        t0(mk) = t    ! store time origins
-        v0(mk) = v(t) ! store velocity at time origins
+        t0(mk) = t    ! Store time origins
+        v0(mk) = v(t) ! Store velocity at time origins
      END IF
 
      IF ( full ) THEN
-        nk = n0 ! correlate with all stored time origins
+        nk = n0 ! Correlate with all stored time origins
      ELSE
-        nk = mk ! correlate with those stored so far
+        nk = mk ! Correlate with those stored so far
      END IF
 
      DO k = 1, nk ! Loop over time origins
+
         dt = t - t0(k)
-        IF ( dt >= 0 .AND. dt <= nt ) THEN
-           c(dt) = c(dt) + v(t) * v0(k) ! increment correlation function
-           n(dt) = n(dt) + 1.0          ! increment normalizing factor
-        END IF
+
+        IF ( dt >= 0 .AND. dt <= nt ) THEN ! Check that dt is in range
+           c(dt) = c(dt) + v(t) * v0(k) ! Increment correlation function
+           n(dt) = n(dt) + 1.0          ! Increment normalizing factor
+        END IF ! End check that dt is in range
+
      END DO ! End loop over time origins
 
   END DO ! End main loop correlating data
+
+  IF ( ANY ( n(:) < 0.5 ) ) THEN ! should never happen
+     WRITE ( unit=error_unit, fmt='(a)') 'Normalization array error'
+     STOP 'Error in corfun'
+  END IF
+
   c(:) = c(:) / n(:) ! Normalise by number of increments
 
   CALL CPU_TIME ( cpu_3 )
@@ -176,24 +188,29 @@ PROGRAM corfun
   ! Data analysis (FFT method)
 
   ! Prepare data for FFT
-  fft_inp            = CMPLX(0.0,0.0) ! fill input array with zeros
-  fft_inp(0:nstep-1) = CMPLX(v)       ! put data into first part (real only)
+  fft_inp            = CMPLX(0.0) ! Fill input array with zeros
+  fft_inp(0:nstep-1) = CMPLX(v)   ! Put data into first part (real only)
 
   ! Forward FFT
-  fft_plan = fftw_plan_dft_1d ( fft_len, fft_inp, fft_out, FFTW_FORWARD, FFTW_ESTIMATE) ! set up plan
-  CALL fftw_execute_dft ( fft_plan, fft_inp, fft_out )                                  ! execute FFT
-  CALL fftw_destroy_plan ( fft_plan )                                                   ! release plan
+  fft_plan = fftw_plan_dft_1d ( fft_len, fft_inp, fft_out, FFTW_FORWARD, FFTW_ESTIMATE) ! Set up plan
+  CALL fftw_execute_dft ( fft_plan, fft_inp, fft_out )                                  ! Execute FFT
+  CALL fftw_destroy_plan ( fft_plan )                                                   ! Release plan
 
-  fft_out = fft_out * CONJG ( fft_out ) ! square modulus
+  fft_out = fft_out * CONJG ( fft_out ) ! Square modulus
 
   ! Reverse FFT
-  fft_plan = fftw_plan_dft_1d ( fft_len, fft_out, fft_inp, FFTW_BACKWARD, FFTW_ESTIMATE) ! set up plan
-  CALL fftw_execute_dft ( fft_plan, fft_out, fft_inp )                                   ! execute FFT
-  CALL fftw_destroy_plan ( fft_plan )                                                    ! release plan
+  fft_plan = fftw_plan_dft_1d ( fft_len, fft_out, fft_inp, FFTW_BACKWARD, FFTW_ESTIMATE) ! Set up plan
+  CALL fftw_execute_dft ( fft_plan, fft_out, fft_inp )                                   ! Execute FFT
+  CALL fftw_destroy_plan ( fft_plan )                                                    ! Release plan
 
-  fft_inp = fft_inp / REAL ( fft_len ) ! normalization factor associated with FFT itself
-  n(:)    = [ ( nstep-t, t = 0, nt ) ]
-  c_fft   = REAL ( fft_inp(0:nt) ) / n(:) ! normalization associated with time origins
+  fft_inp = fft_inp / REAL ( fft_len ) ! Normalization factor associated with FFT itself
+
+  n(:) = [ ( nstep-t, t = 0, nt ) ] ! Normalization factors associated with number of time origins
+  IF ( ANY ( n(:) < 0.5 ) ) THEN ! should never happen
+     WRITE ( unit=error_unit, fmt='(a)') 'Normalization array error'
+     STOP 'Error in corfun'
+  END IF
+  c_fft   = REAL ( fft_inp(0:nt) ) / n(:) ! Apply normalization associated with number of time origins
 
   CALL CPU_TIME ( cpu_4 )
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'CPU time for FFT method = ', cpu_4-cpu_3
@@ -219,11 +236,8 @@ CONTAINS
 
   FUNCTION c_exact ( t ) RESULT ( c )
     IMPLICIT NONE
-
-    REAL, INTENT(in) :: t ! time argument
-    REAL             :: c ! result
-
-    REAL :: del, omega, kp, km, cp, cm
+    REAL             :: c ! Returns analytically known correlation function, for
+    REAL, INTENT(in) :: t ! given time
 
     ! See AD Baczewski and SD Bond J Chem Phys 139 044107 (2013)
     ! In general the exact correlation function may be obtained from the inverse Laplace transform
@@ -233,6 +247,9 @@ CONTAINS
     ! The coefficients c_p and k_p may be determined in terms of the m_p and kappa_p
     ! by solving an equation of order Np+1 and using partial fractions
     ! Here we just do this for the simplest case Np=1
+    ! Agreement with the simulated function is only expected to within statistical error
+
+    REAL :: del, omega, kp, km, cp, cm
 
     IF ( kappa > 4.0 * m ) THEN  ! Real roots
 

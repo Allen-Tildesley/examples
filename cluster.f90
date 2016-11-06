@@ -9,13 +9,13 @@ PROGRAM cluster
   IMPLICIT NONE
 
   ! Reads an atomic configuration with periodic boundary conditions from inp.cnf
-  ! Defines a cluster by a critical separation rcl
-  ! Value of rcl read from standard input using a namelist nml
+  ! Defines a cluster by a critical separation r_cl
+  ! Value of r_cl read from standard input using a namelist nml
   ! Leave namelist empty to accept supplied default
 
   ! Produces a set of circular linked lists of clusters
   ! Input data in atomic (e.g. LJ sigma) units
-  ! Program works in box = 1 units
+  ! Program works in the same units
   ! Reference: SD Stoddard J Comp Phys, 27, 291 (1978)
   ! This simple algorithm does not scale well to large N
 
@@ -25,13 +25,13 @@ PROGRAM cluster
   INTEGER, DIMENSION(:),   ALLOCATABLE :: done ! Indicates assignment to cluster (n)
 
   CHARACTER(len=7), PARAMETER :: filename = 'cnf.inp'
-  REAL                        :: rcl, rcl_sq, box
+  REAL                        :: r_cl, r_cl_sq, box
   INTEGER                     :: ioerr, count, cluster_id
   INTEGER                     :: i, j, k
 
-  NAMELIST /nml/ rcl
+  NAMELIST /nml/ r_cl
 
-  rcl = 1.5 ! default value
+  r_cl = 1.1 ! default value
   
   READ ( unit=input_unit, nml=nml, iostat=ioerr ) ! namelist input
   IF ( ioerr /= 0 ) THEN
@@ -40,21 +40,19 @@ PROGRAM cluster
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in cluster'
   END IF
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Cluster separation distance', rcl
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Cluster separation distance', r_cl
 
-  CALL read_cnf_atoms ( filename, n, box )
-  WRITE( unit=output_unit, fmt='(a,t40,i15)'  ) 'Number of particles', n
+  CALL read_cnf_atoms ( filename, n, box ) ! First call to obtain n
+  WRITE( unit=output_unit, fmt='(a,t40,i15)'  ) 'Number of particles',  n
   WRITE( unit=output_unit, fmt='(a,t40,f15.5)') 'Box (in sigma units)', box
 
   ALLOCATE ( r(3,n), list(n), done(n) )
 
-  CALL read_cnf_atoms ( filename, n, box, r )
+  CALL read_cnf_atoms ( filename, n, box, r ) ! Second call to read in configuration
 
-  ! Convert to box units and apply periodic boundaries
-  r(:,:) = r(:,:) / box
-  r(:,:) = r(:,:) - ANINT ( r(:,:) )
-  rcl    = rcl / box
-  rcl_sq = rcl * rcl
+  r(:,:)  = r(:,:) - ANINT ( r(:,:) / box ) * box ! Apply periodic boundaries
+
+  r_cl_sq = r_cl**2 ! used in in_range function
 
   list(:) = [ (i,i=1,n) ] ! Set up the list
 
@@ -92,9 +90,9 @@ PROGRAM cluster
   WRITE ( unit=output_unit, fmt='(a)' ) 'Cluster Members .....'
   DO ! Begin loop over remaining clusters
 
-     IF ( ALL ( done > 0 ) ) EXIT
+     IF ( ALL ( done > 0 ) ) EXIT ! Loop until all done
 
-     i = MINLOC ( done, dim = 1 ) ! find first zero (FINDLOC is not implemented in gfortran at the time of writing)
+     i = MINLOC ( done, dim = 1 ) ! Find first zero (FINDLOC is not implemented in gfortran at the time of writing)
      cluster_id = cluster_id + 1
      WRITE ( unit=output_unit, fmt='(a,i5,a)', advance='no' ) 'Cluster ', cluster_id, ' = '
      j = i
@@ -123,17 +121,17 @@ CONTAINS
 
   FUNCTION in_range ( j, k )
     IMPLICIT NONE
-    LOGICAL             :: in_range ! Returns indicator of whether pair is in-range or not
+    LOGICAL             :: in_range ! Returns indicator of whether pair is in range or not
     INTEGER, INTENT(in) :: j, k     ! Supplied pair of atom indices
 
     REAL, DIMENSION(3) :: rjk
     REAL               :: rjk_sq
 
-    rjk(:) = r(:,j) - r(:,k)
-    rjk(:) = rjk(:) - ANINT ( rjk(:) )
-    rjk_sq = SUM ( rjk**2 )
+    rjk(:) = r(:,j) - r(:,k)                       ! Separation vector
+    rjk(:) = rjk(:) - ANINT ( rjk(:) / box ) * box ! Periodic boundary conditions
+    rjk_sq = SUM ( rjk**2 )                        ! Squared separation
 
-    in_range = ( rjk_sq <= rcl_sq )
+    in_range = ( rjk_sq <= r_cl_sq ) ! Determines whether pair is in range
 
   END FUNCTION in_range
 

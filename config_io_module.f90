@@ -21,6 +21,9 @@ CONTAINS
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: r        ! Atomic positions (3,n)
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: v        ! Atomic velocities (3,n)
 
+    ! The first call of this routine is just to get n and box, used to allocate arrays
+    ! The second call attempts to read in the atomic positions and optionally velocities
+
     INTEGER :: cnf_unit, ioerr, i
 
     ! Open given filename, will terminate on any errors
@@ -30,6 +33,9 @@ CONTAINS
        WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error opening ', filename, ioerr
        STOP 'Error in read_cnf_atoms'
     END IF
+
+    ! Read number of atoms from first record
+    
     READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) n
     IF ( ioerr /= 0 ) THEN
        WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading n from ', filename, ioerr
@@ -37,6 +43,9 @@ CONTAINS
        IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
        STOP 'Error in read_cnf_atoms'
     END IF
+
+    ! Read box length from second record
+    
     READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) box
     IF ( ioerr /= 0 ) THEN
        WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading box from ', filename, ioerr
@@ -45,11 +54,10 @@ CONTAINS
        STOP 'Error in read_cnf_atoms'
     END IF
 
-    ! The first call of this routine is used just to get n and box
-    ! The second call attempts to read in the atomic positions and optionally velocities
-    ! Expected format is one line per atom containing either r(:,i), v(:,i) or just r(:,i)
+    ! Expected format is one record per atom containing either r(:,i), v(:,i) or just r(:,i)
 
     IF ( PRESENT ( r ) ) THEN
+
        IF ( n /= SIZE ( r, dim=2 ) ) THEN
           WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of r ', n, SIZE ( r, dim=2 )
           STOP 'Error in read_cnf_atoms'
@@ -110,6 +118,8 @@ CONTAINS
        WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error opening ', filename, ioerr
        STOP 'Error in write_cnf_atoms'
     END IF
+
+    ! Write number of atoms to first record, box length to second record
     WRITE ( unit=cnf_unit, fmt='(i15)'  ) n
     WRITE ( unit=cnf_unit, fmt='(f15.8)') box
 
@@ -149,9 +159,13 @@ CONTAINS
     INTEGER,                        INTENT(inout) :: n        ! Number of molecules
     REAL,                           INTENT(out)   :: box      ! Simulation box length (assumed cubic)
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: r        ! Molecular positions (3,n)
-    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: e        ! Orientation vectors (3,n) or quaternions (0:3,n)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: e        ! Orientation vectors (3,n) or quaternions (4,n)
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: v        ! Molecular velocities (3,n)
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: w        ! Angular velocities (3,n)
+
+    ! The first call of this routine is just to get n and box, used to allocate arrays
+    ! The second call attempts to read in the molecular positions, orientations
+    ! and optionally velocities, angular velocities
 
     INTEGER :: cnf_unit, ioerr, i
 
@@ -162,6 +176,9 @@ CONTAINS
        WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error opening ', filename, ioerr
        STOP 'Error opening file in read_cnf_mols'
     END IF
+
+    ! Read number of molecules from first record
+    
     READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) n
     IF ( ioerr /= 0 ) THEN
        WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading n from ', filename, ioerr
@@ -169,6 +186,9 @@ CONTAINS
        IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
        STOP 'Error in read_cnf_mols'
     END IF
+
+    ! Read box length from second record
+    
     READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) box
     IF ( ioerr /= 0 ) THEN
        WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error reading box from ', filename, ioerr
@@ -177,8 +197,6 @@ CONTAINS
        STOP 'Error in read_cnf_mols'
     END IF
 
-    ! The first call of this routine is used just to get n and box
-    ! The second call attempts to read in the atomic positions, orientations and optionally velocities, angular velocities
     ! Expected format is one line per atom containing either r(:,i), e(:,i), v(:,i), w(:,i)  or just r(:,i), e(:,i)
     ! The first dimension of the e array can be 3 elements (vector) or 4 elements (quaternion)
 
@@ -262,6 +280,8 @@ CONTAINS
        WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error opening ', filename, ioerr
        STOP 'Error in write_cnf_mols'
     END IF
+
+    ! Write number of molecules to first record, box length to second record
     WRITE(cnf_unit,'(i15)'  ) n
     WRITE(cnf_unit,'(f15.8)') box
 
