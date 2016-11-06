@@ -504,7 +504,7 @@ CONTAINS
     ! velocity v                sqrt(epsilon/m)
 
     REAL                 :: temp
-    REAL, DIMENSION(3)   :: v_cm, ang
+    REAL, DIMENSION(3)   :: v_cm, ang_mom, ang_vel
     REAL, DIMENSION(3,3) :: inertia
     INTEGER              :: i, xyz
     REAL, PARAMETER      :: tol = 1.e-6
@@ -526,44 +526,44 @@ CONTAINS
     v(:,:)  = v(:,:) - SPREAD ( v_cm(:), dim=2, ncopies=n ) ! Set net momentum to zero
 
     ! Compute total angular momentum and moment of inertia tensor
-    ang = 0.0
+    ang_mom = 0.0
     DO i = 1, n
-       ang     = ang + cross_product ( r(:,i), v(:,i) )
+       ang_mom = ang_mom + cross_product ( r(:,i), v(:,i) )
        inertia = inertia - outer_product ( r(:,i), r(:,i) )
-       FORALL ( xyz=1:3) inertia(xyz,i) = inertia(xyz,i) + DOT_PRODUCT ( r(:,i), r(:,i) )
+       FORALL ( xyz=1:3) inertia(xyz,xyz) = inertia(xyz,xyz) + DOT_PRODUCT ( r(:,i), r(:,i) )
     END DO
-
+    
     ! Solve linear system to get angular velocity
-    ang = solve ( inertia, ang )
+    ang_vel = solve ( inertia, ang_mom )
 
     ! Remove angular momentum
     DO i = 1, n
-       v(:,i) = v(:,i) - cross_product ( ang, r(:,i) )
+       v(:,i) = v(:,i) - cross_product ( ang_vel, r(:,i) )
     END DO
 
     ! Apply bond constraints (which should not introduce linear or angular momentum)
     CALL rattle_b
-
-    ! Check angular and linear momenta
-    v_cm = 0.0
-    ang  = 0.0
-    DO i = 1, n
-       v_cm = v_cm + v(:,i)
-       ang  = ang + cross_product ( r(:,i), v(:,i) )
-    END DO
 
     ! Scale velocities to get correct temperature
     ! Number of degrees of freedom is 3*n - (n-1) bonds - 6 for angular and linear momentum
     temp   = SUM(v(:,:)**2) / REAL ( 3*n - (n-1) - 6 )
     v(:,:) = v(:,:) * SQRT ( temperature / temp )
 
+    ! Check angular and linear momenta
+    v_cm = 0.0
+    ang_mom  = 0.0
+    DO i = 1, n
+       v_cm = v_cm + v(:,i)
+       ang_mom = ang_mom + cross_product ( r(:,i), v(:,i) )
+    END DO
+
     IF ( ANY ( ABS ( v_cm ) > tol ) ) THEN
        WRITE ( unit=error_unit, fmt='(a,3f15.8)' ) 'Linear momentum error', v_cm
        STOP 'Error in initialize_chain_velocities'
     END IF
 
-    IF ( ANY ( ABS ( ang ) > tol ) ) THEN
-       WRITE ( unit=error_unit, fmt='(a,3f15.8)' ) 'Angular momentum error', ang
+    IF ( ANY ( ABS ( ang_mom ) > tol ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,3f15.8)' ) 'Angular momentum error', ang_mom
        STOP 'Error in initialize_chain_velocities'
     END IF
 
