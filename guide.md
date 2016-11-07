@@ -90,13 +90,13 @@ for the cut-but-not-shifted potential (denoted c) using the same corrections as 
 The formulae are implemented in the supplied program `eos_lj`.
 
 Here we compare with typical test runs from our programs using default parameters except where stated.
-Note that E/N is the total internal energy per atom, including the ideal gas part.
+Note that _E_ is the total internal energy per atom, including the ideal gas part.
 
-Source           | &rho;   | _T_         | _E/N_ (cs) | _P_ (cs) | _E/N_ (c) | _P_ (c) | _E/N_ (f) | _P_ (f) |
-------           | ------- | ----------- | --------   | ------   | -------   | ------  | --------  | ------- |
-Thol et al       |   0.75  |   1.00      | -2.9280    | 0.9909   |           |         |           |         |
-Kolafa & Nezbeda |   0.75  |   1.00      |            |          | -3.3172   | 0.6951  | -3.7188   | 0.3939  |
-`bd_nvt_lj`      |   0.75  |   1.00      | -2.93(1)   | 0.98(2)  |           |         | -3.73(1)  | 0.38(2) |
+Source           | &rho;   | _T_     | _E_ (cs) | _P_ (cs) | _E_ (c) | _P_ (c) | _E_ (f)  | _P_ (f) |
+------           | ------- | ------- | -------- | -------- | ------- | ------- | -------  | ------- |
+Thol et al       |   0.75  |   1.00  | -2.9280  | 0.9909   |         |         |          |         |
+Kolafa & Nezbeda |   0.75  |   1.00  |          |          | -3.3172 | 0.6951  | -3.7188  | 0.3939  |
+`bd_nvt_lj`      |   0.75  |   1.00  | -2.93(1) | 0.98(2)  |         |         | -3.73(1) | 0.38(2) |
 
 #Brownian dynamics program
 The program `bd_nvt_lj` carries out a Brownian dynamics simulation for a set of atoms
