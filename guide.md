@@ -68,7 +68,7 @@ f: full, with LRC        |  1.0 | 0.695 | 0.026
 c: cut (but not shifted) |  1.0 | 0.652 | 0.036
 cs: cut-and-shifted      |  1.0 | 0.578 | 0.062
 
-For Lennard-Jones, the default state point (&rho; = 0.75 and _T_ =1.0)
+For Lennard-Jones, the state point (&rho; = 0.75 and _T_ =1.0)
 lies in the liquid region of the phase diagram for all these variants of the model.
 
 For comparison with MD runs, a wide range of simulation data for LJ with
@@ -162,7 +162,7 @@ to quantify the results.
 To make it easier to test this program,
 we have also supplied a self-contained program `diffusion_test`,
 which generates an appropriate trajectory by numerically solving
-the simple Langevin equation for N non-interacting atoms.
+the simple Langevin equation for _N_ non-interacting atoms.
 For this model, one specifies the temperature and friction coefficient,
 which dictates the rate of exponential decay of the vacf,
 and hence the diffusion coefficient.
