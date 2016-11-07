@@ -20,7 +20,9 @@ The default parameters produce an FCC configuration of 256 atoms at reduced dens
 writing out just the positions (for an MC program) to a file `cnf.inp`.
 If the parameter `velocities=.true.` is supplied, then positions and velocities are
 written to the file, corresponding to a reduced temperature _T_ = 1.0.
-The file may then be copied to the directory in which the run is carried out.
+These values of &rho; and _T_ (see below) lie in the liquid region of the Lennard-Jones phase diagram.
+Non-default values may, of course, be preferable for this or other models.
+The `cnf.inp` file may then be copied to the directory in which the run is carried out.
 Typically, runs produce a final configuration `cnf.out`
 (which may be renamed to `cnf.inp` as a starting point for further runs)
 and intermediate configurations `cnf.001`, `cnf.002` etc during the run.
@@ -85,6 +87,7 @@ _Int J Thermophys,_ __17,__ 391 (1996) and __19,__ 1493(E) (1998)
 
 Below we use the Kolafa & Nezbeda formulae (denoted f) and estimate the results
 for the cut-but-not-shifted potential (denoted c) using the same corrections as in the MC codes.
+The formulae are implemented in the supplied program `eos_lj`.
 
 Here we compare with typical test runs from our programs using default parameters except where stated.
 Note that E/N is the total internal energy per atom, including the ideal gas part.
@@ -95,11 +98,83 @@ Thol et al       |   0.75  |   1.00      | -2.9280    | 0.9909   |           |  
 Kolafa & Nezbeda |   0.75  |   1.00      |            |          | -3.3172   | 0.6951  | -3.7188   | 0.3939  |
 `bd_nvt_lj`      |   0.75  |   1.00      | -2.93(1)   | 0.98(2)  |           |         | -3.73(1)  | 0.38(2) |
 
+#Brownian dynamics program
+The program `bd_nvt_lj` carries out a Brownian dynamics simulation for a set of atoms
+interacting through the cut-and-shifted Lennard-Jones potential.
+An initial configuration may be prepared, at a typical Lennard-Jones state point,
+using the `initialize` program in the usual way.
+As well as the usual run parameters, similar to a molecular dynamics code,
+the user specifies a friction coefficient.
+The calculated average thermodynamic quantities should be as expected for an
+equilibrium simulation of this model at the chosen state point (see e.g. the table above).
+
+#Cluster program
+The `cluster` program is self contained. It reads in a configuration of atomic positions
+and produces a circular linked list for each cluster identified within it.
+The best value of the critical separation `r_cl` depends on the particular physical system
+being considered. The supplied default will, for a liquid-state Lennard-Jones configuration,
+most likely identify almost all atoms as belonging to a single cluster, with at most
+a few atoms being isolated on their own. However, this is unlikely to be the type of system
+for which this analysis is useful.
+
+#Correlation function program
+The aim of the program `corfun` is to illustrate the direct method, and the FFT method,
+for calculating time correlation functions.
+The program is self contained: it generates the time dependent data itself,
+using a generalized Langevin equation,
+for which the time correlation function is known.
+The default parameters produce a damped, oscillatory, correlation function,
+but these can be adjusted to give monotonic decay,
+or to make the oscillations more prominent.
+If the `origin_interval` parameter is left at its default value of 1,
+then the direct and FFT methods should agree with each other to within numerical precision.
+The efficiency of the direct method may be improved,
+by selecting origins less frequently,
+and in this case the results obtained by the two methods may differ a little.
+
+#Diffusion program
+The program `diffusion` reads in a sequence of configurations and calculates
+the velocity auto correlation function, the mean square displacement, and
+the cross-correlation between velocity and displacement.
+Any of these may be used to estimate the diffusion coefficient,
+as described in the text.
+The output appears in `diffusion.out`
+It is instructive to plot all three curves vs time.
+
+The input trajectory is handled in a crude way,
+by reading in successive snapshots with filenames `cnf.000`, `cnf.001`, etc.
+These might be produced by a molecular dynamics program,
+at the end of each block,
+choosing to make the blocks fairly small (perhaps 10 steps).
+As written, the program will only handle up to `cnf.999`.
+Obviously, in a practical application,
+a proper trajectory file would be used instead of these separate files.
+
+It is up to the user to provide the time interval between successive configurations.
+This will typically be a small multiple of the timestep used in the original simulation.
+This value `delta` is only used to calculate the time, in the first column of
+the output file.
+A default value of 1 is provided as a place-holder, but
+the user really should specify a physically meaningful value;
+forgetting to do so could cause confusion when one attempts
+to quantify the results.
+
+To make it easier to test this program,
+we have also supplied a self-contained program `diffusion_test`,
+which generates an appropriate trajectory by numerically solving
+the simple Langevin equation for N non-interacting atoms.
+For this model, one specifies the temperature and friction coefficient,
+which dictates the rate of exponential decay of the vacf,
+and hence the diffusion coefficient.
+
 #DPD program
-For the `dpd.f90` example, we recommend generating an initial configuration
+For the `dpd` example, we recommend generating an initial configuration
 using the `initialize` program (in `build_initialize/`), with the
 following namelist input
 ```
 &nml n = 100, density = 3.0, random_positions = .true., velocities = .true. /
 ```
 The value of the density is typical when using this method to model water.
+The approximate DPD equation of state is used to estimate the pressure,
+at the chosen density, temperature, and interaction strength, for comparison.
+This is expected to become inaccurate for densities lower than about 2.
