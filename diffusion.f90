@@ -9,6 +9,10 @@ PROGRAM diffusion
   IMPLICIT NONE
 
   ! Reads a trajectory from a sequence of configuration files
+  ! Calculates velocity autocorrelation function, mean square displacement,
+  ! and cross-correlation between initial velocity and displacement
+  ! Results are written to a file 'diffusion.out' with diagnostics to standard output
+
   ! For illustration and simplicity, we adopt a scheme of formatted files of the same kind
   ! as those that are saved at the end of each block of our MD simulation examples
   ! We assume that the initial configuration of a run has been copied to cnf.000
@@ -19,42 +23,45 @@ PROGRAM diffusion
   ! r and box are assumed to be in the same units (e.g. LJ sigma)
   ! box is assumed to be unchanged throughout
 
-  ! Values of basic parameters nt, origin_interval are read from standard input using a namelist nml
-  ! The user must at least supply the time interval between successive configurations
+  ! Note that we never apply periodic boundary conditions to the atomic positions
+  ! We unfold the trajectory by applying PBCs to the displacements between successive configurations
+  ! This assumes that the atoms never move more than box/2 during that interval
 
-  ! Results are written to a file 'diffusion.out' with diagnostics to standard output
+  ! Values of basic parameters are read from standard input using a namelist nml
+  ! Although a default value of delta=1 is supplied, it is really only a place-holder
+  ! for the correct user-supplied value (time interval between configurations)
 
-  INTEGER :: n               ! number of atoms
-  INTEGER :: nt              ! number of timesteps to correlate
-  INTEGER :: n0              ! number of time origins to store
-  INTEGER :: origin_interval ! interval for time origins
-  INTEGER :: dt              ! time difference (in timesteps)
-  INTEGER :: t               ! time (in timesteps, equivalent to number of file)
-  REAL    :: delta           ! time interval (simulation units: only used in output file)
+  INTEGER :: n               ! Number of atoms
+  INTEGER :: nt              ! Number of timesteps to correlate
+  INTEGER :: n0              ! Number of time origins to store
+  INTEGER :: origin_interval ! Interval for time origins
+  INTEGER :: dt              ! Time difference (in timesteps)
+  INTEGER :: t               ! Time (in timesteps, equivalent to number of file)
+  REAL    :: delta           ! Time interval (simulation units: only used in output file)
 
-  REAL,    DIMENSION(:,:),   ALLOCATABLE :: r, r1 ! positions (3,n)
-  REAL,    DIMENSION(:,:),   ALLOCATABLE :: v     ! velocities (3,n)
-  REAL,    DIMENSION(:,:,:), ALLOCATABLE :: r0    ! stored position origins (3,n,n0)
-  REAL,    DIMENSION(:,:,:), ALLOCATABLE :: v0    ! stored velocity origins (3,n,n0)
-  INTEGER, DIMENSION(:),     ALLOCATABLE :: t0    ! times of origins
-  REAL,    DIMENSION(:),     ALLOCATABLE :: vacf  ! velocity correlation function (0:nt)
-  REAL,    DIMENSION(:),     ALLOCATABLE :: rvcf  ! displacement-velocity cross correlation function (0:nt)
-  REAL,    DIMENSION(:),     ALLOCATABLE :: msd   ! mean-squared displacement (0:nt)
-  REAL,    DIMENSION(:),     ALLOCATABLE :: norm  ! normalization factors (0:nt)
+  REAL,    DIMENSION(:,:),   ALLOCATABLE :: r     ! Positions (3,n)
+  REAL,    DIMENSION(:,:),   ALLOCATABLE :: r_old ! Previous positions (3,n)
+  REAL,    DIMENSION(:,:),   ALLOCATABLE :: v     ! Velocities (3,n)
+  REAL,    DIMENSION(:,:,:), ALLOCATABLE :: r0    ! Stored position origins (3,n,n0)
+  REAL,    DIMENSION(:,:,:), ALLOCATABLE :: v0    ! Stored velocity origins (3,n,n0)
+  INTEGER, DIMENSION(:),     ALLOCATABLE :: t0    ! Times of origins
+  REAL,    DIMENSION(:),     ALLOCATABLE :: vacf  ! Velocity correlation function (0:nt)
+  REAL,    DIMENSION(:),     ALLOCATABLE :: rvcf  ! Displacement-velocity cross correlation function (0:nt)
+  REAL,    DIMENSION(:),     ALLOCATABLE :: msd   ! Mean-squared displacement (0:nt)
+  REAL,    DIMENSION(:),     ALLOCATABLE :: norm  ! Normalization factors (0:nt)
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3)            :: sav_tag
-  INTEGER                     :: unit, ioerr
+  INTEGER                     :: k, mk, nk, unit, ioerr
   LOGICAL                     :: full, exists
-  INTEGER                     :: k, mk, nk
   REAL                        :: box
 
   NAMELIST /nml/ nt, origin_interval, delta
 
   ! Example default values
-  nt              = 500
-  origin_interval = 10
-  delta           = -1.0 ! must be set by user
+  nt              = 500 ! Max correlation time (as a multiple of interval between configurations)
+  origin_interval = 10  ! We only take time origins at these intervals, for efficiency
+  delta           = 1.0 ! This should be set to the actual time interval between configurations
 
   ! Namelist from standard input
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
@@ -65,83 +72,97 @@ PROGRAM diffusion
      STOP 'Error in diffusion'
   END IF
 
-  IF ( delta < 0.0 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'Error: user must supply positive delta (time interval)', delta
-     STOP 'Error in diffusion'
-  END IF
+  n0 = nt / origin_interval + 1 ! Enough origins to span max correlation time
 
-  n0 = nt / origin_interval + 1
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'max correlation time nt = ',   nt
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'origin interval = ',           origin_interval
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'number of time origins n0 = ', n0
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Max correlation time nt = ',       nt
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Origin interval = ',               origin_interval
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of time origins n0 = ',     n0
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time interval between configs = ', delta
 
-  WRITE ( sav_tag, fmt='(i3.3)' ) 0 ! use initial configuration to get n
-  INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! check the file exists
+  sav_tag = '000' ! Use initial configuration to get N
+  INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! Check the file exists
   IF ( .NOT. exists ) THEN
      WRITE ( unit=error_unit, fmt='(a,a)') 'File does not exist: ', cnf_prefix//sav_tag
      STOP 'Error in diffusion'
   END IF
-  CALL read_cnf_atoms ( cnf_prefix//sav_tag, n, box ) ! read n and box
+  CALL read_cnf_atoms ( cnf_prefix//sav_tag, n, box ) ! Read n and box
 
-  ALLOCATE ( r(3,n), r1(3,n), v(3,n), r0(3,n,n0), v0(3,n,n0), t0(n0) )
+  ALLOCATE ( r(3,n), r_old(3,n), v(3,n), r0(3,n,n0), v0(3,n,n0), t0(n0) )
   ALLOCATE ( msd(0:nt), rvcf(0:nt), vacf(0:nt), norm(0:nt) )
 
   msd(:)  = 0.0
   rvcf(:) = 0.0
   vacf(:) = 0.0
   norm(:) = 0.0
-  t       = 0 ! time of each velocity
-  mk      = 0 ! storage location of time origin
+  t       = 0 ! Time of each velocity
+  mk      = 0 ! Storage location of time origin
   full    = .FALSE.
 
   DO ! Single sweep through data until end
 
-     IF ( t >= 1000 ) EXIT ! our naming scheme only goes up to cnf.999
+     IF ( t > 999 ) EXIT ! Our naming scheme only goes up to cnf.999
 
-     WRITE ( sav_tag, fmt='(i3.3)' ) t                      ! number of configuration
-     INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! check the file exists
-     IF ( .NOT. exists ) EXIT                               ! we have come to the end of the data
+     WRITE ( sav_tag, fmt='(i3.3)' ) t                      ! Number of this configuration
+     INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! Check the file exists
+     IF ( .NOT. exists ) EXIT                               ! We have come to the end of the data
 
-     CALL read_cnf_atoms ( cnf_prefix//sav_tag, n, box, r, v ) ! read configuration
+     CALL read_cnf_atoms ( cnf_prefix//sav_tag, n, box, r, v ) ! Read configuration
      WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Processing ', t
 
-     IF ( t > 0 ) CALL unfold ( r1, r )
+     IF ( t > 0 ) CALL unfold ( r_old, r )
 
-     IF ( MOD(t,origin_interval) == 0 ) THEN
-        mk = mk + 1
-        IF ( mk > n0 ) THEN
+     IF ( MOD ( t, origin_interval ) == 0 ) THEN ! Test to store as time origin
+
+        mk = mk + 1 ! Increment origin counter
+
+        IF ( mk > n0 ) THEN ! Test for over-running origin arrays
            full = .TRUE.
-           mk = mk - n0 ! overwrite older values
-        END IF
-        t0(mk)     = t      ! store time origin
-        r0(:,:,mk) = r(:,:) ! store position origins
-        v0(:,:,mk) = v(:,:) ! store velocity origins
-     END IF
+           mk = mk - n0 ! Wrap-around to overwrite older origins
+        END IF ! End test for over-running origin arrays
+
+        t0(mk)     = t      ! Store time origin
+        r0(:,:,mk) = r(:,:) ! Store position origins
+        v0(:,:,mk) = v(:,:) ! Store velocity origins
+
+     END IF ! End test to store as time origin
 
      IF ( full ) THEN
-        nk = n0 ! correlate with all stored time origins
+        nk = n0 ! Correlate with all stored time origins
      ELSE
-        nk = mk ! correlate with those stored so far
+        nk = mk ! Correlate with those stored so far
      END IF
 
-     DO k = 1, nk
-        dt = t - t0(k)
-        IF ( dt >= 0 .AND. dt <= nt ) THEN
-           msd(dt)  = msd(dt)  + SUM ( ( r(:,:) - r0(:,:,k) ) ** 2        ) ! increment msd
-           rvcf(dt) = rvcf(dt) + SUM ( ( r(:,:) - r0(:,:,k) ) * v0(:,:,k) ) ! increment cross correlation function
-           vacf(dt) = vacf(dt) + SUM (   v(:,:) * v0(:,:,k)               ) ! increment autocorrelation function
-           norm(dt) = norm(dt) + 1.0                                        ! increment normalizing factor
-        END IF
-     END DO
+     DO k = 1, nk ! Loop over time origins
 
-     r1 = r     ! ready for next step
-     t  = t + 1 ! number of next step
+        dt = t - t0(k) ! Time difference between current configuration and time origin
+
+        IF ( dt < 0 ) THEN ! should never happen
+           WRITE ( unit=error_unit, fmt='(a,i5)') 'dt error ', dt
+           STOP 'Error in diffusion'
+        END IF
+
+        IF ( dt <= nt ) THEN ! Check that dt is within desired range
+
+           ! Sum over all N atoms and over 3 Cartesian components
+           msd(dt)  = msd(dt)  + SUM ( ( r(:,:) - r0(:,:,k) ) ** 2        ) ! Increment msd
+           rvcf(dt) = rvcf(dt) + SUM ( ( r(:,:) - r0(:,:,k) ) * v0(:,:,k) ) ! Increment cross correlation function
+           vacf(dt) = vacf(dt) + SUM (   v(:,:) * v0(:,:,k)               ) ! Increment autocorrelation function
+
+           norm(dt) = norm(dt) + 1.0 ! Increment normalizing factor
+
+        END IF ! End check that dt is within desired range
+
+     END DO ! End loop over time origins
+
+     r_old = r     ! Ready to unfold next step
+     t     = t + 1 ! Number of next step
 
   END DO  ! End main loop, reading and correlating data
 
-  msd(:)  = msd(:)  / norm(:) / REAL ( n ) ! normalise mean-squared displacement
-  rvcf(:) = rvcf(:) / norm(:) / REAL ( n ) ! normalise cross-correlation function
-  vacf(:) = vacf(:) / norm(:) / REAL ( n ) ! normalise autocorrelation function
+  ! Normalize by N as well as time-origin normalizing factors
+  msd(:)  = msd(:)  / norm(:) / REAL ( n ) ! 3D mean-squared displacement
+  rvcf(:) = rvcf(:) / norm(:) / REAL ( n ) ! 3D cross-correlation function
+  vacf(:) = vacf(:) / norm(:) / REAL ( n ) ! 3D autocorrelation function
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'Output to diffusion.out'
 
@@ -152,25 +173,25 @@ PROGRAM diffusion
   END IF
 
   DO t = 0, nt
-     WRITE ( unit=unit, fmt='(f15.5,3f15.8)' ) t*delta, vacf(t), rvcf(t), msd(t)
+     WRITE ( unit=unit, fmt='(f15.5,3f15.8)' ) t*delta, vacf(t), rvcf(t), msd(t) ! Include delta in time
   END DO
+
   CLOSE(unit=unit)
 
 CONTAINS
 
-  SUBROUTINE unfold ( r1, r )
+  SUBROUTINE unfold ( r_old, r )
     IMPLICIT NONE
-
-    REAL, DIMENSION(:,:), INTENT(in)    :: r1 ! previous configuration
-    REAL, DIMENSION(:,:), INTENT(inout) :: r  ! current configuration
+    REAL, DIMENSION(:,:), INTENT(in)    :: r_old ! Previous configuration
+    REAL, DIMENSION(:,:), INTENT(inout) :: r     ! Current configuration
 
     ! Removes effects of periodic boundaries on particle trajectories
     ! Assumes that no particle actually moves more than half a box length
     ! between successive configurations
 
-    r = r - r1                      ! convert r to displacements relative to r1
-    r = r - ANINT ( r / box ) * box ! apply periodic boundaries to displacements
-    r = r + r1                      ! convert r back to absolute coordinates
+    r = r - r_old                   ! Convert r to displacements relative to r_old
+    r = r - ANINT ( r / box ) * box ! Apply periodic boundaries to displacements
+    r = r + r_old                   ! Convert r back to absolute coordinates
 
   END SUBROUTINE unfold
 
