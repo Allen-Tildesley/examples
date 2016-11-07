@@ -10,7 +10,7 @@ PROGRAM fft3dwrap
 
   ! The program calls use the C subroutine library FFTW to perform the finite Fourier transforms
   ! The details of this library are available at http://www.fftw.org/
-  ! We assume that compiler flags are set such that real and integer fortran variables
+  ! We assume that compiler flags are set such that real and integer Fortran variables
   ! have the appropriate precision to match their C counterparts
 
   ! In this example the box lengths and numbers of grid points are the same in each dimension
@@ -33,11 +33,12 @@ PROGRAM fft3dwrap
 
   NAMELIST /nml/ sc2, box
 
-  ! Typical default values
+  ! Set sensible default values for testing
   sc2 = 2**6 ! Not essential to be a power of 2, but usually more efficient
   box = 6.0  ! Large enough to accommodate the chosen 3D Gaussian, for good comparison with analytical result
 
-  ! Namelist from standard input
+  ! Read parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
@@ -46,6 +47,7 @@ PROGRAM fft3dwrap
      STOP 'Error in fft3dwrap'
   END IF
 
+  ! Write out parameters
   sc = sc2 * 2
   dr = box / REAL (sc)
   dk = (2.0 * pi) / dr / REAL(sc) ! interval in reciprocal space
@@ -54,8 +56,10 @@ PROGRAM fft3dwrap
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Grid spacing in real space (dr) = ',             dr
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Grid spacing in reciprocal space (dk) = ',       dk
 
+  ! Allocate necessary arrays
   ALLOCATE ( fft_inp(0:sc-1,0:sc-1,0:sc-1), fft_out(0:sc-1,0:sc-1,0:sc-1) )
 
+  ! Write titles
   WRITE ( unit=output_unit, fmt='(a)'    ) 'Initial real-space Gaussian'
   WRITE ( unit=output_unit, fmt='(5a15)' ) '   ix   iy   iz', '|r|', 'Gaussian(r)', 'FFT (real)', 'FFT (imag)'
 
@@ -67,8 +71,8 @@ PROGRAM fft3dwrap
         DO iz = 0, sc-1
            r(3) = REAL ( wraparound ( iz ) ) * dr
 
-           r_sq = SUM ( r**2 )        ! squared distance from origin
-           g    = EXP ( - pi * r_sq ) ! Setup 3d Gaussian (decay parameter chosen to be pi)
+           r_sq = SUM ( r**2 )        ! Squared distance from origin
+           g    = EXP ( - pi * r_sq ) ! Setup 3D Gaussian (decay parameter chosen to be pi)
 
            fft_inp(ix,iy,iz) = CMPLX ( g, 0.0 ) ! Feed into complex array for FFT
 
@@ -90,6 +94,7 @@ PROGRAM fft3dwrap
   CALL fftw_execute_dft  ( fft_plan, fft_inp, fft_out )                                    ! Execute FFT
   CALL fftw_destroy_plan ( fft_plan )                                                      ! Release plan
 
+  ! Write titles
   WRITE ( unit=output_unit, fmt='(a)' ) 'Reciprocal-space transform'
   WRITE ( unit=output_unit, fmt='(5a15)' ) '   ix   iy   iz', '|k|', 'Gaussian(k)', 'FFT (real)', 'FFT (imag)'
 
@@ -105,8 +110,8 @@ PROGRAM fft3dwrap
            ! Compare with the (real) analytical expression for the transform of the Gaussian test function
 
            IF ( ix**2 + iy**2 + iz**2 <= out_max ) THEN
-              k_sq = SUM ( k**2 )             ! squared magnitude of wave vector
-              g    = EXP ( -k_sq / 4.0 / pi ) ! analytical transform of the Gaussian
+              k_sq = SUM ( k**2 )             ! Squared magnitude of wave vector
+              g    = EXP ( -k_sq / 4.0 / pi ) ! Analytical transform of the Gaussian
               WRITE ( unit=output_unit, fmt='(3i5,4f15.5)') ix, iy, iz, SQRT(k_sq), g, fft_out(ix,iy,iz)*dr**3
            END IF
 
@@ -126,6 +131,7 @@ PROGRAM fft3dwrap
   ! Write some elements of data in real space after the back transform including the normalising factor 1/sc**3
   ! Compare with the (real) input data
 
+  ! Write titles
   WRITE ( unit=output_unit, fmt='(a)'    ) 'Back Transform to real space'
   WRITE ( unit=output_unit, fmt='(5a15)' ) '   ix   iy   iz', '|r|', 'Gaussian(r)', 'FFT (real)', 'FFT (imag)'
 
@@ -138,7 +144,7 @@ PROGRAM fft3dwrap
            r(3) = REAL ( wraparound ( iz ) ) * dr
 
            IF ( ix**2 + iy**2 + iz**2 <= out_max ) THEN
-              r_sq = SUM ( r**2 )        ! squared distance from origin
+              r_sq = SUM ( r**2 )        ! Squared distance from origin
               g    = EXP ( - pi * r_sq ) ! Original 3d Gaussian
               WRITE ( unit=output_unit, fmt='(3i5,4f15.5)' ) ix, iy, iz, SQRT(r_sq), g, fft_inp(ix,iy,iz)/REAL(sc**3)
            END IF
@@ -148,15 +154,19 @@ PROGRAM fft3dwrap
   END DO
   ! End triple loop over xyz grid points
 
+  ! All done, deallocate arrays
   DEALLOCATE ( fft_inp, fft_out )
 
 CONTAINS
 
-  FUNCTION wraparound ( i ) RESULT ( w ) ! implements wrapping of indices
-    INTEGER, INTENT(in) :: i ! index to be wrapped
-    INTEGER             :: w ! result
+  FUNCTION wraparound ( i ) RESULT ( w )
+    INTEGER             :: w ! Returns wrapped index
+    INTEGER, INTENT(in) :: i ! Index to be wrapped
 
-    IF ( i < 0 .OR. i >= sc ) STOP 'This should never happen'
+    IF ( i < 0 .OR. i >= sc ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,i15)') 'Indexing error', i
+       STOP 'Error in fft3dwrap/wraparound'
+    END IF
 
     IF ( i < sc2 ) THEN
        w = i

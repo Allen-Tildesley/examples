@@ -188,3 +188,12 @@ Since the correlation time of the GLE is exactly known,
 we can predict the effects, and compare with the empirical estimates
 obtained by different methods.
 The program contains extensive comments to explain what is being calculated at each stage.
+
+#FFT program
+The aim of `fft3dwrap` is to illustrate the way a standard Fast Fourier Transform
+library routine is wrapped in a user program.
+We numerically transform a 3D Gaussian function,
+and compare with the analytically, exactly, known result,
+User input defines the number of grid points and the box size;
+sensible defaults are provided.
+The library that we use for this example is [FFTW](http://www.fftw.org/).
