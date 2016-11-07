@@ -3,11 +3,11 @@ Here are some notes to assist in running the programs.
 
 ##Data Input
 Most of the Fortran codes use a `namelist` to input a few parameters from standard input.
-This gives an easy way to specify default values in the program itself, and to use a 
+This gives an easy way to specify default values in the program itself, and to use a
 keyword-based syntax to specify values different from the default ones at run-time.
 The input file, or string, should usually begin with `&nml` and end with `/`.
 As a minimum, the program will expect to read `&nml /` (an empty list), but to
-change the parameters, typical input might be 
+change the parameters, typical input might be
 ```
 &nml nblock=20, nstep=1000, dt=0.001 /
 ```
@@ -32,7 +32,7 @@ while for MD programs the cut-and-shifted potential (cs) is used.
 In all cases, an attempt is made to produce results without, and with, long-range corrections,
 the latter giving an estimate for the full potential (f).
 Differences between the different models are discussed in various places,
-see e.g. 
+see e.g.
 
 * A Trokhymchuk, J Alejandre, _J Chem Phys,_ __111,__ 8510 (1999).
 
@@ -66,20 +66,20 @@ f: full, with LRC        |  1.0 | 0.695 | 0.026
 c: cut (but not shifted) |  1.0 | 0.652 | 0.036
 cs: cut-and-shifted      |  1.0 | 0.578 | 0.062
 
-For Lennard-Jones, the default state point (&rho; = 0.75 and _T_ =1.0) 
-lies in the liquid region of the phase diagram for all these variants of the model. 
+For Lennard-Jones, the default state point (&rho; = 0.75 and _T_ =1.0)
+lies in the liquid region of the phase diagram for all these variants of the model.
 
-For comparison with MD runs, a wide range of simulation data for LJ with 
+For comparison with MD runs, a wide range of simulation data for LJ with
 _Rc_ = 2.5  &sigma; (cut-and-shifted, denoted cs below) is summarized by
 
 * M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)
 
-who present data (in Supplementary Information) and a fitted approximate 
-equation of state (which they also provide as a C++ program). 
+who present data (in Supplementary Information) and a fitted approximate
+equation of state (which they also provide as a C++ program).
 
 Approximate equations of state for the full LJ potential are available from
 
-* J Kolafa and I Nezbeda, _Fluid Phase Equil,_ __100,__ 1 (1994) 
+* J Kolafa and I Nezbeda, _Fluid Phase Equil,_ __100,__ 1 (1994)
 * M Mecke, A Muller, J Winkelmann, J Vrabec, J Fischer, R Span, W Wagner,
 _Int J Thermophys,_ __17,__ 391 (1996) and __19,__ 1493(E) (1998)
 
@@ -94,3 +94,12 @@ Source           | &rho;   | _T_         | _E/N_ (cs) | _P_ (cs) | _E/N_ (c) | _
 Thol et al       |   0.75  |   1.00      | -2.9280    | 0.9909   |           |         |           |         |
 Kolafa & Nezbeda |   0.75  |   1.00      |            |          | -3.3172   | 0.6951  | -3.7188   | 0.3939  |
 `bd_nvt_lj`      |   0.75  |   1.00      | -2.93(1)   | 0.98(2)  |           |         | -3.73(1)  | 0.38(2) |
+
+#DPD program
+For the `dpd.f90` example, we recommend generating an initial configuration
+using the `initialize` program (in `build_initialize/`), with the
+following namelist input
+```
+&nml n = 100, density = 3.0, random_positions = .true., velocities = .true. /
+```
+The value of the density is typical when using this method to model water.

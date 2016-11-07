@@ -135,8 +135,9 @@ PROGRAM bd_nvt_lj
 
         CALL b_propagator ( dt/2.0 ) ! B kick half-step
 
-        CALL calculate ( )                       ! Calculate instantaneous values
-        CALL blk_add ( [e_s,p_s,e_f,p_f,t_k,t_c] ) ! Accumulate block averages
+        ! Calculate and accumulate quantities for this step
+        CALL calculate ( )
+        CALL blk_add ( [ e_s, p_s, e_f, p_f, t_k, t_c ] )
 
      END DO ! End loop over steps
 
@@ -148,6 +149,7 @@ PROGRAM bd_nvt_lj
 
   CALL run_end ( output_unit ) ! Output run averages
 
+  ! Final forces, potential, etc plus overlap check
   CALL force ( box, r_cut, total )
   IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
@@ -223,7 +225,7 @@ CONTAINS
 
     t_c = SUM(f**2) / total%lap ! total%lap is the total Laplacian
 
-    IF ( PRESENT ( string ) ) THEN ! output required
+    IF ( PRESENT ( string ) ) THEN ! Output required
        WRITE ( unit=output_unit, fmt='(a)'           ) string
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E (cut&shift)', e_s
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)', p_s

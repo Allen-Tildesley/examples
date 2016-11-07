@@ -29,8 +29,9 @@ PROGRAM dpd
   ! The typical DPD model described by Groot and Warren, J Chem Phys 107, 4423 (1997)
   ! has temperature kT=1, density rho=3, noise level sigma=3, gamma=sigma**2/(2*kT)=4.5
   ! and force strength parameter a=25 (more generally 75*kT/rho).
-  ! They recommend timestep=0.04, but we recommend a somewhat smaller value.
+  ! We recommend a somewhat smaller timestep than their 0.04.
   ! They also give the approximate pressure as rho*kT + alpha*a*rho**2 where alpha=0.101
+  ! and this value is written out at the end for comparison
 
   ! Most important variables
   REAL :: box         ! Box length
@@ -41,10 +42,10 @@ PROGRAM dpd
   REAL :: temperature ! Temperature (specified)
 
   ! Quantities to be averaged
-  REAL :: p  ! Pressure
-  REAL :: en ! Internal energy per atom
-  REAL :: tk ! Kinetic temperature
-  REAL :: tc ! Configurational temperature
+  REAL :: p   ! Pressure
+  REAL :: e   ! Internal energy per atom
+  REAL :: t_k ! Kinetic temperature
+  REAL :: t_c ! Configurational temperature
 
   ! Composite interaction = pot & vir & lap variables
   TYPE(potential_type) :: total
@@ -80,6 +81,8 @@ PROGRAM dpd
   gamma       = 4.5
   method      = 'Lowe'
 
+  ! Read run parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
@@ -87,6 +90,8 @@ PROGRAM dpd
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in dpd'
   END IF
+
+  ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',              nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',     nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                     dt
@@ -110,6 +115,7 @@ PROGRAM dpd
      STOP 'Error in dpd'
   END IF
 
+  ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
@@ -117,11 +123,8 @@ PROGRAM dpd
   a       = a * temperature / density ! Scale force strength accordingly
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',          density
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Force strength a', a
-
   CALL allocate_arrays ( box )
-
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
-
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
@@ -129,7 +132,8 @@ PROGRAM dpd
   CALL force ( box, a, total )
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N', 'T (kin)', 'T (con)', 'P' ] )
+  ! Initialize arrays for averaging and write column headings
+  CALL run_begin ( [ CHARACTER(len=15) :: 'E', 'T (kin)', 'T (con)', 'P' ] )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -146,26 +150,26 @@ PROGRAM dpd
         CALL force ( box, a, total )    ! Force evaluation
         CALL kick_propagator ( dt/2.0 ) ! Kick half-step
 
-        ! Calculate all variables for this step
+        ! Calculate and accumulate quantities for this step
         CALL calculate ( )
-        CALL blk_add ( [en,tk,tc,p] )
+        CALL blk_add ( [ e, t_k, t_c, p ] )
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )
+     CALL blk_end ( blk, output_unit )                              ! Output block averages
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! Number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! Save configuration
 
   END DO ! End loop over blocks      
 
-  CALL run_end ( output_unit )
+  CALL run_end ( output_unit ) ! Output run averages
 
   ! Final energy etc
   CALL force ( box, a, total )
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Approx EOS pressure', density*temperature+alpha*a*density**2
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Approx EOS P = ', density*temperature+alpha*a*density**2
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
 
@@ -203,19 +207,19 @@ CONTAINS
     REAL :: kin
 
     kin = 0.5*SUM(v**2)
-    tk  = 2.0 * kin / REAL ( 3*(n-1) )
+    t_k = 2.0 * kin / REAL ( 3*(n-1) )
 
-    en = ( total%pot + kin ) / REAL ( n ) ! total%pot is the total PE
+    e = ( total%pot + kin ) / REAL ( n ) ! total%pot is the total PE
 
     p = density * temperature + total%vir / box**3 ! total%vir is the total virial
 
-    tc = SUM(f**2) / total%lap ! total%lap is the total Laplacian
+    t_c = SUM(f**2) / total%lap ! total%lap is the total Laplacian
 
     IF ( PRESENT ( string ) ) THEN ! Output required
        WRITE ( unit=output_unit, fmt='(a)'           ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N',     en
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)', tk
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)', tc
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E',       e
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)', t_k
+       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)', t_c
        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P',       p
     END IF
 
