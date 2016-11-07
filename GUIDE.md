@@ -183,7 +183,7 @@ This is expected to become inaccurate for densities lower than about 2.
 The program `error_calc` is a self-contained illustration of the effects of
 correlations on the estimation of errors for a time series.
 We produce the series using a generalized Langevin equation,
-in the same manner as for correlation functions (see above).
+in the same manner as for the correlation function program (see above).
 Since the correlation time of the GLE is exactly known,
 we can predict the effects, and compare with the empirical estimates
 obtained by different methods.
