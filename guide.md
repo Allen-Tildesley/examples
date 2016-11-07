@@ -178,3 +178,13 @@ The value of the density is typical when using this method to model water.
 The approximate DPD equation of state is used to estimate the pressure,
 at the chosen density, temperature, and interaction strength, for comparison.
 This is expected to become inaccurate for densities lower than about 2.
+
+#Error calculation
+The program `error_calc` is a self-contained illustration of the effects of
+correlations on the estimation of errors for a time series.
+We produce the series using a generalized Langevin equation,
+in the same manner as for correlation functions (see above).
+Since the correlation time of the GLE is exactly known,
+we can predict the effects, and compare with the empirical estimates
+obtained by different methods.
+The program contains extensive comments to explain what is being calculated at each stage.

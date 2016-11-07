@@ -11,7 +11,7 @@ PROGRAM corfun
 
   ! Define underlying process by generalized Langevin equation
   ! with memory function expressed as a decaying exponential function
-  ! see G Ciccotti and JP Ryckaert Mol Phys 40 141 (1980)
+  ! See G Ciccotti and JP Ryckaert Mol Phys 40 141 (1980)
   ! and AD Baczewski and SD Bond J Chem Phys 139 044107 (2013)
 
   ! We assume that the program is linked with the FFTW library (version 3)
@@ -43,6 +43,7 @@ PROGRAM corfun
   INTEGER :: origin_interval ! Interval for time origins
   INTEGER :: dt              ! Time difference
   INTEGER :: t               ! Time (equivalent to step number in file)
+
   LOGICAL :: full
   INTEGER :: k, mk, nk
   INTEGER :: unit, ioerr
@@ -54,8 +55,9 @@ PROGRAM corfun
   COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_out  ! data to be transformed (0:fft_len-1)
   TYPE(C_PTR)                                          :: fft_plan ! plan needed for FFTW
 
-  REAL,    PARAMETER :: b1 = 2.0, b2 = -2.0,     b3 = 4.0/3.0, b4 = -2.0/3.0
-  REAL,    PARAMETER :: d1 = 1.0, d2 = -1.0/2.0, d3 = 1.0/6.0, d4 = -1.0/24.0
+  ! Taylor series coefficients
+  REAL, PARAMETER :: b1 = 2.0, b2 = -2.0,     b3 = 4.0/3.0, b4 = -2.0/3.0  ! b = 1.0 - EXP(-2.0*x)
+  REAL, PARAMETER :: d1 = 1.0, d2 = -1.0/2.0, d3 = 1.0/6.0, d4 = -1.0/24.0 ! d = 1.0 - EXP(-x)
 
   NAMELIST /nml/ nt, origin_interval, nstep, nequil, delta, temperature
 
@@ -115,8 +117,8 @@ PROGRAM corfun
      b = 1.0 - EXP(-2.0*x)
      d = 1.0 - EXP(-x)
   ELSE  ! Taylor expansions for low x
-     b = x * ( b1 + x * ( b2 + x * ( b3 + x * b4 )) )
-     d = x * ( d1 + x * ( d2 + x * ( d3 + x * d4 )) )
+     b = x * ( b1 + x * ( b2 + x * ( b3 + x * b4 ) ) )
+     d = x * ( d1 + x * ( d2 + x * ( d3 + x * d4 ) ) )
   END IF
   b      = SQRT ( b )
   b      = b * SQRT ( kappa/2.0 ) ! alpha in B&B paper
@@ -129,7 +131,7 @@ PROGRAM corfun
   vt = 0.0
   s  = 0.0
 
-  DO t = -nequil, nstep ! Loop including an equilibration period
+  DO t = -nequil, nstep ! Loop over steps including an equilibration period
 
      ! Velocity Verlet type algorithm for vt and auxiliary variable s
      vt = vt + 0.5 * delta * s
@@ -138,7 +140,7 @@ PROGRAM corfun
 
      IF ( t > 0 ) v(t) = vt ! Store velocities, after equilibration
 
-  END DO ! End loop including an equilibration period
+  END DO ! End loop over steps including an equilibration period
 
   CALL CPU_TIME ( cpu_2 )
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'CPU time to generate data = ', cpu_2-cpu_1
