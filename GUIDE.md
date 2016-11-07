@@ -197,3 +197,10 @@ and compare with the analytically, exactly, known result,
 User input defines the number of grid points and the box size;
 sensible defaults are provided.
 The library that we use for this example is [FFTW](http://www.fftw.org/).
+
+#Hit-and-miss and sample-mean
+The two programs `hit_and_miss` and `sample_mean` illustrate two very simple
+Monte Carlo methods to estimate the volume of a 3D object.
+They are both described in detail at the start of Chapter 4.
+No user input is required.
+For the built-in values defining the geometry, the exact result is 5/3.

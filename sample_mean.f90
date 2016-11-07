@@ -1,3 +1,5 @@
+! sample_mean.f90
+! Estimates volume of polyhedron by sample mean integration
 PROGRAM sample_mean
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
 
