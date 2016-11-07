@@ -6,7 +6,7 @@ PROGRAM mc_nvt_lj_re
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
-  USE maths_module,     ONLY : metropolis, random_translate_vector
+  USE maths_module,     ONLY : init_random_seed, metropolis, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_1, potential, move, n, r, &
        &                       potential_type
@@ -105,7 +105,7 @@ PROGRAM mc_nvt_lj_re
   WRITE( unit=output_unit, fmt='(a,t40,i15)') 'Number of processes is', nproc
   CALL time_stamp ( output_unit )
 
-  CALL RANDOM_SEED () ! Initialize random number generator
+  CALL init_random_seed () ! Initialize random number generator (hopefully differently on each process)
   CALL RANDOM_NUMBER ( zeta )
   WRITE( unit=output_unit, fmt='(a,t40,f15.5)') 'First random number', zeta
   WRITE( unit=output_unit, fmt='(a)'          ) 'Should be different for different processes!'

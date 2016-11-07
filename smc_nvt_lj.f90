@@ -44,12 +44,12 @@ PROGRAM smc_nvt_lj
   REAL    :: r_cut       ! Potential cutoff distance
 
   ! Quantities to be averaged
-  real :: m_ratio ! Acceptance ratio for moves
+  REAL :: m_ratio ! Acceptance ratio for moves
   REAL :: en_s    ! Internal energy per atom for simulated, cut-and-shifted, potential
   REAL :: en_f    ! Internal energy per atom for full potential with LRC
   REAL :: p_s     ! Pressure for simulated, cut-and-shifted, potential
   REAL :: p_f     ! Pressure for full potential with LRC
-  real :: tc      ! Configurational temperature
+  REAL :: tc      ! Configurational temperature
 
   ! Composite interaction = forces & pot & cut & vir & lap & ovr variables
   TYPE(potential_type) :: total, total_old, partial_old, partial_new
@@ -69,6 +69,8 @@ PROGRAM smc_nvt_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'Smart Monte Carlo, constant-NVT ensemble'
   CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
+
+  CALL RANDOM_SEED () ! Initialize random number generator
 
   ! Set sensible default run parameters for testing
   nblock      = 10
@@ -104,7 +106,7 @@ PROGRAM smc_nvt_lj
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error: move_mode out of range', move_mode
      STOP 'Error in smc_nvt_lj'
   END IF
-  v_rms = sqrt ( temperature ) ! RMS value for velocity selection
+  v_rms = SQRT ( temperature ) ! RMS value for velocity selection
 
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n

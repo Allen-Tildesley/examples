@@ -64,6 +64,8 @@ PROGRAM bd_nvt_lj
   CALL introduction ( output_unit )
   CALL time_stamp ( output_unit )
 
+  CALL RANDOM_SEED () ! Initialize random number generator
+
   ! Set sensible default run parameters for testing
   nblock      = 10
   nstep       = 5000
