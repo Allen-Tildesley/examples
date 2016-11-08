@@ -16,32 +16,52 @@ PROGRAM initialize
   IMPLICIT NONE
 
   ! Reads several variables and options from standard input using a namelist nml
+  ! Leave namelist empty to accept supplied defaults
 
-  INTEGER            :: nc, ioerr
-  REAL               :: temperature, inertia, density, box, bond
-  LOGICAL            :: velocities, random_positions, random_orientations
-  INTEGER            :: molecule_option
-  CHARACTER(len=10)  :: molecules
+  ! Most important variables
+  INTEGER :: nc                  ! Number of fcc unit cells in each coordinate direction; n = 4*nc**3
+  REAL    :: temperature         ! Specified temperature
+  REAL    :: inertia             ! Specified moment of inertia (for linear and nonlinear molecules)
+  REAL    :: density             ! Specified number density
+  REAL    :: bond                ! Specified bond length (for chain molecules)
+  LOGICAL :: velocities          ! User option requiring velocities for MD (otherwise just positions)
+  LOGICAL :: random_positions    ! User option for random positions (otherwise on a lattice)
+  LOGICAL :: random_orientations ! User option for random orientations (otherwise on a lattice)
 
-  CHARACTER(len=7), PARAMETER :: filename = 'cnf.inp' ! Will be used as an input file for simulations
-  INTEGER,          PARAMETER :: atoms = 0, linear = 1, nonlinear = 2, chain = 3
+  CHARACTER(len=10)  :: molecules       ! Character string, input, used to specify molecule_option
+  INTEGER            :: molecule_option ! User option for atoms, linear, nonlinear or chain molecule
+  INTEGER, PARAMETER :: atoms = 0, linear = 1, nonlinear = 2, chain = 3
+
+  INTEGER            :: ioerr
+  REAL               :: box ! Deduced from N and density (for atoms, linear, and nonlinear molecules)
+
+  CHARACTER(len=7), PARAMETER :: filename = 'cnf.inp' ! Will be used as an input file by later simulations
 
   NAMELIST /nml/ nc, n, temperature, inertia, density, bond, &
        &         velocities, molecules, random_positions, random_orientations
 
-  ! Default values
-  n                   = 0       ! nc takes precedence unless n is explicitly specified
-  nc                  = 4       ! default is N = 4*(4**3) = 256 on a fcc lattice, a small system
-  temperature         = 1.0     ! should lie in the liquid region for density > 0.7 or so
-  inertia             = 1.0     ! only relevant for molecular systems
-  density             = 0.75    ! should lie in the liquid region for temperature > 0.9 or so
-  bond                = 1.0     ! only relevant for chains
-  velocities          = .FALSE. ! by default, produce positions for MC simulations
-  molecules           = 'atoms' ! Options are 'atoms', 'chain', 'linear', 'nonlinear'
-  random_positions    = .FALSE. ! by default, arrange atoms on a lattice
-  random_orientations = .FALSE. ! by default, use predetermined molecular orientations
+  WRITE ( unit=output_unit, fmt='(a)' ) 'initialize'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Sets up initial configuration file for various simulations'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Options for molecules are "atoms", "chain", "linear", "nonlinear"'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass m=1 throughout'
 
-  READ ( unit=input_unit, nml=nml, iostat=ioerr ) ! namelist input
+  CALL RANDOM_SEED()
+
+  ! Set default parameters
+  n                   = 0       ! nc takes precedence unless n is explicitly specified
+  nc                  = 4       ! Default is N = 4*(4**3) = 256 on a fcc lattice, a small system
+  temperature         = 1.0     ! Should lie in the liquid region for density > 0.7 or so
+  inertia             = 1.0     ! Only relevant for linear and nonlinear molecules
+  density             = 0.75    ! Should lie in the liquid region for temperature > 0.9 or so
+  bond                = 1.0     ! Only relevant for chains
+  velocities          = .FALSE. ! By default, produce positions only, for MC simulations
+  molecules           = 'atoms' ! Options are 'atoms', 'chain', 'linear', 'nonlinear'
+  random_positions    = .FALSE. ! By default, arrange atoms on a lattice
+  random_orientations = .FALSE. ! By default, use predetermined molecular orientations
+
+  ! Read run parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
      IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
@@ -49,90 +69,104 @@ PROGRAM initialize
      STOP 'Error in initialize'
   END IF
 
-  IF ( n <= 0 ) THEN
-     IF ( nc <= 0 ) THEN
+  IF ( n <= 0 ) THEN ! Test for unspecified N
+
+     IF ( nc <= 0 ) THEN ! Test for unphysical nc
+
         WRITE ( unit=error_unit, fmt='(a,2i15)') 'nc must be positive', nc
         STOP 'Error in initialize'
-     ELSE
-        WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'nc = ', nc
-        n = 4*nc**3 ! fcc lattice
-        WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'n = ', n
-     END IF
-  ELSE
-     WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'n = ', n
-  END IF
 
-  IF ( INDEX(lowercase(molecules), 'chain') /= 0 ) THEN
+     ELSE ! Deduce N from nc
+
+        WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'nc = ', nc
+        n = 4*nc**3
+        WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'n = ', n
+
+     END IF
+
+  ELSE ! N has been specified
+
+     WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'n = ', n
+
+  END IF ! End test for unspecified N
+
+  ! Use molecules string to deduce molecule_option
+  molecules = lowercase(molecules)
+  
+  IF ( INDEX ( molecules, 'chain' ) /= 0 ) THEN
+
      molecule_option = chain
      WRITE ( unit=output_unit, fmt='(a)' ) 'Chain of atoms, no periodic boundaries'
-  ELSE IF  ( INDEX(lowercase(molecules), 'nonlinear') /= 0 ) THEN
+
+  ELSE IF ( INDEX ( molecules, 'nonlinear' ) /= 0 ) THEN
+
      molecule_option = nonlinear
      WRITE ( unit=output_unit, fmt='(a)' ) 'Nonlinear molecules, periodic boundaries'
-  ELSE IF  ( INDEX(lowercase(molecules), 'linear') /= 0 ) THEN
+
+  ELSE IF ( INDEX ( molecules, 'linear') /= 0 ) THEN
+
      molecule_option = linear
      WRITE ( unit=output_unit, fmt='(a)' ) 'Linear molecules, periodic boundaries'
-  ELSE IF  ( INDEX(lowercase(molecules), 'atoms') /= 0 ) THEN
+
+  ELSE IF ( INDEX ( molecules, 'atoms') /= 0 ) THEN
+
      molecule_option = atoms
      WRITE ( unit=output_unit, fmt='(a)' ) 'Atoms, periodic boundaries'
+
   ELSE
+
      WRITE ( unit=error_unit, fmt='(a,a)') 'Unrecognized molecules option: ', molecules
      STOP 'Error in initialize'
+
   END IF
 
+  ! Allocate arrays appropriately according to molecule_option
   CALL allocate_arrays ( quaternions = ( molecule_option == nonlinear ) )
 
-  CALL RANDOM_SEED()
-
+  ! Initialize positions and optionally velocities
+  
   SELECT CASE ( molecule_option)
 
   CASE ( chain )
 
      IF ( random_positions ) THEN
-        WRITE ( unit=output_unit, fmt='(a)' ) 'Chain, bonds randomly oriented, avoiding overlaps'
-        CALL initialize_chain_random ! unit bond length
+        CALL initialize_chain_random ! Random with unit bond length
      ELSE
-        WRITE ( unit=output_unit, fmt='(a)' ) 'Chain, close-packed atoms surrounded by vacuum'
-        CALL initialize_chain_lattice ! unit bond length
+        CALL initialize_chain_lattice ! On a lattice with unit bond length
      END IF
-     IF ( velocities ) THEN
-        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Chain velocities at temperature', temperature
-        CALL initialize_chain_velocities ( temperature )
-     END IF
+
+     IF ( velocities ) CALL initialize_chain_velocities ( temperature )
 
   CASE default
 
-     IF ( random_positions ) THEN ! coordinates chosen randomly
-        WRITE ( unit=output_unit, fmt='(a)' ) 'Random positions, avoiding overlaps'
-        CALL initialize_positions_random ! unit box
-     ELSE ! close packed lattice
-        WRITE ( unit=output_unit, fmt='(a)' ) 'Close-packed lattice positions'
-        CALL initialize_positions_lattice ! unit box
+     IF ( random_positions ) THEN
+        CALL initialize_positions_random ! Random within unit box
+     ELSE
+        CALL initialize_positions_lattice ! On a lattice within unit box
      END IF
-     IF ( velocities ) THEN
-        WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Velocities at temperature', temperature
-        CALL initialize_velocities ( temperature )
-     END IF
+
+     IF ( velocities ) CALL initialize_velocities ( temperature )
 
   END SELECT
 
+  ! For linear and nonlinear molecules, initialize orientations and optionally angular velocities
+  
   SELECT CASE ( molecule_option )
 
   CASE ( linear, nonlinear )
+
      IF ( random_orientations ) THEN
-        WRITE ( unit=output_unit, fmt='(a)' ) 'Random orientations'
         CALL initialize_orientations_random
      ELSE
-        WRITE ( unit=output_unit, fmt='(a)' ) 'Regular lattice of orientations'
         CALL initialize_orientations_lattice
      END IF
 
-     IF ( velocities ) THEN
-        WRITE ( unit=output_unit, fmt='(a,t40,2f15.5)' ) 'Angular velocities at temperature, inertia', temperature, inertia
-        CALL initialize_angular_velocities ( temperature, inertia )
-     END IF
+     IF ( velocities ) CALL initialize_angular_velocities ( temperature, inertia )
 
   END SELECT
 
+  ! Write out configuration
+  
   WRITE ( unit=output_unit, fmt='(a,a)' ) 'Writing configuration to filename ', filename
 
   SELECT CASE ( molecule_option )

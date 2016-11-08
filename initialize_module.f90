@@ -2,7 +2,7 @@
 ! Routines to initialize configurations and velocities
 MODULE initialize_module
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit, output_unit
 
   IMPLICIT NONE
   PRIVATE
@@ -30,6 +30,7 @@ CONTAINS
     LOGICAL, INTENT(in) :: quaternions
 
     ALLOCATE ( r(3,n), v(3,n), w(3,n), move(n), moved(n) )
+
     IF ( quaternions ) THEN
        ALLOCATE ( e(0:3,n) )
     ELSE
@@ -46,9 +47,9 @@ CONTAINS
 
   SUBROUTINE initialize_positions_lattice
 
-    ! Sets up the fcc lattice
-    ! Four molecules per unit cell
-    ! Simulation box is a unit cube centred at the origin
+    ! Sets up the fcc lattice: four molecules per unit cell
+    ! Initially, employ a unit cell of unit length
+    ! Afterwards, rescale into simulation box of unit length centred at the origin
 
     REAL, DIMENSION(3,4), PARAMETER :: r_fcc = RESHAPE ( [ &
          & 0.25, 0.25, 0.25, &
@@ -59,18 +60,20 @@ CONTAINS
     REAL, DIMENSION(3) :: r_cm
     INTEGER            :: nc, ix, iy, iz, a, i
 
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Close-packed lattice positions'
+
     nc = NINT ( REAL(n/4) ** (1.0/3.0) )
     IF ( n /= 4 * nc ** 3 ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'n, nc mismatch ', n, 4 * nc ** 3
        STOP 'Error in initialize_positions_lattice'
     END IF
 
-    IF ( .NOT. ALLOCATED ( r ) ) THEN
+    IF ( .NOT. ALLOCATED ( r ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
        STOP 'Error in initialize_positions_lattice'
     END IF
 
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of r', SHAPE(r), 3, n
        STOP 'Error in initialize_positions_lattice'
     END IF
@@ -106,6 +109,8 @@ CONTAINS
 
     REAL, DIMENSION(3) :: r_cm
 
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Random positions'
+
     IF ( .NOT. ALLOCATED ( r ) ) THEN
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
        STOP 'Error in initialize_positions_random'
@@ -116,7 +121,7 @@ CONTAINS
        STOP 'Error in initialize_positions_random'
     END IF
 
-    CALL RANDOM_NUMBER ( r(:,:) )
+    CALL RANDOM_NUMBER ( r(:,:) )                           ! All in range (0,1)
     r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL(n)               ! Compute centre of mass position
     r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of mass to the origin
     
@@ -135,28 +140,30 @@ CONTAINS
 
     INTEGER :: nc, k
 
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Regular lattice of orientations'
+
     nc = NINT ( REAL(n/4) ** (1.0/3.0) )
     IF ( n /= 4 * nc ** 3 ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'n, nc mismatch ', n, 4 * nc ** 3
        STOP 'Error in initialize_orientations_lattice'
     END IF
 
-    IF ( .NOT. ALLOCATED ( e ) ) THEN
+    IF ( .NOT. ALLOCATED ( e ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array e is not allocated'
        STOP 'Error in initialize_orientations_lattice'
     END IF
 
-    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) THEN
+    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e lower bound mismatch ', LBOUND(e,dim=1)
        STOP 'Error in initialize_orientations_lattice'
     END IF
 
-    IF ( UBOUND(e,dim=1) /= 3 ) THEN
+    IF ( UBOUND(e,dim=1) /= 3 ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e upper bound mismatch ', UBOUND(e,dim=1)
        STOP 'Error in initialize_orientations_lattice'
     END IF
 
-    IF ( SIZE(e,dim=2) /= n   ) THEN
+    IF ( SIZE(e,dim=2) /= n   ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array e bounds mismatch ', SIZE(e,dim=2), n
        STOP 'Error in initialize_orientations_lattice'
     END IF
@@ -184,22 +191,24 @@ CONTAINS
 
     INTEGER :: i
 
-    IF ( .NOT. ALLOCATED ( e ) ) THEN
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Random orientations'
+
+    IF ( .NOT. ALLOCATED ( e ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array e is not allocated'
        STOP 'Error in initialize_orientations_random'
     END IF
 
-    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) THEN
+    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e lower bound mismatch ', LBOUND(e,dim=1)
        STOP 'Error in initialize_orientations_random'
     END IF
 
-    IF ( UBOUND(e,dim=1) /= 3 ) THEN
+    IF ( UBOUND(e,dim=1) /= 3 ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e upper bound mismatch ', UBOUND(e,dim=1)
        STOP 'Error in initialize_orientations_random'
     END IF
 
-    IF ( SIZE(e,dim=2) /= n   ) THEN
+    IF ( SIZE(e,dim=2) /= n   ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array e bounds mismatch ', SIZE(e,dim=2), n
        STOP 'Error in initialize_orientations_random'
     END IF
@@ -237,12 +246,14 @@ CONTAINS
     REAL               :: v_rms ! Root-mean-square velocity component
     REAL, DIMENSION(3) :: v_cm  ! Centre of mass velocity
 
-    IF ( .NOT. ALLOCATED ( v ) ) THEN
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Velocities at temperature', temperature
+
+    IF ( .NOT. ALLOCATED ( v ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array v is not allocated'
        STOP 'Error in initialize_velocities'
     END IF
 
-    IF ( ANY ( SHAPE(v) /= [3,n] ) ) THEN
+    IF ( ANY ( SHAPE(v) /= [3,n] ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of v', SHAPE(v), 3, n
        STOP 'Error in initialize_velocities'
     END IF
@@ -271,22 +282,24 @@ CONTAINS
     REAL    ::  w_sq, w_sq_mean, w_std_dev,  zeta
     INTEGER ::  i
 
-    IF ( .NOT. ALLOCATED ( w ) ) THEN
-       WRITE ( unit=error_unit, fmt='(a)' ) 'array w is not allocated'
+    WRITE ( unit=output_unit, fmt='(a,t40,2f15.5)' ) 'Angular velocities at temperature, inertia', temperature, inertia
+
+    IF ( .NOT. ALLOCATED ( w ) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a)' ) 'Array w is not allocated'
        STOP 'Error in initialize_angular_velocities'
     END IF
 
-    IF ( ANY ( SHAPE(w) /= [3,n] ) ) THEN
-       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'error in shape of w', SHAPE(r), 3, n
+    IF ( ANY ( SHAPE(w) /= [3,n] ) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of w', SHAPE(r), 3, n
        STOP 'Error in initialize_angular_velocities'
     END IF
 
-    IF ( .NOT. ALLOCATED ( e ) ) THEN
-       WRITE ( unit=error_unit, fmt='(a)' ) 'array e is not allocated'
+    IF ( .NOT. ALLOCATED ( e ) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a)' ) 'Array e is not allocated'
        STOP 'Error in initialize_angular_velocities'
     END IF
 
-    IF ( SIZE(e,dim=2) /= n ) THEN
+    IF ( SIZE(e,dim=2) /= n ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array e bounds mismatch ', SIZE(e,dim=2), n
        STOP 'Error in initialize_angular_velocities'
     END IF
@@ -327,7 +340,11 @@ CONTAINS
          & 0.75, 0.75, 0.25, &
          & 0.75, 0.25, 0.75 ],[3,4] ) ! Positions in unit cell
 
-    INTEGER, DIMENSION(4,2,2) :: atoms_mid, atoms_inp, atoms_out
+    ! Pick out a particular sequence of atoms within cell, according to x_direction and y_direction
+    INTEGER, DIMENSION(4,2,2), PARAMETER :: atoms_mid = RESHAPE ( [ 1,4,2,3, 4,1,3,2, 2,3,1,4, 3,2,4,1 ], [4,2,2] )
+    INTEGER, DIMENSION(4,2,2), PARAMETER :: atoms_inp = RESHAPE ( [ 1,4,2,3, 3,4,1,2, 1,2,3,4, 3,2,4,1 ], [4,2,2] )
+    INTEGER, DIMENSION(4,2,2), PARAMETER :: atoms_out = RESHAPE ( [ 1,2,3,4, 4,1,3,2, 2,3,1,4, 3,4,1,2 ], [4,2,2] )
+
     INTEGER, DIMENSION(4)     :: atoms
     REAL                      :: r_sq
     REAL,    DIMENSION(3)     :: r_cm
@@ -336,35 +353,23 @@ CONTAINS
     INTEGER, DIMENSION(2)     :: istart, istop, istep
     REAL, PARAMETER           :: tol = 1.0e-9
 
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Chain, close-packed atoms surrounded by vacuum'
+
     nc = NINT ( ( REAL(n)/4.0 )**(1.0/3.0) )
     IF ( n /= 4 * nc ** 3 ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'n, nc mismatch ', n, 4 * nc ** 3
        STOP 'Error in initialize_chain_lattice'
     END IF
 
-    IF ( .NOT. ALLOCATED ( r ) ) THEN
+    IF ( .NOT. ALLOCATED ( r ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
        STOP 'Error in initialize_chain_lattice'
     END IF
 
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of r', SHAPE(r), 3, n
        STOP 'Error in initialize_chain_lattice'
     END IF
-
-    ! Define sequences of atoms through unit cells
-    atoms_inp(:,1,1) = [1,4,2,3]
-    atoms_mid(:,1,1) = [1,4,2,3]
-    atoms_out(:,1,1) = [1,2,3,4]
-    atoms_inp(:,2,1) = [3,4,1,2]
-    atoms_mid(:,2,1) = [4,1,3,2]
-    atoms_out(:,2,1) = [4,1,3,2]
-    atoms_inp(:,1,2) = [1,2,3,4]
-    atoms_mid(:,1,2) = [2,3,1,4]
-    atoms_out(:,1,2) = [2,3,1,4]
-    atoms_inp(:,2,2) = [3,2,4,1]
-    atoms_mid(:,2,2) = [3,2,4,1]
-    atoms_out(:,2,2) = [3,4,1,2]
 
     ! Forward and reverse options to traverse cells in xy plane
     istart = [ 1, nc ]
@@ -377,7 +382,7 @@ CONTAINS
        y_direction = MOD(iz,2) + 1 ! Alternate scans across xy plane
        plane_count = 0
        DO iy = istart(y_direction), istop(y_direction), istep(y_direction)
-          x_direction = MOD(iz+iy,2) + 1 ! Alternate scans across x rows
+          x_direction = MOD(iz+iy,2) + 1 ! Alternate scans along x rows
           DO ix = istart(x_direction), istop(x_direction), istep(x_direction)
 
              plane_count = plane_count + 1
@@ -432,11 +437,13 @@ CONTAINS
     REAL,    PARAMETER :: tol = 1.0e-9
     INTEGER, PARAMETER :: iter_max = 1000
 
-    IF ( .NOT. ALLOCATED ( r ) ) THEN
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Chain, bonds randomly oriented, avoiding overlaps'
+
+    IF ( .NOT. ALLOCATED ( r ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
        STOP 'Error in initialize_chain_random'
     END IF
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
+    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of r', SHAPE(r), 3, n
        STOP 'Error in initialize_chain_random'
     END IF
@@ -496,6 +503,7 @@ CONTAINS
     ! apply bond constraints afterwards
     ! In between, we take steps to remove linear and angular momentum
     ! since the configuration may be used in MD simulations without periodic boundaries
+    ! in which case both these quantities are conserved
     ! We assume centre of mass is already at the origin
     ! We assume unit molecular mass and employ Lennard-Jones units
     ! property                  units
@@ -509,12 +517,14 @@ CONTAINS
     INTEGER              :: i, xyz
     REAL, PARAMETER      :: tol = 1.e-6
 
-    IF ( .NOT. ALLOCATED ( v ) ) THEN
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Chain velocities at temperature', temperature
+
+    IF ( .NOT. ALLOCATED ( v ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array v is not allocated'
        STOP 'Error in initialize_chain_velocities'
     END IF
 
-    IF ( ANY ( SHAPE(v) /= [3,n] ) ) THEN
+    IF ( ANY ( SHAPE(v) /= [3,n] ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of v', SHAPE(v), 3, n
        STOP 'Error in initialize_chain_velocities'
     END IF
@@ -530,7 +540,7 @@ CONTAINS
     DO i = 1, n
        ang_mom = ang_mom + cross_product ( r(:,i), v(:,i) )
        inertia = inertia - outer_product ( r(:,i), r(:,i) )
-       FORALL ( xyz=1:3) inertia(xyz,xyz) = inertia(xyz,xyz) + DOT_PRODUCT ( r(:,i), r(:,i) )
+       FORALL ( xyz=1:3 ) inertia(xyz,xyz) = inertia(xyz,xyz) + DOT_PRODUCT ( r(:,i), r(:,i) )
     END DO
     
     ! Solve linear system to get angular velocity
@@ -550,10 +560,10 @@ CONTAINS
     v(:,:) = v(:,:) * SQRT ( temperature / temp )
 
     ! Check angular and linear momenta
-    v_cm = 0.0
-    ang_mom  = 0.0
+    v_cm    = 0.0
+    ang_mom = 0.0
     DO i = 1, n
-       v_cm = v_cm + v(:,i)
+       v_cm    = v_cm + v(:,i)
        ang_mom = ang_mom + cross_product ( r(:,i), v(:,i) )
     END DO
 
@@ -601,16 +611,16 @@ CONTAINS
              rij = r(:,i) - r(:,j)
 
              ! In the following formulae, inverse masses are all unity
-             g  = -0.5*DOT_PRODUCT ( rij, vij ) / DOT_PRODUCT ( rij, rij )
+             g = -0.5*DOT_PRODUCT ( rij, vij ) / DOT_PRODUCT ( rij, rij )
 
              IF ( ABS ( g ) > tol ) THEN ! Test whether constraint already satisfied
 
-                dv      = rij * g          ! Velocity adjustment
-                v(:,i)  = v(:,i) + dv      ! Adjust velocity i
-                v(:,j)  = v(:,j) - dv      ! Adjust velocity j
-                move(i) = .TRUE.           ! Flag that we moved i
-                move(j) = .TRUE.           ! Flag that we moved j
-                done    = .FALSE.          ! Flag that we moved something
+                dv      = rij * g     ! Velocity adjustment
+                v(:,i)  = v(:,i) + dv ! Adjust velocity i
+                v(:,j)  = v(:,j) - dv ! Adjust velocity j
+                move(i) = .TRUE.      ! Flag that we moved i
+                move(j) = .TRUE.      ! Flag that we moved j
+                done    = .FALSE.     ! Flag that we moved something
 
              END IF ! End test whether constraint already satisfied
 
