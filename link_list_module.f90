@@ -54,8 +54,8 @@ CONTAINS
     head(:,:,:) = 0
 
     DO i = 1, n ! Loop over all atoms
-       c(:,i) = c_index ( r(:,i) )       ! Index function allocating i to cell
-       CALL create_in_list ( i, c(:,i) ) ! This does the work of adding i to list
+       c(:,i) = c_index ( r(:,i) )       ! Index function allocating atom i to cell
+       CALL create_in_list ( i, c(:,i) ) ! This does the work of adding atom i to list
     END DO ! End loop over all atoms
 
   END SUBROUTINE make_list
@@ -81,18 +81,18 @@ CONTAINS
 
   END FUNCTION c_index
 
-  SUBROUTINE create_in_list ( i, ci ) ! Routine to create i in cell ci
+  SUBROUTINE create_in_list ( i, ci ) ! Routine to create atom i in cell ci
     IMPLICIT NONE
     INTEGER,               INTENT(in) :: i  ! Index of atom
     INTEGER, DIMENSION(3), INTENT(in) :: ci ! 3D index of cell in which i lies
 
-    list(i)                 = head(ci(1),ci(2),ci(3)) ! transfer old head to list
-    head(ci(1),ci(2),ci(3)) = i                       ! i becomes new head for this list
-    c(:,i)                  = ci(:)                   ! store 3D index in array
+    list(i)                 = head(ci(1),ci(2),ci(3)) ! Transfer old head to list
+    head(ci(1),ci(2),ci(3)) = i                       ! Atom i becomes new head for this list
+    c(:,i)                  = ci(:)                   ! Store 3D index in array
 
   END SUBROUTINE create_in_list
 
-  SUBROUTINE destroy_in_list ( i, ci ) ! Routine to destroy i in cell ci
+  SUBROUTINE destroy_in_list ( i, ci ) ! Routine to destroy atom i in cell ci
     IMPLICIT NONE
     INTEGER,               INTENT(in) :: i  ! Index of atom
     INTEGER, DIMENSION(3), INTENT(in) :: ci ! 3D index of cell in which i lies
@@ -101,11 +101,11 @@ CONTAINS
 
     this = head(ci(1),ci(2),ci(3)) ! Locate head of list corresponding to cell
 
-    IF ( this == i ) THEN ! i is the head atom in that cell
+    IF ( this == i ) THEN ! Atom i is the head atom in that cell
 
        head(ci(1),ci(2),ci(3)) = list(i) ! Simply point head at next atom, we're done
 
-    ELSE ! i lies further down the list
+    ELSE ! Atom i lies further down the list
 
        DO ! Loop traversing link-list
           next = list(this) ! Look ahead to the next entry
@@ -128,15 +128,15 @@ CONTAINS
 
   END SUBROUTINE destroy_in_list
 
-  SUBROUTINE move_in_list ( i, ci ) ! Routine to move i from current cell to ci
+  SUBROUTINE move_in_list ( i, ci ) ! Routine to move atom i from current cell to ci
     IMPLICIT NONE
     INTEGER,               INTENT(in) :: i
     INTEGER, DIMENSION(3), INTENT(in) :: ci
 
-    IF ( ALL ( ci(:) == c(:,i) ) ) RETURN ! no need to do anything
+    IF ( ALL ( ci(:) == c(:,i) ) ) RETURN ! No need to do anything
 
-    CALL destroy_in_list ( i, c(:,i) ) ! Remove from old cell
-    CALL create_in_list  ( i, ci(:)  ) ! Add to new cell
+    CALL destroy_in_list ( i, c(:,i) ) ! Remove atom i from old cell
+    CALL create_in_list  ( i, ci(:)  ) ! Add atom i to new cell
 
   END SUBROUTINE move_in_list
 
@@ -149,11 +149,14 @@ CONTAINS
     INTEGER               :: ci1, ci2, ci3, i
 
     DO i = 1, n ! Loop to check that each atom's cell is correct
+
        ci = c_index ( r(:,i) ) ! Index function
+
        IF ( ANY ( ci(:) /= c(:,i) ) ) THEN
           WRITE ( unit=error_unit, fmt='(a,7i10)') 'Inconsistency 1 found:', i, ci, c(:,i)
           STOP 'Error in check_list'
        END IF
+
     END DO ! End loop to check that each atom's cell is correct
 
     ! Triple loop over cells
@@ -192,8 +195,8 @@ CONTAINS
 
     ! This routine uses the link-list cell structure to fill out the array j_list
     ! with possible neighbours of atom i, padding with zeroes
-    ! If half==.false., all 27 cells around, and including, ci, are searched.
-    ! If half==.true., only cell ci, and 13 of the neighbour cells, are searched
+    ! If half==.false., cell ci and all 26 surrounding cells are searched.
+    ! If half==.true., cell ci, and just 13 of the neighbour cells, are searched
     ! and moreover, in ci, we only look down-list making use of list(i)
     ! There is a subtlety: using list(i) assumes that our interest is in the cells that
     ! are neighbours of c(:,i), i.e. that ci(:)==c(:,i), and we check for this explicitly.
