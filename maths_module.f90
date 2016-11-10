@@ -1,5 +1,5 @@
 ! maths_module.f90
-! routines for maths, random numbers, order parameters
+! Routines for maths, random numbers, order parameters
 MODULE maths_module
 
   ! We use the standard error_unit for error messages
@@ -157,16 +157,16 @@ CONTAINS
     LOGICAL,           SAVE :: saved = .FALSE.
 
     IF ( saved ) THEN     ! Saved number is available
-       r = s              ! normal, with mean=0, std=1
-       r = mean + std * r ! normal, with desired mean, std
-       saved = .FALSE.    ! flag to generate fresh numbers next time
+       r = s              ! Normal, with mean=0, std=1
+       r = mean + std * r ! Normal, with desired mean, std
+       saved = .FALSE.    ! Flag to generate fresh numbers next time
 
     ELSE                                              ! Saved number is not available
-       CALL RANDOM_NUMBER (zeta)                      ! two uniformly distributed random numbers
-       r = SQRT(-2.0*LOG(zeta(1)))*COS(twopi*zeta(2)) ! normal, with mean=0, std=1
-       s = SQRT(-2.0*LOG(zeta(1)))*SIN(twopi*zeta(2)) ! also normal, with mean=0, std=1
-       r = mean + std * r                             ! normal, with desired mean, std
-       saved = .TRUE.                                 ! flag to use saved number next time
+       CALL RANDOM_NUMBER (zeta)                      ! Two uniformly distributed random numbers
+       r = SQRT(-2.0*LOG(zeta(1)))*COS(twopi*zeta(2)) ! Normal, with mean=0, std=1
+       s = SQRT(-2.0*LOG(zeta(1)))*SIN(twopi*zeta(2)) ! Also normal, with mean=0, std=1
+       r = mean + std * r                             ! Normal, with desired mean, std
+       saved = .TRUE.                                 ! Flag to use saved number next time
 
     END IF
 
@@ -216,7 +216,10 @@ CONTAINS
     DO ! Loop over possible outcomes
        IF ( zeta <= cumw ) EXIT ! Random number less than cumulative weight up to k
        k = k + 1
-       IF ( k > SIZE(w) ) STOP 'Error in pick_r' ! Should never happen
+       IF ( k > SIZE(w) ) THEN ! Should never happen
+          WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'k error ', k, SIZE(w)
+          STOP 'Error in pick_r' 
+       END IF
        cumw = cumw+w(k)
     END DO ! End loop over possible outcomes
 
@@ -237,7 +240,10 @@ CONTAINS
     DO ! Loop over possible outcomes
        IF ( zeta <= REAL(cumw) ) EXIT ! Random number less than cumulative weight up to k
        k = k + 1
-       IF ( k > SIZE(w) ) STOP 'Error in pick_i' ! Should never happen
+       IF ( k > SIZE(w) ) THEN ! Should never happen
+          WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'k error ', k, SIZE(w)
+          STOP 'Error in pick_i'
+       END IF
        cumw = cumw+w(k)
     END DO ! End loop over possible outcomes
 
@@ -321,7 +327,10 @@ CONTAINS
     REAL               :: proj, norm
 
     norm = SUM ( old**2 ) ! Old squared length
-    IF ( norm < tol ) STOP 'Error in random_perpendicular_vector' ! This should never happen
+    IF ( norm < tol ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2es15.3)' ) 'old normalization error', norm, tol
+       STOP 'Error in random_perpendicular_vector' 
+    END IF
     n = old / SQRT(norm) ! Normalized old vector
 
     DO ! Loop until generated vector is not too small
@@ -338,7 +347,7 @@ CONTAINS
 
   FUNCTION random_translate_vector ( dr_max, old ) RESULT ( r )
     IMPLICIT NONE
-    REAL, DIMENSION(3)             :: r      ! Returns a vector translated by a
+    REAL, DIMENSION(3)             :: r      ! Returns a vector translated by a random amount with
     REAL,               INTENT(in) :: dr_max ! maximum displacement relative to
     REAL, DIMENSION(3), INTENT(in) :: old    ! the old vector
 
@@ -347,7 +356,7 @@ CONTAINS
     REAL, DIMENSION(3) :: zeta ! Random numbers
 
     CALL RANDOM_NUMBER ( zeta )   ! Three uniform random numbers in range (0,1)
-    zeta = 2.0*zeta - 1.0         ! now in range (-1,+1)
+    zeta = 2.0*zeta - 1.0         ! Now in range (-1,+1)
     r(:) = old(:) + zeta * dr_max ! Move to new position
 
   END FUNCTION random_translate_vector
@@ -367,7 +376,10 @@ CONTAINS
     REAL :: norm
 
     norm = SUM ( old**2 ) ! Old squared length
-    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in random_rotate_vector_1' ! Should never happen
+    IF ( ABS ( norm - 1.0 ) > tol ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2es20.8)' ) 'old normalization error', norm, tol
+       STOP 'Error in random_rotate_vector_1'
+    END IF
 
     ! Choose new orientation by adding random small vector
     e    = old + angle_max * random_vector ()
@@ -391,7 +403,10 @@ CONTAINS
     REAL               :: norm, angle, zeta
 
     norm = SUM ( old**2 ) ! Old squared length
-    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in random_rotate_vector_2' ! Should never happen
+    IF ( ABS ( norm - 1.0 ) > tol ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2es20.8)' ) 'old normalization error', norm, tol
+       STOP 'Error in random_rotate_vector_2'
+    END IF
 
     perp = random_perpendicular_vector ( old ) ! Choose unit vector perpendicular to old
 
@@ -421,16 +436,19 @@ CONTAINS
     REAL               :: angle, norm, zeta
 
     norm = SUM ( old**2 ) ! Old squared length
-    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in random_rotate_vector_3' ! Should never happen
+    IF ( ABS ( norm - 1.0 ) > tol ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2es20.8)' ) 'old normalization error', norm, tol
+       STOP 'Error in random_rotate_vector_3'
+    END IF
 
     axis    = 0.0
-    k       = random_integer (1,3) ! random axis choice x=1, y=2, z=3
+    k       = random_integer (1,3) ! Random axis choice x=1, y=2, z=3
     axis(k) = 1.0
 
     CALL RANDOM_NUMBER ( zeta )              ! Uniform random number between 0 and 1
     angle = ( 2.0 * zeta - 1.0 ) * angle_max ! Uniform random angle in desired range
 
-    e = rotate_vector ( angle, axis, old ) ! General rotation formula
+    e = rotate_vector ( angle, axis, old ) ! General rotation function
 
   END FUNCTION random_rotate_vector_3
 
@@ -451,7 +469,10 @@ CONTAINS
     REAL :: cos_min, norm
 
     norm = SUM ( old**2 ) ! Old squared length
-    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in random_rotate_vector_4' ! Should never happen
+    IF ( ABS ( norm - 1.0 ) > tol ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2es20.8)' ) 'old normalization error', norm, tol
+       STOP 'Error in random_rotate_vector_4'
+    END IF
 
     cos_min = COS ( angle_max )
 
@@ -504,13 +525,16 @@ CONTAINS
     REAL               :: zeta, angle, norm
 
     norm = SUM ( old**2 ) ! Old squared length
-    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in random_rotate_quaternion' ! Should never happen
+    IF ( ABS ( norm - 1.0 ) > tol ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2es20.8)' ) 'old normalization error', norm, tol
+       STOP 'Error in random_rotate_quaternion'
+    END IF
 
     axis = random_vector ( )                ! Choose random unit vector
     CALL RANDOM_NUMBER ( zeta )             ! Random number between 0 and 1
     angle = ( 2.0*angle - 1.0 ) * angle_max ! Uniform random angle in desired range
 
-    e = rotate_quaternion ( angle, axis, old )
+    e = rotate_quaternion ( angle, axis, old ) ! General rotation function
 
   END FUNCTION random_rotate_quaternion
 
@@ -537,10 +561,10 @@ CONTAINS
 
   FUNCTION rotate_vector ( angle, axis, old ) RESULT ( e )
     IMPLICIT NONE
-    REAL, DIMENSION(3)             :: e     ! Returns a vector rotated by a
-    REAL,               INTENT(in) :: angle ! specified rotation angle (in radians) about a
+    REAL, DIMENSION(3)             :: e     ! Returns a vector rotated by
+    REAL,               INTENT(in) :: angle ! specified rotation angle (in radians) about
     REAL, DIMENSION(3), INTENT(in) :: axis  ! specified rotation axis relative to
-    REAL, DIMENSION(3), INTENT(in) :: old   ! the old vector
+    REAL, DIMENSION(3), INTENT(in) :: old   ! old vector
 
     ! Note that the axis vector should be normalized and we test for this
     ! In general, the old vector need not be normalized, and the same goes for the result
@@ -549,7 +573,10 @@ CONTAINS
     REAL :: proj, c, s, norm
 
     norm = SUM ( axis**2 ) ! Axis squared length
-    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in rotate_vector' ! Should never happen
+    IF ( ABS ( norm - 1.0 ) > tol ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2es20.8)' ) 'axis normalization error', norm, tol
+       STOP 'Error in rotate_vector'
+    END IF
 
     c    = COS ( angle )
     s    = SIN ( angle )
@@ -562,10 +589,10 @@ CONTAINS
 
   FUNCTION rotate_quaternion ( angle, axis, old ) RESULT ( e )
     IMPLICIT NONE
-    REAL, DIMENSION(0:3)             :: e     ! Returns a quaternion rotated by a
-    REAL,                 INTENT(in) :: angle ! specified rotation angle (in radians) about a
+    REAL, DIMENSION(0:3)             :: e     ! Returns a quaternion rotated by
+    REAL,                 INTENT(in) :: angle ! specified rotation angle (in radians) about
     REAL, DIMENSION(3),   INTENT(in) :: axis  ! specified rotation axis relative to
-    REAL, DIMENSION(0:3), INTENT(in) :: old   ! the old quaternion
+    REAL, DIMENSION(0:3), INTENT(in) :: old   ! old quaternion
 
     ! Note that the axis vector should be normalized and we test for this
     ! In general, the old quaternion need not be normalized, and the same goes for the result
@@ -575,7 +602,10 @@ CONTAINS
     REAL, DIMENSION(0:3) :: rot
 
     norm = SUM ( axis**2 ) ! Axis squared length
-    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in rotate_quaternion' ! Should never happen
+    IF ( ABS ( norm - 1.0 ) > tol ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2es20.8)' ) 'axis normalization error', norm, tol
+       STOP 'Error in rotate_quaternion'
+    END IF
 
     ! Standard formula for rotation quaternion, using half angles
     rot(0)   = COS(0.5*angle)
@@ -666,7 +696,7 @@ CONTAINS
   FUNCTION translational_order ( r, k ) RESULT ( order )
     IMPLICIT NONE
     REAL                                          :: order ! Returns a translational order parameter from
-    REAL,    DIMENSION(:,:), INTENT(in)           :: r     ! a set of molecular position vectors (3,n), and a
+    REAL,    DIMENSION(:,:), INTENT(in)           :: r     ! set of molecular position vectors (3,n), and
     INTEGER, DIMENSION(3),   INTENT(in), OPTIONAL :: k     ! lattice reciprocal vector (integer)
 
     ! Calculate the "melting factor" for translational order 
@@ -732,7 +762,7 @@ CONTAINS
 
     REAL, DIMENSION(3,4), PARAMETER :: e0 = RESHAPE (  SQRT(1.0/3.0)*[ &
          &  1.0,  1.0,  1.0,    1.0, -1.0, -1.0,  &
-         & -1.0,  1.0, -1.0,   -1.0, -1.0,  1.0 ],[3,4] ) ! orientations in unit cell
+         & -1.0,  1.0, -1.0,   -1.0, -1.0,  1.0 ],[3,4] ) ! Orientations in unit cell
 
     IF ( SIZE(e,dim=1) /= 3 ) THEN
        WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Error in e dimension ', SIZE(e,dim=1)
@@ -810,9 +840,9 @@ CONTAINS
 
   FUNCTION solve ( a, b ) RESULT ( x )
     IMPLICIT NONE
-    REAL, DIMENSION(3)               :: x ! Returns a vector x, the solution of Ax=b where
-    REAL, DIMENSION(3,3), INTENT(in) :: a ! is a supplied 3x3 matrix A, and
-    REAL, DIMENSION(3),   INTENT(in) :: b ! is a supplied constant vector
+    REAL, DIMENSION(3)               :: x ! Returns a vector x, the solution of ax=b, for
+    REAL, DIMENSION(3,3), INTENT(in) :: a ! supplied 3x3 matrix, and
+    REAL, DIMENSION(3),   INTENT(in) :: b ! supplied constant vector
 
     ! Use Cramer's rule to solve 3x3 linear system
 
@@ -847,20 +877,22 @@ CONTAINS
   FUNCTION q_to_a ( q ) RESULT ( a )
     IMPLICIT NONE
     REAL, DIMENSION(3,3)             :: a ! Returns a 3x3 rotation matrix calculated from
-    REAL, DIMENSION(0:3), INTENT(in) :: q ! a supplied quaternion
+    REAL, DIMENSION(0:3), INTENT(in) :: q ! supplied quaternion
 
     ! The rows of the rotation matrix correspond to unit vectors of the molecule in the space-fixed frame
-    ! The third row  a(3,:) is [2*(q(1)*q(3)+q(0)*q(2)),2*(q(2)*q(3)-q(0)*q(1)),q(0)**2-q(1)**2-q(2)**2+q(3)**2]
-    ! which is "the" axis of the molecule, for uniaxial molecules
-    ! use a to convert space-fixed to body-fixed axes thus: db = matmul(a,ds)
-    ! use transpose of a to convert body-fixed to space-fixed axes thus: ds = matmul(db,a)
+    ! The third row  a(3,:) is "the" axis of the molecule, for uniaxial molecules
+    ! Use a to convert space-fixed to body-fixed axes thus: db = matmul(a,ds)
+    ! Use transpose of a to convert body-fixed to space-fixed axes thus: ds = matmul(db,a)
 
     ! The supplied quaternion should be normalized and we check for this
 
     REAL :: norm
 
     norm = SUM ( q**2 ) ! Quaternion squared length
-    IF ( ABS ( norm - 1.0 ) > tol ) STOP 'Error in q_to_a' ! Should never happen
+    IF ( ABS ( norm - 1.0 ) > tol ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2es20.8)' ) 'quaternion normalization error', norm, tol
+       STOP 'Error in q_to_a'
+    END IF
 
     ! Write out row by row, for clarity
 
