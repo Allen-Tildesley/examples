@@ -4,7 +4,7 @@ PROGRAM qmc_pi_sho
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
-  USE averages_module, ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE averages_module, ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE maths_module,  ONLY : metropolis
 
   IMPLICIT NONE
@@ -25,29 +25,43 @@ PROGRAM qmc_pi_sho
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
 
-  REAL, DIMENSION(:), ALLOCATABLE  :: x ! position of each bead (p)
+  REAL, DIMENSION(:), ALLOCATABLE  :: x ! Position of each bead (p)
 
-  INTEGER :: p
-  REAL    :: temperature, dx_max, xi, zeta, beta
-  REAL    :: pot_cl, pot_cl_old, pot_cl_new, pot_qu, pot_qu_old, pot_qu_new
-  REAL    :: energy, kin, k_spring, delta, move_ratio, e_qu
-  INTEGER :: i, ip1, im1, nstep, production_blocks, equilibration_blocks, blk, stp
+  ! Most important variables
+  INTEGER :: p           ! Number of beads in ring polymer
+  REAL    :: temperature ! Specified temperature
+  REAL    :: dx_max      ! Maximum Monte Carlo displacement
+  REAL    :: pot_cl      ! Classical potential energy
+  REAL    :: pot_qu      ! Quantum potential energy
+
+  ! Quantities to be averaged
+  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
+
+  REAL    :: xi, zeta, beta
+  REAL    :: pot_cl_old, pot_cl_new, pot_qu_old, pot_qu_new
+  REAL    :: k_spring, delta, e_qu, m_ratio
+  INTEGER :: i, ip1, im1, nstep, nblock, nequil, blk, stp
   INTEGER :: moves, ioerr
 
-  NAMELIST /nml/ p, temperature, nstep, production_blocks, equilibration_blocks, dx_max
+  NAMELIST /nml/ p, temperature, nstep, nblock, nequil, dx_max
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'qmc_pi_sho'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Path Integral Monte Carlo simulation of a quantum oscillator'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Results in atomic units'
   CALL time_stamp ( output_unit )
 
-  ! Set up default parameters for the simulation
-  p                    = 8     ! number of beads
-  temperature          = 0.2   ! temperature
-  nstep                = 50000 ! number of steps per block
-  production_blocks    = 20    ! number of steps for production
-  equilibration_blocks = 10    ! number of steps for equilibration
-  dx_max               = 1.0   ! maximum Monte Carlo displacement
+  CALL RANDOM_SEED() ! Initialize random number generator
+
+  ! Set sensible default run parameters for testing
+  p           = 8
+  temperature = 0.2
+  nstep       = 50000
+  nblock      = 20
+  nequil      = 10
+  dx_max      = 1.0
+
+  ! Read run parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Error reading namelist nml from standard input', ioerr
@@ -59,33 +73,29 @@ PROGRAM qmc_pi_sho
      WRITE ( unit=error_unit, fmt='(a,i15)') 'p must be > 1 in this program ', p
      STOP 'Error in qmc_pi_sho'
   END IF
+
+  ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of beads, P = ',                 p
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature = ',                        temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks for production = ',    production_blocks
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks for equilibration = ', equilibration_blocks
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks for production = ',    nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks for equilibration = ', nequil
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block = ',          nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Max displacement = ',                   dx_max
   beta     = 1.0 / temperature
   k_spring = REAL(p) * temperature**2
 
   ALLOCATE ( x(p) )
-  CALL RANDOM_SEED()
-
-  ! set up initial positions at origin
-  x = 0.0
+  x = 0.0 ! Set up initial positions at origin
 
   ! Calculate initial values
   pot_cl = 0.5 * SUM ( x**2 ) / REAL (p )                ! Classical potential energy
   pot_qu = 0.5 * k_spring * SUM ( ( x-CSHIFT(x,1) )**2 ) ! Quantum potential energy
-  kin    = 0.5 * p * temperature                         ! Kinetic energy
-  energy = kin + pot_cl - pot_qu
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial classical potential energy', pot_cl
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial quantum potential energy',   pot_qu
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial energy',                     energy
+  CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Pot-classical', 'Pot-quantum', 'Energy' ] )
+  ! Initialize arrays for averaging and write column headings
+  CALL run_begin ( output_unit, variables )
 
-  DO blk = 1, production_blocks + equilibration_blocks ! Begin loop over blocks
+  DO blk = 1-nequil, nblock ! Begin loop over blocks (including equilibration)
 
      CALL blk_begin
 
@@ -100,55 +110,95 @@ PROGRAM qmc_pi_sho
            im1 = i-1
            IF ( im1 < 1 ) im1 = p
 
-           CALL RANDOM_NUMBER ( zeta ) ! one uniform random number in range (0,1)
-           zeta = 2.0*zeta - 1.0       ! now in range (-1,+1)
+           CALL RANDOM_NUMBER ( zeta ) ! One uniform random number in range (0,1)
+           zeta = 2.0*zeta - 1.0       ! Now in range (-1,+1)
 
            xi         = x(i)
            pot_cl_old = 0.5 * xi**2 / REAL(p)
            pot_qu_old = 0.5 * k_spring * ( (xi-x(im1))**2 + (xi-x(ip1))**2 )
-           xi         = xi + zeta * dx_max   ! trial move to new position
+           xi         = xi + zeta * dx_max   ! Trial move to new position
            pot_cl_new = 0.5 * xi**2 / REAL(p)
            pot_qu_new = 0.5 * k_spring * ( (xi-x(im1))**2 + (xi-x(ip1))**2 )
 
            delta = ( pot_cl_new + pot_qu_new - pot_cl_old - pot_qu_old ) / temperature
-           IF ( metropolis ( delta ) ) THEN ! accept Metropolis test
-              pot_cl    = pot_cl + pot_cl_new - pot_cl_old ! update classical potential energy
-              pot_qu    = pot_qu + pot_qu_new - pot_qu_old ! update quantum potential energy
-              x(i) = xi                                    ! update position
-              moves  = moves + 1                           ! increment move counter
-           END IF ! reject Metropolis test
+           IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
+              pot_cl = pot_cl + pot_cl_new - pot_cl_old ! Update classical potential energy
+              pot_qu = pot_qu + pot_qu_new - pot_qu_old ! Update quantum potential energy
+              x(i)   = xi                               ! Update position
+              moves  = moves + 1                        ! Increment move counter
+           END IF ! Reject Metropolis test
 
         END DO ! End loop over beads
 
-        ! Calculate all variables for this step
-        move_ratio = REAL(moves) / REAL(p)
-        energy = kin + pot_cl - pot_qu
-        IF ( blk > equilibration_blocks ) CALL blk_add ( [move_ratio,pot_cl,pot_qu,energy] )
+        m_ratio = REAL(moves) / REAL(p)
 
-     END DO ! end loop over steps
-     IF ( blk > equilibration_blocks ) CALL blk_end ( blk, output_unit )
+        IF ( blk > 0 ) THEN ! Test for production phase
+           ! Calculate and accumulate variables for this step
+           CALL calculate ( )
+           CALL blk_add ( variables )
+        END IF ! End test for production phase
 
-  END DO ! End loop over blocks
+     END DO ! End loop over steps
 
-  CALL run_end ( output_unit )
+     IF ( blk > 0 ) CALL blk_end ( blk, output_unit ) ! Output block averages
+
+  END DO ! End loop over blocks (including equilibration)
+
+  CALL run_end ( output_unit ) ! Output run averages
 
   e_qu = e_pi_sho ( p, beta )
-  WRITE ( unit=output_unit, fmt='(a,i0.0,a,t40,f15.5)' ) 'Exact P=',p,' energy', e_qu
+  WRITE ( unit=output_unit, fmt='(a,i0.0,a,t40,f15.5)' ) 'Exact P=', p, ' energy', e_qu
   e_qu = 0.5 / TANH(0.5*beta)
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'        ) 'Exact P=infinity energy', e_qu
 
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final classical potential energy', pot_cl
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final quantum potential energy',   pot_qu
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',                     energy
+  CALL calculate ( 'Final values' )
   pot_cl = 0.5 * SUM ( x**2 ) / REAL (p )                ! Classical potential energy
   pot_qu = 0.5 * k_spring * SUM ( ( x-CSHIFT(x,1) )**2 ) ! Quantum potential energy
-  energy = kin + pot_cl - pot_qu
-  WRITE ( unit=output_unit, fmt='(a)'           ) 'Final check'
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final classical potential energy', pot_cl
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final quantum potential energy',   pot_qu
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Final energy',                     energy
+  CALL calculate ( 'Final check' )
 
 CONTAINS
+
+  SUBROUTINE calculate ( string )
+    USE averages_module, ONLY : write_variables
+    IMPLICIT NONE
+    CHARACTER (len=*), INTENT(in), OPTIONAL :: string
+
+    ! This routine calculates all variables of interest and (optionally) writes them out
+    ! They are collected together in the variables array, for use in the main program
+
+    TYPE(variable_type) :: m_r, pe_cl, pe_qu, energy
+    REAL                :: kin
+
+    ! Preliminary calculations
+    kin = 0.5 * p * temperature  ! Kinetic energy for P-bead system
+
+    ! Move ratio
+
+    IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
+       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
+    ELSE
+       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
+    END IF
+
+    ! Classical potential energy
+    pe_cl = variable_type ( nam = 'Pot-classical', val = pot_cl )
+
+    ! Quantum potential energy
+    pe_qu = variable_type ( nam = 'Pot-quantum', val = pot_qu )
+
+    ! Energy
+    energy = variable_type ( nam = 'Energy', val = kin+pot_cl-pot_qu )
+
+    ! Collect together for averaging
+    ! Fortran 2003 should automatically allocate this first time
+    variables = [ m_r, pe_cl, pe_qu, energy ]
+
+    IF ( PRESENT ( string ) ) THEN
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       CALL write_variables ( output_unit, variables(2:) ) ! Don't write out move ratio
+    END IF
+
+  END SUBROUTINE calculate
 
   FUNCTION e_pi_sho ( p, beta ) RESULT ( e )
     INTEGER, INTENT(in) :: p
@@ -161,8 +211,8 @@ CONTAINS
     ! KS Schweizer, RM Stratt, D Chandler, and PG Wolynes, J Chem Phys, 75, 1347 (1981)
     ! M Takahashi and M Imada, J Phys Soc Japan, 53, 3765 (1984)
 
-    ! For any given, not-too-high, P it is probably best to express the results as a ratio 
-    ! of polynomials in alpha, with integer coefficients, most conveniently in partial-fraction form.
+    ! For not-too-high P, we may express the results as a ratio of polynomials in alpha, 
+    ! with integer coefficients, most conveniently in partial-fraction form.
     ! We give these up to P=8, and they are easy to obtain using a computer algebra package.
 
     ! Otherwise, we use the floating-point formula, but this might become
@@ -238,6 +288,6 @@ CONTAINS
     END DO
 
   END FUNCTION polynomial
-  
+
 END PROGRAM qmc_pi_sho
 

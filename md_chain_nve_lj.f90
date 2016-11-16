@@ -5,10 +5,10 @@ PROGRAM md_chain_nve_lj
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE maths_module,     ONLY : lowercase
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, worst_bond, r, v, n, potential_type, &
+       &                       zero_cm, force, worst_bond, r, v, n, potential_type, &
        &                       milcshake_a, milcshake_b, rattle_a, rattle_b
 
   IMPLICIT NONE
@@ -34,8 +34,7 @@ PROGRAM md_chain_nve_lj
   REAL :: wc   ! Constraint virial (not used in this example)
 
   ! Quantities to be averaged
-  REAL :: tk ! Temperature (kinetic)
-  REAL :: en ! Internal energy per atom
+  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & ovr variables
   TYPE(potential_type) :: total
@@ -67,6 +66,8 @@ PROGRAM md_chain_nve_lj
   dt          = 0.002
   constraints = 'rattle'
 
+  ! Read run parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
@@ -74,6 +75,8 @@ PROGRAM md_chain_nve_lj
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in md_chain'
   END IF
+
+  ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
@@ -90,13 +93,13 @@ PROGRAM md_chain_nve_lj
      STOP 'Error in md_chain'
   END IF
 
+  ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond ) ! First call is just to get n and bond
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',          n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length (in sigma units)', bond
-
   CALL allocate_arrays
-
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r, v ) ! Second call gets r and v
+  CALL zero_cm ! Set centre-of-mass position and velocity to zero
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
 
   ! Calculate initial values and forces
@@ -107,7 +110,8 @@ PROGRAM md_chain_nve_lj
   END IF
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N', 'T (kin)' ] )
+  ! Initialize arrays for averaging and write column headings
+  CALL run_begin ( output_unit, variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -125,19 +129,19 @@ PROGRAM md_chain_nve_lj
 
         CALL move_b ( dt, bond, wc ) ! RATTLE/MILCSHAKE part B
 
-        ! Calculate all variables for this step
+        ! Calculate and accumulate variables for this step
         CALL calculate ( )
-        CALL blk_add ( [en,tk] )
+        CALL blk_add ( variables )
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk            ! number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, bond, r, v ) ! save configuration
+     CALL blk_end ( blk, output_unit )                           ! Output block averages
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk            ! Number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, bond, r, v ) ! Save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit )
+  CALL run_end ( output_unit ) ! Output run averages
 
   CALL force ( total )
   IF ( total%ovr ) THEN
@@ -148,7 +152,7 @@ PROGRAM md_chain_nve_lj
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
   CALL time_stamp ( output_unit )
 
-  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r, v )
+  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r, v ) ! Write out final configuration
 
   CALL deallocate_arrays
   CALL conclusion ( output_unit )
@@ -156,30 +160,47 @@ PROGRAM md_chain_nve_lj
 CONTAINS
 
   SUBROUTINE calculate ( string )
+    USE averages_module, ONLY : write_variables
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    ! This routine calculates the properties of interest from total values
-    ! and optionally writes them out (e.g. at the start and end of the run)
+    ! This routine calculates all variables of interest and (optionally) writes them out
+    ! They are collected together in the variables array, for use in the main program
+
     ! In this example we simulate using a specified potential (e.g. WCA LJ)
     ! which goes to zero smoothly at the cutoff to highlight energy conservation
-    ! so long-range corrections for cut-and-shift versions do not arise
+    ! so long-range corrections do not arise
 
-    REAL    :: kin  ! Total kinetic energy
-    INTEGER :: free ! Number of degrees of freedom
+    TYPE(variable_type) :: e_f, t_k
+    REAL                :: kin
 
+    ! Preliminary calculations
     kin  = 0.5*SUM(v**2)
-    free = 3 * n                     ! Three degrees of freedom per atom
-    free = free - (n-1)              ! Subtract n-1 constraints
-    free = free - 6                  ! Correct for angular and linear momentum conservation
-    tk   = 2.0 * kin / REAL ( free ) ! Kinetic temperature
 
-    en  = ( total%pot + kin ) / REAL ( n ) ! total%pot is the total LJ nonbonded energy
+    ! Variables of interest, of type variable_type, containing three components:
+    !   %val: the instantaneous value
+    !   %nam: used for headings
+    !   %msd: indicating if mean squared deviation required
+    ! If not set below, %msd adopts its default value of .false.
+    ! The %msd and %nam components need only be defined once, at the start of the program,
+    ! but for clarity and readability we assign all the values together below
+
+    ! Internal energy per atom
+    ! Total KE plus total LJ nonbonded energy divided by N
+    e_f = variable_type ( nam = 'E/N', val = (kin+total%pot)/REAL(n) )
+
+    ! Kinetic temperature
+    ! Remove 6 degrees of freedom for conserved linear and angular momentum
+    ! and also (n-1) degrees of freedom for the bond constraints
+    t_k = variable_type ( nam = 'T (kin)', val = 2.0*kin/REAL(3*n-(n-1)-6) )
+
+    ! Collect together for averaging
+    ! Fortran 2003 should automatically allocate this first time
+    variables = [ e_f, t_k ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'E/N',     en
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'  ) 'T (kin)', tk
+       CALL write_variables ( output_unit, variables )
     END IF
 
   END SUBROUTINE calculate

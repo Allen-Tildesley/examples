@@ -9,7 +9,7 @@ MODULE md_module
 
   ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: force, spring
+  PUBLIC :: zero_cm, force, spring
   PUBLIC :: rattle_a, rattle_b, worst_bond, milcshake_a, milcshake_b 
 
   ! Public data
@@ -84,6 +84,20 @@ CONTAINS
     DEALLOCATE ( dd, dd_tmp )
     DEALLOCATE ( dl, dl_tmp, du, du_tmp )
   END SUBROUTINE deallocate_arrays
+
+  SUBROUTINE zero_cm
+
+    ! Routine to set centre-of-mass at the origin and zero the total momentum
+
+    REAL, DIMENSION(3) :: c
+
+    c = SUM ( r, dim=2 ) / REAL(n)
+    r = r - SPREAD ( c, dim = 2, ncopies = n )
+
+    c = SUM ( v, dim=2 ) / REAL(n)
+    v = v - SPREAD ( c, dim = 2, ncopies = n )
+
+  END SUBROUTINE zero_cm
 
   SUBROUTINE force ( total )
     IMPLICIT NONE

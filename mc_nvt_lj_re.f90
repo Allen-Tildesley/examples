@@ -5,11 +5,10 @@ PROGRAM mc_nvt_lj_re
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE maths_module,     ONLY : init_random_seed, metropolis, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       potential_1, potential, move, n, r, &
-       &                       potential_type
+       &                       potential_1, potential, move, n, r, potential_type
   USE mpi
 
   IMPLICIT NONE
@@ -27,6 +26,9 @@ PROGRAM mc_nvt_lj_re
   ! Note that the various processes running this program will share standard input and error units
   ! but will write "standard output" to a file std##.out where ## is the process rank
   ! Similarly, configurations are read, saved, and written to files named cnf##.inp etc
+  ! NB a program intended for real-world application would be much more careful about
+  ! closing down all the MPI processes in the event of an error on any one process
+  ! for example, on attempting to open and read the input configuration file
 
   ! Positions r are divided by box length after reading in
   ! However, input configuration, output configuration, most calculations, and all results 
@@ -38,35 +40,31 @@ PROGRAM mc_nvt_lj_re
 
   ! Most important variables
   REAL :: box         ! Box length
-  REAL :: density     ! Density
   REAL :: dr_max      ! Maximum MC displacement
   REAL :: temperature ! Specified temperature
   REAL :: r_cut       ! Potential cutoff distance
 
   ! Quantities to be averaged
-  REAL :: m_ratio ! Acceptance ratio of moves
-  REAL :: x_ratio ! Acceptance ratio of exchange swaps with higher neighbour
-  REAL :: en_c    ! Internal energy per atom for simulated, cut, potential
-  REAL :: en_f    ! Internal energy per atom for full potential with LRC
-  REAL :: p_c     ! Pressure for simulated, cut, potential
-  REAL :: p_f     ! Pressure for full potential with LRC
-  REAL :: tc      ! Configurational temperature
+  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & vir & ovr variables
   TYPE(potential_type) :: total, partial_old, partial_new
 
+  ! Arrays holding values for all processes
   REAL, DIMENSION(:), ALLOCATABLE :: every_temperature, every_beta, every_dr_max
 
   LOGICAL            :: swap
   INTEGER            :: blk, stp, i, nstep, nblock, moves, swap_interval, swapped, updown, ioerr
-  REAL               :: beta, other_beta, other_pot, delta, zeta
+  REAL               :: beta, other_beta, other_pot, delta, zeta, m_ratio, x_ratio
   REAL, DIMENSION(3) :: ri
 
-  INTEGER                      :: output_unit                                  ! output file unit number 
-  CHARACTER(len=3),  PARAMETER :: inp_tag = 'inp', out_tag = 'out'
-  CHARACTER(len=6)             :: cnf_prefix = 'cnf##.', std_prefix = 'std##.' ! will have rank inserted
-  CHARACTER(len=3)             :: sav_tag = 'sav'                              ! may be overwritten with block number
-  CHARACTER(len=2)             :: m_tag                                        ! will contain rank number
+  INTEGER                      :: output_unit           ! Output file unit number 
+  CHARACTER(len=3),  PARAMETER :: inp_tag    = 'inp'
+  CHARACTER(len=3),  PARAMETER :: out_tag    = 'out'
+  CHARACTER(len=6)             :: cnf_prefix = 'cnf##.' ! Will have rank inserted
+  CHARACTER(len=6)             :: std_prefix = 'std##.' ! Will have rank inserted
+  CHARACTER(len=3)             :: sav_tag    = 'sav'    ! May be overwritten with block number
+  CHARACTER(len=2)             :: m_tag                 ! Will contain rank number
 
   INTEGER                             :: m             ! MPI process rank (id of this process)
   INTEGER                             :: nproc         ! MPI world size (number of processes)
@@ -87,11 +85,11 @@ PROGRAM mc_nvt_lj_re
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Number of processes is too large', nproc
      STOP 'Error in mc_nvt_lj_re'
   END IF
-  WRITE(m_tag,fmt='(i2.2)') m ! convert rank into character form
-  cnf_prefix(4:5) = m_tag     ! insert process rank into configuration filename
-  std_prefix(4:5) = m_tag     ! insert process rank into standard output filename
+  WRITE(m_tag,fmt='(i2.2)') m ! Convert rank into character form
+  cnf_prefix(4:5) = m_tag     ! Insert process rank into configuration filename
+  std_prefix(4:5) = m_tag     ! Insert process rank into standard output filename
 
-  OPEN ( newunit=output_unit, file = std_prefix // out_tag, iostat=ioerr ) ! open file for standard output
+  OPEN ( newunit=output_unit, file = std_prefix // out_tag, iostat=ioerr ) ! Open file for standard output
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,a)') 'Could not open file ', std_prefix // out_tag
      STOP 'Error in mc_nvt_lj_re'
@@ -110,15 +108,19 @@ PROGRAM mc_nvt_lj_re
   WRITE( unit=output_unit, fmt='(a,t40,f15.5)') 'First random number', zeta
   WRITE( unit=output_unit, fmt='(a)'          ) 'Should be different for different processes!'
 
+  ! Allocate processor-dependent arrays
   ALLOCATE ( every_temperature(0:nproc-1), every_beta(0:nproc-1), every_dr_max(0:nproc-1) )
 
-  ! Set sensible defaults for testing
+  ! Set sensible default run parameters for testing
   nblock            = 10
   nstep             = 1000
   swap_interval     = 20
   r_cut             = 2.5
-  every_temperature = [ ( 0.7*(1.05)**i,  i = 0, nproc-1 ) ] ! just empirical settings for LJ
-  every_dr_max      = [ ( 0.15*(1.05)**i, i = 0, nproc-1 ) ] ! just empirical settings for LJ
+  every_temperature = [ ( 0.7*(1.05)**i,  i = 0, nproc-1 ) ] ! Just empirical settings for LJ
+  every_dr_max      = [ ( 0.15*(1.05)**i, i = 0, nproc-1 ) ] ! Just empirical settings for LJ
+
+  ! Read run parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
@@ -131,6 +133,7 @@ PROGRAM mc_nvt_lj_re
   dr_max      = every_dr_max(m)         ! Max displacement for this process
   beta        = every_beta(m)           ! Inverse temperature for this process
 
+  ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',               nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',      nstep
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Replica exchange swap interval', swap_interval
@@ -138,16 +141,13 @@ PROGRAM mc_nvt_lj_re
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance',      r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum displacement',           dr_max
 
-  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! first call is just to get n and box
+  ! Read in initial configuration and allocate necessary arrays
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
-
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
   CALL allocate_arrays ( box, r_cut ) ! Allocate r
-
-  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! second call is to get r
-
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! Second call is to get r
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
@@ -159,8 +159,8 @@ PROGRAM mc_nvt_lj_re
   END IF
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move ratio', 'Swap ratio', &
-       &            'E/N (cut)', 'P (cut)', 'E/N (full)', 'P (full)', 'T (con)' ] )
+  ! Initialize arrays for averaging and write column headings
+  CALL run_begin ( output_unit, variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -222,7 +222,7 @@ PROGRAM mc_nvt_lj_re
                     IF ( swap ) THEN ! Exchange configurations
                        CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m+1, msg3_id, m+1, msg4_id, &
                             &                      MPI_COMM_WORLD, msg_status, msg_error )
-                       total   = potential ( box, r_cut ) ! Alternatively, we could exchange this information
+                       total   = potential ( box, r_cut ) ! Alternatively, we could get this from m+1
                        swapped = 1
                     END IF ! End exchange configurations
 
@@ -240,7 +240,7 @@ PROGRAM mc_nvt_lj_re
                     IF ( swap ) THEN ! Exchange configurations
                        CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m-1, msg4_id, m-1, msg3_id, &
                             &                      MPI_COMM_WORLD, msg_status, msg_error )
-                       total = potential ( box, r_cut ) ! Alternatively, we could exchange this information
+                       total = potential ( box, r_cut ) ! Alternatively, we could get this from m-1
                     END IF ! End exchange configurations
 
                  END IF ! End ensure partner exists
@@ -253,19 +253,21 @@ PROGRAM mc_nvt_lj_re
 
         x_ratio = REAL(swapped*swap_interval) ! Include factor for only attempting at intervals
 
+        ! Calculate and accumulate variables for this step
         CALL calculate ( )
-        CALL blk_add ( [m_ratio,x_ratio,en_c,p_c,en_f,p_f,tc] )
+        CALL blk_add ( variables )
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,fmt='(i3.3)') blk        ! number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box ) ! save configuration
+     CALL blk_end ( blk, output_unit )                           ! Output block averages
+     IF ( nblock < 1000 ) WRITE(sav_tag,fmt='(i3.3)') blk        ! Number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box ) ! Save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit )
+  CALL run_end ( output_unit ) ! Output run averages
 
+  ! Output final values
   CALL calculate ( 'Final values' )
 
   ! Double-check book-keeping for totals, and overlap
@@ -276,7 +278,7 @@ PROGRAM mc_nvt_lj_re
   END IF
   CALL calculate ( 'Final check' )
 
-  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box )
+  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box ) ! Write out final configuration
   CALL time_stamp ( output_unit )
 
   CALL deallocate_arrays
@@ -289,36 +291,73 @@ PROGRAM mc_nvt_lj_re
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE mc_module, ONLY : potential_lrc, pressure_lrc, pressure_delta, force_sq
+    USE mc_module,       ONLY : potential_lrc, pressure_lrc, pressure_delta, force_sq
+    USE averages_module, ONLY : write_variables
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    ! This routine calculates the properties of interest from total values
-    ! and optionally writes them out (e.g. at the start and end of the run)
+    ! This routine calculates all variables of interest and (optionally) writes them out
+    ! They are collected together in the variables array, for use in the main program
+
     ! In this example we simulate using the cut (but not shifted) potential
-    ! The values of < p_c >,  < en_c > and density should be consistent (for this potential)
+    ! The values of < p_c >,  < e_c > and density should be consistent (for this potential)
     ! For comparison, long-range corrections are also applied to give
-    ! estimates of < en_f > and < p_f > for the full (uncut) potential
+    ! estimates of < e_f > and < p_f > for the full (uncut) potential
     ! The value of the cut-and-shifted potential is not used, in this example
 
-    en_c = total%pot / REAL ( n )                  ! PE/N for cut (but not shifted) potential
-    en_c = en_c + 1.5 * temperature                ! Add ideal gas contribution KE/N to give E_c/N
-    en_f = en_c + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E/N estimate
+    TYPE(variable_type) :: m_r, x_r, e_c, p_c, e_f, p_f, t_c
+    REAL                :: vol, rho, fsq
 
-    p_c = total%vir / box**3                      ! Virial contribution to P_c
-    p_c = p_c + density * temperature             ! Add ideal gas contribution to P_c
-    p_f = p_c + pressure_lrc ( density, r_cut )   ! Add long-range contribution to give P_f
-    p_c = p_c + pressure_delta ( density, r_cut ) ! Add delta correction to P_c (not needed for P_f)
+    ! Preliminary calculations (m_ratio, total etc are known already)
+    vol = box**3                  ! Volume
+    rho = REAL(n) / vol           ! Density
+    fsq = force_sq ( box, r_cut ) ! Total squared force
 
-    tc = force_sq ( box, r_cut ) / total%lap ! Configurational temperature
+    ! Variables of interest, of type variable_type, containing three components:
+    !   %val: the instantaneous value
+    !   %nam: used for headings
+    !   %msd: indicating if mean squared deviation required
+    ! If not set below, %msd adopts its default value of .false.
+    ! The %msd and %nam components need only be defined once, at the start of the program,
+    ! but for clarity and readability we assign all the values together below
+
+    ! Move and exchange acceptance ratios
+
+    IF ( PRESENT ( string ) ) THEN ! The ratios are meaningless in this case
+       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
+       x_r = variable_type ( nam = 'Swap ratio', val = 0.0 )
+    ELSE
+       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
+       x_r = variable_type ( nam = 'Swap ratio', val = x_ratio )
+    END IF
+
+    ! Internal energy per atom for simulated, cut, potential
+    ! Ideal gas contribution plus cut (but not shifted) PE divided by N 
+    e_c = variable_type ( nam = 'E (cut)', val = 1.5*temperature + total%pot/REAL(n) )
+
+    ! Internal energy per atom for full potential with LRC
+    ! LRC plus ideal gas contribution plus cut (but not shifted) PE divided by N
+    e_f = variable_type ( nam = 'E (full)', val = potential_lrc(rho,r_cut) + 1.5*temperature + total%pot/REAL(n) )
+
+    ! Pressure for simulated, cut, potential
+    ! Delta correction plus ideal gas contribution plus total virial divided by V 
+    p_c = variable_type ( nam = 'P (cut)', val = pressure_delta(rho,r_cut) + rho*temperature + total%vir/vol )
+
+    ! Pressure for full potential with LRC
+    ! LRC plus ideal gas contribution plus total virial divided by V
+    p_f = variable_type ( nam = 'P (full)', val = pressure_lrc(rho,r_cut) + rho*temperature + total%vir/vol )
+
+    ! Configurational temperature
+    ! Total squared force divided by total Laplacian
+    t_c = variable_type ( nam = 'T (con)', val = fsq/total%lap )
+
+    ! Collect together for averaging
+    ! Fortran 2003 should automatically allocate this first time
+    variables = [ m_r, x_r, e_c, p_c, e_f, p_f, t_c ]
 
     IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)'           ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut)',  en_c
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut)',    p_c
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)', en_f
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',   p_f
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',    tc
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       CALL write_variables ( output_unit, variables(3:) ) ! Don't write out move ratios
     END IF
 
   END SUBROUTINE calculate

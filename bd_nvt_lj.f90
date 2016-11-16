@@ -5,7 +5,7 @@ PROGRAM bd_nvt_lj
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE maths_module,     ONLY : random_normals
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       force, r, v, f, n, potential_type
@@ -32,19 +32,13 @@ PROGRAM bd_nvt_lj
 
   ! Most important variables
   REAL :: box         ! Box length
-  REAL :: density     ! Density
   REAL :: dt          ! Time step
   REAL :: r_cut       ! Potential cutoff distance
   REAL :: temperature ! Temperature (specified)
   REAL :: gamma       ! Friction coefficient
 
   ! Quantities to be averaged
-  REAL :: e_s ! Internal energy (cut-and-shifted ) per atom
-  REAL :: p_s ! Pressure (cut-and-shifted)
-  REAL :: e_f ! Internal energy (full, including LRC) per atom
-  REAL :: p_f ! Pressure (full, including LRC)
-  REAL :: t_k ! Kinetic temperature
-  REAL :: t_c ! Configurational temperature
+  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & cut & vir & lap & ovr variables
   TYPE(potential_type) :: total
@@ -97,8 +91,7 @@ PROGRAM bd_nvt_lj
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
   CALL allocate_arrays ( box, r_cut )
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
   r(:,:) = r(:,:) / box              ! Convert positions to box units
@@ -113,8 +106,7 @@ PROGRAM bd_nvt_lj
   CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( [ CHARACTER(len=15) :: 'E (cut&shift)', 'P (cut&shift)', &
-       &            'E (full)', 'P (full)', 'T (kin)', 'T (con)' ] )
+  CALL run_begin ( output_unit, variables )
   
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -135,9 +127,9 @@ PROGRAM bd_nvt_lj
 
         CALL b_propagator ( dt/2.0 ) ! B kick half-step
 
-        ! Calculate and accumulate quantities for this step
+        ! Calculate and accumulate variables for this step
         CALL calculate ( )
-        CALL blk_add ( [ e_s, p_s, e_f, p_f, t_k, t_c ] )
+        CALL blk_add ( variables )
 
      END DO ! End loop over steps
 
@@ -165,37 +157,43 @@ PROGRAM bd_nvt_lj
 
 CONTAINS
 
-  SUBROUTINE a_propagator ( t ) ! A propagator (drift)
+  SUBROUTINE a_propagator ( t )
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
 
+    ! Implements the A propagator (drift)
+    
     r(:,:) = r(:,:) + t * v(:,:) / box ! Positions in box=1 units
     r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries (box=1 units)
 
   END SUBROUTINE a_propagator
 
-  SUBROUTINE b_propagator ( t ) ! B propagator (kick)
+  SUBROUTINE b_propagator ( t )
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
 
+    ! Implements the B propagator (kick)
+    
     v(:,:) = v(:,:) + t * f(:,:)
 
   END SUBROUTINE b_propagator
 
-  SUBROUTINE o_propagator ( t ) ! O propagator (friction and random contributions)
+  SUBROUTINE o_propagator ( t )
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt)
 
+    ! Implements the O propagator (friction and random contributions)
+    
     REAL                 :: x, c
     REAL, DIMENSION(3,n) :: zeta
 
-    REAL, PARAMETER :: c1 = 2.0, c2 = -2.0, c3 = 4.0/3.0, c4 = -2.0/3.0
+    REAL, PARAMETER :: c1 = 2.0, c2 = -2.0, c3 = 4.0/3.0, c4 = -2.0/3.0 ! Taylor series coefficients
 
     x = gamma * t
-    IF ( x > 0.0001 ) THEN
+    IF ( x > 0.0001 ) THEN ! Use formula
        c = 1-EXP(-2.0*x)
-    ELSE
-       c = x * ( c1 + x * ( c2 + x * ( c3 + x * c4 )) ) ! Taylor expansion for low x
+    ELSE ! Use Taylor expansion for low x
+       c = x * ( c1 + x * ( c2 + x * ( c3 + x * c4 ) ) ) 
     END IF
     c = SQRT ( c )
 
@@ -205,34 +203,62 @@ CONTAINS
   END SUBROUTINE o_propagator
 
   SUBROUTINE calculate ( string )
-    USE md_module, ONLY : potential_lrc, pressure_lrc
+    USE md_module,       ONLY : potential_lrc, pressure_lrc
+    USE averages_module, ONLY : write_variables
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    ! This routine calculates variables of interest and (optionally) writes them out
+    ! This routine calculates all variables of interest and (optionally) writes them out
+    ! They are collected together in the variables array, for use in the main program
 
-    REAL :: kin
+    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c
+    REAL                :: kin, fsq, vol, rho
 
-    kin = 0.5*SUM(v**2)            ! Total KE
-    t_k = 2.0 * kin / REAL ( 3*n ) ! Momentum is not conserved, hence 3N degrees of freedom
+    ! Preliminary calculations
+    kin = 0.5*SUM(v**2) ! Total kinetic energy
+    fsq = SUM(f**2)     ! Total squared force
+    vol = box**3        ! Volume
+    rho = REAL(n) / vol ! Density
 
-    e_s = ( total%pot + kin ) / REAL ( n )       ! total%pot is the total cut-and-shifted PE
-    e_f = ( total%cut + kin ) / REAL ( n )       ! total%cut is the total cut (but not shifted) PE
-    e_f = e_f + potential_lrc ( density, r_cut ) ! Add LRC
+    ! Variables of interest, of type variable_type, containing three components:
+    !   %val: the instantaneous value
+    !   %nam: used for headings
+    !   %msd: indicating if mean squared deviation required
+    ! If not set below, %msd adopts its default value of .false.
+    ! The %msd and %nam components need only be defined once, at the start of the program,
+    ! but for clarity and readability we assign all the values together below
 
-    p_s = density * temperature + total%vir / box**3 ! total%vir is the total virial
-    p_f = p_s + pressure_lrc ( density, r_cut )      ! Add LRC
+    ! Internal energy (cut-and-shifted ) per atom
+    ! Total KE plus cut-and-shifted PE divided by N
+    e_s = variable_type ( nam = 'E/N (cut&shift)', val = (kin+total%pot)/REAL(n) )
 
-    t_c = SUM(f**2) / total%lap ! total%lap is the total Laplacian
+    ! Pressure (cut-and-shifted)
+    ! Ideal gas part plus total virial divided by V
+    p_s = variable_type ( nam = 'P (cut&shift)', val = rho*temperature + total%vir/vol )
 
+    ! Internal energy (full, including LRC) per atom
+    ! LRC plus total KE plus cut (but not shifted) PE, divided by N
+    e_f = variable_type ( nam = 'E/N (full)', val = potential_lrc(rho,r_cut) + (kin+total%cut)/REAL(n) )
+
+    ! Pressure (full, including LRC)
+    ! LRC + ideal gas part plus total virial divided by V plus LRC
+    p_f = variable_type ( nam = 'P (full)', val = pressure_lrc(rho,r_cut) + rho*temperature + total%vir/vol )
+
+    ! Kinetic temperature
+    ! Momentum is not conserved, hence 3N degrees of freedom
+    t_k = variable_type ( nam = 'T (kin)', val = 2.0*kin/REAL(3*n) )
+
+    ! Configurational temperature
+    ! Total squared force divided by total Laplacian
+    t_c = variable_type ( nam = 'T (con)', val = fsq/total%lap )
+    
+    ! Collect together for averaging
+    ! Fortran 2003 should automatically allocate this first time
+    variables = [ e_s, p_s, e_f, p_f, t_k, t_c ]
+    
     IF ( PRESENT ( string ) ) THEN ! Output required
-       WRITE ( unit=output_unit, fmt='(a)'           ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E (cut&shift)', e_s
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)', p_s
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E (full)',      e_f
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',      p_f
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)',       t_k
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',       t_c
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       CALL write_variables ( output_unit, variables )
     END IF
 
   END SUBROUTINE calculate

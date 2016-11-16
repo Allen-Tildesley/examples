@@ -5,11 +5,10 @@ PROGRAM smc_nvt_lj
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE maths_module,     ONLY : random_normals, metropolis
   USE smc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, force_1, r, r_old, zeta, v, move, n, &
-       &                       potential_type
+       &                       force, force_1, r, r_old, zeta, v, move, n, potential_type
 
   IMPLICIT NONE
 
@@ -36,7 +35,6 @@ PROGRAM smc_nvt_lj
 
   ! Most important variables
   REAL    :: box         ! Box length
-  REAL    :: density     ! Density
   REAL    :: temperature ! Temperature (specified)
   INTEGER :: move_mode   ! Selects single- or multi-atom moves
   REAL    :: fraction    ! Fraction of atoms to move in multi-atom move
@@ -44,24 +42,21 @@ PROGRAM smc_nvt_lj
   REAL    :: r_cut       ! Potential cutoff distance
 
   ! Quantities to be averaged
-  REAL :: m_ratio ! Acceptance ratio for moves
-  REAL :: en_s    ! Internal energy per atom for simulated, cut-and-shifted, potential
-  REAL :: en_f    ! Internal energy per atom for full potential with LRC
-  REAL :: p_s     ! Pressure for simulated, cut-and-shifted, potential
-  REAL :: p_f     ! Pressure for full potential with LRC
-  REAL :: tc      ! Configurational temperature
+  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = forces & pot & cut & vir & lap & ovr variables
   TYPE(potential_type) :: total, total_old, partial_old, partial_new
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
   INTEGER :: i, n_move
-  REAL    :: v_rms, kin_old, kin_new, delta
+  REAL    :: v_rms, kin_old, kin_new, delta, m_ratio
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
-  CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
-  CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
-  INTEGER,          PARAMETER :: single_atom = 1, multi_atom = 2
+  CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
+  CHARACTER(len=3), PARAMETER :: out_tag    = 'out'
+  CHARACTER(len=3)            :: sav_tag    = 'sav' ! May be overwritten with block number
+
+  INTEGER, PARAMETER :: single_atom = 1, multi_atom = 2
 
   NAMELIST /nml/ nblock, nstep, r_cut, dt, move_mode, temperature, fraction
 
@@ -81,6 +76,8 @@ PROGRAM smc_nvt_lj
   move_mode   = 1
   fraction    = 0.5
 
+  ! Read run parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
@@ -88,6 +85,8 @@ PROGRAM smc_nvt_lj
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in smc_nvt_lj'
   END IF
+
+  ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
@@ -108,20 +107,17 @@ PROGRAM smc_nvt_lj
   END IF
   v_rms = SQRT ( temperature ) ! RMS value for velocity selection
 
+  ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
-
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
   CALL allocate_arrays ( box, r_cut )
-
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! Second call gets r
-
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
-  ! First calculation of total system properties and check for overlap
+  ! Initial forces, potential, etc plus overlap check
   total = force ( box, r_cut )
   IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
@@ -129,8 +125,8 @@ PROGRAM smc_nvt_lj
   END IF
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Move Ratio', 'E/N (cut&shift)', 'P (cut&shift)', &
-       &            'E/N (full)', 'P (full)', 'T (con)' ] )
+  ! Initialize arrays for averaging and write column headings
+  CALL run_begin ( output_unit, variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -224,19 +220,19 @@ PROGRAM smc_nvt_lj
 
         END SELECT
 
-        ! Calculate all variables for this step
+        ! Calculate and accumulate variables for this step
         CALL calculate ( )
-        CALL blk_add ( [m_ratio,en_s,p_s,en_f,p_f,tc] )
+        CALL blk_add ( variables )
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk            ! number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box ) ! save configuration
+     CALL blk_end ( blk, output_unit )                           ! Output block averages
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk            ! Number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box ) ! Save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit )
+  CALL run_end ( output_unit ) ! Output run averages
 
   CALL calculate ( 'Final values' )
 
@@ -257,31 +253,65 @@ PROGRAM smc_nvt_lj
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE smc_module, ONLY : potential_lrc, pressure_lrc
+    USE smc_module,      ONLY : potential_lrc, pressure_lrc
+    USE averages_module, ONLY : write_variables
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
-    en_s = total%pot / REAL ( n )   ! PE/N for cut-and-shifted potential
-    en_s = en_s + 1.5 * temperature ! Add ideal gas contribution KE/N to give E_s/N
+    ! This routine calculates all variables of interest and (optionally) writes them out
+    ! They are collected together in the variables array, for use in the main program
 
-    en_f = total%cut / REAL ( n )                  ! PE/N for cut (but not shifted) potential
-    en_f = en_f + 1.5 * temperature                ! Add ideal gas contribution KE/N
-    en_f = en_f + potential_lrc ( density, r_cut ) ! Add long-range contribution to give E_f/N
+    TYPE(variable_type) :: m_r, e_s, p_s, e_f, p_f, t_c
+    REAL                :: vol, rho, fsq
 
-    p_s = total%vir / box**3          ! Virial contribution to P
-    p_s = p_s + density * temperature ! Add ideal gas contribution to give P_s
+    ! Preliminary calculations
+    vol = box**3                    ! Volume
+    rho = REAL(n) / vol             ! Density
+    fsq = SUM ( total%f(:,1:n)**2 ) ! Total squared force
 
-    p_f = p_s + pressure_lrc ( density, r_cut ) ! Add long-range contribution to give P_f
+    ! Variables of interest, of type variable_type, containing three components:
+    !   %val: the instantaneous value
+    !   %nam: used for headings
+    !   %msd: indicating if mean squared deviation required
+    ! If not set below, %msd adopts its default value of .false.
+    ! The %msd and %nam components need only be defined once, at the start of the program,
+    ! but for clarity and readability we assign all the values together below
 
-    tc = SUM ( total%f(:,1:n)**2 ) / total%lap
+    ! Move acceptance ratio
+
+    IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
+       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
+    ELSE
+       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
+    END IF
+
+    ! Internal energy per atom for simulated, cut-and-shifted, potential
+    ! Ideal gas contribution plus total cut-and-shifted PE divided by N
+    e_s = variable_type ( nam = 'E/N (cut&shift)', val = 1.5*temperature + total%pot/REAL(n) )
+
+    ! Internal energy per atom for full potential with LRC
+    ! LRC plus ideal gas contribution plus total cut (but not shifted) PE divided by N
+    e_f = variable_type ( nam = 'E/N (full)', val = potential_lrc(rho,r_cut) + 1.5*temperature + total%cut/REAL(n) )
+
+    ! Pressure for simulated, cut-and-shifted, potential
+    ! Ideal gas contribution plus total virial divided by V
+    p_s = variable_type ( nam = 'P (cut&shift)', val = rho*temperature + total%vir/vol )
+
+    ! Pressure for full potential with LRC
+    ! LRC plus ideal gas contribution plus total virial divided by V
+    p_f = variable_type ( nam = 'P (full)', val = pressure_lrc(rho,r_cut) + rho*temperature + total%vir/vol )
+
+    ! Configurational temperature
+    ! Total squared force divided by total Laplacian
+    t_c = variable_type ( nam = 'T (con)', val = fsq/total%lap )
+
+    ! Collect together for averaging
+    ! Fortran 2003 should automatically allocate this first time
+    variables = [ m_r, e_s, p_s, e_f, p_f, t_c ]
 
     IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)'           ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut&shift)', en_s
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)',   p_s
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)',      en_f
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',        p_f
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',         tc
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       CALL write_variables ( output_unit, variables(2:) ) ! Don't write out move ratio
     END IF
 
   END SUBROUTINE calculate

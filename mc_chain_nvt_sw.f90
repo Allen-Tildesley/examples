@@ -4,10 +4,9 @@ PROGRAM mc_chain_nvt_sw
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       regrow, crank, pivot, qcount, weight, &
-       &                       n, r
+       &                       regrow, crank, pivot, qcount, weight, n, r
 
   IMPLICIT NONE
 
@@ -44,12 +43,8 @@ PROGRAM mc_chain_nvt_sw
   INTEGER :: q_max          ! max value of q seen in simulation (minimum energy)
   INTEGER :: nq             ! Maximum anticipated energy
 
-  ! Quantities for averaging
-  REAL :: regrow_ratio ! acceptance ratio for regrowth moves
-  REAL :: crank_ratio  ! acceptance ratio for crankshaft moves
-  REAL :: pivot_ratio  ! acceptance ratio for pivot moves
-  REAL :: pe           ! total potential energy of system
-  REAL :: r_g          ! Radius of gyration
+  ! Quantities to be averaged
+  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Histograms and tables
   REAL, DIMENSION(:), ALLOCATABLE :: h ! Histogram of q values (0:nq)
@@ -57,10 +52,13 @@ PROGRAM mc_chain_nvt_sw
 
   INTEGER :: blk, stp, nstep, nblock, ioerr, try, n_acc
   LOGICAL :: accepted
+  REAL    :: r_ratio, c_ratio, p_ratio
 
-  CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.', his_prefix = 'his.'
-  CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
-  CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
+  CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
+  CHARACTER(len=4), PARAMETER :: his_prefix = 'his.'
+  CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
+  CHARACTER(len=3), PARAMETER :: out_tag    = 'out'
+  CHARACTER(len=3)            :: sav_tag    = 'sav' ! May be overwritten with block number
 
   NAMELIST /nml/ nblock, nstep, m_max, k_max, crank_max, crank_fraction, pivot_max, pivot_fraction, &
        &         temperature, range
@@ -73,18 +71,19 @@ PROGRAM mc_chain_nvt_sw
   CALL RANDOM_SEED () ! Initialize random number generator
 
   ! Set sensible default run parameters for testing
+  nblock         = 10    ! Number of blocks
+  nstep          = 10000 ! Number of sweeps per block
+  m_max          = 3     ! Maximum atoms in regrow
+  k_max          = 32    ! Number of random tries per atom in regrow
+  crank_max      = 0.5   ! Maximum move angle in crankshaft
+  crank_fraction = 0.5   ! Fraction of atoms to try in crank moves
+  pivot_max      = 0.5   ! Maximum move angle in pivot
+  pivot_fraction = 0.2   ! Fraction of atoms to try in pivot moves
+  temperature    = 1.0   ! Temperature (in units of well depth)
+  range          = 1.5   ! Range of attractive well
 
-  nblock         = 10    ! number of blocks
-  nstep          = 10000 ! number of sweeps per block
-  m_max          = 3     ! maximum atoms in regrow
-  k_max          = 32    ! number of random tries per atom in regrow
-  crank_max      = 0.5   ! maximum move angle in crankshaft
-  crank_fraction = 0.5   ! fraction of atoms to try in crank moves
-  pivot_max      = 0.5   ! maximum move angle in pivot
-  pivot_fraction = 0.2   ! fraction of atoms to try in pivot moves
-  temperature    = 1.0   ! temperature (in units of well depth)
-  range          = 1.5   ! range of attractive well
-
+  ! Read run parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
@@ -92,6 +91,8 @@ PROGRAM mc_chain_nvt_sw
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in mc_chain_nvt_sw'
   END IF
+
+  ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',                nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',       nstep
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Max atoms in regrow',             m_max
@@ -102,28 +103,29 @@ PROGRAM mc_chain_nvt_sw
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Pivot fraction',                  pivot_fraction
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature/well depth',          temperature
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Attractive well range',           range
-
   IF ( range < 1.0 ) THEN
      WRITE ( unit=output_unit, fmt='(a)' ) 'Warning, range < core diameter (1.0)'
   END IF
 
+  ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond ) ! First call is just to get n and bond
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',          n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length (in sigma units)', bond
+  CALL allocate_arrays
+  nq = 6*n ! Anticipated maximum number of pair interactions within range
+  ALLOCATE ( h(0:nq), s(0:nq) )
+  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r ) ! Second call gets r
+
+  ! Set number of crankshaft and pivot moves per step
   n_crank = NINT(crank_fraction*REAL(n))
   n_pivot = NINT(pivot_fraction*REAL(n))
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of crankshaft tries per step', n_crank
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of pivot tries per step',      n_pivot
 
-  CALL allocate_arrays
-  nq = 6*n ! Anticipated maximum number of pair interactions within range
-  ALLOCATE ( h(0:nq), s(0:nq) )
-
-  CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r ) ! Second call gets r
-
   ! Initialize Boltzmann exponents, s(q), which are just values of E/kT
   s = [ ( -REAL(q)/temperature, q = 0, nq ) ]
 
+  ! Initial energy calculation plus overlap check
   IF ( weight() == 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_chain_nvt_sw'
@@ -131,10 +133,10 @@ PROGRAM mc_chain_nvt_sw
   q = qcount ( range )
   WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Initial energy', q
   q_max = q ! Max q seen so far
-
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'Regrow ratio', 'Crank ratio', 'Pivot ratio', 'PE', 'Rg' ] )
+  ! Initialize arrays for averaging and write column headings
+  CALL run_begin ( output_unit, variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -143,61 +145,56 @@ PROGRAM mc_chain_nvt_sw
 
      DO stp = 1, nstep ! Begin loop over steps
 
+        r_ratio = 0.0
         CALL regrow ( s, m_max, k_max, bond, range, q, accepted )
-        IF ( accepted ) THEN
-           regrow_ratio = 1.0
-        ELSE
-           regrow_ratio = 0.0
-        END IF
+        IF ( accepted ) r_ratio = 1.0
         CALL update_histogram
 
-        n_acc = 0
-        DO try = 1, n_pivot
-           CALL pivot ( s, pivot_max, range, q, accepted )
-           IF ( accepted ) n_acc = n_acc + 1
-           CALL update_histogram
-        END DO
+        p_ratio = 0.0
         IF ( n_pivot > 0 ) THEN
-           pivot_ratio = REAL(n_acc) / REAL(n_pivot)
-        ELSE
-           pivot_ratio = 0.0
+           n_acc = 0
+           DO try = 1, n_pivot
+              CALL pivot ( s, pivot_max, range, q, accepted )
+              IF ( accepted ) n_acc = n_acc + 1
+              CALL update_histogram
+           END DO
+           p_ratio = REAL(n_acc) / REAL(n_pivot)
         END IF
 
-        n_acc = 0
-        DO try = 1, n_crank
-           CALL crank ( s, crank_max, range, q, accepted )
-           IF ( accepted ) n_acc = n_acc + 1
-           CALL update_histogram
-        END DO
+        c_ratio = 0.0
         IF ( n_crank > 0 ) THEN
-           crank_ratio = REAL(n_acc) / REAL(n_crank)
-        ELSE
-           crank_ratio = 0.0
+           n_acc = 0
+           DO try = 1, n_crank
+              CALL crank ( s, crank_max, range, q, accepted )
+              IF ( accepted ) n_acc = n_acc + 1
+              CALL update_histogram
+           END DO
+           c_ratio = REAL(n_acc) / REAL(n_crank)
         END IF
 
-        ! Calculate all variables for this step
-        CALL calculate()
-        CALL blk_add ( [regrow_ratio,crank_ratio,pivot_ratio,pe,r_g] )
+        ! Calculate and accumulate variables for this step
+        CALL calculate ( )
+        CALL blk_add ( variables )
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk         ! number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, bond, r ) ! save configuration
-     CALL write_histogram ( his_prefix//sav_tag )             ! save histogram
+     CALL blk_end ( blk, output_unit )                        ! Output block averages
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk         ! Number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, bond, r ) ! Save configuration
+     CALL write_histogram ( his_prefix//sav_tag )             ! Save histogram
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit )
+  CALL run_end ( output_unit ) ! Output run averages
 
   CALL calculate ( 'Final values' )
 
+  ! Final energy calculation and overlap check
   IF ( weight() == 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in mc_chain_nvt_sw'
   END IF
-  q = qcount ( range ) ! count all non-bonded interactions
-
+  q = qcount ( range ) ! Count all non-bonded interactions
   CALL calculate ( 'Final check' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r )
@@ -210,19 +207,60 @@ PROGRAM mc_chain_nvt_sw
 CONTAINS
 
   SUBROUTINE calculate ( string )
+    USE averages_module, ONLY : write_variables
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    REAL, DIMENSION(3) :: r_cm
+    ! This routine calculates all variables of interest and (optionally) writes them out
+    ! They are collected together in the variables array, for use in the main program
 
-    r_cm = SUM ( r, dim=2 ) / REAL(n) ! Centre of mass
-    r_g  = SQRT ( SUM ( ( r - SPREAD(r_cm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) )
-    pe   = -REAL(q)
+    TYPE(variable_type) :: r_r, c_r, p_r, e_x, r_g, c_x
+    REAL, DIMENSION(3)  :: rcm
+    real                :: rsq
 
-    IF ( PRESENT ( string ) ) THEN ! output required
-       WRITE ( unit=output_unit, fmt='(a)'          ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'PE', pe
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Rg', r_g
+    ! Preliminary calculations
+    rcm = SUM ( r, dim=2 ) / REAL(n)                                 ! Centre of mass
+    rsq = SUM ( ( r - SPREAD(rcm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) ! Mean-squared distance from COM
+
+    ! Variables of interest, of type variable_type, containing three components:
+    !   %val: the instantaneous value
+    !   %nam: used for headings
+    !   %msd: indicating if mean squared deviation required
+    ! If not set below, %msd adopts its default value of .false.
+    ! The %msd and %nam components need only be defined once, at the start of the program,
+    ! but for clarity and readability we assign all the values together below
+
+    ! Acceptance ratios for regrowth, crankshaft, and pivot moves
+
+    IF ( PRESENT ( string ) ) THEN ! The ratios are meaningless in this case
+       r_r = variable_type ( nam = 'Regrow ratio', val = 0.0 )
+       c_r = variable_type ( nam = 'Crank ratio',  val = 0.0 )
+       p_r = variable_type ( nam = 'Pivot ratio',  val = 0.0 )
+    ELSE
+       r_r = variable_type ( nam = 'Regrow ratio', val = r_ratio )
+       c_r = variable_type ( nam = 'Crank ratio',  val = c_ratio )
+       p_r = variable_type ( nam = 'Pivot ratio',  val = p_ratio )
+    END IF
+
+    ! Total potential energy of system  (extensive, i.e. not divided by N)
+    ! PE=negative of the number of square-well contacts
+    e_x = variable_type ( nam = 'PE', val = -REAL(q) )
+
+    ! Radius of gyration
+    r_g = variable_type ( nam = 'Rg', val = SQRT(rsq) )
+
+    ! Heat Capacity (excess, without ideal gas contribution, extensive)
+    ! MSD of total PE / T
+    ! PE=negative of the number of square-well contacts
+    c_x = variable_type ( nam = 'HeatCap (ex)', val = -REAL(q)/temperature, msd = .TRUE. )
+
+    ! Collect together for averaging
+    ! Fortran 2003 should automatically allocate this first time
+    variables = [ r_r, c_r, p_r, e_x, r_g, c_x ]
+
+    IF ( PRESENT ( string ) ) THEN ! Output required
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       CALL write_variables ( output_unit, variables(4:5) ) ! Not acceptance ratios or heat capacity
     END IF
 
   END SUBROUTINE calculate

@@ -5,7 +5,7 @@ PROGRAM qmc_walk_sho
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE averages_module, ONLY : time_stamp
-  USE maths_module,  ONLY : random_normal
+  USE maths_module,    ONLY : random_normal
 
   IMPLICIT NONE
 

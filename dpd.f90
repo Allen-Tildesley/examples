@@ -5,7 +5,7 @@ PROGRAM dpd
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE maths_module,     ONLY : lowercase
   USE dpd_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       force, lowe, shardlow, r, v, f, n, potential_type
@@ -30,27 +30,21 @@ PROGRAM dpd
   ! has temperature kT=1, density rho=3, noise level sigma=3, gamma=sigma**2/(2*kT)=4.5
   ! and force strength parameter a=25 (more generally 75*kT/rho).
   ! We recommend a somewhat smaller timestep than their 0.04.
-  ! They also give the approximate pressure as rho*kT + alpha*a*rho**2 where alpha=0.101
-  ! and this value is written out at the end for comparison
+  ! They also give an approximate expression for the pressure, written out at the end for comparison
 
   ! Most important variables
   REAL :: box         ! Box length
-  REAL :: density     ! Density
+  REAL :: rho         ! Density
   REAL :: a           ! Force strength parameter
   REAL :: dt          ! Time step
   REAL :: gamma       ! Thermalization rate (inverse time)
   REAL :: temperature ! Temperature (specified)
 
   ! Quantities to be averaged
-  REAL :: p   ! Pressure
-  REAL :: e   ! Internal energy per atom
-  REAL :: t_k ! Kinetic temperature
-  REAL :: t_c ! Configurational temperature
+  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & vir & lap variables
   TYPE(potential_type) :: total
-
-  REAL, PARAMETER :: alpha = 0.101 ! constant in approximate equation of state
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
 
@@ -119,9 +113,9 @@ PROGRAM dpd
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  density = REAL(n) / box**3
-  a       = a * temperature / density ! Scale force strength accordingly
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',          density
+  rho = REAL(n) / box**3
+  a   = a * temperature / rho ! Scale force strength accordingly
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',          rho
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Force strength a', a
   CALL allocate_arrays ( box )
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
@@ -133,7 +127,7 @@ PROGRAM dpd
   CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( [ CHARACTER(len=15) :: 'E', 'T (kin)', 'T (con)', 'P' ] )
+  CALL run_begin ( output_unit, variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -152,7 +146,7 @@ PROGRAM dpd
 
         ! Calculate and accumulate quantities for this step
         CALL calculate ( )
-        CALL blk_add ( [ e, t_k, t_c, p ] )
+        CALL blk_add ( variables )
 
      END DO ! End loop over steps
 
@@ -169,9 +163,9 @@ PROGRAM dpd
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Approx EOS P = ', density*temperature+alpha*a*density**2
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Approx EOS P = ', p_eos ( )
 
-  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
+  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v ) ! Write out final configuration
 
   CALL deallocate_arrays
   CALL conclusion ( output_unit )
@@ -196,34 +190,67 @@ CONTAINS
   END SUBROUTINE drift_propagator
 
   SUBROUTINE calculate ( string )
+    USE averages_module, ONLY : write_variables
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
-    ! This routine calculates the properties of interest from total values
-    ! and optionally writes them out (e.g. at the start and end of the run)
+    ! This routine calculates all variables of interest and (optionally) writes them out
+    ! They are collected together in the variables array, for use in the main program
+
     ! The DPD potential is short ranged, zero at, and beyond, r_cut
     ! so issues of shifted potentials and long-range corrections do not arise
 
-    REAL :: kin
+    TYPE(variable_type) :: p_f, e_f, t_k, t_c
+    REAL                :: kin, fsq, vol
 
-    kin = 0.5*SUM(v**2)
-    t_k = 2.0 * kin / REAL ( 3*(n-1) )
+    ! Preliminary calculations
+    kin = 0.5*SUM(v**2) ! Total kinetic energy
+    fsq = SUM(f**2)     ! Total squared force
+    vol = box**3        ! Volume
 
-    e = ( total%pot + kin ) / REAL ( n ) ! total%pot is the total PE
+    ! Variables of interest, of type variable_type, containing three components:
+    !   %val: the instantaneous value
+    !   %nam: used for headings
+    !   %msd: indicating if mean squared deviation required
+    ! If not set below, %msd adopts its default value of .false.
+    ! The %msd and %nam components need only be defined once, at the start of the program,
+    ! but for clarity and readability we assign all the values together below
 
-    p = density * temperature + total%vir / box**3 ! total%vir is the total virial
+    ! Kinetic temperature
+    ! Momentum is conserved, hence 3N-3 degrees of freedom
+    t_k = variable_type ( nam = 'T (kin)', val = 2.0*kin/REAL(3*n-3) )
 
-    t_c = SUM(f**2) / total%lap ! total%lap is the total Laplacian
+    ! Internal energy per atom
+    ! Total KE plus total PE divided N
+    e_f = variable_type ( nam = 'E/N', val = (kin+total%pot)/REAL(n) )
+
+    ! Pressure
+    ! Ideal gas part plus total virial divided by V
+    p_f = variable_type ( nam = 'P', val = rho*temperature + total%vir/vol )
+
+    ! Configurational temperature
+    ! Total squared force divided by total Laplacian
+    t_c = variable_type ( nam = 'T (con)', val = fsq/total%lap )
+
+    ! Collect together for averaging
+    ! Fortran 2003 should automatically allocate this first time
+    variables = [ e_f, t_k, t_c, p_f ]
 
     IF ( PRESENT ( string ) ) THEN ! Output required
-       WRITE ( unit=output_unit, fmt='(a)'           ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E',       e
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)', t_k
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)', t_c
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P',       p
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       CALL write_variables ( output_unit, variables )
     END IF
 
   END SUBROUTINE calculate
+
+  FUNCTION p_eos ( )
+    REAL :: p_eos ! Returns approximate equation of state
+
+    REAL, PARAMETER :: alpha = 0.101
+
+    p_eos = rho * temperature + alpha * a * rho**2
+
+  END FUNCTION p_eos
 
 END PROGRAM dpd
 

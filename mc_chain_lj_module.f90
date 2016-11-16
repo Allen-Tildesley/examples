@@ -52,6 +52,13 @@ CONTAINS
     IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
+    ! This model, specifically its collapse behaviour, is discussed in detail by
+    ! F Calvo, JPK Doye, DJ Wales, J Chem Phys 116, 2642 (2002)
+    ! A similar model, with rigid bond lengths, is discussed by
+    ! A Irback, E Sandelin, J Chem Phys 110, 12256 (1999)
+    ! Both types of model are also studied by
+    ! P Grassberger, R Hegger, J Phys Cond Matt 7, 3089 (1995)
+    
     WRITE ( unit=output_unit, fmt='(a)' ) 'LJ chain, no cutoff, no shift'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'   
     WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1'   
@@ -119,7 +126,7 @@ CONTAINS
 
     std   = SQRT(temperature/k_spring) ! Spring bond standard deviation
     d_max = 3.0*std                    ! Impose a limit on variation, say 3*std
-    IF ( d_max > 0.5*bond ) THEN       ! must not be too large, say 0.5*bond
+    IF ( d_max > 0.5*bond ) THEN       ! Must not be too large, say 0.5*bond
        WRITE ( unit=error_unit, fmt='(a,2f15.5)' ) 'Spring bond strength error', d_max, bond
        STOP 'Error in regrow'
     END IF
@@ -272,7 +279,7 @@ CONTAINS
     TYPE(potential_type) :: partial
     INTEGER              :: i
 
-    IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
+    IF ( n > SIZE(r,dim=2) ) THEN ! Should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
        STOP 'Impossible error in potential'
     END IF
@@ -305,7 +312,7 @@ CONTAINS
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
     ! The optional argument j_range restricts partner indices to j>i, or j<i
 
-    ! Coordinates are assumed to be in LJ units where sigma = 1, no periodic boundaries
+    ! Coordinates are assumed to be in LJ units where sigma = 1, no box, no periodic boundaries
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
     INTEGER              :: j, j1, j2
@@ -368,9 +375,9 @@ CONTAINS
   FUNCTION random_bond ( b, std, d_max ) RESULT ( d )
     USE maths_module, ONLY : random_normal
     IMPLICIT NONE
-    REAL             :: d     ! Returns random bond length, generated around a
+    REAL             :: d     ! Returns random bond length, generated around
     REAL, INTENT(in) :: b     ! specified mean bond length, Gaussian-distributed with
-    REAL, INTENT(in) :: std   ! specified standard deviation, but subject to a
+    REAL, INTENT(in) :: std   ! specified standard deviation, but subject to
     REAL, INTENT(in) :: d_max ! maximum allowed value of d
 
     ! Uses von Neumann's rejection method to sample (d**2)*exp(-0.5*(d-b)**2/std**2)

@@ -14,15 +14,15 @@ MODULE mc_module
   REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! Positions (3,n)
 
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! j-range options
-  REAL,    PARAMETER :: sigma = 1.0     ! Hard-sphere diameter (unit of length)
 
 CONTAINS
 
   SUBROUTINE introduction ( output_unit )
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
-    WRITE ( unit=output_unit, fmt='(a)'           ) 'Hard sphere potential'
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ', sigma    
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Hard sphere potential'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'   
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Energy, kT = 1'   
   END SUBROUTINE introduction
   
   SUBROUTINE conclusion ( output_unit )

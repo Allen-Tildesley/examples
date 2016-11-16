@@ -5,7 +5,7 @@ PROGRAM md_nvt_lj
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE maths_module,     ONLY : random_normals
-  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add
+  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       force, r, v, f, n, potential_type
 
@@ -33,26 +33,19 @@ PROGRAM md_nvt_lj
 
   ! Most important variables
   REAL :: box         ! Box length
-  REAL :: density     ! Density
   REAL :: dt          ! Time step
   REAL :: r_cut       ! Potential cutoff distance
   REAL :: temperature ! Specified temperature
   REAL :: g           ! Number of degrees of freedom
   REAL :: tau         ! Thermostat time scale
 
-  INTEGER, PARAMETER    :: m = 3 ! number of Nose-Hoover chain variables
-  REAL,    DIMENSION(m) :: q     ! thermal inertias
-  REAL,    DIMENSION(m) :: eta   ! thermal coordinates (needed only to calculate conserved quantity)
-  REAL,    DIMENSION(m) :: p_eta ! thermal momenta
+  INTEGER, PARAMETER    :: m = 3 ! Number of Nose-Hoover chain variables
+  REAL,    DIMENSION(m) :: q     ! Thermal inertias
+  REAL,    DIMENSION(m) :: eta   ! Thermal coordinates (needed only to calculate conserved quantity)
+  REAL,    DIMENSION(m) :: p_eta ! Thermal momenta
 
   ! Quantities to be averaged
-  REAL :: en_s    ! Internal energy (cut-and-shifted ) per atom
-  REAL :: p_s     ! Pressure (cut-and-shifted)
-  REAL :: en_f    ! Internal energy (full, including LRC) per atom
-  REAL :: p_f     ! Pressure (full, including LRC)
-  REAL :: tk      ! Kinetic temperature
-  REAL :: tc      ! Configurational temperature
-  REAL :: cn      ! Conserved energy-like quantity per atom
+  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & cut & vir & lap & ovr variables
   TYPE(potential_type) :: total
@@ -79,8 +72,8 @@ PROGRAM md_nvt_lj
   temperature = 0.7 ! specified temperature
   tau         = 2.0 ! desired thermostat timescale
 
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Nose-Hoover chains with m = ', m
-
+  ! Read run parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
@@ -89,22 +82,21 @@ PROGRAM md_nvt_lj
      STOP 'Error in md_nvt_lj'
   END IF
 
+  ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Specified temperature',     temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Nose-Hoover chain length ', m
 
+  ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
-
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
   CALL allocate_arrays ( box, r_cut )
-
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
-
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
@@ -125,8 +117,8 @@ PROGRAM md_nvt_lj
   END IF
   CALL calculate ( 'Initial values' )
 
-  CALL run_begin ( [ CHARACTER(len=15) :: 'E/N (cut&shift)', 'P (cut&shift)', &
-       &            'E/N (full)', 'P (full)',  'T (kin)', 'T (con)', 'Cons/N' ] )
+  ! Initialize arrays for averaging and write column headings
+  CALL run_begin ( output_unit, variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -134,9 +126,9 @@ PROGRAM md_nvt_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        CALL u4_propagator ( dt/4.0, m, 1 )
+        CALL u4_propagator ( dt/4.0, m, 1 ) ! Inwards order
         CALL u3_propagator ( dt/2.0 )
-        CALL u4_propagator ( dt/4.0, 1, m )
+        CALL u4_propagator ( dt/4.0, 1, m ) ! Outwards order
 
         CALL u2_propagator ( dt/2.0 )
         CALL u1_propagator ( dt )
@@ -149,24 +141,23 @@ PROGRAM md_nvt_lj
 
         CALL u2_propagator ( dt/2.0 )
 
-        CALL u4_propagator ( dt/4.0, m, 1 )
+        CALL u4_propagator ( dt/4.0, m, 1 ) ! Inwards order
         CALL u3_propagator ( dt/2.0 )
-        CALL u4_propagator ( dt/4.0, 1, m )
+        CALL u4_propagator ( dt/4.0, 1, m ) ! Outwards order
 
+        ! Calculate and accumulate variables for this step
         CALL calculate ( )
-
-        ! Calculate all variables for this step
-        CALL blk_add ( [en_s,p_s,en_f,p_f,tk,tc,cn] )
+        CALL blk_add ( variables )
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! save configuration
+     CALL blk_end ( blk, output_unit )                              ! Output block averages
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! Number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! Save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit )
+  CALL run_end ( output_unit ) ! Output run averages
 
   CALL force ( box, r_cut, total )
   IF ( total%ovr ) THEN ! should never happen
@@ -176,7 +167,7 @@ PROGRAM md_nvt_lj
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
-  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
+  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v ) ! Write out final configuration
 
   CALL deallocate_arrays
   CALL conclusion ( output_unit )
@@ -255,39 +246,66 @@ CONTAINS
   END SUBROUTINE u4_propagator
 
   SUBROUTINE calculate ( string )
-    USE md_module, ONLY : potential_lrc, pressure_lrc
+    USE md_module,       ONLY : potential_lrc, pressure_lrc
+    USE averages_module, ONLY : write_variables
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
-    ! This routine calculates variables of interest and (optionally) writes them out
+    ! This routine calculates all variables of interest and (optionally) writes them out
+    ! They are collected together in the variables array, for use in the main program
 
-    REAL :: kin
+    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, conserved
+    REAL                :: vol, rho, kin, fsq, ext
 
-    kin = 0.5*SUM(v**2)
-    tk  = 2.0 * kin / g
+    ! Preliminary calculations
+    vol = box**3        ! Volume
+    rho = REAL(n) / vol ! Density
+    kin = 0.5*SUM(v**2) ! Kinetic energy
+    fsq = SUM(f**2)     ! Total squared force
+    ext = SUM(0.5*p_eta**2/q) + temperature * ( g*eta(1) + SUM(eta(2:m)) ) ! Extra terms for conserved variable
 
-    en_s = ( total%pot + kin ) / REAL ( n )        ! total%pot is the total cut-and-shifted PE
-    en_f = ( total%cut + kin ) / REAL ( n )        ! total%cut is the total cut (but not shifted) PE
-    en_f = en_f + potential_lrc ( density, r_cut ) ! Add LRC
-    
-    p_s  = density * temperature + total%vir / box**3 ! total%vir is the total virial
-    p_f  = p_s + pressure_lrc ( density, r_cut )      ! Add LRC
+    ! Variables of interest, of type variable_type, containing three components:
+    !   %val: the instantaneous value
+    !   %nam: used for headings
+    !   %msd: indicating if mean squared deviation required
+    ! If not set below, %msd adopts its default value of .false.
+    ! The %msd and %nam components need only be defined once, at the start of the program,
+    ! but for clarity and readability we assign all the values together below
 
-    tc = SUM(f**2) / total%lap ! total%lap is the total Laplacian
+    ! Internal energy (cut-and-shifted ) per atom
+    ! Total KE plus total cut-and-shifted PE divided by N
+    e_s = variable_type ( nam = 'E/N (cut&shift)', val = (kin+total%pot)/REAL(n) )
 
-    cn = total%pot + kin + SUM(0.5*p_eta**2/q)
-    cn = cn + temperature * ( g*eta(1) + SUM(eta(2:m)) )
-    cn = cn / REAL(n)
+    ! Internal energy (full, including LRC) per atom
+    ! LRC plus total KE plus total cut (but not shifted) PE divided by N
+    e_f = variable_type ( nam = 'E/N (full)', val = potential_lrc(rho,r_cut) + (kin+total%cut)/REAL(n) )
+
+    ! Pressure (cut-and-shifted)
+    ! Ideal gas contribution plus total virial divided by V
+    p_s = variable_type ( nam = 'P (cut&shift)', val = rho*temperature + total%vir/vol )
+
+    ! Pressure (full, including LRC)
+    ! LRC plus ideal gas contribution plus total virial divided by V
+    p_f = variable_type ( nam = 'P (full)', val = pressure_lrc(rho,r_cut) + rho*temperature + total%vir/vol )
+
+    ! Kinetic temperature
+    t_k = variable_type ( nam = 'T (kin)', val = 2.0*kin/g )
+
+    ! Configurational temperature
+    ! Total squared force divided by total Laplacian
+    t_c = variable_type ( nam = 'T (con)', val = fsq/total%lap )
+
+    ! Conserved energy-like quantity per atom
+    ! Energy plus extra terms defined above
+    conserved = variable_type ( nam = 'Cons/N', val = (kin+total%pot+ext)/REAL(n) )
+
+    ! Collect together for averaging
+    ! Fortran 2003 should automatically allocate this first time
+    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, conserved ]
 
     IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)'           ) string
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (cut&shift)', en_s
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (cut&shift)',   p_s
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'E/N (full)',      en_f
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'P (full)',        p_f
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (kin)',         tk
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'T (con)',         tc
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Cons/N',          cn
+       WRITE ( unit=output_unit, fmt='(a)' ) string
+       CALL write_variables ( output_unit, variables )
     END IF
 
   END SUBROUTINE calculate
