@@ -71,32 +71,37 @@ cs: cut-and-shifted      |  1.0 | 0.578 | 0.062
 For Lennard-Jones, the state point (&rho; = 0.75 and _T_ =1.0)
 lies in the liquid region of the phase diagram for all these variants of the model.
 
-For comparison with MD runs, a wide range of simulation data for LJ with
-_Rc_ = 2.5  &sigma; (cut-and-shifted, denoted cs below) is summarized by
+Approximate equations of state for the full LJ potential have been presented by
 
-* M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)
-
-who present data (in Supplementary Information) and a fitted approximate
-equation of state (which they also provide as a C++ program).
-
-Approximate equations of state for the full LJ potential are available from
-
+* JK Johnson, JA Zollweg, KE Gubbins, _Mol Phys_, __78,__ 591 (1993)
 * J Kolafa and I Nezbeda, _Fluid Phase Equil,_ __100,__ 1 (1994)
 * M Mecke, A Muller, J Winkelmann, J Vrabec, J Fischer, R Span, W Wagner,
 _Int J Thermophys,_ __17,__ 391 (1996) and __19,__ 1493(E) (1998)
 
-Below we use the Kolafa & Nezbeda formulae (denoted f) and estimate the results
-for the cut-but-not-shifted potential (denoted c) using the same corrections as in the MC codes.
+For testing our programs we used the more recent fitted equations of state presented by
+* M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)
+* M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, _J Phys Chem Ref Data,_ __45,__ 023101 (2016)
+for both the cut-and-shifted potential (denoted cs below), at _Rc_ = 2.5  &sigma;,
+and the full potential (denoted f).
+We estimate the results for the cut (but not shifted) potential (denoted c),
+again at _Rc_ = 2.5  &sigma;,
+from the full potential (f) results using the same LRC and delta corrections as in the MC codes.
 The formulae are implemented in the supplied program `eos_lj`.
+For completeness, note that Thol et al also supply C++ programs, and tables of data,
+in the Supplementary Information associated with their papers.
 
 Here we compare with typical test runs from our programs using default parameters except where stated.
-Note that _E_ is the total internal energy per atom, including the ideal gas part.
+Note that _E_ is the total internal energy per atom, including the ideal gas part,
+and that _Cv_ and _P_ likewise include the ideal gas contributions.
+The value of _Cv_ (c) should be equal to the value for the full potential,
+since the energy LRC is independent of temperature. 
 
-Source           | &rho;   | _T_     | _E_ (cs) | _P_ (cs) | _E_ (c) | _P_ (c) | _E_ (f)  | _P_ (f) |
-------           | ------- | ------- | -------- | -------- | ------- | ------- | -------  | ------- |
-Thol et al       |   0.75  |   1.00  | -2.9280  | 0.9909   |         |         |          |         |
-Kolafa & Nezbeda |   0.75  |   1.00  |          |          | -3.3172 | 0.6951  | -3.7188  | 0.3939  |
-`bd_nvt_lj`      |   0.75  |   1.00  | -2.93(1) | 0.98(2)  |         |         | -3.73(1) | 0.38(2) |
+Source           | &rho;   | _T_     | _E_ (cs) | _P_ (cs) | _Cv_ (cs) | _E_ (c) | _P_ (c) | _E_ (f)  | _P_ (f) | _Cv_ (f) |
+------           | ------- | ------- | -------- | -------- | --------- | ------- | ------- | -------  | ------- | -------- |
+Thol et al (2015)|   0.75  |   1.00  | -2.9286  | 0.9897   |  2.2787   |         |         |          |         |          |
+Estimated from f |   0.75  |   1.00  |          |          |           | -3.3197 | 0.7008  |          |         |          |
+Thol et al (2016)|   0.75  |   1.00  |          |          |           |         |         | -3.7212  | 0.3996  |  2.2630  |
+`bd_nvt_lj`      |   0.75  |   1.00  | -2.93(1) | 0.98(2)  |           |         |         | -3.73(1) | 0.38(2) |          |
 
 #Brownian dynamics program
 The program `bd_nvt_lj` carries out a Brownian dynamics simulation for a set of atoms
