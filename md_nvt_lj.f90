@@ -66,10 +66,10 @@ PROGRAM md_nvt_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 1000
+  nstep       = 50000
   r_cut       = 2.5
   dt          = 0.002
-  temperature = 0.7 ! specified temperature
+  temperature = 1.0 ! specified temperature
   tau         = 2.0 ! desired thermostat timescale
 
   ! Read run parameters from namelist
@@ -254,7 +254,7 @@ CONTAINS
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
 
-    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, conserved
+    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, conserved, c_s, c_f, conserved_msd
     REAL                :: vol, rho, kin, fsq, ext
 
     ! Preliminary calculations
@@ -299,13 +299,25 @@ CONTAINS
     ! Energy plus extra terms defined above
     conserved = variable_type ( nam = 'Cons/N', val = (kin+total%pot+ext)/REAL(n) )
 
+    ! Heat capacity (cut-and-shifted)
+    ! Total energy divided by temperature and sqrt(N) to make result intensive
+    c_s = variable_type ( nam = 'Cv/N (cut&shift)', val = (kin+total%pot)/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+
+    ! Heat capacity (full)
+    ! Total energy divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
+    c_f = variable_type ( nam = 'Cv/N (full)', val = (kin+total%cut)/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+
+    ! Mean-squared deviation of conserved energy-like quantity
+    ! Energy plus extra terms defined above
+    conserved_msd = variable_type ( nam = 'Cons (MSD)', val = kin+total%pot+ext, msd = .TRUE. )
+
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, conserved ]
+    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, conserved, c_s, c_f, conserved_msd ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables )
+       CALL write_variables ( output_unit, variables(1:7) ) ! Don't write out MSD variables
     END IF
 
   END SUBROUTINE calculate

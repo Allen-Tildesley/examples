@@ -98,13 +98,14 @@ and that _Cv_ and _P_ likewise include the ideal gas contributions.
 The value of _Cv_ (c) should be equal to the value for the full potential,
 since the energy LRC is independent of temperature.
 
-Source             | &rho;   | _T_     | _E_ (cs)  | _P_ (cs) | _Cv_ (cs) | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)  | _Cv_ (f) |
-------             | ------- | ------- | --------  | -------- | --------- | -------   | -------  | -------   | -------  | -------- |
-Thol et al (2015)  |   0.75  |   1.00  | -2.9286   | 0.9897   |  2.2787   |           |          |           |          |          |
-Thol et al (2016)  |   0.75  |   1.00  |           |          |           |           |          | -3.7212   | 0.3996   |  2.2630  |
-Estimated from (f) |   0.75  |   1.00  |           |          |           | -3.3197   | 0.7008   |           |          |          |
-`bd_nvt_lj`        |   0.75  |   1.00  | -2.925(3) | 0.980(5) |  2.36(8)  |           |          | -3.725(3) | 0.379(5) |  2.37(8) |
-`mc_nvt_lj`        |   0.75  |   1.00  |           |          |           | -3.332(1) | 0.651(3) | -3.734(1) | 0.350(3) |  2.28(1) |
+Source             | &rho;   | _T_     | _E_ (cs)  | _P_ (cs) | _Cv_ (cs) | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)  | _Cv_ (f)  |
+------             | ------- | ------- | --------  | -------- | --------- | -------   | -------  | -------   | -------  | --------  |
+Thol et al (2015)  |   0.75  |   1.00  | -2.9286   | 0.9897   |  2.2787   |           |          |           |          |           |
+Thol et al (2016)  |   0.75  |   1.00  |           |          |           |           |          | -3.7212   | 0.3996   |  2.2630   |
+Estimated from (f) |   0.75  |   1.00  |           |          |           | -3.3197   | 0.7008   |           |          |           |
+`bd_nvt_lj`        |   0.75  |   1.00  | -2.925(3) | 0.980(5) |  2.36(8)  |           |          | -3.725(3) | 0.379(5) |  2.37(8)  | 
+`mc_nvt_lj`        |   0.75  |   1.00  |           |          |           | -3.332(1) | 0.651(3) | -3.734(1) | 0.350(3) |  2.28(1)  |
+`md_nvt_lj`        |   0.75  |   1.00  | -2.993(3) | 0.965(6) |  2.08(11) |           |          | -3.733(3) | 0.363(6) |  2.09(12) |
 
 #Brownian dynamics program
 The program `bd_nvt_lj` carries out a Brownian dynamics simulation for a set of atoms
