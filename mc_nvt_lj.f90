@@ -60,8 +60,8 @@ PROGRAM mc_nvt_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 1000
-  temperature = 0.7
+  nstep       = 10000
+  temperature = 1.0
   r_cut       = 2.5
   dr_max      = 0.15
 
@@ -189,7 +189,7 @@ CONTAINS
     ! estimates of < e_f > and < p_f > for the full (uncut) potential
     ! The value of the cut-and-shifted potential is not used, in this example
 
-    TYPE(variable_type) :: m_r, e_c, p_c, e_f, p_f, t_c
+    TYPE(variable_type) :: m_r, e_c, p_c, e_f, p_f, t_c, c_f
     REAL                :: vol, rho, fsq
 
     ! Preliminary calculations
@@ -233,13 +233,17 @@ CONTAINS
     ! Total squared force divided by total Laplacian
     t_c = variable_type ( nam = 'T (con)', val = fsq/total%lap )
 
+    ! Heat capacity (excess, full)
+    ! Total potential energy divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
+    c_f = variable_type ( nam = 'Cv(ex)/N (full)', val = total%pot/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ m_r, e_c, p_c, e_f, p_f, t_c ]
+    variables = [ m_r, e_c, p_c, e_f, p_f, t_c, c_f ]
 
     IF ( PRESENT ( string ) ) THEN ! Output required
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(2:) ) ! Don't write out move ratio
+       CALL write_variables ( output_unit, variables(2:6) ) ! Don't write out move ratio or heat capacity variable
     END IF
 
   END SUBROUTINE calculate
