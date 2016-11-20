@@ -13,11 +13,12 @@ MODULE averages_module
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add, time_stamp, write_variables
 
   ! Private data
-  INTEGER,           PARAMETER :: col_width = 15              ! Must be large enough to allow sensible format
-  CHARACTER(len=13), PARAMETER :: colf_fmt  = '(*(1x,f15.5))' ! Format for floats; we assume that 5 dp will be sufficient
-  CHARACTER(len=11), PARAMETER :: cola_fmt  = '(*(1x,a15))'   ! Format for strings
-  CHARACTER(len=5),  PARAMETER :: col1a_fmt = '(a15)'         ! Format for column 1 strings
-  CHARACTER(len=5),  parameter :: col1i_fmt = '(i15)'         ! Format for column 1 integers
+  INTEGER,          PARAMETER :: col_width = 18               ! Must be large enough to allow sensible format
+  CHARACTER(len=*), PARAMETER :: colf_fmt  = '(*(1x,f18.6))'  ! Format for floats; we assume that 6 dp will be sufficient
+  CHARACTER(len=*), PARAMETER :: cola_fmt  = '(*(1x,a18))'    ! Format for strings
+  CHARACTER(len=*), PARAMETER :: col1a_fmt = '(a18)'          ! Format for column 1 strings
+  CHARACTER(len=*), PARAMETER :: col1i_fmt = '(i18)'          ! Format for column 1 integers
+  CHARACTER(len=*), PARAMETER :: line_fmt  = '(a18,5x,f18.6)' ! Format for single line output
 
   INTEGER,                                             SAVE :: n_avg, line_width
   CHARACTER(len=col_width), DIMENSION(:), ALLOCATABLE, SAVE :: headings
@@ -27,9 +28,9 @@ MODULE averages_module
 
   ! Public derived type for variables to average
   TYPE, PUBLIC :: variable_type
-     CHARACTER(len=col_width) :: nam ! Name to be used in headings
-     REAL                     :: val ! Instantaneous value to be averaged
-     LOGICAL                  :: msd = .false. ! Flag indicating mean square difference required
+     CHARACTER(len=col_width) :: nam           ! Name to be used in headings
+     REAL                     :: val           ! Instantaneous value to be averaged
+     LOGICAL                  :: msd = .FALSE. ! Flag indicating if mean square difference required
   END TYPE variable_type
 
 CONTAINS
@@ -188,7 +189,7 @@ CONTAINS
     INTEGER :: i
 
     DO i = 1, SIZE(variables)
-       WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) variables(i)%nam, variables(i)%val
+       WRITE ( unit=output_unit, fmt=line_fmt ) variables(i)%nam, variables(i)%val
     END DO
 
   END SUBROUTINE write_variables

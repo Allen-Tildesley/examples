@@ -62,7 +62,7 @@ PROGRAM bd_nvt_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 5000
+  nstep       = 50000
   r_cut       = 2.5
   dt          = 0.002
   gamma       = 1.0
@@ -211,7 +211,7 @@ CONTAINS
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
 
-    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c
+    TYPE(variable_type) :: e_s, p_s, c_s, e_f, p_f, c_f, t_k, t_c
     REAL                :: kin, fsq, vol, rho
 
     ! Preliminary calculations
@@ -251,14 +251,22 @@ CONTAINS
     ! Configurational temperature
     ! Total squared force divided by total Laplacian
     t_c = variable_type ( nam = 'T (con)', val = fsq/total%lap )
-    
+
+    ! Heat capacity (cut-and-shifted)
+    ! Total energy divided by temperature and sqrt(N) to make result intensive
+    c_s = variable_type ( nam = 'Cv/N (cut&shift)', val = (kin+total%pot)/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+
+    ! Heat capacity (full)
+    ! Total energy divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
+    c_f = variable_type ( nam = 'Cv/N (full)', val = (kin+total%cut)/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c ]
+    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, c_s, c_f ]
     
     IF ( PRESENT ( string ) ) THEN ! Output required
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables )
+       CALL write_variables ( output_unit, variables(1:6) ) ! Don't write heat capacity variables
     END IF
 
   END SUBROUTINE calculate

@@ -79,8 +79,10 @@ Approximate equations of state for the full LJ potential have been presented by
 _Int J Thermophys,_ __17,__ 391 (1996) and __19,__ 1493(E) (1998)
 
 For testing our programs we used the more recent fitted equations of state presented by
+
 * M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)
 * M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, _J Phys Chem Ref Data,_ __45,__ 023101 (2016)
+
 for both the cut-and-shifted potential (denoted cs below), at _Rc_ = 2.5  &sigma;,
 and the full potential (denoted f).
 We estimate the results for the cut (but not shifted) potential (denoted c),
@@ -94,14 +96,14 @@ Here we compare with typical test runs from our programs using default parameter
 Note that _E_ is the total internal energy per atom, including the ideal gas part,
 and that _Cv_ and _P_ likewise include the ideal gas contributions.
 The value of _Cv_ (c) should be equal to the value for the full potential,
-since the energy LRC is independent of temperature. 
+since the energy LRC is independent of temperature.
 
-Source           | &rho;   | _T_     | _E_ (cs) | _P_ (cs) | _Cv_ (cs) | _E_ (c) | _P_ (c) | _E_ (f)  | _P_ (f) | _Cv_ (f) |
-------           | ------- | ------- | -------- | -------- | --------- | ------- | ------- | -------  | ------- | -------- |
-Thol et al (2015)|   0.75  |   1.00  | -2.9286  | 0.9897   |  2.2787   |         |         |          |         |          |
-Estimated from f |   0.75  |   1.00  |          |          |           | -3.3197 | 0.7008  |          |         |          |
-Thol et al (2016)|   0.75  |   1.00  |          |          |           |         |         | -3.7212  | 0.3996  |  2.2630  |
-`bd_nvt_lj`      |   0.75  |   1.00  | -2.93(1) | 0.98(2)  |           |         |         | -3.73(1) | 0.38(2) |          |
+Source             | &rho;   | _T_     | _E_ (cs)  | _P_ (cs) | _Cv_ (cs) | _E_ (c) | _P_ (c) | _E_ (f)   | _P_ (f)  | _Cv_ (f) |
+------             | ------- | ------- | --------  | -------- | --------- | ------- | ------- | -------   | -------  | -------- |
+Thol et al (2015)  |   0.75  |   1.00  | -2.9286   | 0.9897   |  2.2787   |         |         |           |          |          |
+Thol et al (2016)  |   0.75  |   1.00  |           |          |           |         |         | -3.7212   | 0.3996   |  2.2630  |
+Estimated from (f) |   0.75  |   1.00  |           |          |           | -3.3197 | 0.7008  |           |          |          |
+`bd_nvt_lj`        |   0.75  |   1.00  | -2.925(3) | 0.980(5) |  2.36(8)  |         |         | -3.725(3) | 0.379(5) |  2.37(8) |
 
 #Brownian dynamics program
 The program `bd_nvt_lj` carries out a Brownian dynamics simulation for a set of atoms
