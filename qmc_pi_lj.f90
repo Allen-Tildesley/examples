@@ -244,22 +244,22 @@ CONTAINS
     ! Acceptance ratio of moves
 
     IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
+       m_r = variable_type ( nam = 'Move:ratio', val = 0.0 )
     ELSE
-       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
+       m_r = variable_type ( nam = 'Move:ratio', val = m_ratio )
     END IF
 
     ! Internal energy per atom for simulated, cut, potential
     ! Total (cut but not shifted) PE already divided by factor P
     ! plus total classical KE for NP-atom system MINUS total spring potential
     ! all divided by N
-    e_c = variable_type ( nam = 'E/N (cut)', val = (kin+total%pot-total_spr)/REAL(n) )
+    e_c = variable_type ( nam = 'E/N:cut', val = (kin+total%pot-total_spr)/REAL(n) )
 
     ! Internal energy per atom for full potential with LRC
     ! LRC plus total (cut but not shifted) PE already divided by factor P
     ! plus total classical KE for NP-atom system MINUS total spring potential
     ! all divided by N
-    e_f = variable_type ( nam = 'E/N (full)', val = potential_lrc(rho,r_cut) + (kin+total%pot-total_spr)/REAL(n) )
+    e_f = variable_type ( nam = 'E/N:full', val = potential_lrc(rho,r_cut) + (kin+total%pot-total_spr)/REAL(n) )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

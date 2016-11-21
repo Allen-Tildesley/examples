@@ -233,18 +233,18 @@ CONTAINS
     ! Acceptance ratios for regrowth, crankshaft, and pivot moves
 
     IF ( PRESENT ( string ) ) THEN ! The ratios are meaningless in this case
-       r_r = variable_type ( nam = 'Regrow ratio', val = 0.0 )
-       c_r = variable_type ( nam = 'Crank ratio',  val = 0.0 )
-       p_r = variable_type ( nam = 'Pivot ratio',  val = 0.0 )
+       r_r = variable_type ( nam = 'Regrow:ratio', val = 0.0 )
+       c_r = variable_type ( nam = 'Crank:ratio',  val = 0.0 )
+       p_r = variable_type ( nam = 'Pivot:ratio',  val = 0.0 )
     ELSE
-       r_r = variable_type ( nam = 'Regrow ratio', val = r_ratio )
-       c_r = variable_type ( nam = 'Crank ratio',  val = c_ratio )
-       p_r = variable_type ( nam = 'Pivot ratio',  val = p_ratio )
+       r_r = variable_type ( nam = 'Regrow:ratio', val = r_ratio )
+       c_r = variable_type ( nam = 'Crank:ratio',  val = c_ratio )
+       p_r = variable_type ( nam = 'Pivot:ratio',  val = p_ratio )
     END IF
 
     ! Total potential energy of system  (extensive, i.e. not divided by N)
     ! PE=negative of the number of square-well contacts
-    e_x = variable_type ( nam = 'PE', val = -REAL(q) )
+    e_x = variable_type ( nam = 'PE:whole chain', val = -REAL(q) )
 
     ! Radius of gyration
     r_g = variable_type ( nam = 'Rg', val = SQRT(rsq) )
@@ -252,7 +252,7 @@ CONTAINS
     ! Heat Capacity (excess, without ideal gas contribution, extensive)
     ! MSD of total PE / T
     ! PE=negative of the number of square-well contacts
-    c_x = variable_type ( nam = 'HeatCap (ex)', val = -REAL(q)/temperature, msd = .TRUE. )
+    c_x = variable_type ( nam = 'Cv (excess):whole chain', val = -REAL(q)/temperature, msd = .TRUE. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

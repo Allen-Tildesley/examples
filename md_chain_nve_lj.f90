@@ -44,7 +44,7 @@ PROGRAM md_chain_nve_lj
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
   CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
-  CHARACTER(len=10)           :: constraints
+  CHARACTER(len=30)           :: constraints
 
   ! Define procedure pointers with interfaces like those of rattle_a and rattle_b
   PROCEDURE(rattle_a), POINTER :: move_a => NULL()
@@ -80,11 +80,11 @@ PROGRAM md_chain_nve_lj
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
-  IF ( INDEX( lowercase(constraints), 'rattle' ) /= 0 ) THEN
+  IF ( INDEX( lowercase(constraints), 'ratt' ) /= 0 ) THEN
      move_a => rattle_a
      move_b => rattle_b
      WRITE ( unit=output_unit, fmt='(a)' ) 'RATTLE constraint method'
-  ELSE IF ( INDEX( lowercase(constraints), 'milcshake' ) /= 0 ) THEN
+  ELSE IF ( INDEX( lowercase(constraints), 'milc' ) /= 0 ) THEN
      move_a => milcshake_a
      move_b => milcshake_b
      WRITE ( unit=output_unit, fmt='(a)' ) 'MILCSHAKE constraint method'
@@ -192,7 +192,7 @@ CONTAINS
     ! Kinetic temperature
     ! Remove 6 degrees of freedom for conserved linear and angular momentum
     ! and also (n-1) degrees of freedom for the bond constraints
-    t_k = variable_type ( nam = 'T (kin)', val = 2.0*kin/REAL(3*n-(n-1)-6) )
+    t_k = variable_type ( nam = 'T:kinetic', val = 2.0*kin/REAL(3*n-(n-1)-6) )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

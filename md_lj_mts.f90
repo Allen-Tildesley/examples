@@ -277,27 +277,27 @@ CONTAINS
     ! but for clarity and readability we assign all the values together below
 
     ! Kinetic temperature
-    t_k = variable_type ( nam = 'T (kin)', val = tmp )
+    t_k = variable_type ( nam = 'T:kinetic', val = tmp )
 
     ! Internal energy (cut-and-shifted) per atom
     ! Total KE plus cut-and-shifted PE divided by N
-    e_s = variable_type ( nam = 'E/N (cut&shift)', val = (kin+pot)/REAL(n) ) 
+    e_s = variable_type ( nam = 'E/N:cut&shifted', val = (kin+pot)/REAL(n) ) 
 
     ! Internal energy (full, including LRC) per atom
     ! LRC plus total KE plus total cut (but not shifted) PE divided by N
-    e_f = variable_type ( nam = 'E/N (full)', val = potential_lrc(rho,r_cut(k_max)) + (kin+cut)/REAL(n) )
+    e_f = variable_type ( nam = 'E/N:full', val = potential_lrc(rho,r_cut(k_max)) + (kin+cut)/REAL(n) )
 
     ! Pressure (cut-and-shifted)
     ! Ideal gas contribution plus total virial divided by V
-    p_s = variable_type ( nam = 'P (cut&shift)', val = rho*tmp + vir/vol )
+    p_s = variable_type ( nam = 'P:cut&shifted', val = rho*tmp + vir/vol )
 
     ! Pressure (full, including LRC)
     ! LRC plus ideal gas contribution plus total virial divided by V
-    p_f = variable_type ( nam = 'P (full)', val = pressure_lrc(rho,r_cut(k_max)) + rho*tmp + vir/vol )
+    p_f = variable_type ( nam = 'P:full', val = pressure_lrc(rho,r_cut(k_max)) + rho*tmp + vir/vol )
 
     ! Configurational temperature
     ! Total squared force divided by Laplacian with small Hessian correction
-    t_c = variable_type ( nam = 'T (con)', val = fsq/(lap-2.0*(hes/fsq)) )
+    t_c = variable_type ( nam = 'T:config', val = fsq/(lap-2.0*(hes/fsq)) )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

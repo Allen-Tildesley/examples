@@ -6,7 +6,7 @@ PROGRAM smc_nvt_lj
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
-  USE maths_module,     ONLY : random_normals, metropolis
+  USE maths_module,     ONLY : random_normals, metropolis, lowercase
   USE smc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       force, force_1, r, r_old, zeta, v, move, n, potential_type
 
@@ -38,7 +38,7 @@ PROGRAM smc_nvt_lj
   REAL    :: temperature ! Temperature (specified)
   INTEGER :: move_mode   ! Selects single- or multi-atom moves
   REAL    :: fraction    ! Fraction of atoms to move in multi-atom move
-  REAL    :: dt          ! Time step
+  REAL    :: dt          ! Time step (effectively determines typical displacement)
   REAL    :: r_cut       ! Potential cutoff distance
 
   ! Quantities to be averaged
@@ -55,10 +55,11 @@ PROGRAM smc_nvt_lj
   CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
   CHARACTER(len=3), PARAMETER :: out_tag    = 'out'
   CHARACTER(len=3)            :: sav_tag    = 'sav' ! May be overwritten with block number
+  CHARACTER(len=30)           :: mode
 
   INTEGER, PARAMETER :: single_atom = 1, multi_atom = 2
 
-  NAMELIST /nml/ nblock, nstep, r_cut, dt, move_mode, temperature, fraction
+  NAMELIST /nml/ nblock, nstep, r_cut, dt, mode, temperature, fraction
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'smc_nvt_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Smart Monte Carlo, constant-NVT ensemble'
@@ -69,12 +70,12 @@ PROGRAM smc_nvt_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 1000
+  nstep       = 10000
   r_cut       = 2.5
-  dt          = 0.05
-  temperature = 0.7
-  move_mode   = 1
-  fraction    = 0.5
+  temperature = 1.0           ! Default temperature T
+  dt          = 0.1           ! Together with v_rms=sqrt(T) determines typical displacement
+  mode        = 'single-atom' ! Other option is 'multi-atom', probably requiring smaller dt
+  fraction    = 0.5           ! Only applicable in multi-atom mode
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -92,20 +93,23 @@ PROGRAM smc_nvt_lj
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',               temperature
-  IF ( move_mode == single_atom ) THEN
-     WRITE ( unit=output_unit, fmt='(a,t40,a)' ) 'Move mode is ', 'single-atom'
-  ELSE IF ( move_mode == multi_atom ) THEN
-     WRITE ( unit=output_unit, fmt='(a,t40,a)'     ) 'Move mode is ', 'multi-atom'
+  IF ( INDEX( lowercase(mode), 'sing' ) /= 0 ) THEN
+     move_mode = single_atom
+     WRITE ( unit=output_unit, fmt='(a,t40,a15)' ) 'Move mode is ', 'single-atom'
+  ELSE IF ( INDEX( lowercase(mode), 'mult' ) /= 0 ) THEN
+     move_mode = multi_atom
+     WRITE ( unit=output_unit, fmt='(a,t40,a15)'   ) 'Move mode is ', 'multi-atom'
      WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Fraction of atoms moving', fraction
      IF ( fraction < 0.0 .OR. fraction > 1.0 ) THEN
         WRITE ( unit=error_unit, fmt='(a)') 'Error: fraction out of range'
         STOP 'Error in smc_nvt_lj'
      END IF
   ELSE
-     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error: move_mode out of range', move_mode
+     WRITE ( unit=error_unit, fmt='(a,a)') 'Error: unrecognized move mode ', mode
      STOP 'Error in smc_nvt_lj'
   END IF
   v_rms = SQRT ( temperature ) ! RMS value for velocity selection
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Typical dr', v_rms*dt
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
@@ -261,7 +265,7 @@ CONTAINS
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
 
-    TYPE(variable_type) :: m_r, e_s, p_s, e_f, p_f, t_c
+    TYPE(variable_type) :: m_r, e_s, p_s, e_f, p_f, t_c, c_s, c_f
     REAL                :: vol, rho, fsq
 
     ! Preliminary calculations
@@ -280,38 +284,46 @@ CONTAINS
     ! Move acceptance ratio
 
     IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
+       m_r = variable_type ( nam = 'Move:ratio', val = 0.0 )
     ELSE
-       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
+       m_r = variable_type ( nam = 'Move:ratio', val = m_ratio )
     END IF
 
     ! Internal energy per atom for simulated, cut-and-shifted, potential
     ! Ideal gas contribution plus total cut-and-shifted PE divided by N
-    e_s = variable_type ( nam = 'E/N (cut&shift)', val = 1.5*temperature + total%pot/REAL(n) )
+    e_s = variable_type ( nam = 'E/N:cut&shifted', val = 1.5*temperature + total%pot/REAL(n) )
 
     ! Internal energy per atom for full potential with LRC
     ! LRC plus ideal gas contribution plus total cut (but not shifted) PE divided by N
-    e_f = variable_type ( nam = 'E/N (full)', val = potential_lrc(rho,r_cut) + 1.5*temperature + total%cut/REAL(n) )
+    e_f = variable_type ( nam = 'E/N:full', val = potential_lrc(rho,r_cut) + 1.5*temperature + total%cut/REAL(n) )
 
     ! Pressure for simulated, cut-and-shifted, potential
     ! Ideal gas contribution plus total virial divided by V
-    p_s = variable_type ( nam = 'P (cut&shift)', val = rho*temperature + total%vir/vol )
+    p_s = variable_type ( nam = 'P:cut&shifted', val = rho*temperature + total%vir/vol )
 
     ! Pressure for full potential with LRC
     ! LRC plus ideal gas contribution plus total virial divided by V
-    p_f = variable_type ( nam = 'P (full)', val = pressure_lrc(rho,r_cut) + rho*temperature + total%vir/vol )
+    p_f = variable_type ( nam = 'P:full', val = pressure_lrc(rho,r_cut) + rho*temperature + total%vir/vol )
 
     ! Configurational temperature
     ! Total squared force divided by total Laplacian
-    t_c = variable_type ( nam = 'T (con)', val = fsq/total%lap )
+    t_c = variable_type ( nam = 'T:config', val = fsq/total%lap )
+
+    ! Heat capacity (excess, cut-and-shifted)
+    ! Total PE divided by temperature and sqrt(N) to make result intensive
+    c_s = variable_type ( nam = 'Cv(ex)/N:cut&shifted', val = total%pot/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+
+    ! Heat capacity (excess, full)
+    ! Total PE divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
+    c_f = variable_type ( nam = 'Cv(ex)/N:full', val = total%cut/(temperature*SQRT(REAL(n))), msd = .TRUE. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ m_r, e_s, p_s, e_f, p_f, t_c ]
+    variables = [ m_r, e_s, p_s, e_f, p_f, t_c, c_s, c_f ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(2:) ) ! Don't write out move ratio
+       CALL write_variables ( output_unit, variables(2:6) ) ! Don't write out move ratio or MSD variables
     END IF
 
   END SUBROUTINE calculate

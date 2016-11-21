@@ -230,35 +230,35 @@ CONTAINS
 
     ! Internal energy (cut-and-shifted ) per atom
     ! Total KE plus cut-and-shifted PE divided by N
-    e_s = variable_type ( nam = 'E/N (cut&shift)', val = (kin+total%pot)/REAL(n) )
+    e_s = variable_type ( nam = 'E/N:cut&shifted', val = (kin+total%pot)/REAL(n) )
 
     ! Pressure (cut-and-shifted)
     ! Ideal gas part plus total virial divided by V
-    p_s = variable_type ( nam = 'P (cut&shift)', val = rho*temperature + total%vir/vol )
+    p_s = variable_type ( nam = 'P:cut&shifted', val = rho*temperature + total%vir/vol )
 
     ! Internal energy (full, including LRC) per atom
     ! LRC plus total KE plus cut (but not shifted) PE, divided by N
-    e_f = variable_type ( nam = 'E/N (full)', val = potential_lrc(rho,r_cut) + (kin+total%cut)/REAL(n) )
+    e_f = variable_type ( nam = 'E/N:full', val = potential_lrc(rho,r_cut) + (kin+total%cut)/REAL(n) )
 
     ! Pressure (full, including LRC)
     ! LRC + ideal gas part plus total virial divided by V plus LRC
-    p_f = variable_type ( nam = 'P (full)', val = pressure_lrc(rho,r_cut) + rho*temperature + total%vir/vol )
+    p_f = variable_type ( nam = 'P:full', val = pressure_lrc(rho,r_cut) + rho*temperature + total%vir/vol )
 
     ! Kinetic temperature
     ! Momentum is not conserved, hence 3N degrees of freedom
-    t_k = variable_type ( nam = 'T (kin)', val = 2.0*kin/REAL(3*n) )
+    t_k = variable_type ( nam = 'T:kinetic', val = 2.0*kin/REAL(3*n) )
 
     ! Configurational temperature
     ! Total squared force divided by total Laplacian
-    t_c = variable_type ( nam = 'T (con)', val = fsq/total%lap )
+    t_c = variable_type ( nam = 'T:config', val = fsq/total%lap )
 
     ! Heat capacity (cut-and-shifted)
     ! Total energy divided by temperature and sqrt(N) to make result intensive
-    c_s = variable_type ( nam = 'Cv/N (cut&shift)', val = (kin+total%pot)/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+    c_s = variable_type ( nam = 'Cv/N:cut&shifted', val = (kin+total%pot)/(temperature*SQRT(REAL(n))), msd = .TRUE. )
 
     ! Heat capacity (full)
     ! Total energy divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
-    c_f = variable_type ( nam = 'Cv/N (full)', val = (kin+total%cut)/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+    c_f = variable_type ( nam = 'Cv/N:full', val = (kin+total%cut)/(temperature*SQRT(REAL(n))), msd = .TRUE. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

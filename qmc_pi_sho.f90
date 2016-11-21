@@ -175,16 +175,16 @@ CONTAINS
     ! Move ratio
 
     IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
+       m_r = variable_type ( nam = 'Move:ratio', val = 0.0 )
     ELSE
-       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
+       m_r = variable_type ( nam = 'Move:ratio', val = m_ratio )
     END IF
 
     ! Classical potential energy
-    pe_cl = variable_type ( nam = 'Pot-classical', val = pot_cl )
+    pe_cl = variable_type ( nam = 'PE:classical', val = pot_cl )
 
     ! Quantum potential energy
-    pe_qu = variable_type ( nam = 'Pot-quantum', val = pot_qu )
+    pe_qu = variable_type ( nam = 'PE:quantum', val = pot_qu )
 
     ! Energy
     energy = variable_type ( nam = 'Energy', val = kin+pot_cl-pot_qu )

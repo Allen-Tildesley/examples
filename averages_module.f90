@@ -13,24 +13,24 @@ MODULE averages_module
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add, time_stamp, write_variables
 
   ! Private data
-  INTEGER,          PARAMETER :: col_width = 18               ! Must be large enough to allow sensible format
-  CHARACTER(len=*), PARAMETER :: colf_fmt  = '(*(1x,f18.6))'  ! Format for floats; we assume that 6 dp will be sufficient
-  CHARACTER(len=*), PARAMETER :: cola_fmt  = '(*(1x,a18))'    ! Format for strings
-  CHARACTER(len=*), PARAMETER :: col1a_fmt = '(a18)'          ! Format for column 1 strings
-  CHARACTER(len=*), PARAMETER :: col1i_fmt = '(i18)'          ! Format for column 1 integers
-  CHARACTER(len=*), PARAMETER :: line_fmt  = '(a18,5x,f18.6)' ! Format for single line output
+  INTEGER,          PARAMETER :: col_width = 15                ! Must be large enough to allow sensible format
+  CHARACTER(len=*), PARAMETER :: colf_fmt  = '(*(1x,f15.6))'   ! Format for floats; we assume that 6 dp will be sufficient
+  CHARACTER(len=*), PARAMETER :: cola_fmt  = '(*(1x,a15))'     ! Format for strings
+  CHARACTER(len=*), PARAMETER :: col1a_fmt = '(a15)'           ! Format for column 1 strings
+  CHARACTER(len=*), PARAMETER :: col1i_fmt = '(i15)'           ! Format for column 1 integers
+  CHARACTER(len=*), PARAMETER :: line_fmt  = '(a30,10x,f15.6)' ! Format for single line output
 
   INTEGER,                                             SAVE :: n_avg, line_width
-  CHARACTER(len=col_width), DIMENSION(:), ALLOCATABLE, SAVE :: headings
+  CHARACTER(len=col_width), DIMENSION(:), ALLOCATABLE, SAVE :: headings, subheads
   REAL,                     DIMENSION(:), ALLOCATABLE, SAVE :: blk_avg, blk_msd, run_avg, run_err
   LOGICAL,                  DIMENSION(:), ALLOCATABLE, SAVE :: msd
   REAL,                                                SAVE :: run_nrm, blk_nrm
 
   ! Public derived type for variables to average
   TYPE, PUBLIC :: variable_type
-     CHARACTER(len=col_width) :: nam           ! Name to be used in headings
-     REAL                     :: val           ! Instantaneous value to be averaged
-     LOGICAL                  :: msd = .FALSE. ! Flag indicating if mean square difference required
+     CHARACTER(len=2*col_width) :: nam           ! Name to be used in headings
+     REAL                       :: val           ! Instantaneous value to be averaged
+     LOGICAL                    :: msd = .FALSE. ! Flag indicating if mean square difference required
   END TYPE variable_type
 
 CONTAINS
@@ -58,11 +58,11 @@ CONTAINS
 
     ! Set up averaging variables based on supplied arrays of names & write headings
 
-    INTEGER :: i
+    INTEGER :: i, colon
 
     n_avg = SIZE ( variables ) ! Set the number of variables to average
 
-    ALLOCATE ( headings(n_avg) )
+    ALLOCATE ( headings(n_avg), subheads(n_avg) )
     ALLOCATE ( blk_avg(n_avg), blk_msd(n_avg) )
     ALLOCATE ( run_avg(n_avg), run_err(n_avg) )
     ALLOCATE ( msd(n_avg) )
@@ -71,9 +71,18 @@ CONTAINS
     line_width = col_width + n_avg * ( col_width + 1 )
 
     ! Store variable names locally in tidied-up format
-    headings = variables%nam
+    ! Attempt to split name string at colon
     DO i = 1, n_avg
+       colon = SCAN ( variables(i)%nam, ':' )
+       IF ( colon > 0 .AND. colon <= col_width ) THEN
+          headings(i) = variables(i)%nam(1:colon-1)
+          subheads(i) = variables(i)%nam(colon+1:colon+col_width)
+       ELSE
+          headings(i) = variables(i)%nam(1:col_width)
+          subheads(i) = ''
+       END IF
        headings(i) = ADJUSTR ( headings(i) )
+       subheads(i) = ADJUSTR ( subheads(i) )
     END DO
 
     ! Store msd flags locally
@@ -88,6 +97,8 @@ CONTAINS
     WRITE ( unit=output_unit, fmt='(a)'                   ) REPEAT ( '=', line_width ) 
     WRITE ( unit=output_unit, fmt=col1a_fmt, advance='no' ) 'Block'
     WRITE ( unit=output_unit, fmt=cola_fmt                ) headings
+    WRITE ( unit=output_unit, fmt=col1a_fmt, advance='no' ) '     '
+    WRITE ( unit=output_unit, fmt=cola_fmt                ) subheads
     WRITE ( unit=output_unit, fmt='(a)'                   ) REPEAT ( '-', line_width )
 
   END SUBROUTINE run_begin
@@ -185,11 +196,16 @@ CONTAINS
     TYPE(variable_type), DIMENSION(:), INTENT(in) :: variables   ! Variables to be written
 
     ! Writes out instantaneous values
+    ! Converts the colon to a space
 
-    INTEGER :: i
+    INTEGER                    :: i, colon
+    CHARACTER(len=2*col_width) :: string
 
     DO i = 1, SIZE(variables)
-       WRITE ( unit=output_unit, fmt=line_fmt ) variables(i)%nam, variables(i)%val
+       string = variables(i)%nam
+       colon = SCAN ( string, ':' )
+       IF ( colon > 0 ) string(colon:colon)=' '
+       WRITE ( unit=output_unit, fmt=line_fmt ) string, variables(i)%val
     END DO
 
   END SUBROUTINE write_variables

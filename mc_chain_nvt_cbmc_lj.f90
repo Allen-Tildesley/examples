@@ -166,14 +166,14 @@ CONTAINS
     ! Move acceptance ratio
 
     IF ( PRESENT ( string ) ) THEN ! m_ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Regrow ratio', val = 0.0 )
+       m_r = variable_type ( nam = 'Regrow:ratio', val = 0.0 )
     ELSE
-       m_r = variable_type ( nam = 'Regrow ratio', val = m_ratio )
+       m_r = variable_type ( nam = 'Regrow:ratio', val = m_ratio )
     END IF
 
     ! Total potential energy (extensive, i.e. not divided by N)
     ! Total PE of bond springs plus total LJ PE (not cut, nor shifted)
-    e_x = variable_type ( nam = 'PE', val = spr+total%pot )
+    e_x = variable_type ( nam = 'PE:whole chain', val = spr+total%pot )
 
     ! Radius of gyration
     r_g = variable_type ( nam = 'Rg', val = SQRT(rsq) )
@@ -181,7 +181,7 @@ CONTAINS
     ! Heat Capacity (excess, without ideal gas contribution, extensive)
     ! MSD of total PE / T
     ! Total PE of bond springs plus total LJ PE (not cut, nor shifted), divided by T
-    c_x = variable_type ( nam = 'HeatCap (ex)', val = (spr+total%pot)/temperature, msd = .TRUE. )
+    c_x = variable_type ( nam = 'Cv(ex):whole chain', val = (spr+total%pot)/temperature, msd = .TRUE. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

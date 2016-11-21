@@ -182,7 +182,7 @@ CONTAINS
     ! but for clarity and readability we assign all the values together below
 
     ! Collision rate per particle
-    coll_rate = variable_type ( nam = 'Collision Rate', val = 2.0*REAL(ncoll)/t/REAL(n) )
+    coll_rate = variable_type ( nam = 'Collision:Rate', val = 2.0*REAL(ncoll)/t/REAL(n) )
 
     ! Collisional pressure
     ! ideal + collisional virial / volume

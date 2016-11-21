@@ -245,9 +245,9 @@ CONTAINS
     ! but for clarity and readability we assign all the values together below
 
     ! Acceptance ratios for regrowth, crankshaft, and pivot moves
-    r_r = variable_type ( nam = 'Regrow ratio', val = r_ratio )
-    c_r = variable_type ( nam = 'Crank ratio',  val = c_ratio )
-    p_r = variable_type ( nam = 'Pivot ratio',  val = p_ratio )
+    r_r = variable_type ( nam = 'Regrow:ratio', val = r_ratio )
+    c_r = variable_type ( nam = 'Crank:ratio',  val = c_ratio )
+    p_r = variable_type ( nam = 'Pivot:ratio',  val = p_ratio )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
