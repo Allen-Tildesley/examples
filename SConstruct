@@ -29,6 +29,7 @@ env_mpi.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFIX='
 env_omp.Append(F90FLAGS=OMP_F90FLAGS,LINKFLAGS=OMP_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
 
 variants={}
+variants['build_adjust_energy']        = (['adjust_energy.f90','md_lj_module.f90','config_io_module.f90'],env_normal)
 variants['build_bd_nvt_lj']            = (['bd_nvt_lj.f90','md_lj_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
 variants['build_dpd']                  = (['dpd.f90','dpd_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
 variants['build_cluster']              = (['cluster.f90','config_io_module.f90'],env_normal)
