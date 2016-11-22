@@ -59,7 +59,8 @@ PROGRAM md_npt_lj
   ! Composite interaction = pot & cut & vir & lap & ovr variables
   TYPE(potential_type) :: total
 
-  INTEGER :: blk, stp, nstep, nblock, ioerr
+  INTEGER            :: blk, stp, nstep, nblock, ioerr
+  REAL, DIMENSION(3) :: vcm
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
@@ -111,8 +112,10 @@ PROGRAM md_npt_lj
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
   CALL allocate_arrays ( box, r_cut )
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
-  r(:,:) = r(:,:) / box              ! Convert positions to box units
-  r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
+  r(:,:) = r(:,:) / box                                     ! Convert positions to box units
+  r(:,:) = r(:,:) - ANINT ( r(:,:) )                        ! Periodic boundaries
+  vcm(:) = SUM ( v(:,:), dim=2 ) / REAL(n)                  ! Centre-of mass velocity
+  v(:,:) = v(:,:) - SPREAD ( vcm(:), dim = 2, ncopies = n ) ! Set COM velocity to zero
 
   ! Initial values of thermal variables
   g    = REAL ( 3*(n-1) )

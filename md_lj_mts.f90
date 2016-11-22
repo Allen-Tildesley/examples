@@ -47,8 +47,9 @@ PROGRAM md_lj_mts
   ! Composite interaction = pot & cut & vir & lap & ovr variables for each shell
   TYPE(potential_type), DIMENSION(k_max) :: total
 
-  INTEGER :: blk, stp1, stp2, stp3, nstep, nblock, k, ioerr
-  REAL    :: pairs
+  INTEGER            :: blk, stp1, stp2, stp3, nstep, nblock, k, ioerr
+  REAL               :: pairs
+  REAL, DIMENSION(3) :: vcm
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
@@ -127,7 +128,9 @@ PROGRAM md_lj_mts
   END IF
   CALL allocate_arrays ( r_cut )
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call to get r and v
-  r(:,:) = r(:,:) - ANINT ( r(:,:) / box ) * box ! Periodic boundaries
+  r(:,:) = r(:,:) - ANINT ( r(:,:) / box ) * box            ! Periodic boundaries
+  vcm(:) = SUM ( v(:,:), dim=2 ) / REAL(n)                  ! Centre-of mass velocity
+  v(:,:) = v(:,:) - SPREAD ( vcm(:), dim = 2, ncopies = n ) ! Set COM velocity to zero
 
   ! Calculate initial forces and pot, vir contributions for each shell
   DO k = 1, k_max

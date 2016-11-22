@@ -41,7 +41,8 @@ PROGRAM md_nvt_lj_le
   ! Composite interaction = pot & cut & vir & lap & ovr variables
   TYPE(potential_type) :: total
 
-  INTEGER :: blk, stp, nstep, nblock, ioerr
+  INTEGER            :: blk, stp, nstep, nblock, ioerr
+  REAL, DIMENSION(3) :: vcm
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
@@ -87,12 +88,13 @@ PROGRAM md_nvt_lj_le
   density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
   CALL allocate_arrays ( box, r_cut )
-  ! For simplicity we assume that input configuration has strain = 0
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
-  strain = 0.0
-  r(:,:) = r(:,:) / box                       ! Convert positions to box units
-  r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain ! Extra correction (box=1 units)
-  r(:,:) = r(:,:) - ANINT ( r(:,:) )          ! Periodic boundaries (box=1 units)
+  strain = 0.0                                              ! For simplicity assume that this is true
+  r(:,:) = r(:,:) / box                                     ! Convert positions to box units
+  r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain               ! Extra correction (box=1 units)
+  r(:,:) = r(:,:) - ANINT ( r(:,:) )                        ! Periodic boundaries (box=1 units)
+  vcm(:) = SUM ( v(:,:), dim=2 ) / REAL(n)                  ! Centre-of mass velocity
+  v(:,:) = v(:,:) - SPREAD ( vcm(:), dim = 2, ncopies = n ) ! Set COM velocity to zero
 
   ! Initial forces, potential, etc plus overlap check
   CALL force ( box, r_cut, strain, total )

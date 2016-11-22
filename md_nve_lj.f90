@@ -38,7 +38,8 @@ PROGRAM md_nve_lj
   ! Composite interaction = pot & cut & vir & lap & ovr variables
   TYPE(potential_type) :: total
 
-  INTEGER :: blk, stp, nstep, nblock, ioerr
+  INTEGER            :: blk, stp, nstep, nblock, ioerr
+  REAL, DIMENSION(3) :: vcm
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
@@ -55,9 +56,9 @@ PROGRAM md_nve_lj
 
   ! Set sensible default run parameters for testing
   nblock = 10
-  nstep  = 1000
+  nstep  = 50000
   r_cut  = 2.5
-  dt     = 0.005
+  dt     = 0.002
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -82,8 +83,10 @@ PROGRAM md_nve_lj
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
   CALL allocate_arrays ( box, r_cut )
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
-  r(:,:) = r(:,:) / box              ! Convert positions to box units
-  r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
+  r(:,:) = r(:,:) / box                                     ! Convert positions to box units
+  r(:,:) = r(:,:) - ANINT ( r(:,:) )                        ! Periodic boundaries
+  vcm(:) = SUM ( v(:,:), dim=2 ) / REAL(n)                  ! Centre-of mass velocity
+  v(:,:) = v(:,:) - SPREAD ( vcm(:), dim = 2, ncopies = n ) ! Set COM velocity to zero
 
   ! Initial forces, potential, etc plus overlap check
   CALL force ( box, r_cut, total )
@@ -154,7 +157,7 @@ CONTAINS
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
 
-    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c
+    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, pe_msd, conserved_msd
     REAL                :: vol, rho, fsq, kin, hes, tmp
 
     ! Preliminary calculations
@@ -196,13 +199,20 @@ CONTAINS
     ! Total squared force divided by total Laplacian with small Hessian correction
     t_c = variable_type ( nam = 'T:config', val = fsq/(total%lap-(2.0*hes/fsq)) )
 
+    ! Mean-squared deviation of cut-and-shifted potential energy, intensive
+    ! This may be used to calculate the heat capacity Cv
+    pe_msd = variable_type ( nam = 'PE/sqrt(N):MSD', val = total%pot/SQRT(REAL(n)), msd = .TRUE. )
+
+    ! Mean-squared deviation of conserved energy
+    conserved_msd = variable_type ( nam = 'E:MSD', val = kin+total%pot, msd = .TRUE. )
+
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c ]
+    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, pe_msd, conserved_msd ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables )
+       CALL write_variables ( output_unit, variables(1:6) ) ! Don't write out MSD variables
     END IF
 
   END SUBROUTINE calculate

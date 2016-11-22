@@ -44,7 +44,7 @@ PROGRAM md_nve_hs
 
   INTEGER            :: i, j, k, ncoll, coll, blk, nblock, ioerr
   REAL               :: tij, vir_sum
-  REAL, DIMENSION(3) :: total_momentum
+  REAL, DIMENSION(3) :: vcm
 
   NAMELIST /nml/ nblock, ncoll
 
@@ -78,15 +78,13 @@ PROGRAM md_nve_hs
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',              REAL(n) / box**3
   CALL allocate_arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
-  total_momentum = SUM(v,dim=2)
-  total_momentum = total_momentum / REAL(n)
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Net momentum/particle', total_momentum
-  v          = v - SPREAD(total_momentum,dim=1,ncopies=3)
+  r(:,:) = r(:,:) / box                                     ! Convert positions to box=1 units
+  r(:,:) = r(:,:) - ANINT ( r(:,:) )                        ! Periodic boundaries
+  vcm(:) = SUM ( v(:,:), dim=2 ) / REAL(n)                  ! Centre-of mass velocity
+  v(:,:) = v(:,:) - SPREAD ( vcm(:), dim = 2, ncopies = n ) ! Set COM velocity to zero
   kin        = 0.5 * SUM ( v**2 )
   temp_kinet = 2.0 * kin / REAL ( 3*(n-1) )
   WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature', temp_kinet
-  r(:,:) = r(:,:) / box              ! Convert positions to box=1 units
-  r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
   ! Initial overlap check
   IF ( overlap ( box ) ) THEN
