@@ -98,18 +98,18 @@ PROGRAM md_npt_lj
   ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Specified temperature',     temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Specified pressure',        pressure
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Thermostat timescale',      tau
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Barostat timescale',        tau_baro
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance', r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step',                 dt
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Specified temperature',     temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Specified pressure',        pressure
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Thermostat timescale',      tau
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Barostat timescale',        tau_baro
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',               REAL(n) / box**3
   CALL allocate_arrays ( box, r_cut )
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
   r(:,:) = r(:,:) / box                                     ! Convert positions to box units
@@ -121,17 +121,17 @@ PROGRAM md_npt_lj
   g    = REAL ( 3*(n-1) )
   q    = temperature * tau**2   
   q(1) = g * temperature * tau**2
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'Thermal inertias Q', q
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.6))' ) 'Thermal inertias Q', q
   eta(:) = 0.0
   CALL random_normals ( 0.0, SQRT(temperature), p_eta(:)  )
   p_eta(:) = p_eta(:) * SQRT(q(:))
   q_baro = temperature * tau_baro**2   
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) "Barostat thermal inertias Q'", q_baro
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.6))' ) "Barostat thermal inertias Q'", q_baro
   eta_baro(:) = 0.0
   CALL random_normals ( 0.0, SQRT(temperature), p_eta_baro(:)  )
   p_eta_baro(:) = p_eta_baro(:) * SQRT(q_baro(:))
   w_eps = g * temperature * tau_baro**2
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) "Barostat inertia W", w_eps
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) "Barostat inertia W", w_eps
   box0  = box ! reference box length for strain
   eps   = 1.0 ! initial strain
   p_eps = random_normal ( 0.0, SQRT(temperature*w_eps) ) ! strain momentum

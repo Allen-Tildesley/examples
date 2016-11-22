@@ -105,7 +105,7 @@ PROGRAM mc_nvt_lj_re
 
   CALL init_random_seed () ! Initialize random number generator (hopefully differently on each process)
   CALL RANDOM_NUMBER ( zeta )
-  WRITE( unit=output_unit, fmt='(a,t40,f15.5)') 'First random number', zeta
+  WRITE( unit=output_unit, fmt='(a,t40,f15.6)') 'First random number', zeta
   WRITE( unit=output_unit, fmt='(a)'          ) 'Should be different for different processes!'
 
   ! Allocate processor-dependent arrays
@@ -137,15 +137,15 @@ PROGRAM mc_nvt_lj_re
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',               nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',      nstep
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Replica exchange swap interval', swap_interval
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',                    temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance',      r_cut
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum displacement',           dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature',                    temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance',      r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum displacement',           dr_max
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',               REAL(n) / box**3
   CALL allocate_arrays ( box, r_cut ) ! Allocate r
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! Second call is to get r
   r(:,:) = r(:,:) / box              ! Convert positions to box units

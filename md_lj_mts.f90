@@ -88,7 +88,7 @@ PROGRAM md_lj_mts
 
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'      ) 'Number of blocks',           nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'      ) 'Number of steps per block',  nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'Potential cutoff distances', r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.6))' ) 'Potential cutoff distances', r_cut
 
   DO k = 1, k_max
      IF ( k == 1 ) THEN
@@ -96,7 +96,7 @@ PROGRAM md_lj_mts
      ELSE
         pairs = r_cut(k)**3 - r_cut(k-1)**3
         IF ( r_cut(k)-r_cut(k-1) < lambda ) THEN
-           WRITE ( unit=error_unit, fmt='(a,3f15.5)' ) 'r_cut interval error', r_cut(k-1), r_cut(k), lambda
+           WRITE ( unit=error_unit, fmt='(a,3f15.6)' ) 'r_cut interval error', r_cut(k-1), r_cut(k), lambda
            STOP 'Error in md_lj_mts'
         END IF
      END IF
@@ -114,16 +114,16 @@ PROGRAM md_lj_mts
      STOP 'Error in md_lj_mts'
   END IF
   DO k = 1, k_max
-     WRITE ( unit=output_unit, fmt='(a,i1,t40,f15.5)' ) 'Time step for shell ', k, PRODUCT(n_mts(1:k))*dt
+     WRITE ( unit=output_unit, fmt='(a,i1,t40,f15.6)' ) 'Time step for shell ', k, PRODUCT(n_mts(1:k))*dt
   END DO
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',               REAL(n) / box**3
   IF ( r_cut(k_max) > box/2.0  ) THEN
-     WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_cut(k_max) too large ', r_cut(k_max)
+     WRITE ( unit=error_unit, fmt='(a,f15.6)') 'r_cut(k_max) too large ', r_cut(k_max)
      STOP 'Error in md_lj_mts'
   END IF
   CALL allocate_arrays ( r_cut )

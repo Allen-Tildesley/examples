@@ -74,8 +74,8 @@ PROGRAM md_nve_hs
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',  n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box (in sigma units)', box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',              REAL(n) / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Box (in sigma units)', box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',              REAL(n) / box**3
   CALL allocate_arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
   r(:,:) = r(:,:) / box                                     ! Convert positions to box=1 units
@@ -84,7 +84,7 @@ PROGRAM md_nve_hs
   v(:,:) = v(:,:) - SPREAD ( vcm(:), dim = 2, ncopies = n ) ! Set COM velocity to zero
   kin        = 0.5 * SUM ( v**2 )
   temp_kinet = 2.0 * kin / REAL ( 3*(n-1) )
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature', temp_kinet
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature', temp_kinet
 
   ! Initial overlap check
   IF ( overlap ( box ) ) THEN

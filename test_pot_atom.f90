@@ -37,7 +37,7 @@ PROGRAM test_pot_atom
   IF (.NOT.ok) WRITE ( output_unit, fmt='(a)' ) 'Warning: atom placement failed'
 
   CALL force ( r, pot, f ) ! Calculation of potential, and analytical forces
-  WRITE ( output_unit, fmt='(a,t25,f15.5)' ) 'Potential energy = ', pot
+  WRITE ( output_unit, fmt='(a,t25,f15.6)' ) 'Potential energy = ', pot
 
   ! Check momentum and angular momentum conservation
   ftot = SUM ( f, dim=2 )
@@ -62,7 +62,7 @@ PROGRAM test_pot_atom
         CALL force ( r, potm )
         r(:,i)    = rsave ! Restore position
         fnum      = -(potp-potm)/(2.0*delta)
-        WRITE ( output_unit, fmt='(i10,a10,2f15.5,es15.3)' ) i, cf(xyz), f(xyz,i), fnum, f(xyz,i)-fnum
+        WRITE ( output_unit, fmt='(i10,a10,2f15.6,es15.3)' ) i, cf(xyz), f(xyz,i), fnum, f(xyz,i)-fnum
      END DO ! End loop to calculate numerical forces
 
   END DO ! End loop over molecules

@@ -88,20 +88,20 @@ PROGRAM dpd
   ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',              nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',     nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                     dt
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Specified temperature',         temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Force strength a*rho/kT',       a
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Friction / thermal rate gamma', gamma
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step',                     dt
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Specified temperature',         temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Force strength a*rho/kT',       a
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Friction / thermal rate gamma', gamma
 
   IF ( INDEX( lowercase(method), 'shardlow' ) /= 0 ) THEN
      thermalize => shardlow
      WRITE ( unit=output_unit, fmt='(a)' ) 'Shardlow integration method'
-     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'DPD sigma parameter', SQRT ( 2.0 * gamma * temperature )
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'DPD sigma parameter', SQRT ( 2.0 * gamma * temperature )
   ELSE IF ( INDEX( lowercase(method), 'lowe' ) /= 0 ) THEN
      thermalize => lowe
      WRITE ( unit=output_unit, fmt='(a)' ) 'Lowe thermalization method'
      IF ( gamma*dt > 1.0 ) THEN
-        WRITE ( unit=error_unit, fmt='(a,f15.5)') 'gamma*dt too large', gamma*dt
+        WRITE ( unit=error_unit, fmt='(a,f15.6)') 'gamma*dt too large', gamma*dt
         STOP 'Error in dpd'
      END IF
   ELSE
@@ -112,11 +112,11 @@ PROGRAM dpd
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
   rho = REAL(n) / box**3
   a   = a * temperature / rho ! Scale force strength accordingly
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',          rho
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Force strength a', a
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',          rho
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Force strength a', a
   CALL allocate_arrays ( box )
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
   r(:,:) = r(:,:) / box              ! Convert positions to box units
@@ -163,7 +163,7 @@ PROGRAM dpd
   CALL calculate ( 'Final values' )
   CALL time_stamp ( output_unit )
 
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Approx EOS P = ', p_eos ( )
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Approx EOS P = ', p_eos ( )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v ) ! Write out final configuration
 

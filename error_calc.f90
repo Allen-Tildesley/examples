@@ -53,9 +53,9 @@ PROGRAM error_calc
 
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps in run = ', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Equilibration steps = ',    nequil
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step delta = ',        delta
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Desired average value = ',  average
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Desired variance = ',       variance
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step delta = ',        delta
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Desired average value = ',  average
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Desired variance = ',       variance
 
   ALLOCATE ( a(nstep) )
 
@@ -67,8 +67,8 @@ PROGRAM error_calc
   ! (0.25,4.0) (overdamped)
   m     = 0.25
   kappa = 4.0
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'm ',     m
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'kappa ', kappa
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'm ',     m
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'kappa ', kappa
 
   ! Coefficients used in algorithm
   x = delta*kappa
@@ -149,11 +149,11 @@ PROGRAM error_calc
   a_var_1 = SUM ( a**2 ) / REAL(nstep-1) ! Bias-corrected sample variance
   a_err   = SQRT(a_var_1 / REAL(nstep))  ! Error estimate neglecting any correlations
 
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Sample average value = ',                   a_avg
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Deviation from exact average = ',           a_avg - average
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Sample average value = ',                   a_avg
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Deviation from exact average = ',           a_avg - average
   WRITE ( unit=output_unit, fmt='(a)') 'Deviation should (typically) lie within +/- exact error estimate'
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Sample variance = ',                        a_var_1
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Error estimate neglecting correlations = ', a_err
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Sample variance = ',                        a_var_1
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Error estimate neglecting correlations = ', a_err
   WRITE ( unit=output_unit, fmt='(a)') 'This should be very over-optimistic!'
 
   ! We must take account of the correlations between successive values in time

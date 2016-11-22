@@ -127,7 +127,7 @@ CONTAINS
     std   = SQRT(temperature/k_spring) ! Spring bond standard deviation
     d_max = 3.0*std                    ! Impose a limit on variation, say 3*std
     IF ( d_max > 0.5*bond ) THEN       ! Must not be too large, say 0.5*bond
-       WRITE ( unit=error_unit, fmt='(a,2f15.5)' ) 'Spring bond strength error', d_max, bond
+       WRITE ( unit=error_unit, fmt='(a,2f15.6)' ) 'Spring bond strength error', d_max, bond
        STOP 'Error in regrow'
     END IF
     d_max = d_max + bond ! This is the actual max d allowed

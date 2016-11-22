@@ -86,18 +86,18 @@ PROGRAM mc_zvt_lj
   ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',              nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',     nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',                   temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Activity',                      activity
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Probability of move',           prob_move
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Probability of create/destroy', prob_create
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance',     r_cut
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum displacement',          dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature',                   temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Activity',                      activity
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Probability of move',           prob_move
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Probability of create/destroy', prob_create
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance',     r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum displacement',          dr_max
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',               REAL(n) / box**3
   n = n * 2 ! Increase n for array allocation
   CALL allocate_arrays ( box, r_cut ) ! Allocate r
   n = n / 2 ! Restore value of n

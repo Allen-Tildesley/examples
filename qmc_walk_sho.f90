@@ -75,9 +75,9 @@ PROGRAM qmc_walk_sho
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps for production = ',          production_steps
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps for equilibration = ',       equilibration_steps
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Output interval = ',                         output_interval
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Initial estimate of ground state energy = ', et
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step = ',                               ds
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Max x for wavefunction = ',                  x_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Initial estimate of ground state energy = ', et
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step = ',                               ds
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Max x for wavefunction = ',                  x_max
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of bins for wavefunction = ',         n_bin
 
   dx = 2.0*x_max / REAL(n_bin)  ! Bin interval for calculating the wavefunction
@@ -158,7 +158,7 @@ PROGRAM qmc_walk_sho
      ! Periodically write the current number of walkers, trial energy, average potential
 
      IF( MOD(step,output_interval) == 0 ) THEN
-        WRITE ( unit=output_unit, fmt='(i15,i15,2f15.5)') step, n, et, pot
+        WRITE ( unit=output_unit, fmt='(i15,i15,2f15.6)') step, n, et, pot
      ENDIF
 
      ! Calculate the distribution of walkers on the line and energy averages
@@ -190,8 +190,8 @@ PROGRAM qmc_walk_sho
   et_avg  = et_avg / REAL(step_count)
   pot_avg = pot_avg / REAL(step_count)
 
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Average trial energy = ',     et_avg
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Average potential energy = ', pot_avg
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)') 'Average trial energy = ',     et_avg
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)') 'Average potential energy = ', pot_avg
 
   ! Print ground state wave function
   WRITE ( unit=output_unit, fmt= '(a)' ) '              x         psi(x)   psi_exact(x)'
@@ -199,7 +199,7 @@ PROGRAM qmc_walk_sho
   DO i = 1, n_bin
      x_bin  = -x_max + ( REAL(i - 1) + 0.5 ) * dx
      pexact = const * EXP(- 0.5 * x_bin * x_bin)
-     WRITE ( unit=output_unit, fmt='(3f15.5)') x_bin, psi(i), pexact
+     WRITE ( unit=output_unit, fmt='(3f15.6)') x_bin, psi(i), pexact
   END DO
   CALL time_stamp ( output_unit )
 

@@ -52,9 +52,9 @@ PROGRAM fft3dwrap
   dr = box / REAL (sc)
   dk = (2.0 * pi) / dr / REAL(sc) ! interval in reciprocal space
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of grid points in each dimension, sc = ', sc
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Periodic repeat length (box) = ',                box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Grid spacing in real space (dr) = ',             dr
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Grid spacing in reciprocal space (dk) = ',       dk
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Periodic repeat length (box) = ',                box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Grid spacing in real space (dr) = ',             dr
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Grid spacing in reciprocal space (dk) = ',       dk
 
   ! Allocate necessary arrays
   ALLOCATE ( fft_inp(0:sc-1,0:sc-1,0:sc-1), fft_out(0:sc-1,0:sc-1,0:sc-1) )
@@ -78,7 +78,7 @@ PROGRAM fft3dwrap
 
            ! Write some elements of data in same form as later output
            IF ( ix**2 + iy**2 + iz**2 <= out_max ) THEN
-              WRITE ( unit=output_unit, fmt='(3i5,4f15.5)' ) ix, iy, iz, SQRT(r_sq), g, fft_inp(ix,iy,iz)
+              WRITE ( unit=output_unit, fmt='(3i5,4f15.6)' ) ix, iy, iz, SQRT(r_sq), g, fft_inp(ix,iy,iz)
            END IF
 
         END DO
@@ -112,7 +112,7 @@ PROGRAM fft3dwrap
            IF ( ix**2 + iy**2 + iz**2 <= out_max ) THEN
               k_sq = SUM ( k**2 )             ! Squared magnitude of wave vector
               g    = EXP ( -k_sq / 4.0 / pi ) ! Analytical transform of the Gaussian
-              WRITE ( unit=output_unit, fmt='(3i5,4f15.5)') ix, iy, iz, SQRT(k_sq), g, fft_out(ix,iy,iz)*dr**3
+              WRITE ( unit=output_unit, fmt='(3i5,4f15.6)') ix, iy, iz, SQRT(k_sq), g, fft_out(ix,iy,iz)*dr**3
            END IF
 
         END DO
@@ -146,7 +146,7 @@ PROGRAM fft3dwrap
            IF ( ix**2 + iy**2 + iz**2 <= out_max ) THEN
               r_sq = SUM ( r**2 )        ! Squared distance from origin
               g    = EXP ( - pi * r_sq ) ! Original 3d Gaussian
-              WRITE ( unit=output_unit, fmt='(3i5,4f15.5)' ) ix, iy, iz, SQRT(r_sq), g, fft_inp(ix,iy,iz)/REAL(sc**3)
+              WRITE ( unit=output_unit, fmt='(3i5,4f15.6)' ) ix, iy, iz, SQRT(r_sq), g, fft_inp(ix,iy,iz)/REAL(sc**3)
            END IF
 
         END DO

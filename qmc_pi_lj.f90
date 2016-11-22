@@ -89,24 +89,24 @@ PROGRAM qmc_pi_lj
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Size of each ring polymer', p
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',               temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum displacement',      dr_max
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'de Boer length',            lambda
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature',               temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance', r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum displacement',      dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'de Boer length',            lambda
   IF ( p < 2 .OR. p > 99 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'p must lie between 2 and 99', p
      STOP 'Error in qmc_pi_lj'
   END IF
   k_spring = REAL(p) * ( temperature / lambda ) ** 2
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Quantum spring constant', k_spring
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Quantum spring constant', k_spring
 
   ! Read in initial configuration and allocate necessary arrays
   ! Read each polymer index from a unique file; we assume that n and box are all the same!
   cnf_prefix(4:5) = '01' ! Read first LJ configuration to get basic parameters n and box
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box )
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',               REAL(n) / box**3
   CALL allocate_arrays ( box, r_cut ) ! Allocate r
   DO k = 1, p ! Loop over ring polymer indices
      WRITE(k_tag,fmt='(i2.2)') k ! Convert into character form

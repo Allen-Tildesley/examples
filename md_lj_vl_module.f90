@@ -73,7 +73,7 @@ CONTAINS
     ALLOCATE ( r(3,n), v(3,n), f(3,n) )
     r_cut_box = r_cut / box
     IF ( r_cut_box > 0.5 ) THEN
-       WRITE ( unit=error_unit, fmt='(a,f15.5)' ) 'r_cut/box too large ', r_cut_box
+       WRITE ( unit=error_unit, fmt='(a,f15.6)' ) 'r_cut/box too large ', r_cut_box
        STOP 'Error in allocate_arrays'
     END IF
 

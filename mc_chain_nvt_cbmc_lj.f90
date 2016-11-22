@@ -77,13 +77,13 @@ PROGRAM mc_chain_nvt_cbmc_lj
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',       nstep
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Max atoms in regrow',             m_max
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Random tries per atom in regrow', k_max
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature/well depth',          temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond spring strength',            k_spring
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature/well depth',          temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Bond spring strength',            k_spring
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond ) ! First call is just to get n and bond
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',          n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length (in sigma units)', bond
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Bond length (in sigma units)', bond
   CALL allocate_arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r ) ! Second call gets r
 

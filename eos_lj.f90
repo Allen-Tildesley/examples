@@ -40,8 +40,8 @@ PROGRAM eos_lj
      STOP 'Error in eos_lj'
   END IF
 
-  WRITE ( unit=output_unit, fmt='(a,f15.5)' ) 'T   = ', temperature
-  WRITE ( unit=output_unit, fmt='(a,f15.5)' ) 'rho = ', density
+  WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'T   = ', temperature
+  WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'rho = ', density
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'Full Lennard-Jones potential'
 
@@ -58,16 +58,16 @@ PROGRAM eos_lj
   e = temperature * ( 1.5 + a_res(1,0) )
   cv = 1.5 - a_res(2,0)
   cp = 2.5 - a_res(2,0)+(1.0+a_res(0,1)-a_res(1,1))*(1.0+a_res(0,1)-a_res(1,1))/(1.0+2.0*a_res(0,1)+a_res(0,2)) - 1.0
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.5)' ) 'P', p
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.5)' ) 'E/N', e
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.5)' ) 'Cv/NkB', cv
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.5)' ) 'Cp/NkB', cp
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'P', p
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'E/N', e
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cv/NkB', cv
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cp/NkB', cp
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential cut (but not shifted) at 2.5 sigma'
   p  = p - pressure_lrc ( density, r_cut ) + pressure_delta ( density, r_cut )
   e  = e - potential_lrc ( density, r_cut )
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.5)' ) 'P', p
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.5)' ) 'E/N', e
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'P', p
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'E/N', e
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential cut-and-shifted at 2.5 sigma'
 
@@ -84,9 +84,9 @@ PROGRAM eos_lj
   e = temperature * ( 1.5 + a_res(1,0) )
   cv = 1.5 - a_res(2,0)
   cp = 2.5 - a_res(2,0)+(1.0+a_res(0,1)-a_res(1,1))*(1.0+a_res(0,1)-a_res(1,1))/(1.0+2.0*a_res(0,1)+a_res(0,2)) - 1.0
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.5)' ) 'P', p
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.5)' ) 'E/N', e
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.5)' ) 'Cv/NkB', cv
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.5)' ) 'Cp/NkB', cp
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'P', p
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'E/N', e
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cv/NkB', cv
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cp/NkB', cp
 
 END PROGRAM eos_lj

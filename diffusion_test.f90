@@ -67,10 +67,10 @@ PROGRAM diffusion_test
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of atoms',           n
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Friction coefficient',      gamma
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',               temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Ideal diffusion coefft',    temperature / gamma
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step',                 dt
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Friction coefficient',      gamma
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature',               temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Ideal diffusion coefft',    temperature / gamma
 
   ALLOCATE ( r(3,n), v(3,n), zeta(3,n) )
 

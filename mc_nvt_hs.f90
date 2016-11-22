@@ -71,14 +71,14 @@ PROGRAM mc_nvt_hs
   ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',           nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',  nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum displacement',       dr_max
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Pressure scaling parameter', eps_box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum displacement',       dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Pressure scaling parameter', eps_box
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',               REAL(n) / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',               REAL(n) / box**3
   CALL allocate_arrays ! Allocates r
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! Second call to get r
   r(:,:) = r(:,:) / box              ! Convert positions to box units

@@ -244,7 +244,7 @@ CONTAINS
                 dot = DOT_PRODUCT ( rij_old, rij ) ! This should be of the order of bond**2
 
                 IF ( dot < dot_tol * bond**2 ) THEN
-                   WRITE ( unit=error_unit, fmt='(a,3f15.5)' ) 'Constraint failure', dot, dot_tol, bond**2
+                   WRITE ( unit=error_unit, fmt='(a,3f15.6)' ) 'Constraint failure', dot, dot_tol, bond**2
                    STOP 'Error in rattle_a'
                 END IF
 

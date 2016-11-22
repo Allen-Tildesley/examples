@@ -77,7 +77,7 @@ PROGRAM diffusion
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Max correlation time nt = ',       nt
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Origin interval = ',               origin_interval
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of time origins n0 = ',     n0
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time interval between configs = ', delta
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time interval between configs = ', delta
 
   sav_tag = '000' ! Use initial configuration to get N
   INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! Check the file exists
@@ -173,7 +173,7 @@ PROGRAM diffusion
   END IF
 
   DO t = 0, nt
-     WRITE ( unit=unit, fmt='(f15.5,3f15.8)' ) t*delta, vacf(t), rvcf(t), msd(t) ! Include delta in time
+     WRITE ( unit=unit, fmt='(f15.6,3f15.8)' ) t*delta, vacf(t), rvcf(t), msd(t) ! Include delta in time
   END DO
 
   CLOSE(unit=unit)

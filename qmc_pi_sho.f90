@@ -76,11 +76,11 @@ PROGRAM qmc_pi_sho
 
   ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of beads, P = ',                 p
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature = ',                        temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature = ',                        temperature
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks for production = ',    nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks for equilibration = ', nequil
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block = ',          nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Max displacement = ',                   dx_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Max displacement = ',                   dx_max
   beta     = 1.0 / temperature
   k_spring = REAL(p) * temperature**2
 
@@ -147,9 +147,9 @@ PROGRAM qmc_pi_sho
   CALL run_end ( output_unit ) ! Output run averages
 
   e_qu = e_pi_sho ( p, beta )
-  WRITE ( unit=output_unit, fmt='(a,i0.0,a,t40,f15.5)' ) 'Exact P=', p, ' energy', e_qu
+  WRITE ( unit=output_unit, fmt='(a,i0.0,a,t40,f15.6)' ) 'Exact P=', p, ' energy', e_qu
   e_qu = 0.5 / TANH(0.5*beta)
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'        ) 'Exact P=infinity energy', e_qu
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)'        ) 'Exact P=infinity energy', e_qu
 
   CALL calculate ( 'Final values' )
   pot_cl = 0.5 * SUM ( x**2 ) / REAL (p )                ! Classical potential energy

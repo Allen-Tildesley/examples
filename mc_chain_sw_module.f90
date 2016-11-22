@@ -29,7 +29,7 @@ CONTAINS
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Hard-sphere chain with fixed bond length'
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Square-well attractive potential'
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, sigma = ', sigma
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Diameter, sigma = ', sigma
 
   END SUBROUTINE introduction
 

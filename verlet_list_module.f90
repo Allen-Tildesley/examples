@@ -40,7 +40,7 @@ CONTAINS
     REAL, PARAMETER :: pi = 4.0*ATAN(1.0)
     NAMELIST /nml_list/ r_list_factor
 
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list based on r_cut/box =', r_cut_box
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)') 'Verlet list based on r_cut/box =', r_cut_box
 
     ! Sensible default for r_list_factor
     r_list_factor = 1.2
@@ -51,19 +51,19 @@ CONTAINS
        IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
        STOP 'Error in initialize_list'
     END IF
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list factor = ', r_list_factor
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)') 'Verlet list factor = ', r_list_factor
     IF ( r_list_factor <= 1.0 ) THEN
-       WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_list_factor must be > 1', r_list_factor
+       WRITE ( unit=error_unit, fmt='(a,f15.6)') 'r_list_factor must be > 1', r_list_factor
        STOP 'Error in initialize_list'
     END IF
     r_list_box = r_cut_box * r_list_factor
     IF ( r_list_box > 0.5 ) THEN
-       WRITE ( unit=error_unit, fmt='(a,f15.5)') 'r_list/box too large', r_list_box
+       WRITE ( unit=error_unit, fmt='(a,f15.6)') 'r_list/box too large', r_list_box
        STOP 'Error in initialize_list'
     END IF
     r_skin_box = r_list_box - r_cut_box
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list range (box units) = ', r_list_box
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Verlet list skin  (box units) = ', r_skin_box
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)') 'Verlet list range (box units) = ', r_list_box
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)') 'Verlet list skin  (box units) = ', r_skin_box
 
     ! Estimate list size based on density + 10 per cent
     nl = CEILING ( 1.1*(4.0*pi/3.0)*(r_list_box**3)*REAL(n*(n-1)) / 2.0 )

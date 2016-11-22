@@ -23,7 +23,7 @@ CONTAINS
     INTEGER, INTENT(in) :: n         ! Number of particles
     REAL,    INTENT(in) :: r_cut_box ! rcut/box, assume never changes
 
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)') 'Link cells based on r_cut/box =', r_cut_box
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)') 'Link cells based on r_cut/box =', r_cut_box
 
     sc = FLOOR ( 1.0 / r_cut_box ) ! Number of cells in each dimension
     IF ( sc < 3 ) THEN
@@ -69,7 +69,7 @@ CONTAINS
     ! Lees-Edwards boundaries as well as normal ones
     ! But we must check that ri is within bounds
     IF ( ANY ( ABS(ri) > 0.5 ) ) THEN ! Should never happen
-       WRITE ( unit=error_unit, fmt='(a,3f15.5)') 'Atom not in main box', ri
+       WRITE ( unit=error_unit, fmt='(a,3f15.6)') 'Atom not in main box', ri
        STOP 'Error in c_index'
     END IF
 

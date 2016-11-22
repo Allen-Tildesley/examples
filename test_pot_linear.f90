@@ -39,7 +39,7 @@ PROGRAM test_pot_linear
 
   ! Calculation of potential, and analytical forces and torques
   CALL force ( r, e, pot, f, t )
-  WRITE ( unit=output_unit, fmt='(a,t25,f15.5)' ) 'Potential energy = ', pot
+  WRITE ( unit=output_unit, fmt='(a,t25,f15.6)' ) 'Potential energy = ', pot
 
   ! Check momentum and angular momentum conservation
   ftot = SUM ( f, dim=2 )
@@ -64,7 +64,7 @@ PROGRAM test_pot_linear
         CALL force ( r, e, potm )
         r(:,i)    = rsave ! Restore position
         fnum      = -(potp-potm)/(2.0*delta)
-        WRITE ( unit=output_unit, fmt='(i10,a10,2f15.5,es15.3)' ) i, cf(xyz), f(xyz,i), fnum, f(xyz,i)-fnum
+        WRITE ( unit=output_unit, fmt='(i10,a10,2f15.6,es15.3)' ) i, cf(xyz), f(xyz,i), fnum, f(xyz,i)-fnum
      END DO ! End loop to calculate numerical forces
 
      DO xyz = 1, 3 ! Loop to calculate numerical torques
@@ -77,7 +77,7 @@ PROGRAM test_pot_linear
         CALL force ( r, e, potm )
         e(:,i)    = esave ! Restore orientation
         tnum      = -(potp-potm)/(2.0*delta)
-        WRITE ( unit=output_unit, fmt='(i10,a10,2f15.5,es15.3)' ) i, ct(xyz), t(xyz,i), tnum, t(xyz,i)-tnum
+        WRITE ( unit=output_unit, fmt='(i10,a10,2f15.6,es15.3)' ) i, ct(xyz), t(xyz,i), tnum, t(xyz,i)-tnum
      END DO ! End loop to calculate numerical torques on A
 
   END DO ! End loop over molecules

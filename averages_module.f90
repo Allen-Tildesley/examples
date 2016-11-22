@@ -48,7 +48,7 @@ CONTAINS
     CALL CPU_TIME ( cpu )
     WRITE ( unit=output_unit, fmt='(a,t45,a4,a1,a2,a1,a2)' ) 'Date: ', date(1:4), '/', date(5:6), '/', date(7:8)
     WRITE ( unit=output_unit, fmt='(a,t47,a2,a1,a2,a1,a2)' ) 'Time: ', time(1:2), ':', time(3:4), ':', time(5:6)
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)'          ) 'CPU time: ', cpu
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)'          ) 'CPU time: ', cpu
 
   END SUBROUTINE time_stamp
 
@@ -138,7 +138,7 @@ CONTAINS
     ! Write out averages at end of every block
 
     IF ( blk_nrm < 0.5 ) THEN ! Check for no accumulation; should never happen
-       WRITE ( unit=error_unit, fmt='(a,f15.5)' ) 'Block accumulation error', blk_nrm
+       WRITE ( unit=error_unit, fmt='(a,f15.6)' ) 'Block accumulation error', blk_nrm
        STOP 'Error in blk_end'
     END IF ! End check for no accumulation
 
@@ -168,7 +168,7 @@ CONTAINS
     ! For a discussion of errors, see Chapter 8 and the error_calc.f90 example
 
     IF ( run_nrm < 0.5 ) THEN ! Check for no accumulation; should never happen
-       WRITE ( unit=error_unit, fmt='(a,f15.5)' ) 'Run accumulation error', run_nrm
+       WRITE ( unit=error_unit, fmt='(a,f15.6)' ) 'Run accumulation error', run_nrm
        STOP 'Error in run_end'
     END IF ! End check for no accumulation
 

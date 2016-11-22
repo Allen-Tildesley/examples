@@ -72,9 +72,9 @@ CONTAINS
 
     WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Number of atoms per molecule', na
     DO i = 1, na ! Loop over atoms
-       WRITE ( unit=output_unit, fmt='(a,i1,t40,3f15.5)' ) 'Body-fixed atom vector ', i, db(:,i)
+       WRITE ( unit=output_unit, fmt='(a,i1,t40,3f15.6)' ) 'Body-fixed atom vector ', i, db(:,i)
     END DO ! End loop over atoms
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Molecular diameter ', diameter
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Molecular diameter ', diameter
 
   END SUBROUTINE introduction
 
@@ -97,7 +97,7 @@ CONTAINS
 
     rm_cut_box = ( r_cut+diameter ) / box
     IF ( rm_cut_box > 0.5 ) THEN
-       WRITE ( unit=error_unit, fmt='(a,f15.5)') 'rm_cut/box too large ', rm_cut_box
+       WRITE ( unit=error_unit, fmt='(a,f15.6)') 'rm_cut/box too large ', rm_cut_box
        STOP 'Error in allocate_arrays'
     END IF
 

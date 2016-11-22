@@ -82,16 +82,16 @@ PROGRAM mc_nvt_poly_lj
   ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature',               temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum r displacement',    dr_max
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Maximum e displacement',    de_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature',               temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance', r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum r displacement',    dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum e displacement',    de_max
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of molecules',   n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density of molecules',  REAL(n) / box**3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density of molecules',  REAL(n) / box**3
   CALL allocate_arrays ( box, r_cut )
   CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box, r, e ) ! Second call is to get r and e
   r(:,:) = r(:,:) / box              ! Convert positions to box units

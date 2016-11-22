@@ -91,8 +91,8 @@ PROGRAM corfun
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Max correlation time nt = ',   nt
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Origin interval = ',           origin_interval
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of time origins n0 = ', n0
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step delta = ',           delta
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature = ',               temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step delta = ',           delta
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature = ',               temperature
 
   ALLOCATE ( v(nstep), v0(n0), t0(n0) )
   ALLOCATE ( c(0:nt), c_fft(0:nt), n(0:nt) )
@@ -107,8 +107,8 @@ PROGRAM corfun
   ! (0.25,4.0) (overdamped)
   m     = 1.0
   kappa = 1.0
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'm = ',     m
-  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.5))' ) 'kappa = ', kappa
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.6))' ) 'm = ',     m
+  WRITE ( unit=output_unit, fmt='(a,t40,*(f15.6))' ) 'kappa = ', kappa
 
   ! Coefficients used in algorithm
   x = delta*kappa
@@ -143,7 +143,7 @@ PROGRAM corfun
   END DO ! End loop over steps including an equilibration period
 
   CALL CPU_TIME ( cpu_2 )
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'CPU time to generate data = ', cpu_2-cpu_1
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'CPU time to generate data = ', cpu_2-cpu_1
 
   ! Data analysis (direct method)
 
@@ -191,7 +191,7 @@ PROGRAM corfun
   c(:) = c(:) / n(:) ! Normalise by number of increments
 
   CALL CPU_TIME ( cpu_3 )
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'CPU time for direct method = ', cpu_3-cpu_2
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'CPU time for direct method = ', cpu_3-cpu_2
 
   ! Data analysis (FFT method)
 
@@ -221,7 +221,7 @@ PROGRAM corfun
   c_fft   = REAL ( fft_inp(0:nt) ) / n(:) ! Apply normalization associated with number of time origins
 
   CALL CPU_TIME ( cpu_4 )
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'CPU time for FFT method = ', cpu_4-cpu_3
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'CPU time for FFT method = ', cpu_4-cpu_3
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'Output to corfun.out'
 

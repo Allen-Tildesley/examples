@@ -49,7 +49,7 @@ CONTAINS
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'DPD soft potential'
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Diameter, r_cut = ', r_cut    
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Diameter, r_cut = ', r_cut    
 
   END SUBROUTINE introduction
 

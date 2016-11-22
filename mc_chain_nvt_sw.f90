@@ -97,12 +97,12 @@ PROGRAM mc_chain_nvt_sw
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',       nstep
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Max atoms in regrow',             m_max
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Random tries per atom in regrow', k_max
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Max move angle in crankshaft',    crank_max
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Crank fraction',                  crank_fraction
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Max move angle in pivot',         pivot_max
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Pivot fraction',                  pivot_fraction
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Temperature/well depth',          temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Attractive well range',           range
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Max move angle in crankshaft',    crank_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Crank fraction',                  crank_fraction
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Max move angle in pivot',         pivot_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Pivot fraction',                  pivot_fraction
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature/well depth',          temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Attractive well range',           range
   IF ( range < 1.0 ) THEN
      WRITE ( unit=output_unit, fmt='(a)' ) 'Warning, range < core diameter (1.0)'
   END IF
@@ -110,7 +110,7 @@ PROGRAM mc_chain_nvt_sw
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond ) ! First call is just to get n and bond
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',          n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length (in sigma units)', bond
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Bond length (in sigma units)', bond
   CALL allocate_arrays
   nq = 6*n ! Anticipated maximum number of pair interactions within range
   ALLOCATE ( h(0:nq), s(0:nq) )

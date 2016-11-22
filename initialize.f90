@@ -175,8 +175,8 @@ PROGRAM initialize
 
      ! Write out coordinates in same units as box
      box = ( REAL(n) / density ) ** ( 1.0/3.0 )
-     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',    density
-     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box length', box
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',    density
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Box length', box
      IF ( velocities ) THEN
         CALL write_cnf_atoms ( filename, n, box, box*r, v )
      ELSE
@@ -187,7 +187,7 @@ PROGRAM initialize
 
      ! We do not use periodic boundaries for this system
      ! Instead, use "box" variable to store bond length
-     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length', bond
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Bond length', bond
      IF ( velocities ) THEN
         CALL write_cnf_atoms ( filename, n, bond, bond*r, v )
      ELSE
@@ -198,8 +198,8 @@ PROGRAM initialize
 
      ! Write out coordinates in same units as box
      box = ( REAL(n) / density ) ** ( 1.0/3.0 )
-     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density',    density
-     WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Box length', box
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',    density
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Box length', box
      IF ( velocities ) THEN
         CALL write_cnf_mols ( filename, n, box, box*r, e, v, w )
      ELSE

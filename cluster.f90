@@ -40,11 +40,11 @@ PROGRAM cluster
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in cluster'
   END IF
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Cluster separation distance', r_cl
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Cluster separation distance', r_cl
 
   CALL read_cnf_atoms ( filename, n, box ) ! First call to obtain n
   WRITE( unit=output_unit, fmt='(a,t40,i15)'  ) 'Number of particles',  n
-  WRITE( unit=output_unit, fmt='(a,t40,f15.5)') 'Box (in sigma units)', box
+  WRITE( unit=output_unit, fmt='(a,t40,f15.6)') 'Box (in sigma units)', box
 
   ALLOCATE ( r(3,n), list(n), done(n) )
 

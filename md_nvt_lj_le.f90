@@ -77,16 +77,16 @@ PROGRAM md_nvt_lj_le
   ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Potential cutoff distance', r_cut
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Strain rate',               strain_rate
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance', r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step',                 dt
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Strain rate',               strain_rate
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Simulation box length', box
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
   density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Density', density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density', density
   CALL allocate_arrays ( box, r_cut )
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
   strain = 0.0                                              ! For simplicity assume that this is true

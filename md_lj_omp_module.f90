@@ -65,7 +65,7 @@ CONTAINS
     IMPLICIT NONE
     INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'OpenMP walltime = ', omp_get_wtime()-wall_time
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'OpenMP walltime = ', omp_get_wtime()-wall_time
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Program ends'
 
   END SUBROUTINE conclusion
@@ -81,7 +81,7 @@ CONTAINS
 
     r_cut_box = r_cut / box
     IF ( r_cut_box > 0.5 ) THEN
-       WRITE ( unit=error_unit, fmt='(a,f15.5)' ) 'r_cut/box too large ', r_cut_box
+       WRITE ( unit=error_unit, fmt='(a,f15.6)' ) 'r_cut/box too large ', r_cut_box
        STOP 'Error in allocate_arrays'
     END IF
 

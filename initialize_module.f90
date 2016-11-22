@@ -246,7 +246,7 @@ CONTAINS
     REAL               :: v_rms ! Root-mean-square velocity component
     REAL, DIMENSION(3) :: v_cm  ! Centre of mass velocity
 
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Velocities at temperature', temperature
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Velocities at temperature', temperature
 
     IF ( .NOT. ALLOCATED ( v ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array v is not allocated'
@@ -282,7 +282,7 @@ CONTAINS
     REAL    ::  w_sq, w_sq_mean, w_std_dev,  zeta
     INTEGER ::  i
 
-    WRITE ( unit=output_unit, fmt='(a,t40,2f15.5)' ) 'Angular velocities at temperature, inertia', temperature, inertia
+    WRITE ( unit=output_unit, fmt='(a,t40,2f15.6)' ) 'Angular velocities at temperature, inertia', temperature, inertia
 
     IF ( .NOT. ALLOCATED ( w ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array w is not allocated'
@@ -517,7 +517,7 @@ CONTAINS
     INTEGER              :: i, xyz
     REAL, PARAMETER      :: tol = 1.e-6
 
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Chain velocities at temperature', temperature
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Chain velocities at temperature', temperature
 
     IF ( .NOT. ALLOCATED ( v ) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a)' ) 'Array v is not allocated'

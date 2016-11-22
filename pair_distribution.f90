@@ -55,7 +55,7 @@ PROGRAM pair_distribution
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in pair_distribution'
   END IF
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'g(r) spacing dr = ', dr
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'g(r) spacing dr = ', dr
 
   WRITE ( sav_tag, fmt='(i3.3)' ) 0 ! use initial configuration to get n and box
   INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! check the file exists

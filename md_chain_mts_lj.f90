@@ -75,15 +75,15 @@ PROGRAM md_chain_mts_lj
   ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Time step',                 dt
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond spring constant',      k_spring
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step',                 dt
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Bond spring constant',      k_spring
   WRITE ( unit=output_unit, fmt='(a,t40,i15  )' ) 'Multiple time step factor', n_mts
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Large time step',           dt*n_mts
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Large time step',           dt*n_mts
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond ) ! First call is just to get n and bond
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',          n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.5)' ) 'Bond length (in sigma units)', bond
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Bond length (in sigma units)', bond
   CALL allocate_arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r, v ) ! Second call is to get r and v
   CALL zero_cm ! Set centre-of-mass position and velocity to zero
