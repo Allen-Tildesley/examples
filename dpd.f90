@@ -218,7 +218,7 @@ CONTAINS
 
     ! Kinetic temperature
     ! Momentum is conserved, hence 3N-3 degrees of freedom
-    t_k = variable_type ( nam = 'T:kinetic', val = 2.0*kin/REAL(3*n-3) )
+    t_k = variable_type ( nam = 'T kinetic', val = 2.0*kin/REAL(3*n-3) )
 
     ! Internal energy per atom
     ! Total KE plus total PE divided N
@@ -230,7 +230,7 @@ CONTAINS
 
     ! Configurational temperature
     ! Total squared force divided by total Laplacian
-    t_c = variable_type ( nam = 'T:config', val = fsq/total%lap )
+    t_c = variable_type ( nam = 'T config', val = fsq/total%lap )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

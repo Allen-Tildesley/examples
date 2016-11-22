@@ -212,18 +212,18 @@ CONTAINS
     ! Move acceptance ratio
 
     IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move:ratio', val = 0.0 )
+       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
     ELSE
-       m_r = variable_type ( nam = 'Move:ratio', val = m_ratio )
+       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
     END IF
 
     ! Internal energy per molecule (cut-and-shifted potential)
     ! Ideal gas contribution (assuming nonlinear molecules) plus total (cut-and-shifted) PE divided by N
-    e_s = variable_type ( nam = 'E/N:cut&shift', val = 3.0*temperature + total%pot/REAL(n) )
+    e_s = variable_type ( nam = 'E/N cut&shift', val = 3.0*temperature + total%pot/REAL(n) )
 
     ! Pressure (cut-and-shifted potential)
     ! Ideal gas contribution plus total virial divided by V
-    p_s = variable_type ( nam = 'P:cut&shift', val = rho*temperature + total%vir/vol )
+    p_s = variable_type ( nam = 'P cut&shift', val = rho*temperature + total%vir/vol )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

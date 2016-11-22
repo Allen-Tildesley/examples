@@ -180,9 +180,9 @@ CONTAINS
     ! Move acceptance ratio
 
     IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move:ratio', val = 0.0 )
+       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
     ELSE
-       m_r = variable_type ( nam = 'Move:ratio', val = m_ratio )
+       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
     END IF
 
     ! Pressure in units kT/sigma**3
@@ -190,7 +190,7 @@ CONTAINS
     p = variable_type ( nam = 'P', val = rho + vir/vol )
 
     ! Orientational order parameter
-    order = variable_type ( nam = 'Order:orientational', val = ord )
+    order = variable_type ( nam = 'Order orientational', val = ord )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

@@ -178,33 +178,33 @@ CONTAINS
 
     ! Internal energy (cut-and-shifted) per atom
     ! Total KE plus total cut-and-shifted PE divided by N
-    e_s = variable_type ( nam = 'E/N:cut&shifted', val = (kin+total%pot)/REAL(n) )
+    e_s = variable_type ( nam = 'E/N cut&shifted', val = (kin+total%pot)/REAL(n) )
 
     ! Internal energy (full, including LRC) per atom
     ! LRC plus total KE plus total cut (but not shifted) PE divided by N
-    e_f = variable_type ( nam = 'E/N:full', val = potential_lrc(rho,r_cut) + (kin+total%cut)/REAL(n) )
+    e_f = variable_type ( nam = 'E/N full', val = potential_lrc(rho,r_cut) + (kin+total%cut)/REAL(n) )
 
     ! Pressure (cut-and-shifted)
     ! Ideal gas contribution plus total virial divided by V
-    p_s = variable_type ( nam = 'P:cut&shifted', val = rho*tmp + total%vir/vol )
+    p_s = variable_type ( nam = 'P cut&shifted', val = rho*tmp + total%vir/vol )
 
     ! Pressure (full, including LRC)
     ! LRC plus ideal gas contribution plus total virial divided by V
-    p_f = variable_type ( nam = 'P:full', val = pressure_lrc(rho,r_cut) + rho*tmp + total%vir/vol )
+    p_f = variable_type ( nam = 'P full', val = pressure_lrc(rho,r_cut) + rho*tmp + total%vir/vol )
 
     ! Kinetic temperature
-    t_k = variable_type ( nam = 'T:kinetic', val = tmp )
+    t_k = variable_type ( nam = 'T kinetic', val = tmp )
 
     ! Configurational temperature
     ! Total squared force divided by total Laplacian with small Hessian correction
-    t_c = variable_type ( nam = 'T:config', val = fsq/(total%lap-(2.0*hes/fsq)) )
+    t_c = variable_type ( nam = 'T config', val = fsq/(total%lap-(2.0*hes/fsq)) )
 
     ! Mean-squared deviation of cut-and-shifted potential energy, intensive
     ! This may be used to calculate the heat capacity Cv
-    pe_msd = variable_type ( nam = 'PE/sqrt(N):MSD', val = total%pot/SQRT(REAL(n)), msd = .TRUE. )
+    pe_msd = variable_type ( nam = 'PE/sqrt(N) MSD', val = total%pot/SQRT(REAL(n)), msd = .TRUE. )
 
     ! Mean-squared deviation of conserved energy
-    conserved_msd = variable_type ( nam = 'E:MSD', val = kin+total%pot, msd = .TRUE. )
+    conserved_msd = variable_type ( nam = 'E MSD', val = kin+total%pot, msd = .TRUE. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

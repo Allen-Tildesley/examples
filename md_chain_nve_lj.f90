@@ -192,7 +192,7 @@ CONTAINS
     ! Kinetic temperature
     ! Remove 6 degrees of freedom for conserved linear and angular momentum
     ! and also (n-1) degrees of freedom for the bond constraints
-    t_k = variable_type ( nam = 'T:kinetic', val = 2.0*kin/REAL(3*n-(n-1)-6) )
+    t_k = variable_type ( nam = 'T kinetic', val = 2.0*kin/REAL(3*n-(n-1)-6) )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

@@ -324,32 +324,32 @@ CONTAINS
     ! Move and exchange acceptance ratios
 
     IF ( PRESENT ( string ) ) THEN ! The ratios are meaningless in this case
-       m_r = variable_type ( nam = 'Move:ratio', val = 0.0 )
-       x_r = variable_type ( nam = 'Swap:ratio', val = 0.0 )
+       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
+       x_r = variable_type ( nam = 'Swap ratio', val = 0.0 )
     ELSE
-       m_r = variable_type ( nam = 'Move:ratio', val = m_ratio )
-       x_r = variable_type ( nam = 'Swap:ratio', val = x_ratio )
+       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
+       x_r = variable_type ( nam = 'Swap ratio', val = x_ratio )
     END IF
 
     ! Internal energy per atom for simulated, cut, potential
     ! Ideal gas contribution plus cut (but not shifted) PE divided by N 
-    e_c = variable_type ( nam = 'E:cut', val = 1.5*temperature + total%pot/REAL(n) )
+    e_c = variable_type ( nam = 'E cut', val = 1.5*temperature + total%pot/REAL(n) )
 
     ! Internal energy per atom for full potential with LRC
     ! LRC plus ideal gas contribution plus cut (but not shifted) PE divided by N
-    e_f = variable_type ( nam = 'E:full', val = potential_lrc(rho,r_cut) + 1.5*temperature + total%pot/REAL(n) )
+    e_f = variable_type ( nam = 'E full', val = potential_lrc(rho,r_cut) + 1.5*temperature + total%pot/REAL(n) )
 
     ! Pressure for simulated, cut, potential
     ! Delta correction plus ideal gas contribution plus total virial divided by V 
-    p_c = variable_type ( nam = 'P:cut', val = pressure_delta(rho,r_cut) + rho*temperature + total%vir/vol )
+    p_c = variable_type ( nam = 'P cut', val = pressure_delta(rho,r_cut) + rho*temperature + total%vir/vol )
 
     ! Pressure for full potential with LRC
     ! LRC plus ideal gas contribution plus total virial divided by V
-    p_f = variable_type ( nam = 'P:full', val = pressure_lrc(rho,r_cut) + rho*temperature + total%vir/vol )
+    p_f = variable_type ( nam = 'P full', val = pressure_lrc(rho,r_cut) + rho*temperature + total%vir/vol )
 
     ! Configurational temperature
     ! Total squared force divided by total Laplacian
-    t_c = variable_type ( nam = 'T:config', val = fsq/total%lap )
+    t_c = variable_type ( nam = 'T config', val = fsq/total%lap )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

@@ -241,25 +241,33 @@ CONTAINS
     rho = REAL(n) / vol             ! Density
     kin = 1.5 * n * p * temperature ! Average kinetic energy for NP-atom system
 
+    ! Variables of interest, of type variable_type, containing three components:
+    !   %val: the instantaneous value
+    !   %nam: used for headings
+    !   %msd: indicating if mean squared deviation required
+    ! If not set below, %msd adopts its default value of .false.
+    ! The %msd and %nam components need only be defined once, at the start of the program,
+    ! but for clarity and readability we assign all the values together below
+
     ! Acceptance ratio of moves
 
     IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move:ratio', val = 0.0 )
+       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
     ELSE
-       m_r = variable_type ( nam = 'Move:ratio', val = m_ratio )
+       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
     END IF
 
     ! Internal energy per atom for simulated, cut, potential
     ! Total (cut but not shifted) PE already divided by factor P
     ! plus total classical KE for NP-atom system MINUS total spring potential
     ! all divided by N
-    e_c = variable_type ( nam = 'E/N:cut', val = (kin+total%pot-total_spr)/REAL(n) )
+    e_c = variable_type ( nam = 'E/N cut', val = (kin+total%pot-total_spr)/REAL(n) )
 
     ! Internal energy per atom for full potential with LRC
     ! LRC plus total (cut but not shifted) PE already divided by factor P
     ! plus total classical KE for NP-atom system MINUS total spring potential
     ! all divided by N
-    e_f = variable_type ( nam = 'E/N:full', val = potential_lrc(rho,r_cut) + (kin+total%pot-total_spr)/REAL(n) )
+    e_f = variable_type ( nam = 'E/N full', val = potential_lrc(rho,r_cut) + (kin+total%pot-total_spr)/REAL(n) )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

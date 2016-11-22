@@ -172,9 +172,9 @@ CONTAINS
     ! Move acceptance ratio
 
     IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move:ratio', val = 0.0 )
+       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
     ELSE
-       m_r = variable_type ( nam = 'Move:ratio', val = m_ratio )
+       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
     END IF
 
     ! Pressure in units kT/sigma**3
