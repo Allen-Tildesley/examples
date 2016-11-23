@@ -68,7 +68,7 @@ PROGRAM md_lj_mts
 
   ! Set sensible default run parameters for testing
   nblock = 10
-  nstep  = 1000
+  nstep  = 6000
   r_cut  = [ 2.4, 3.5, 4.0 ]
   n_mts  = [ 1, 4, 2 ]
   dt     = 0.002
@@ -85,26 +85,10 @@ PROGRAM md_lj_mts
   END IF
 
   ! Write out run parameters
-
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'      ) 'Number of blocks',           nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'      ) 'Number of steps per block',  nstep
   WRITE ( unit=output_unit, fmt='(a,t40,*(f15.6))' ) 'Potential cutoff distances', r_cut
-
-  DO k = 1, k_max
-     IF ( k == 1 ) THEN
-        pairs = r_cut(k)**3
-     ELSE
-        pairs = r_cut(k)**3 - r_cut(k-1)**3
-        IF ( r_cut(k)-r_cut(k-1) < lambda ) THEN
-           WRITE ( unit=error_unit, fmt='(a,3f15.6)' ) 'r_cut interval error', r_cut(k-1), r_cut(k), lambda
-           STOP 'Error in md_lj_mts'
-        END IF
-     END IF
-     pairs = REAL(n*(n-1)/2) * (4.0/3.0)*pi * pairs / box**3
-     WRITE ( unit=output_unit, fmt='(a,i1,t40,i15)' ) 'Estimated pairs in shell ', k, NINT ( pairs )
-  END DO
-
-  WRITE ( unit=output_unit, fmt='(a,t40,*(i15))'  ) 'Multiple step ratios', n_mts(:)
+  WRITE ( unit=output_unit, fmt='(a,t40,*(i15))'   ) 'Multiple step ratios', n_mts(:)
   IF ( n_mts(1) /= 1 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)' ) 'n_mts(1) must be 1', n_mts(1)
      STOP 'Error in md_lj_mts'
@@ -132,6 +116,21 @@ PROGRAM md_lj_mts
   vcm(:) = SUM ( v(:,:), dim=2 ) / REAL(n)                  ! Centre-of mass velocity
   v(:,:) = v(:,:) - SPREAD ( vcm(:), dim = 2, ncopies = n ) ! Set COM velocity to zero
 
+  ! Diagnostic information to assess efficiency
+  DO k = 1, k_max
+     IF ( k == 1 ) THEN
+        pairs = r_cut(k)**3
+     ELSE
+        pairs = r_cut(k)**3 - r_cut(k-1)**3
+        IF ( r_cut(k)-r_cut(k-1) < lambda ) THEN
+           WRITE ( unit=error_unit, fmt='(a,3f15.6)' ) 'r_cut interval error', r_cut(k-1), r_cut(k), lambda
+           STOP 'Error in md_lj_mts'
+        END IF
+     END IF
+     pairs = REAL((n*(n-1))/2) * (4.0/3.0)*pi * pairs / box**3
+     WRITE ( unit=output_unit, fmt='(a,i1,t40,i15)' ) 'Estimated pairs in shell ', k, NINT ( pairs )
+  END DO
+
   ! Calculate initial forces and pot, vir contributions for each shell
   DO k = 1, k_max
      CALL force ( box, r_cut, lambda, k, total(k) )
@@ -141,7 +140,7 @@ PROGRAM md_lj_mts
      END IF
   END DO
   CALL calculate ( 'Initial values' )
-
+  
   ! Initialize arrays for averaging and write column headings
   CALL run_begin ( output_unit, variables )
 
@@ -255,7 +254,7 @@ CONTAINS
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
 
-    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c
+    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, pe_s_msd, pe_f_msd, conserved_msd
 
     REAL :: kin, vol, rho, tmp, pot, cut, vir, lap, fsq, hes
 
@@ -302,13 +301,24 @@ CONTAINS
     ! Total squared force divided by Laplacian with small Hessian correction
     t_c = variable_type ( nam = 'T config', val = fsq/(lap-2.0*(hes/fsq)) )
 
+    ! Mean-squared deviation of cut-and-shifted potential energy, intensive
+    ! This may be used to calculate the heat capacity Cv
+    pe_s_msd = variable_type ( nam = 'PE/sqrt(N) cut&shifted MSD', val = pot/SQRT(REAL(n)), msd = .TRUE. )
+
+    ! Mean-squared deviation of full potential energy, intensive
+    ! This may be used to calculate the heat capacity Cv
+    pe_f_msd = variable_type ( nam = 'PE/sqrt(N) full MSD', val = cut/SQRT(REAL(n)), msd = .TRUE. )
+
+    ! Mean-squared deviation of conserved energy
+    conserved_msd = variable_type ( nam = 'E MSD', val = kin+pot, msd = .TRUE. )
+
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c ]
+    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, pe_s_msd, pe_f_msd, conserved_msd ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables )
+       CALL write_variables ( output_unit, variables(1:6) ) ! Don't write out MSD variables
     END IF
 
   END SUBROUTINE calculate

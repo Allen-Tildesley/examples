@@ -157,7 +157,7 @@ CONTAINS
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
 
-    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, pe_msd, conserved_msd
+    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, pe_s_msd, pe_f_msd, conserved_msd
     REAL                :: vol, rho, fsq, kin, hes, tmp
 
     ! Preliminary calculations
@@ -201,14 +201,18 @@ CONTAINS
 
     ! Mean-squared deviation of cut-and-shifted potential energy, intensive
     ! This may be used to calculate the heat capacity Cv
-    pe_msd = variable_type ( nam = 'PE/sqrt(N) MSD', val = total%pot/SQRT(REAL(n)), msd = .TRUE. )
+    pe_s_msd = variable_type ( nam = 'PE/sqrt(N) cut&shifted MSD', val = total%pot/SQRT(REAL(n)), msd = .TRUE. )
+
+    ! Mean-squared deviation of full potential energy, intensive
+    ! This may be used to calculate the heat capacity Cv
+    pe_f_msd = variable_type ( nam = 'PE/sqrt(N) full MSD', val = total%cut/SQRT(REAL(n)), msd = .TRUE. )
 
     ! Mean-squared deviation of conserved energy
     conserved_msd = variable_type ( nam = 'E MSD', val = kin+total%pot, msd = .TRUE. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, pe_msd, conserved_msd ]
+    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, pe_s_msd, pe_f_msd, conserved_msd ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string

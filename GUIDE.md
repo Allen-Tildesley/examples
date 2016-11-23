@@ -106,12 +106,20 @@ Estimated from (f) | 0.75  | 1.00      |           |          |           | -3.3
 `bd_nvt_lj`        | 0.75  | 1.00      | -2.925(3) | 0.980(5) |  2.36(8)  |           |          | -3.725(3) | 0.379(5) |  2.37(8)  |
 `mc_nvt_lj`        | 0.75  | 1.00      |           |          |           | -3.332(1) | 0.651(3) | -3.734(1) | 0.350(3) |  2.28(1)  |
 `md_nvt_lj`        | 0.75  | 1.00      | -2.993(3) | 0.965(6) |  2.08(11) |           |          | -3.733(3) | 0.363(6) |  2.09(12) |
-`md_nve_lj`        | 0.75  | 1.0031(1) | -2.9280   | 0.989(2) |  2.25(1)* |           |          | -3.7276   | 0.387(2) |           |
+`md_nve_lj`        | 0.75  | 1.0031(1) | -2.9280   | 0.989(2) |  2.25(1)&dagger; |    |          | -3.7276   | 0.387(2) |           |
+`md_nve_lj_omp`    | 0.75  | 1.0027(1) | -2.9280   | 0.990(2) |  2.26(1)&dagger; |    |          | -3.7276   | 0.388(2) |           |
 `smc_nvt_lj`       | 0.75  | 1.00      | -2.930(1) | 0.969(4) |  2.27(1)  |           |          | -3.729(1) | 0.367(4) |  2.27(1)  |
 
-The MC program does not seem to produce accurate pressures
-The SMC program seems to have a bug affecting multi-atom moves
-Cv* for the MD program estimated from PE MSD
+The MC program does not seem to produce accurate pressures, needs investigating
+The SMC program seems to have a bug affecting multi-atom moves, needs fixing
+
+Results for `md_lj_mts` are not directly comparable, because they use a larger cutoff (by default _Rc_ = 4.0  &sigma;)
+and a larger system (e.g. _N_ = 400) but here are the averages from a typical simulation
+Source             | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _Cv_ (cs) | _E_ (f)    | _P_ (f)  | _Cv_ (f)  |
+`md_lj_mts`        | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)&dagger;  | -3.7188(5) | 0.404(2) | 2.27(1)*  |
+With the default parameters, energy conservation is not great, with MSD average around 0.02
+
+Note(&dagger;): Cv for the MD NVE programs estimated from PE MSD: Cv/NkB = 9/(6-4X) where X=<PE<sup>2</sup>>/N(kBT)<sup>2</sup>
 
 #Brownian dynamics program
 The program `bd_nvt_lj` carries out a Brownian dynamics simulation for a set of atoms

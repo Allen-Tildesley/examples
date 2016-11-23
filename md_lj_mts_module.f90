@@ -214,8 +214,9 @@ CONTAINS
 
           END IF ! End test whether in shell
 
-       END DO ! End loop over pairs in this shell
+       END DO
     END DO
+    ! End double loop over atoms
 
     total%vir = total%vir / 3.0 ! Divide virial by 3
     total%lap = total%lap * 2.0 ! Factor 2 for ij and ji
@@ -264,19 +265,17 @@ CONTAINS
 
     ! Calculates Hessian function (for 1/N correction to config temp)
     ! This routine is only needed in a constant-energy ensemble
-    ! It is assumed that positions are in units where box = 1
-    ! but the result is given in units where sigma = 1 and epsilon = 1
+    ! The result is given in units where sigma = 1 and epsilon = 1
+    ! It is assumed that positions are in those units too
     ! It is assumed that forces for all shells have already been calculated in array f(3,n,:)
     ! These need to be summed over the last index to get the total fij between two atoms
 
     INTEGER            :: i, j
-    REAL               :: r_cut_box, r_cut_box_sq, box_sq, rij_sq
+    REAL               :: r_cut_sq, rij_sq
     REAL               :: sr2, sr6, sr8, sr10, rf, ff, v1, v2
     REAL, DIMENSION(3) :: rij, fij
 
-    r_cut_box    = r_cut / box
-    r_cut_box_sq = r_cut_box ** 2
-    box_sq       = box ** 2
+    r_cut_sq = r_cut ** 2
 
     hes = 0.0
 
@@ -284,14 +283,11 @@ CONTAINS
 
        DO j = i + 1, n ! Begin inner loop over atoms
 
-          rij(:) = r(:,i) - r(:,j)           ! Separation vector
-          rij(:) = rij(:) - ANINT ( rij(:) ) ! Periodic boundary conditions in box=1 units
-          rij_sq = SUM ( rij**2 )            ! Squared separation
+          rij(:) = r(:,i) - r(:,j)                       ! Separation vector
+          rij(:) = rij(:) - ANINT ( rij(:) / box ) * box ! Periodic boundary conditions
+          rij_sq = SUM ( rij**2 )                        ! Squared separation
 
-          IF ( rij_sq < r_cut_box_sq ) THEN ! Check within cutoff
-
-             rij_sq = rij_sq * box_sq ! Now in sigma=1 units
-             rij(:) = rij(:) * box    ! Now in sigma=1 units
+          IF ( rij_sq < r_cut_sq ) THEN ! Check within cutoff
 
              fij(:) = SUM ( f(:,i,:) - f(:,j,:), dim=2 ) ! Difference in forces
 
