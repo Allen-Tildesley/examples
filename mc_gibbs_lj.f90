@@ -1,7 +1,7 @@
 ! mc_gibbs_lj.f90
 ! Monte Carlo, Gibbs ensemble
 PROGRAM mc_gibbs_lj
-  
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
@@ -32,30 +32,31 @@ PROGRAM mc_gibbs_lj
   ! The model is defined in mc_module
 
   ! Most important variables
-  REAL, dimension(2) :: box ! Box lengths
-  REAL :: dr_max            ! Maximum MC displacement
-  REAL :: temperature       ! Specified temperature
-  REAL :: r_cut             ! Potential cutoff distance
+  REAL, DIMENSION(2) :: box         ! Box lengths
+  REAL               :: dr_max      ! Maximum MC displacement
+  REAL               :: dv_max      ! Maximum MC volume change
+  REAL               :: temperature ! Specified temperature
+  REAL               :: r_cut       ! Potential cutoff distance
 
   ! Quantities to be averaged
   TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & vir & ovr variables
-  TYPE(potential_type), dimension(2) :: total
+  TYPE(potential_type), DIMENSION(2) :: total, total_new
   TYPE(potential_type)               :: partial_old, partial_new
 
-  INTEGER            :: blk, stp, i, nstep, nblock
-  INTEGER            :: try, ntry, m_try, m_acc, u_try, u_acc, d_try, d_acc, v_try, v_acc, ioerr
-  REAL               :: prob_move, prob_create, delta, zeta, m_ratio, u_ratio, d_ratio, v_ratio
+  INTEGER            :: blk, stp, i, nstep, nblock, nswap
+  INTEGER            :: iswap, m_acc, x12_try, x12_acc, x21_try, x21_acc, ioerr
+  REAL               :: delta, dv, zeta, m1_ratio, m2_ratio, x12_ratio, x21_ratio, v_ratio
   REAL, DIMENSION(3) :: ri
+  REAL, DIMENSION(2) :: box_new, vol_new, vol_old
 
-  CHARACTER(len=5), PARAMETER :: cnf1_prefix = 'cnf1.'
-  CHARACTER(len=5), PARAMETER :: cnf2_prefix = 'cnf2.'
-  CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
-  CHARACTER(len=3), PARAMETER :: out_tag    = 'out'
-  CHARACTER(len=3)            :: sav_tag    = 'sav' ! May be overwritten with block number
+  CHARACTER(len=5), DIMENSION(2), PARAMETER :: cnf_prefix = ['cnf1.','cnf2.']
+  CHARACTER(len=3),               PARAMETER :: inp_tag    = 'inp'
+  CHARACTER(len=3),               PARAMETER :: out_tag    = 'out'
+  CHARACTER(len=3)                          :: sav_tag    = 'sav' ! May be overwritten with block number
 
-  NAMELIST /nml/ nblock, nstep, temperature, r_cut, dr_max
+  NAMELIST /nml/ nblock, nstep, nswap, temperature, r_cut, dr_max, dv_max
 
   WRITE( unit=output_unit, fmt='(a)' ) 'mc_gibbs_lj'
   WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, Gibbs ensemble'
@@ -66,10 +67,12 @@ PROGRAM mc_gibbs_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 1000
+  nstep       = 10000
+  nswap       = 20
   temperature = 1.2
   r_cut       = 2.5
   dr_max      = 0.15
+  dv_max      = 10.0
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -84,29 +87,28 @@ PROGRAM mc_gibbs_lj
   ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',              nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',     nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Swap attempts per step',        nswap
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature',                   temperature
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance',     r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum displacement',          dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum volume change',         dv_max
 
   ! Read in initial configurations and allocate necessary arrays
-  CALL read_cnf_atoms ( cnf1_prefix//inp_tag, n1, box(1) ) ! First call is just to get n and box
-  CALL read_cnf_atoms ( cnf2_prefix//inp_tag, n2, box(2) ) ! First call is just to get n and box
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n1
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box(1)
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',               REAL(n1) / box(1)**3
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n2
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box(2)
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',               REAL(n2) / box(2)**3
-  CALL allocate_arrays ( box, r_cut ) ! Allocate r
-  CALL read_cnf_atoms ( cnf1_prefix//inp_tag, n1, box(1), r(:,1:n1) )       ! Second call is to get r
-  CALL read_cnf_atoms ( cnf2_prefix//inp_tag, n2, box(2), r(:,n1+1:n1+n2) ) ! Second call is to get r
-  r1(:,1:n1)       = r(:,1:n1)       / box(1)  ! Convert positions to box units
-  r1(:,n1+1:n1+n2) = r(:,n1+1:n1+n2) / box(2)  ! Convert positions to box units
-  r(:,:)           = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
+  CALL read_cnf_atoms ( cnf_prefix(1)//inp_tag, n(1), box(1) ) ! First call is just to get n and box
+  CALL read_cnf_atoms ( cnf_prefix(2)//inp_tag, n(2), box(2) ) ! First call is just to get n and box
+  WRITE ( unit=output_unit, fmt='(a,t40,2i15)'   ) 'Number of particles',   n(:)
+  WRITE ( unit=output_unit, fmt='(a,t40,2f15.6)' ) 'Simulation box length', box(:)
+  WRITE ( unit=output_unit, fmt='(a,t40,2f15.6)' ) 'Density',               REAL(n(:)) / box(:)**3
+  CALL allocate_arrays ( box(:), r_cut ) ! Allocate r
+  CALL read_cnf_atoms ( cnf_prefix(1)//inp_tag, n(1), box(1), r(:,1:n(1)) )           ! Second call is to get r
+  CALL read_cnf_atoms ( cnf_prefix(2)//inp_tag, n(2), box(2), r(:,n(1)+1:n(1)+n(2)) ) ! Second call is to get r
+  r(:,1:n(1))           = r(:,1:n(1))           / box(1)  ! Convert positions to box units
+  r(:,n(1)+1:n(1)+n(2)) = r(:,n(1)+1:n(1)+n(2)) / box(2)  ! Convert positions to box units
+  r(:,:)                = r(:,:) - ANINT ( r(:,:) )       ! Periodic boundaries
 
   ! Initial energy and overlap check
-  total(1) = potential ( 1,    n1,    box(1), r_cut ) 
-  total(2) = potential ( n1+1, n1+n2, box(2), r_cut ) 
+  total(1) = potential ( 1,      n(1),      box(1), r_cut ) 
+  total(2) = potential ( n(1)+1, n(1)+n(2), box(2), r_cut ) 
   IF ( total(1)%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration 1'
      STOP 'Error in mc_gibbs_lj'
@@ -126,128 +128,167 @@ PROGRAM mc_gibbs_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        m_try = 0
         m_acc = 0
-        u_try = 0
-        u_acc = 0
-        d_try = 0
-        d_acc = 0
-        v_try = 0
-        v_acc = 0
 
-        DO i = 1, n1 ! Loop over atoms in system 1
-              partial_old = potential_1 ( 1, n1, r(:,i), i, box(1), r_cut ) ! Old atom potential, virial etc
+        DO i = 1, n(1) ! Loop over atoms in system 1
 
-              IF ( partial_old%ovr ) THEN ! should never happen
-                 WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
-                 STOP 'Error in mc_gibbs_lj'
-              END IF
+           partial_old = potential_1 ( 1, n(1), r(:,i), i, box(1), r_cut ) ! Old atom potential, virial etc
 
-              ri(:) = random_translate_vector ( dr_max/box(1), r(:,i) ) ! Trial move to new position (in box=1 units)
-              ri(:) = ri(:) - ANINT ( ri(:) )                           ! Periodic boundary correction
+           IF ( partial_old%ovr ) THEN ! should never happen
+              WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
+              STOP 'Error in mc_gibbs_lj'
+           END IF
 
-              partial_new = potential_1 ( 1, n1, ri, i, box(1), r_cut ) ! New atom potential, virial etc
+           ri(:) = random_translate_vector ( dr_max/box(1), r(:,i) ) ! Trial move to new position (in box=1 units)
+           ri(:) = ri(:) - ANINT ( ri(:) )                           ! Periodic boundary correction
 
-              IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
+           partial_new = potential_1 ( 1, n(1), ri, i, box(1), r_cut ) ! New atom potential, virial etc
 
-                 delta = partial_new%pot - partial_old%pot ! Use cut (but not shifted) potential
-                 delta = delta / temperature               ! Divide by temperature
+           IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
 
-                 IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                    CALL move ( i, ri )                       ! Update position
-                    total(1) = total(1) + partial_new - partial_old ! Update total values
-                    m_acc = m_acc + 1                         ! Increment move counter
-                 END IF ! End accept Metropolis test
-
-              END IF ! End test for overlapping configuration
-           END DO ! End loop over atoms in system 1
-
-           DO i = n1+1, n1+n2 ! Loop over atoms in system 2
-              partial_old = potential_1 ( n1+1, n1+n2, r(:,i), i, box(2), r_cut ) ! Old atom potential, virial etc
-
-              IF ( partial_old%ovr ) THEN ! should never happen
-                 WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
-                 STOP 'Error in mc_gibbs_lj'
-              END IF
-
-              ri(:) = random_translate_vector ( dr_max/box(2), r(:,i) ) ! Trial move to new position (in box=1 units)
-              ri(:) = ri(:) - ANINT ( ri(:) )                           ! Periodic boundary correction
-
-              partial_new = potential_1 ( n1+1, n1+n2, ri, i, box(2), r_cut ) ! New atom potential, virial etc
-
-              IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
-
-                 delta = partial_new%pot - partial_old%pot ! Use cut (but not shifted) potential
-                 delta = delta / temperature               ! Divide by temperature
-
-                 IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                    CALL move ( i, ri )                       ! Update position
-                    total(2) = total(2) + partial_new - partial_old ! Update total values
-                    m_acc = m_acc + 1                         ! Increment move counter
-                 END IF ! End accept Metropolis test
-
-              END IF ! End test for overlapping configuration
-           END DO ! End loop over atoms in system 2
-
-           ELSE IF ( zeta < prob_move + prob_create ) THEN ! Try create
-
-              c_try = c_try + 1
-
-              IF ( n+1 > SIZE(r,dim=2) ) then
-                 WRITE ( unit=error_unit, fmt='(a,2i5)') 'n has grown too large', n+1, SIZE(r,dim=2)
-                 STOP 'Error in mc_zvt_lj'
-              END IF
-
-              CALL RANDOM_NUMBER ( ri ) ! Three uniform random numbers in range (0,1)
-              ri = ri - 0.5             ! Now in range (-0.5,+0.5) for box=1 units
-
-              partial_new = potential_1 ( ri, n+1, box, r_cut ) ! New atom potential, virial, etc
-
-              IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
-
-                 delta = partial_new%pot / temperature                    ! Use cut (not shifted) potential
-                 delta = delta - LOG ( activity * box**3 / REAL ( n+1 ) ) ! Activity term for creation
-
-                 IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                    CALL create ( ri )          ! Create new particle
-                    total = total + partial_new ! Update total values
-                    c_acc = c_acc + 1           ! Increment creation move counter
-                 END IF ! End accept Metropolis test
-
-              END IF ! End test for overlapping configuration
-
-           ELSE ! Try destroy
-
-              d_try = d_try + 1
-
-              i = random_integer ( 1, n ) ! Choose particle at random
-
-              partial_old = potential_1 ( r(:,i), i, box, r_cut ) ! Old atom potential, virial, etc
-
-              IF ( partial_old%ovr ) THEN ! should never happen
-                 WRITE ( unit=error_unit, fmt='(a)') 'Overlap found on particle removal'
-                 STOP 'Error in mc_zvt_lj'
-              END IF
-
-              delta = -partial_old%pot / temperature                      ! Use cut (not shifted) potential
-              delta = delta - LOG ( REAL ( n ) / ( activity * box**3 )  ) ! Activity term for destruction
+              delta = partial_new%pot - partial_old%pot ! Use cut (but not shifted) potential
+              delta = delta / temperature               ! Divide by temperature
 
               IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                 CALL destroy ( i )          ! Destroy chosen particle
-                 total = total - partial_old ! Update total values
-                 d_acc = d_acc + 1           ! Increment destruction move counter
+                 CALL move ( i, ri )                             ! Update position
+                 total(1) = total(1) + partial_new - partial_old ! Update total values
+                 m_acc    = m_acc + 1                            ! Increment move counter
               END IF ! End accept Metropolis test
 
-           END IF ! End choice of move type
+           END IF ! End test for overlapping configuration
 
-        END DO ! End loop over tries of different kinds
+        END DO ! End loop over atoms in system 1
 
-        m_ratio = 0.0
-        c_ratio = 0.0
-        d_ratio = 0.0
-        IF ( m_try > 0 ) m_ratio = REAL(m_acc) / REAL(m_try)
-        IF ( c_try > 0 ) c_ratio = REAL(c_acc) / REAL(c_try)
-        IF ( d_try > 0 ) d_ratio = REAL(d_acc) / REAL(d_try)
+        m1_ratio = REAL(m_acc) / real(n(1))
+
+        m_acc = 0
+        
+        DO i = n(1)+1, n(1)+n(2) ! Loop over atoms in system 2
+
+           partial_old = potential_1 ( n(1)+1, n(1)+n(2), r(:,i), i, box(2), r_cut ) ! Old atom potential, virial etc
+
+           IF ( partial_old%ovr ) THEN ! should never happen
+              WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
+              STOP 'Error in mc_gibbs_lj'
+           END IF
+
+           ri(:) = random_translate_vector ( dr_max/box(2), r(:,i) ) ! Trial move to new position (in box=1 units)
+           ri(:) = ri(:) - ANINT ( ri(:) )                           ! Periodic boundary correction
+
+           partial_new = potential_1 ( n(1)+1, n(1)+n(2), ri, i, box(2), r_cut ) ! New atom potential, virial etc
+
+           IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
+
+              delta = partial_new%pot - partial_old%pot ! Use cut (but not shifted) potential
+              delta = delta / temperature               ! Divide by temperature
+
+              IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
+                 CALL move ( i, ri )                             ! Update position
+                 total(2) = total(2) + partial_new - partial_old ! Update total values
+                 m_acc    = m_acc + 1                            ! Increment move counter
+              END IF ! End accept Metropolis test
+
+           END IF ! End test for overlapping configuration
+
+        END DO ! End loop over atoms in system 2
+
+        m2_ratio = REAL(m_acc) / real(n(2))
+
+        x12_try = 0
+        x12_acc = 0
+        x21_try = 0
+        x21_acc = 0
+
+        DO iswap = 1, nswap ! Loop over swap attempts
+
+           CALL RANDOM_NUMBER ( ri )   ! Three uniform random numbers in range (0,1)
+           ri = ri - 0.5               ! Now in range (-0.5,+0.5) for box=1 units
+           CALL RANDOM_NUMBER ( zeta ) ! Uniform random number on (0,1)
+
+           IF ( zeta > 0.5 ) THEN ! Try swapping 1->2
+
+              x12_try     = x12_try + 1
+              i           = random_integer ( 1, n(1) )                        ! Choose atom at random in system 1
+              partial_old = potential_1 ( 1, n(1), r(:,i), i, box(1), r_cut ) ! Old atom potential, virial, etc
+              IF ( partial_old%ovr ) THEN ! should never happen
+                 WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
+                 STOP 'Error in mc_gibbs_lj'
+              END IF
+              partial_new = potential_1 ( n(1)+1, n(1)+n(2), ri, 0, box(2), r_cut ) ! New atom potential, virial, etc
+
+              IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
+
+                 delta = ( partial_new%pot - partial_old%pot ) / temperature ! Use cut (not shifted) potential
+                 delta = delta - LOG ( box(2)**3 / REAL ( n(2)+1 ) ) ! Creation in 2
+                 delta = delta + LOG ( box(1)**3 / REAL ( n(1) ) )   ! Destruction in 1
+
+                 IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
+                    CALL swap ( i, ri )               ! Carry out swap
+                    total(1) = total(1) - partial_old ! Update total values
+                    total(2) = total(2) + partial_new ! Update total values
+                    x12_acc  = x12_acc + 1            ! Increment 1->2 move counter
+                 END IF ! End accept Metropolis test
+
+              END IF ! End test for overlapping configuration
+
+           ELSE ! Try swapping 2->1
+              x21_try     = x21_try + 1
+              i           = random_integer ( n(1)+1, n(1)+n(2) )                        ! Choose atom at random in system 2
+              partial_old = potential_1 ( n(1)+1, n(1)+n(2), r(:,i), i, box(2), r_cut ) ! Old atom potential, virial, etc
+              IF ( partial_old%ovr ) THEN ! should never happen
+                 WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
+                 STOP 'Error in mc_gibbs_lj'
+              END IF
+              partial_new = potential_1 ( 1, n(1), ri, 0, box(1), r_cut ) ! New atom potential, virial, etc
+
+              IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
+
+                 delta = ( partial_new%pot - partial_old%pot ) / temperature ! Use cut (not shifted) potential
+                 delta = delta - LOG ( box(1)**3 / REAL ( n(1)+1 ) ) ! Creation in 1
+                 delta = delta + LOG ( box(2)**3 / REAL ( n(2) ) )   ! Destruction in 2
+
+                 IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
+                    CALL swap ( i, ri )               ! Carry out swap
+                    total(2) = total(2) - partial_old ! Update total values
+                    total(1) = total(1) + partial_new ! Update total values
+                    x21_acc  = x21_acc + 1            ! Increment 2->1 move counter
+                 END IF ! End accept Metropolis test
+
+              END IF ! End test for overlapping configuration
+           END IF
+
+        END DO ! End loop over swap attempts
+
+        x12_ratio = 0.0
+        IF ( x12_try > 0 ) x12_ratio = REAL(x12_acc) / REAL(x12_try)
+        x21_ratio = 0.0
+        IF ( x21_try > 0 ) x21_ratio = REAL(x21_acc) / REAL(x21_try)
+
+        ! Volume move
+
+        v_ratio = 0.0
+        CALL RANDOM_NUMBER ( zeta )                  ! Uniform on (0,1)
+        dv           = 2.0 * dv_max * ( zeta - 1.0 ) ! Uniform on (-dv_max,+dv_max)
+        vol_old(:)   = box(:)**3                     ! Old volumes
+        vol_new(:)   = vol_old(:) + [-dv,dv]         ! New volumes
+        box_new(:)   = vol_new(:)**(1.0/3.0)         ! New box lengths
+        total_new(1) = potential ( 1,      n(1),      box_new(1), r_cut ) 
+        total_new(2) = potential ( n(1)+1, n(1)+n(2), box_new(2), r_cut ) 
+
+        IF ( .NOT. ANY ( total_new%ovr ) ) THEN ! Test for non-overlapping configurations
+
+           delta = SUM ( total_new%pot - total%pot )             ! Use cut (but not shifted) potential
+           delta = delta / temperature                           ! Divide by temperature
+           delta = delta - REAL(n(1))*LOG(vol_new(1)/vol_old(1)) ! Volume scaling in system 1
+           delta = delta - REAL(n(2))*LOG(vol_new(2)/vol_old(2)) ! Volume scaling in system 2
+
+           IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
+              total(:) = total_new(:) ! Update total values
+              box(:)   = box_new(:)   ! Update box lengths
+              v_ratio  = 1.0          ! Set move counter
+           END IF ! Reject Metropolis test
+
+        END IF ! End test for non-overlapping configurations
 
         ! Calculate and accumulate variables for this step
         CALL calculate ( )
@@ -255,9 +296,10 @@ PROGRAM mc_gibbs_lj
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )                                  ! Output block averages
-     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk                   ! Number configuration by block
-     CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r(:,1:n)*box ) ! Save configuration
+     CALL blk_end ( blk, output_unit )                                                           ! Output block averages
+     IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk                                            ! Number configuration by block
+     CALL write_cnf_atoms ( cnf_prefix(1)//sav_tag, n(1), box(1), box(1)*r(:,1:n(1)) )           ! Save configuration
+     CALL write_cnf_atoms ( cnf_prefix(2)//sav_tag, n(2), box(2), box(2)*r(:,n(1)+1:n(1)+n(2)) ) ! Save configuration
 
   END DO ! End loop over blocks
 
@@ -266,15 +308,21 @@ PROGRAM mc_gibbs_lj
   CALL calculate ( 'Final values' )
 
   ! Double-check book-keeping of totals and overlap
-  total = potential ( box, r_cut )
-  IF ( total%ovr ) THEN ! should never happen
-     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
-     STOP 'Error in mc_zvt_lj'
+  total(1) = potential ( 1, n(1), box(1), r_cut )
+  IF ( total(1)%ovr ) THEN ! should never happen
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration 1'
+     STOP 'Error in mc_gibbs_lj'
+  END IF
+  total(2) = potential ( n(1)+1, n(1)+n(2), box(2), r_cut )
+  IF ( total(2)%ovr ) THEN ! should never happen
+     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration 2'
+     STOP 'Error in mc_gibbs_lj'
   END IF
   CALL calculate ( 'Final check' )
   CALL time_stamp ( output_unit )
 
-  CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r(:,1:n)*box ) ! Write out final configuration
+  CALL write_cnf_atoms ( cnf_prefix(1)//out_tag, n(1), box(1), box(1)*r(:,1:n(1))           ) ! Write out final configuration
+  CALL write_cnf_atoms ( cnf_prefix(2)//out_tag, n(2), box(2), box(2)*r(:,n(1)+1:n(1)+n(2)) ) ! Write out final configuration
 
   CALL deallocate_arrays
   CALL conclusion ( output_unit )
@@ -282,7 +330,7 @@ PROGRAM mc_gibbs_lj
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE mc_module,       ONLY : potential_lrc, pressure_lrc, pressure_delta, force_sq
+    USE mc_module,       ONLY : potential_lrc, pressure_lrc, pressure_delta
     USE averages_module, ONLY : write_variables
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
@@ -296,13 +344,12 @@ CONTAINS
     ! estimates of < e_f > and < p_f > for the full (uncut) potential
     ! The value of the cut-and-shifted potential is not used, in this example
 
-    TYPE(variable_type) :: m_r, c_r, d_r, density, e_c, p_c, e_f, p_f, t_c
-    REAL                :: fsq, vol, rho
+    TYPE(variable_type) :: m1_r, m2_r, x12_r, x21_r, v_r, density_1, density_2, e1_c, e2_c, p1_c, p2_c
+    REAL, dimension(2)  :: vol, rho
 
     ! Preliminary calculations (m_ratio, total etc are known already)
-    fsq = force_sq ( box, r_cut )
-    vol = box**3
-    rho = REAL(n) / vol
+    vol(:) = box(:)**3
+    rho(:) = REAL(n(:)) / vol(:)
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -314,46 +361,41 @@ CONTAINS
 
     ! Move, creation, and destruction acceptance ratios
 
-    IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move ratio',    val = 0.0 )
-       c_r = variable_type ( nam = 'Create ratio',  val = 0.0 )
-       d_r = variable_type ( nam = 'Destroy ratio', val = 0.0 )
+    IF ( PRESENT ( string ) ) THEN ! The ratios are meaningless in this case
+       m1_r  = variable_type ( nam = 'Move ratio (1)',    val = 0.0 )
+       m2_r  = variable_type ( nam = 'Move ratio (2)',    val = 0.0 )
+       x12_r = variable_type ( nam = 'Swap ratio (1->2)', val = 0.0 )
+       x21_r = variable_type ( nam = 'Swap ratio (2->1)', val = 0.0 )
+       v_r   = variable_type ( nam = 'Volume ratio',      val = 0.0 )
     ELSE
-       m_r = variable_type ( nam = 'Move ratio',    val = m_ratio )
-       c_r = variable_type ( nam = 'Create ratio',  val = c_ratio )
-       d_r = variable_type ( nam = 'Destroy ratio', val = d_ratio )
+       m1_r  = variable_type ( nam = 'Move ratio (1)',    val = m1_ratio  )
+       m2_r  = variable_type ( nam = 'Move ratio (2)',    val = m2_ratio  )
+       x12_r = variable_type ( nam = 'Swap ratio (1->2)', val = x12_ratio )
+       x21_r = variable_type ( nam = 'Swap ratio (2->1)', val = x21_ratio )
+       v_r   = variable_type ( nam = 'Volume ratio',      val = v_ratio   )
     END IF
 
     ! Density
-    density = variable_type ( nam = 'Density', val = rho )
+    density_1 = variable_type ( nam = 'Density (1)', val = rho(1) )
+    density_2 = variable_type ( nam = 'Density (2)', val = rho(2) )
 
     ! Internal energy per atom for simulated, cut, potential
     ! Ideal gas contribution plus cut (but not shifted) PE divided by N
-    e_c = variable_type ( nam = 'E/N cut', val = 1.5*temperature + total%pot/REAL(n) )
-
-    ! Internal energy per atom for full potential with LRC
-    ! LRC plus ideal gas contribution plus cut (but not shifted) PE divided by N
-    e_f = variable_type ( nam = 'E/N full', val = potential_lrc(rho,r_cut) + 1.5*temperature + total%pot/REAL(n) )
+    e1_c = variable_type ( nam = 'E/N cut (1)', val = 1.5*temperature + total(1)%pot/REAL(n(1)) )
+    e2_c = variable_type ( nam = 'E/N cut (2)', val = 1.5*temperature + total(2)%pot/REAL(n(2)) )
 
     ! Pressure for simulated, cut, potential
     ! delta correction plus ideal gas contribution plus total virial divided by V
-    p_c = variable_type ( nam = 'P cut', val = pressure_delta(rho,r_cut) + rho*temperature + total%vir/vol )
-
-    ! Pressure for full potential with LRC
-    ! LRC plus ideal gas contribution plus total virial divided by V 
-    p_f = variable_type ( nam = 'P full', val = pressure_lrc(rho,r_cut) + rho*temperature + total%vir/vol )
-
-    ! Configurational temperature
-    ! Total squared force divided by total Laplacian
-    t_c = variable_type ( nam = 'T config', val = fsq/total%lap )
+    p1_c = variable_type ( nam = 'P cut (1)', val = pressure_delta(rho(1),r_cut) + rho(1)*temperature + total(1)%vir/vol(1) )
+    p2_c = variable_type ( nam = 'P cut (2)', val = pressure_delta(rho(2),r_cut) + rho(2)*temperature + total(2)%vir/vol(2) )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ m_r, c_r, d_r, density, e_c, p_c, e_f, p_f, t_c ]
+    variables = [ m1_r, m2_r, x12_r, x21_r, v_r, density_1, density_2, e1_c, e2_c, p1_c, p2_c ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(4:) ) ! Don't write out move ratios
+       CALL write_variables ( output_unit, variables(6:) ) ! Don't write out move ratios
     END IF
 
   END SUBROUTINE calculate

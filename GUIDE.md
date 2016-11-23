@@ -119,7 +119,8 @@ Source             | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _Cv_ (cs) | _E_
 `md_lj_mts`        | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)&dagger;  | -3.7188(5) | 0.404(2) | 2.27(1)*  |
 With the default parameters, energy conservation is not great, with MSD average around 0.02
 
-Note(&dagger;): Cv for the MD NVE programs estimated from PE MSD: Cv/NkB = 9/(6-4X) where X=<PE<sup>2</sup>>/N(kBT)<sup>2</sup>
+Note(&dagger;): Cv for the MD NVE programs estimated from PE MSD: Cv/NkB = 9/(6-4X)
+where X=MSD(PE/sqrt(N))/(kBT)<sup>2</sup>
 
 #Brownian dynamics program
 The program `bd_nvt_lj` carries out a Brownian dynamics simulation for a set of atoms

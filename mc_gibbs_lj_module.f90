@@ -9,15 +9,12 @@ MODULE mc_module
 
   ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: potential_1, potential, potential_lrc, pressure_lrc, pressure_delta, force_sq
-  PUBLIC :: move, create, destroy
+  PUBLIC :: potential_1, potential, potential_lrc, pressure_lrc, pressure_delta
+  PUBLIC :: move, swap
 
   ! Public data
-  INTEGER,                              PUBLIC :: n1,n2 ! Number of atoms in each box
-  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r     ! Positions (3,n1+n2)
-
-  ! Private data
-  REAL, DIMENSION(:,:), ALLOCATABLE :: f ! Forces for force_sq calculation (3,n1+n2)
+  INTEGER, DIMENSION(2),                PUBLIC :: n ! Number of atoms in each box
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! Positions (3,n(1)+n(2))
 
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
 
@@ -25,7 +22,6 @@ MODULE mc_module
   TYPE, PUBLIC :: potential_type   ! A composite variable for interactions comprising
      REAL    :: pot ! the potential energy cut at r_cut and
      REAL    :: vir ! the virial and
-     REAL    :: lap ! the Laplacian and
      LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
    CONTAINS
      PROCEDURE :: add_potential_type
@@ -42,7 +38,6 @@ CONTAINS
     CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  +   b%pot
     c%vir = a%vir  +   b%vir
-    c%lap = a%lap  +   b%lap
     c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
 
@@ -52,7 +47,6 @@ CONTAINS
     CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  -   b%pot
     c%vir = a%vir  -   b%vir
-    c%lap = a%lap  -   b%lap
     c%ovr = a%ovr .OR. b%ovr ! This is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
 
@@ -64,6 +58,7 @@ CONTAINS
     WRITE ( unit=output_unit, fmt='(a)' ) 'Cut (but not shifted)'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'    
     WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Two simulation boxes'
 
   END SUBROUTINE introduction
 
@@ -82,9 +77,9 @@ CONTAINS
 
     REAL :: r_cut_box
 
-    ALLOCATE ( r(3,n1+n2), f(3,n1+n2) )
+    ALLOCATE ( r(3,sum(n)) )
 
-    r_cut_box = r_cut / minval ( box )
+    r_cut_box = r_cut / MINVAL ( box )
     IF ( r_cut_box > 0.5 ) THEN
        WRITE ( unit=error_unit, fmt='(a,f15.6)') 'r_cut/box too large ', r_cut_box
        STOP 'Error in allocate_arrays'
@@ -95,20 +90,19 @@ CONTAINS
   SUBROUTINE deallocate_arrays
     IMPLICIT NONE
 
-    DEALLOCATE ( r, f )
+    DEALLOCATE ( r )
 
   END SUBROUTINE deallocate_arrays
 
   FUNCTION potential ( i1, i2, box, r_cut ) RESULT ( total )
     IMPLICIT NONE
     TYPE(potential_type) :: total  ! Returns a composite of pot, vir etc
-    INTEGER, INTENT(in)  :: i1, i2 ! Index range defining system: (1,n1) or (n1+1,n2)
+    INTEGER, INTENT(in)  :: i1, i2 ! Index range defining system: (1,n(1)) or (n(1)+1,n(1)+n(2))
     REAL,    INTENT(in)  :: box    ! Simulation box length
     REAL,    INTENT(in)  :: r_cut  ! Potential cutoff distance
 
     ! total%pot is the nonbonded cut (not shifted) potential energy for whole system
     ! total%vir is the corresponding virial for whole system
-    ! total%lap is the corresponding Laplacian for whole system
     ! total%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this flag is .true., the values of total%pot etc should not be used
     ! Actual calculation is performed by function potential_1
@@ -116,12 +110,12 @@ CONTAINS
     TYPE(potential_type) :: partial ! Atomic contribution to total
     INTEGER              :: i
 
-    IF ( n1+n2 > SIZE(r,dim=2) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n1+n2, SIZE(r,dim=2)
+    IF ( sum(n) > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', sum(n), SIZE(r,dim=2)
        STOP 'Error in potential'
     END IF
 
-    total = potential_type ( pot=0.0, vir=0.0, lap=0.0, ovr=.FALSE. ) ! Initialize
+    total = potential_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
 
     DO i = i1, i2
 
@@ -143,7 +137,7 @@ CONTAINS
   FUNCTION potential_1 ( i1, i2, ri, i, box, r_cut, j_range ) RESULT ( partial )
     IMPLICIT NONE
     TYPE(potential_type)            :: partial ! Returns a composite of pot, vir etc for given atom
-    INTEGER,            INTENT(in)  :: i1, i2  ! Index range defining system: (1,n1) or (n1+1,n2)
+    INTEGER,            INTENT(in)  :: i1, i2  ! Index range defining system: (1,n(1)) or (n(1)+1,n(1)+n(2))
     REAL, DIMENSION(3), INTENT(in)  :: ri      ! Coordinates of atom of interest
     INTEGER,            INTENT(in)  :: i       ! Index of atom of interest
     REAL,               INTENT(in)  :: box     ! Simulation box length
@@ -152,7 +146,6 @@ CONTAINS
 
     ! partial%pot is the nonbonded cut (not shifted) potential energy of atom ri with a set of other atoms
     ! partial%vir is the corresponding virial of atom ri
-    ! partial%lap is the corresponding Laplacian of atom ri
     ! partial%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this is .true., the values of partial%pot etc should not be used
     ! The coordinates in ri are not necessarily identical with those in r(:,i)
@@ -168,12 +161,8 @@ CONTAINS
     REAL, PARAMETER      :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
     TYPE(potential_type) :: pair
 
-    IF ( n1+n2 > SIZE(r,dim=2) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n1+n2, SIZE(r,dim=2)
-       STOP 'Error in potential_1'
-    END IF
-    IF ( i < i1 .or. i > i2 ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,3i15)' ) 'Indexing error', i1, i2, i
+    IF ( sum(n) > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', sum(n), SIZE(r,dim=2)
        STOP 'Error in potential_1'
     END IF
 
@@ -198,7 +187,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    partial = potential_type ( pot=0.0, vir=0.0, lap=0.0, ovr=.FALSE. ) ! Initialize
+    partial = potential_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Loop over selected range of partners
 
@@ -221,9 +210,8 @@ CONTAINS
 
           sr6      = sr2**3
           sr12     = sr6**2
-          pair%pot = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
-          pair%vir = pair%pot + sr12               ! LJ pair virial
-          pair%lap = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
+          pair%pot = sr12 - sr6      ! LJ pair potential (cut but not shifted)
+          pair%vir = pair%pot + sr12 ! LJ pair virial
 
           partial = partial + pair 
 
@@ -234,60 +222,9 @@ CONTAINS
     ! Include numerical factors
     partial%pot = partial%pot * 4.0        ! 4*epsilon
     partial%vir = partial%vir * 24.0 / 3.0 ! 24*epsilon and divide virial by 3
-    partial%lap = partial%lap * 24.0 * 2.0 ! 24*epsilon and factor 2 for ij and ji
     partial%ovr = .FALSE.                  ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential_1
-
-  FUNCTION force_sq ( i1, i2, box, r_cut ) RESULT ( fsq )
-    IMPLICIT NONE
-    REAL                :: fsq    ! Returns total squared force
-    INTEGER, INTENT(in) :: i1, i2 ! Index range defining system: (1,n1) or (n1+1,n2)
-    REAL,    INTENT(in) :: box    ! Simulation box length
-    REAL,    INTENT(in) :: r_cut  ! Potential cutoff distance
-
-    ! Calculates total squared force (using array f)
-
-    INTEGER            :: i, j
-    REAL               :: r_cut_box, r_cut_box_sq, box_sq, rij_sq
-    REAL               :: sr2, sr6, sr12
-    REAL, DIMENSION(3) :: rij, fij
-
-    r_cut_box    = r_cut / box
-    r_cut_box_sq = r_cut_box ** 2
-    box_sq       = box ** 2
-
-    f(:,i1:i2) = 0.0 ! Initialize
-
-    DO i = i1, i2 - 1 ! Begin outer loop over atoms
-
-       DO j = i + 1, i2 ! Begin inner loop over atoms
-
-          rij(:) = r(:,i) - r(:,j)           ! Separation vector
-          rij(:) = rij(:) - ANINT ( rij(:) ) ! Periodic boundary conditions in box=1 units
-          rij_sq = SUM ( rij**2 )            ! Squared separation
-
-          IF ( rij_sq < r_cut_box_sq ) THEN ! Check within cutoff
-
-             rij_sq = rij_sq * box_sq ! Now in sigma=1 units
-             rij(:) = rij(:) * box    ! Now in sigma=1 units
-             sr2    = 1.0 / rij_sq
-             sr6    = sr2 ** 3
-             sr12   = sr6 ** 2
-             fij    = rij * (2.0*sr12 - sr6) *sr2 ! LJ pair forces
-             f(:,i) = f(:,i) + fij
-             f(:,j) = f(:,j) - fij
-
-          END IF ! End check within cutoff
-
-       END DO ! End inner loop over atoms
-
-    END DO ! End outer loop over atoms
-
-    f(:,i1:i2) = f(:,i1:i2) * 24.0     ! Numerical factor 24*epsilon
-    fsq        = SUM ( f(:,i1:i2)**2 ) ! Result
-
-  END FUNCTION force_sq
 
   FUNCTION potential_lrc ( density, r_cut )
     IMPLICIT NONE
@@ -358,18 +295,20 @@ CONTAINS
     INTEGER,            INTENT(in) :: i  ! Index of particle to be destroyed
     REAL, DIMENSION(3), INTENT(in) :: ri ! Position of particle to be created
 
-    IF ( i <= n1 ) THEN ! Destroy in system 1, create in system 2
-       r(:,i)    = r(:,n1) ! Replace coordinates of i with those of N1
-       n1        = n1 - 1  ! Decrease N1
-       n2        = n2 + 1  ! Increase N2
-       r(:,n1+1) = ri      ! New particle coordinates at start of system 2
+    integer :: t
+
+    IF ( i <= n(1) ) THEN ! Destroy in system 1, create in system 2
+       t      = n(1)          ! Last atom in system 1
+       r(:,i) = r(:,t)        ! Replace coordinates of i with t
+       r(:,t) = ri            ! New particle coordinates
+       n(:)   = n(:) + [-1,1] ! Move boundary down to include t
     ELSE ! Destroy in system 2, create in system 1
-       r(:,i)  = r(:,n1+1) ! Replace coordinates of i with those of N1+1
-       n1      = n1 + 1    ! Increase N1
-       n2      = n2 - 1    ! Decrease N2
-       r(:,n1) = ri        ! New particle coordinates at end of system 1
+       t      = n(1)+1        ! First atom in system 2
+       r(:,i) = r(:,t)        ! Replace coordinates of i with t
+       r(:,t) = ri            ! New particle coordinates
+       n(:)   = n(:) + [1,-1] ! Move boundary up to include t
     END IF
-     
+
   END SUBROUTINE swap
 
 END MODULE mc_module
