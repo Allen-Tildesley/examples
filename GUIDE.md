@@ -27,6 +27,12 @@ Typically, runs produce a final configuration `cnf.out`
 (which may be renamed to `cnf.inp` as a starting point for further runs)
 and intermediate configurations `cnf.001`, `cnf.002` etc during the run.
 
+A couple of utility programs are provided:
+`adjust_energy` takes in an MD configuration and scales the velocities to
+produce a configuration with a desired internal energy per atom, while
+`adjust_density` takes in an MC or MD configuration
+and scales the positions (and the box length) to produce a desired density.
+
 ##State points for different Lennard-Jones models
 For most of the examples, we use a cutoff of _Rc_ = 2.5 &sigma;.
 For MC programs the cut (but not shifted) potential (c) is used in the simulation,
@@ -91,6 +97,7 @@ from the full potential (f) results using the same LRC and delta corrections as 
 The formulae are implemented in the supplied program `eos_lj`.
 For completeness, note that Thol et al also supply C++ programs, and tables of data,
 in the Supplementary Information associated with their papers.
+They are not responsible for our (Fortran) program!
 
 Here we compare with typical test runs from our programs using default parameters except where stated.
 Note that _E_ is the total internal energy per atom, including the ideal gas part,
@@ -110,20 +117,22 @@ Estimated from (f) | 0.75  | 1.00      |           |          |           | -3.3
 `md_nve_lj_omp`    | 0.75  | 1.0027(1) | -2.9280   | 0.990(2) |  2.26(1)&dagger; |    |          | -3.7276   | 0.388(2) |           |
 `smc_nvt_lj`       | 0.75  | 1.00      | -2.930(1) | 0.969(4) |  2.27(1)  |           |          | -3.729(1) | 0.367(4) |  2.27(1)  |
 
-The MC program does not seem to produce accurate pressures, needs investigating
-The SMC program seems to have a bug affecting multi-atom moves, needs fixing
+* The `bd_nvt_lj` program seems to give a slightly high _Cv_
+* The `mc_nvt_lj` program seems to give a low pressure, needs investigating.
+* The `smc_nvt_lj` program seems to have a bug affecting multi-atom moves, needs fixing.
+* The `md_nvt_lj` program seems to give a low _Cv_, maybe needs looking at.
 
 Results for `md_lj_mts` are not directly comparable, because they use a larger cutoff (by default _Rc_ = 4.0  &sigma;)
-and a larger system (e.g. _N_ = 400) but here are the averages from a typical simulation
+and hence a larger system. Here are the averages from a typical simulation, with _N_ = 400.
 
 Source             | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _Cv_ (cs) | _E_ (f)    | _P_ (f)  | _Cv_ (f)  |
 -------            | ----- | -------   | ---------  | -------- | --------- | -------    | -------  | --------  |
 `md_lj_mts`        | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)&dagger;  | -3.7188(5) | 0.404(2) | 2.27(1)&dagger;  |
 
-With the default parameters, energy conservation is not great, with MSD average around 0.02
+With the default parameters, energy conservation is not great, with MSD average around 0.02. Perhaps needs looking at.
 
-Note(&dagger;): Cv for the MD NVE programs estimated from PE MSD: Cv/NkB = 9/(6-4X)
-where X=MSD(PE/sqrt(N))/(kBT)<sup>2</sup>
+Note(&dagger;): _Cv_ for the MD NVE programs estimated from PE MSD: _Cv/NkB_ = 9/(6-4 _X_ )
+where _X_ = MSD(_PE_/sqrt(_N_))/(_kBT_)<sup>2</sup>.
 
 #Brownian dynamics program
 The program `bd_nvt_lj` carries out a Brownian dynamics simulation for a set of atoms
@@ -145,16 +154,16 @@ with configurations at gas and liquid densities, with roughly equal numbers of p
 and slowly work upwards in temperature, to equilibrate.
 Exchanges of box identity are expected as the critical temperature is approached,
 and so one should not place blind trust in the separate box averages reported by the program,
-but refer to histograms of density, temperature etc.
-At _T_=1.0, however, these exchanges of box identity quite infrequent,
+but refer to histograms of density, energy etc.
+At _T_=1.0, however, these exchanges of box identity are quite infrequent,
 and the averages corresponded well to literature values for the coexistence parameters.
 The production run corresponded to default parameters in the program.
 
-Source               | &rho; (liq) | &rho; (gas) | P (liq)  | P (gas)  | _E/N_ (liq, c) | _E/N_ (gas, c)
--------              | ----------- | ----------- | -------  | -------- | -------------- | --------------
-Trokhymchuk et al MC | 0.6542      | 0.0439      | 0.0336   | 0.0336   |                |
-Trokhymchuk et al MD | 0.6507      | 0.0500      | 0.0380   | 0.0380   | -2.713 &Dagger;| 1.047 &Dagger;
-`mc_gibbs_lj`        | 0.652(1)    | 0.050(1)    | 0.028(1) | 0.038(1) | -2.730(5)      | 1.054(8)
+Source               | &rho; (liq) | &rho; (gas) | _P_ (liq) | _P_ (gas) | _E/N_ (liq, c) | _E/N_ (gas, c)
+-------              | ----------- | ----------- | -------   | --------  | -------------- | --------------
+Trokhymchuk et al MC | 0.6542      | 0.0439      | 0.0336    | 0.0336    |                |
+Trokhymchuk et al MD | 0.6507      | 0.0500      | 0.0380    | 0.0380    | -2.713 &Dagger;| 1.047 &Dagger;
+`mc_gibbs_lj`        | 0.652(1)    | 0.050(1)    | 0.028(1)  | 0.038(1)  | -2.730(5)      | 1.054(8)
 
 There is a small discrepancy between pressures in the two boxes.
 The values indicated by &Dagger; are from the Thol et al (2016) EOS with cutoff correction.
