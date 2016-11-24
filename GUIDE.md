@@ -115,8 +115,11 @@ The SMC program seems to have a bug affecting multi-atom moves, needs fixing
 
 Results for `md_lj_mts` are not directly comparable, because they use a larger cutoff (by default _Rc_ = 4.0  &sigma;)
 and a larger system (e.g. _N_ = 400) but here are the averages from a typical simulation
+
 Source             | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _Cv_ (cs) | _E_ (f)    | _P_ (f)  | _Cv_ (f)  |
-`md_lj_mts`        | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)&dagger;  | -3.7188(5) | 0.404(2) | 2.27(1)*  |
+-------            | ----- | -------   | ---------  | -------- | --------- | -------    | -------  | --------  |
+`md_lj_mts`        | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)&dagger;  | -3.7188(5) | 0.404(2) | 2.27(1)&dagger;  |
+
 With the default parameters, energy conservation is not great, with MSD average around 0.02
 
 Note(&dagger;): Cv for the MD NVE programs estimated from PE MSD: Cv/NkB = 9/(6-4X)
@@ -131,6 +134,30 @@ As well as the usual run parameters, similar to a molecular dynamics code,
 the user specifies a friction coefficient.
 The calculated average thermodynamic quantities should be as expected for an
 equilibrium simulation of this model at the chosen state point (see e.g. the table above).
+
+#Gibbs Monte Carlo program
+The program `mc_gibbs_lj` carries out Gibbs ensemble Monte Carlo,
+and to test it we selected a temperature _T_=1.0,
+which is below the critical point for the cut (but not shifted) LJ potential
+(see tables above).
+It was found convenient to start from a lower temperature,
+with configurations at gas and liquid densities, with roughly equal numbers of particles,
+and slowly work upwards in temperature, to equilibrate.
+Exchanges of box identity are expected as the critical temperature is approached,
+and so one should not place blind trust in the separate box averages reported by the program,
+but refer to histograms of density, temperature etc.
+At _T_=1.0, however, these exchanges of box identity quite infrequent,
+and the averages corresponded well to literature values for the coexistence parameters.
+The production run corresponded to default parameters in the program.
+
+Source               | &rho; (liq) | &rho; (gas) | P (liq)  | P (gas)  | _E/N_ (liq, c) | _E/N_ (gas, c)
+-------              | ----------- | ----------- | -------  | -------- | -------------- | --------------
+Trokhymchuk et al MC | 0.6542      | 0.0439      | 0.0336   | 0.0336   |                |
+Trokhymchuk et al MD | 0.6507      | 0.0500      | 0.0380   | 0.0380   | -2.713 &Dagger;| 1.047 &Dagger;
+`mc_gibbs_lj`        | 0.652(1)    | 0.050(1)    | 0.028(1) | 0.038(1) | -2.730(5)      | 1.054(8)
+
+There is a small discrepancy between pressures in the two boxes.
+The values indicated by &Dagger; are from the Thol et al (2016) EOS with cutoff correction.
 
 #Cluster program
 The `cluster` program is self contained. It reads in a configuration of atomic positions

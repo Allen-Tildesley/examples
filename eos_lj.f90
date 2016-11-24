@@ -15,7 +15,7 @@ PROGRAM eos_lj
   ! A similar notation, consistent with the papers, is retained for clarity.
 
   ! Formulae for P, E/N etc in terms of the scaled free energy derivatives a_res(0,1) etc
-  ! may be found in the abbove papers
+  ! may be found in the above papers
 
   IMPLICIT NONE
 

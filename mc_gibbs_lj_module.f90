@@ -77,7 +77,7 @@ CONTAINS
 
     REAL :: r_cut_box
 
-    ALLOCATE ( r(3,sum(n)) )
+    ALLOCATE ( r(3,SUM(n)) )
 
     r_cut_box = r_cut / MINVAL ( box )
     IF ( r_cut_box > 0.5 ) THEN
@@ -110,8 +110,8 @@ CONTAINS
     TYPE(potential_type) :: partial ! Atomic contribution to total
     INTEGER              :: i
 
-    IF ( sum(n) > SIZE(r,dim=2) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', sum(n), SIZE(r,dim=2)
+    IF ( SUM(n) > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', SUM(n), SIZE(r,dim=2)
        STOP 'Error in potential'
     END IF
 
@@ -161,8 +161,8 @@ CONTAINS
     REAL, PARAMETER      :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
     TYPE(potential_type) :: pair
 
-    IF ( sum(n) > SIZE(r,dim=2) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', sum(n), SIZE(r,dim=2)
+    IF ( SUM(n) > SIZE(r,dim=2) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', SUM(n), SIZE(r,dim=2)
        STOP 'Error in potential_1'
     END IF
 
@@ -295,18 +295,23 @@ CONTAINS
     INTEGER,            INTENT(in) :: i  ! Index of particle to be destroyed
     REAL, DIMENSION(3), INTENT(in) :: ri ! Position of particle to be created
 
-    integer :: t
+    INTEGER :: t
 
     IF ( i <= n(1) ) THEN ! Destroy in system 1, create in system 2
        t      = n(1)          ! Last atom in system 1
-       r(:,i) = r(:,t)        ! Replace coordinates of i with t
+       r(:,i) = r(:,t)        ! Replace i coordinates with t coordinates
        r(:,t) = ri            ! New particle coordinates
        n(:)   = n(:) + [-1,1] ! Move boundary down to include t
     ELSE ! Destroy in system 2, create in system 1
        t      = n(1)+1        ! First atom in system 2
-       r(:,i) = r(:,t)        ! Replace coordinates of i with t
+       r(:,i) = r(:,t)        ! Replace i coordinates with t coordinates
        r(:,t) = ri            ! New particle coordinates
        n(:)   = n(:) + [1,-1] ! Move boundary up to include t
+    END IF
+
+    IF ( MINVAL(n) <= 0 ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,2i15)') 'Number of particles is zero', n
+       STOP 'Error in mc_gibbs_lj'
     END IF
 
   END SUBROUTINE swap

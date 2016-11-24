@@ -15,6 +15,7 @@ PROGRAM mc_gibbs_lj
   ! Takes in a pair of configurations of atoms (positions)
   ! Cubic periodic boundary conditions
   ! Conducts Gibbs ensemble Monte Carlo at the given temperature, total volume and total N
+  ! To avoid some inconvenient tests, we disallow configurations in which either box is empty
   ! Uses no special neighbour lists
 
   ! Reads several variables and options from standard input using a namelist nml
@@ -45,6 +46,14 @@ PROGRAM mc_gibbs_lj
   TYPE(potential_type), DIMENSION(2) :: total, total_new
   TYPE(potential_type)               :: partial_old, partial_new
 
+  ! Histograms of density, energy, and pressure
+  INTEGER, PARAMETER  :: nh = 300
+  REAL,    PARAMETER  :: rho_min = 0.0, rho_max = 0.9
+  REAL,    PARAMETER  :: rho_del = ( rho_max - rho_min ) / REAL(nh)
+  REAL,    PARAMETER  :: eng_min = -3.3, eng_max = 1.2
+  REAL,    PARAMETER  :: eng_del = ( eng_max - eng_min ) / REAL(nh)
+  REAL, DIMENSION(nh) :: rho_hist, eng_hist
+
   INTEGER            :: blk, stp, i, nstep, nblock, nswap
   INTEGER            :: iswap, m_acc, x12_try, x12_acc, x21_try, x21_acc, ioerr
   REAL               :: delta, dv, zeta, m1_ratio, m2_ratio, x12_ratio, x21_ratio, v_ratio
@@ -69,7 +78,7 @@ PROGRAM mc_gibbs_lj
   nblock      = 10
   nstep       = 10000
   nswap       = 20
-  temperature = 1.2
+  temperature = 1.0
   r_cut       = 2.5
   dr_max      = 0.15
   dv_max      = 10.0
@@ -81,7 +90,7 @@ PROGRAM mc_gibbs_lj
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
      IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
-     STOP 'Error in mc_zvt_lj'
+     STOP 'Error in mc_gibbs_lj'
   END IF
 
   ! Write out run parameters
@@ -118,6 +127,10 @@ PROGRAM mc_gibbs_lj
      STOP 'Error in mc_gibbs_lj'
   END IF
   CALL calculate ( 'Initial values' )
+
+  ! Zero histograms
+  rho_hist(:) = 0.0
+  eng_hist(:) = 0.0
 
   ! Initialize arrays for averaging and write column headings
   CALL run_begin ( output_unit, variables )
@@ -159,10 +172,10 @@ PROGRAM mc_gibbs_lj
 
         END DO ! End loop over atoms in system 1
 
-        m1_ratio = REAL(m_acc) / real(n(1))
+        m1_ratio = REAL(m_acc) / REAL(n(1))
 
         m_acc = 0
-        
+
         DO i = n(1)+1, n(1)+n(2) ! Loop over atoms in system 2
 
            partial_old = potential_1 ( n(1)+1, n(1)+n(2), r(:,i), i, box(2), r_cut ) ! Old atom potential, virial etc
@@ -192,7 +205,7 @@ PROGRAM mc_gibbs_lj
 
         END DO ! End loop over atoms in system 2
 
-        m2_ratio = REAL(m_acc) / real(n(2))
+        m2_ratio = REAL(m_acc) / REAL(n(2))
 
         x12_try = 0
         x12_acc = 0
@@ -216,7 +229,7 @@ PROGRAM mc_gibbs_lj
               END IF
               partial_new = potential_1 ( n(1)+1, n(1)+n(2), ri, 0, box(2), r_cut ) ! New atom potential, virial, etc
 
-              IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
+              IF ( .NOT. partial_new%ovr .AND. n(1) > 1 ) THEN ! Test for non-overlapping configuration & disallow n(1)->0
 
                  delta = ( partial_new%pot - partial_old%pot ) / temperature ! Use cut (not shifted) potential
                  delta = delta - LOG ( box(2)**3 / REAL ( n(2)+1 ) ) ! Creation in 2
@@ -229,7 +242,7 @@ PROGRAM mc_gibbs_lj
                     x12_acc  = x12_acc + 1            ! Increment 1->2 move counter
                  END IF ! End accept Metropolis test
 
-              END IF ! End test for overlapping configuration
+              END IF ! End test for overlapping configuration & disallow n(1)->0
 
            ELSE ! Try swapping 2->1
               x21_try     = x21_try + 1
@@ -241,7 +254,7 @@ PROGRAM mc_gibbs_lj
               END IF
               partial_new = potential_1 ( 1, n(1), ri, 0, box(1), r_cut ) ! New atom potential, virial, etc
 
-              IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
+              IF ( .NOT. partial_new%ovr .AND. n(2) > 1 ) THEN ! Test for non-overlapping configuration & disallow n(2)->0
 
                  delta = ( partial_new%pot - partial_old%pot ) / temperature ! Use cut (not shifted) potential
                  delta = delta - LOG ( box(1)**3 / REAL ( n(1)+1 ) ) ! Creation in 1
@@ -254,7 +267,7 @@ PROGRAM mc_gibbs_lj
                     x21_acc  = x21_acc + 1            ! Increment 2->1 move counter
                  END IF ! End accept Metropolis test
 
-              END IF ! End test for overlapping configuration
+              END IF ! End test for overlapping configuration & disallow n(2)->0
            END IF
 
         END DO ! End loop over swap attempts
@@ -267,11 +280,15 @@ PROGRAM mc_gibbs_lj
         ! Volume move
 
         v_ratio = 0.0
-        CALL RANDOM_NUMBER ( zeta )                  ! Uniform on (0,1)
-        dv           = 2.0 * dv_max * ( zeta - 1.0 ) ! Uniform on (-dv_max,+dv_max)
-        vol_old(:)   = box(:)**3                     ! Old volumes
-        vol_new(:)   = vol_old(:) + [-dv,dv]         ! New volumes
-        box_new(:)   = vol_new(:)**(1.0/3.0)         ! New box lengths
+        CALL RANDOM_NUMBER ( zeta )                ! Uniform on (0,1)
+        dv           = dv_max * ( 2.0*zeta - 1.0 ) ! Uniform on (-dv_max,+dv_max)
+        vol_old(:)   = box(:)**3                   ! Old volumes
+        vol_new(:)   = vol_old(:) + [-dv,dv]       ! New volumes
+        box_new(:)   = vol_new(:)**(1.0/3.0)       ! New box lengths
+        IF ( MINVAL(box_new) < r_cut ) THEN
+           WRITE ( unit=error_unit, fmt='(a,2f15.6)') 'Box length too small', box_new
+           STOP 'Error in mc_gibbs_lj'
+        END IF
         total_new(1) = potential ( 1,      n(1),      box_new(1), r_cut ) 
         total_new(2) = potential ( n(1)+1, n(1)+n(2), box_new(2), r_cut ) 
 
@@ -293,6 +310,7 @@ PROGRAM mc_gibbs_lj
         ! Calculate and accumulate variables for this step
         CALL calculate ( )
         CALL blk_add ( variables )
+        CALL add_hist
 
      END DO ! End loop over steps
 
@@ -324,6 +342,8 @@ PROGRAM mc_gibbs_lj
   CALL write_cnf_atoms ( cnf_prefix(1)//out_tag, n(1), box(1), box(1)*r(:,1:n(1))           ) ! Write out final configuration
   CALL write_cnf_atoms ( cnf_prefix(2)//out_tag, n(2), box(2), box(2)*r(:,n(1)+1:n(1)+n(2)) ) ! Write out final configuration
 
+  CALL write_hist
+
   CALL deallocate_arrays
   CALL conclusion ( output_unit )
 
@@ -344,8 +364,9 @@ CONTAINS
     ! estimates of < e_f > and < p_f > for the full (uncut) potential
     ! The value of the cut-and-shifted potential is not used, in this example
 
-    TYPE(variable_type) :: m1_r, m2_r, x12_r, x21_r, v_r, density_1, density_2, e1_c, e2_c, p1_c, p2_c
-    REAL, dimension(2)  :: vol, rho
+    TYPE(variable_type) :: m1_r, m2_r, x12_r, x21_r, v_r
+    TYPE(variable_type) :: n_1, n_2, density_1, density_2, e1_c, e2_c, p1_c, p2_c
+    REAL, DIMENSION(2)  :: vol, rho
 
     ! Preliminary calculations (m_ratio, total etc are known already)
     vol(:) = box(:)**3
@@ -375,6 +396,10 @@ CONTAINS
        v_r   = variable_type ( nam = 'Volume ratio',      val = v_ratio   )
     END IF
 
+    ! Number of particles
+    n_1 = variable_type ( nam = 'Number (1)', val = REAL(n(1)) )
+    n_2 = variable_type ( nam = 'Number (2)', val = REAL(n(2)) )
+
     ! Density
     density_1 = variable_type ( nam = 'Density (1)', val = rho(1) )
     density_2 = variable_type ( nam = 'Density (2)', val = rho(2) )
@@ -391,7 +416,7 @@ CONTAINS
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ m1_r, m2_r, x12_r, x21_r, v_r, density_1, density_2, e1_c, e2_c, p1_c, p2_c ]
+    variables = [ m1_r, m2_r, x12_r, x21_r, v_r, n_1, n_2, density_1, density_2, e1_c, e2_c, p1_c, p2_c ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
@@ -399,5 +424,51 @@ CONTAINS
     END IF
 
   END SUBROUTINE calculate
+
+  SUBROUTINE add_hist
+    REAL    :: rho, eng
+    INTEGER :: k
+
+    rho = REAL(n(1)) / box(1)**3
+    k = 1 + FLOOR ( ( rho - rho_min ) / rho_del )
+    IF ( k >= 1 .AND. k <= nh ) rho_hist(k) = rho_hist(k) + 1.0
+
+    rho = REAL(n(2)) / box(2)**3
+    k = 1 + FLOOR ( ( rho - rho_min ) / rho_del )
+    IF ( k >= 1 .AND. k <= nh ) rho_hist(k) = rho_hist(k) + 1.0
+
+    eng = 1.5*temperature + total(1)%pot/REAL(n(1))
+    k = 1 + FLOOR ( ( eng - eng_min ) / eng_del )
+    IF ( k >= 1 .AND. k <= nh ) eng_hist(k) = eng_hist(k) + 1.0
+
+    eng = 1.5*temperature + total(2)%pot/REAL(n(2))
+    k = 1 + FLOOR ( ( eng - eng_min ) / eng_del )
+    IF ( k >= 1 .AND. k <= nh ) eng_hist(k) = eng_hist(k) + 1.0
+
+  END SUBROUTINE add_hist
+
+  SUBROUTINE write_hist
+    INTEGER                     :: hist_unit, ioerr, k
+    REAL                        :: norm, rho, eng
+    CHARACTER(len=7), PARAMETER :: filename = 'his.out'
+
+    ! Normalization factor for two data points at each step
+    norm     = REAL(2*nstep*nblock)
+    rho_hist = rho_hist / ( norm * rho_del )
+    eng_hist = eng_hist / ( norm * eng_del )
+
+    OPEN ( newunit = hist_unit, file = filename, status='replace', iostat=ioerr )
+    IF ( ioerr /= 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,a,i15)') 'Error opening ', filename, ioerr
+       STOP 'Error in write_hist'
+    END IF
+    DO k = 1, nh
+       rho = rho_min + (REAL(k)-0.5) * rho_del
+       eng = eng_min + (REAL(k)-0.5) * eng_del
+       WRITE ( unit=hist_unit, fmt='(4f15.6)' ) rho, rho_hist(k), eng, eng_hist(k)
+    END DO
+    CLOSE ( unit=hist_unit )
+
+  END SUBROUTINE write_hist
 
 END PROGRAM mc_gibbs_lj
