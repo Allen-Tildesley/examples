@@ -65,9 +65,9 @@ PROGRAM mc_zvt_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 1000
-  temperature = 0.7
-  activity    = 1.0
+  nstep       = 50000
+  temperature = 1.0
+  activity    = 0.0795
   prob_move   = 0.34
   r_cut       = 2.5
   dr_max      = 0.15
@@ -273,7 +273,7 @@ CONTAINS
     ! estimates of < e_f > and < p_f > for the full (uncut) potential
     ! The value of the cut-and-shifted potential is not used, in this example
 
-    TYPE(variable_type) :: m_r, c_r, d_r, density, e_c, p_c, e_f, p_f, t_c
+    TYPE(variable_type) :: m_r, c_r, d_r, number, density, e_c, p_c, e_f, p_f, t_c, n_msd
     REAL                :: fsq, vol, rho
 
     ! Preliminary calculations (m_ratio, total etc are known already)
@@ -301,6 +301,9 @@ CONTAINS
        d_r = variable_type ( nam = 'Destroy ratio', val = d_ratio )
     END IF
 
+    ! Number
+    number = variable_type ( nam = 'N', val = REAL(n) )
+    
     ! Density
     density = variable_type ( nam = 'Density', val = rho )
 
@@ -324,13 +327,16 @@ CONTAINS
     ! Total squared force divided by total Laplacian
     t_c = variable_type ( nam = 'T config', val = fsq/total%lap )
 
+    ! Number MSD
+    n_msd = variable_type ( nam = 'N MSD', val = REAL(n), msd = .true. )
+
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ m_r, c_r, d_r, density, e_c, p_c, e_f, p_f, t_c ]
+    variables = [ m_r, c_r, d_r, number, density, e_c, p_c, e_f, p_f, t_c, n_msd ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(4:) ) ! Don't write out move ratios
+       CALL write_variables ( output_unit, variables(4:10) ) ! Don't write out move ratios or MSD variables
     END IF
 
   END SUBROUTINE calculate

@@ -19,7 +19,7 @@ PROGRAM eos_lj
 
   IMPLICIT NONE
 
-  REAL    :: temperature, density, e, p, cv, cp
+  REAL    :: temperature, density, e, p, cv, cp, mu, z
   INTEGER :: ioerr, i, j
 
   REAL, DIMENSION(0:2,0:2) :: a_res ! Residual free energy and scaled derivatives
@@ -43,6 +43,8 @@ PROGRAM eos_lj
   WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'T   = ', temperature
   WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'rho = ', density
 
+  ! Results for full potential from Thol et al (2016) fitting formula
+  
   WRITE ( unit=output_unit, fmt='(a)' ) 'Full Lennard-Jones potential'
 
   a_res = a_res_full ( temperature, density )
@@ -54,21 +56,33 @@ PROGRAM eos_lj
      END DO
   END DO
 
-  p = density * temperature * ( 1.0 + a_res(0,1) )
-  e = temperature * ( 1.5 + a_res(1,0) )
+  p  = density * temperature * ( 1.0 + a_res(0,1) )
+  e  = temperature * ( 1.5 + a_res(1,0) )
   cv = 1.5 - a_res(2,0)
   cp = 2.5 - a_res(2,0)+(1.0+a_res(0,1)-a_res(1,1))*(1.0+a_res(0,1)-a_res(1,1))/(1.0+2.0*a_res(0,1)+a_res(0,2)) - 1.0
+  mu = temperature * ( LOG(density) + a_res(0,0) + a_res(0,1) )
+  z  = density * EXP ( a_res(0,0) + a_res(0,1) )
   WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'P', p
   WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'E/N', e
   WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cv/NkB', cv
   WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cp/NkB', cp
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'mu', mu
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'z (activity)', z
 
+  ! Estimates for cut (but not shifted) potential by reverse-application of long-range & delta corrections
+  
   WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential cut (but not shifted) at 2.5 sigma'
   p  = p - pressure_lrc ( density, r_cut ) + pressure_delta ( density, r_cut )
   e  = e - potential_lrc ( density, r_cut )
+  mu = mu - 2.0 * potential_lrc ( density, r_cut )
+  z  = z * EXP ( -2.0* potential_lrc ( density, r_cut ) / temperature )
   WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'P', p
   WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'E/N', e
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'mu', mu
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'z (activity)', z
 
+  ! Results for cut-and-shifted potential from Thol et al (2015) fitting formula
+  
   WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential cut-and-shifted at 2.5 sigma'
 
   a_res = a_res_cutshift ( temperature, density )
@@ -80,13 +94,17 @@ PROGRAM eos_lj
      END DO
   END DO
 
-  p = density * temperature * ( 1.0 + a_res(0,1) )
-  e = temperature * ( 1.5 + a_res(1,0) )
+  p  = density * temperature * ( 1.0 + a_res(0,1) )
+  e  = temperature * ( 1.5 + a_res(1,0) )
   cv = 1.5 - a_res(2,0)
   cp = 2.5 - a_res(2,0)+(1.0+a_res(0,1)-a_res(1,1))*(1.0+a_res(0,1)-a_res(1,1))/(1.0+2.0*a_res(0,1)+a_res(0,2)) - 1.0
+  mu = temperature * ( LOG(density) + a_res(0,0) + a_res(0,1) )
+  z  = density * EXP ( a_res(0,0) + a_res(0,1) )
   WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'P', p
   WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'E/N', e
   WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cv/NkB', cv
   WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cp/NkB', cp
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'mu', mu
+  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'z (activity)', z
 
 END PROGRAM eos_lj

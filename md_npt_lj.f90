@@ -77,13 +77,13 @@ PROGRAM md_npt_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 1000
+  nstep       = 50000
   r_cut       = 2.5
   dt          = 0.002
-  temperature = 0.7 ! Specified temperature
-  pressure    = 0.5 ! Specified pressure
-  tau         = 2.0 ! Desired thermostat timescale
-  tau_baro    = 2.0 ! Desired barostat timescale
+  temperature = 1.0  ! Specified temperature
+  pressure    = 0.99 ! Specified pressure
+  tau         = 2.0  ! Desired thermostat timescale
+  tau_baro    = 2.0  ! Desired barostat timescale
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -367,8 +367,9 @@ CONTAINS
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
 
-    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, density, conserved
-    REAL                :: vol, rho, kin, fsq, ext
+    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, density
+    TYPE(variable_type) :: c_s, c_f, vol_msd, conserved, conserved_msd
+    REAL                :: vol, rho, kin, fsq, ext, enp
 
     ! Preliminary calculations
     vol = box**3        ! Volume
@@ -416,13 +417,30 @@ CONTAINS
     ! Energy plus extra terms defined above
     conserved = variable_type ( nam = 'Conserved/N', val = (kin+total%pot+ext)/REAL(n) )
 
+    ! Heat capacity (cut-and-shifted)
+    ! Total "enthalpy" divided by temperature and sqrt(N) to make result intensive
+    enp = kin+total%pot+pressure*vol
+    c_s = variable_type ( nam = 'Cp/N cut&shifted', val = enp/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+
+    ! Heat capacity (full)
+    ! Total "enthalpy" divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
+    enp = kin+total%cut+pressure*vol
+    c_f = variable_type ( nam = 'Cp/N full', val = enp/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+
+    ! Volume MSD
+    vol_msd = variable_type ( nam = 'Volume MSD', val = vol, msd = .TRUE. )
+    
+    ! Mean-squared deviation of conserved energy-like quantity
+    ! Energy plus extra terms defined above
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin+total%pot+ext, msd = .TRUE. )
+
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, density, conserved ]
+    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, density, conserved, c_s, c_f, vol_msd, conserved_msd ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables )
+       CALL write_variables ( output_unit, variables(1:8) ) ! Don't write out MSD variables
     END IF
 
   END SUBROUTINE calculate

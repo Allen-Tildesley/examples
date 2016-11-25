@@ -58,14 +58,14 @@ CONTAINS
 
     IF ( PRESENT ( r ) ) THEN
 
-       IF ( n /= SIZE ( r, dim=2 ) ) THEN
+       IF ( n > SIZE ( r, dim=2 ) ) THEN
           WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of r ', n, SIZE ( r, dim=2 )
           STOP 'Error in read_cnf_atoms'
        END IF
 
        IF ( PRESENT ( v ) ) THEN
 
-          IF ( n /= SIZE ( v, dim=2 ) ) THEN
+          IF ( n > SIZE ( v, dim=2 ) ) THEN
              WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of v ', n, SIZE ( v, dim=2 )
              STOP 'Error in read_cnf_atoms'
           END IF
@@ -123,14 +123,14 @@ CONTAINS
     WRITE ( unit=cnf_unit, fmt='(i15)'  ) n
     WRITE ( unit=cnf_unit, fmt='(f15.8)') box
 
-    IF ( n /= SIZE ( r, dim=2 ) ) THEN
+    IF ( n > SIZE ( r, dim=2 ) ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of r ', n, SIZE ( r, dim=2 )
        STOP 'Error in write_cnf_atoms'
     END IF
 
     IF ( PRESENT ( v ) ) THEN
 
-       IF ( n /= SIZE ( v, dim=2 ) ) THEN
+       IF ( n > SIZE ( v, dim=2 ) ) THEN
           WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of v ', n, SIZE ( v, dim=2 )
           STOP 'Error in write_cnf_atoms'
        END IF
@@ -206,11 +206,11 @@ CONTAINS
           WRITE ( unit=error_unit, fmt='(a,a,i15)') 'r and e arguments must be present together'
           STOP 'Error in read_cnf_mols'
        END IF
-       IF ( n /= SIZE ( r, dim=2 ) ) THEN
+       IF ( n > SIZE ( r, dim=2 ) ) THEN
           WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of r ', n, SIZE ( r, dim=2 )
           STOP 'Error in read_cnf_mols'
        END IF
-       IF ( n /= SIZE ( e, dim=2 ) ) THEN
+       IF ( n > SIZE ( e, dim=2 ) ) THEN
           WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of e ', n, SIZE ( e, dim=2 )
           STOP 'Error in read_cnf_mols'
        END IF
@@ -221,11 +221,11 @@ CONTAINS
              WRITE ( unit=error_unit, fmt='(a,a,i15)') 'v and w arguments must be present together'
              STOP 'Error in read_cnf_mols'
           END IF
-          IF ( n /= SIZE ( v, dim=2 ) ) THEN
+          IF ( n > SIZE ( v, dim=2 ) ) THEN
              WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of v ', n, SIZE ( v, dim=2 )
              STOP 'Error in read_cnf_mols'
           END IF
-          IF ( n /= SIZE ( w, dim=2 ) ) THEN
+          IF ( n > SIZE ( w, dim=2 ) ) THEN
              WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of w ', n, SIZE ( w, dim=2 )
              STOP 'Error in read_cnf_mols'
           END IF
@@ -285,11 +285,11 @@ CONTAINS
     WRITE(cnf_unit,'(i15)'  ) n
     WRITE(cnf_unit,'(f15.8)') box
 
-    IF ( n /= SIZE ( r, dim=2 ) ) THEN
+    IF ( n > SIZE ( r, dim=2 ) ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of r ', n, SIZE ( r, dim=2 )
        STOP 'Error in write_cnf_mols'
     END IF
-    IF ( n /= SIZE ( e, dim=2 ) ) THEN
+    IF ( n > SIZE ( e, dim=2 ) ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of e ', n, SIZE ( e, dim=2 )
        STOP 'Error in write_cnf_mols'
     END IF
@@ -299,11 +299,11 @@ CONTAINS
           WRITE ( unit=error_unit, fmt='(a,a,i15)') 'v and w arguments must be present together'
           STOP 'Error in write_cnf_mols'
        END IF
-       IF ( n /= SIZE ( v, dim=2 ) ) THEN
+       IF ( n > SIZE ( v, dim=2 ) ) THEN
           WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of v ', n, SIZE ( v, dim=2 )
           STOP 'Error in write_cnf_mols'
        END IF
-       IF ( n /= SIZE ( w, dim=2 ) ) THEN
+       IF ( n > SIZE ( w, dim=2 ) ) THEN
           WRITE ( unit=error_unit, fmt='(a,2i15)') 'Error in size of w ', n, SIZE ( w, dim=2 )
           STOP 'Error in write_cnf_mols'
        END IF
