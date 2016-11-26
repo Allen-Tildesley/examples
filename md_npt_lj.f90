@@ -132,8 +132,8 @@ PROGRAM md_npt_lj
   p_eta_baro(:) = p_eta_baro(:) * SQRT(q_baro(:))
   w_eps = g * temperature * tau_baro**2
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) "Barostat inertia W", w_eps
-  box0  = box ! reference box length for strain
-  eps   = 1.0 ! initial strain
+  box0  = box ! Reference box length for strain
+  eps   = 0.0 ! Initial strain; generally eps = log ( box/box0 )
   p_eps = random_normal ( 0.0, SQRT(temperature*w_eps) ) ! strain momentum
 
   ! Initial forces, potential, etc plus overlap check
@@ -429,7 +429,7 @@ CONTAINS
 
     ! Volume MSD
     vol_msd = variable_type ( nam = 'Volume MSD', val = vol, msd = .TRUE. )
-    
+
     ! Mean-squared deviation of conserved energy-like quantity
     ! Energy plus extra terms defined above
     conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin+total%pot+ext, msd = .TRUE. )
