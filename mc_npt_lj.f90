@@ -70,9 +70,9 @@ PROGRAM mc_npt_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 1000
-  temperature = 0.7
-  pressure    = 0.1
+  nstep       = 10000
+  temperature = 1.0
+  pressure    = 0.69
   r_cut       = 2.5
   dr_max      = 0.15
   db_max      = 0.025
@@ -230,8 +230,9 @@ CONTAINS
     ! The value of the cut-and-shifted potential is not used, in this example
 
     TYPE(variable_type) :: m_r, v_r, density, p_c, p_f, e_c, e_f, t_c
+    TYPE(variable_type) :: c_c, c_f, vol_msd
 
-    REAL :: fsq, vol, rho
+    REAL :: fsq, vol, rho, enp
 
     ! Preliminary calculations (m_ratio, total etc are known already)
     fsq = force_sq ( box, r_cut )
@@ -279,13 +280,30 @@ CONTAINS
     ! Total squared force divided by total Laplacian
     t_c = variable_type ( nam = 'T config', val = fsq/total%lap )
 
+    ! Heat capacity (cut but not shifted)
+    ! Excess "enthalpy" divided by temperature and sqrt(N) to make result intensive
+    ! NB this is not really the excess Cp/NkB, it simply omits the kinetic energy fluctuations
+    ! i.e. add the ideal gas part of Cv/NkB, 1.5, to get total Cp/NkB
+    enp = total%pot+pressure*vol
+    c_c = variable_type ( nam = 'Cp(ex)/N cut', val = enp/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+
+    ! Heat capacity (full)
+    ! Excess "enthalpy" divided by temperature and sqrt(N) to make result intensive
+    ! NB this is not really the excess Cp/NkB, it simply omits the kinetic energy fluctuations
+    ! i.e. add the ideal gas part of Cv/NkB, 1.5, to get total Cp/NkB
+    enp = REAL(n)*potential_lrc(rho,r_cut)+total%pot+pressure*vol
+    c_f = variable_type ( nam = 'Cp(ex)/N full', val = enp/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+
+    ! Volume MSD
+    vol_msd = variable_type ( nam = 'Volume MSD', val = vol, msd = .TRUE. )
+
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ m_r, v_r, density, e_c, p_c, e_f, p_f, t_c ]
+    variables = [ m_r, v_r, density, e_c, p_c, e_f, p_f, t_c, c_c, c_f, vol_msd ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(3:) ) ! Don't write out move ratios
+       CALL write_variables ( output_unit, variables(3:8) ) ! Don't write out move ratios or MSD values
     END IF
 
   END SUBROUTINE calculate

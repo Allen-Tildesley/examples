@@ -138,9 +138,12 @@ Source                 | &rho;     | _T_   | _E_ (c)   | _P_ (c)  | _E_ (f)   | 
 ------                 | -----     | ----- | -------   | -------  | -------   | -------  | --------  |
 Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197   | 0.7008   | -3.7212   | 0.3996   |  2.2630   |
 `mc_nvt_lj`            | 0.75      | 1.00  | -3.332(1) | 0.651(3) | -3.734(1) | 0.350(3) |  2.28(1)  |
-`mc_zvt_lj`            | 0.7504(4) | 1.00  | -3.333(3) | 0.668(4) | -3.735(3) | 0.366(4) |
+`mc_npt_lj`            | 0.7501(2) | 1.00  | -3.331(1) | 0.69     | -3.733(1) | 0.364(2) |           |
+`mc_zvt_lj`            | 0.7504(4) | 1.00  | -3.333(3) | 0.668(4) | -3.735(3) | 0.366(4) |           |
 
 * The `mc_nvt_lj` program seems to give a low pressure, needs investigating.
+* The `mc_npt_lj` measured pressure is 0.666(2) which is a little low. Measured Cp (full) is 5.28(7) compared with
+Thol et al (2016) EOS giving 5.22
 * The `mc_zvt_lj` program was run at activity _z_=0.0795, the default value in the program, in a box of length 7&sigma;.
 The Thol et al (2016) LRC-corrected value to give &rho;=0.75 would be _z_=0.080627.
 Acceptance rate of creation/destruction moves is quite small, at about 0.3%.
@@ -183,11 +186,11 @@ At _T_=1.0, however, these exchanges of box identity are quite infrequent,
 and the averages corresponded well to literature values for the coexistence parameters.
 The production run corresponded to default parameters in the program.
 
-Source               | &rho; (liq) | &rho; (gas) | _P_ (liq) | _P_ (gas) | _E/N_ (liq, c) | _E/N_ (gas, c)
--------              | ----------- | ----------- | -------   | --------  | -------------- | --------------
-Trokhymchuk et al MC | 0.6542      | 0.0439      | 0.0336    | 0.0336    |                |
-Trokhymchuk et al MD | 0.6507      | 0.0500      | 0.0380    | 0.0380    | -2.713 &Dagger;| 1.047 &Dagger;
-`mc_gibbs_lj`        | 0.652(1)    | 0.050(1)    | 0.028(1)  | 0.038(1)  | -2.730(5)      | 1.054(8)
+Source               | &rho;<sub>L</sub> | &rho;<sub>G</sub> | _P_<sub>L</sub> | _P_<sub>G</sub> | _E_<sub>L</sub>/_N_ (c) | _E_<sub>G</sub>/_N_ (c)
+-------              | -----------       | -----------       | -------         | --------        | --------------          | --------------
+Trokhymchuk et al MC | 0.6542            | 0.0439            | 0.0336          | 0.0336          |                         |
+Trokhymchuk et al MD | 0.6507            | 0.0500            | 0.0380          | 0.0380          | -2.713 &Dagger;         | 1.047 &Dagger;
+`mc_gibbs_lj`        | 0.652(1)          | 0.050(1)          | 0.028(1)        | 0.038(1)        | -2.730(5)               | 1.054(8)
 
 There is a small discrepancy between pressures in the two boxes.
 The values indicated by &Dagger; are from the Thol et al (2016) EOS with cutoff correction.
