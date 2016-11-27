@@ -100,16 +100,16 @@ Here we compare with typical test runs from our programs using default parameter
 Note that _E_ is the total internal energy per atom, including the ideal gas part,
 and that _Cv_ and _P_ likewise include the ideal gas contributions.
 
-Source                 | &rho;    | _T_       | _E_ (cs)  | _P_ (cs) | _Cv_ (cs)        | _E_ (f)   | _P_ (f)  | _Cv_ (f)  |
-------                 | -----    | -----     | --------  | -------- | ---------        | -------   | -------  | --------  |
-Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286   | 0.9897   |  2.2787          |           |          |           |
-Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |                  | -3.7212   | 0.3996   |  2.2630   |
-`bd_nvt_lj`            | 0.75     | 1.00      | -2.925(3) | 0.980(5) |  2.36(8)         | -3.725(3) | 0.379(5) |  2.37(8)  |
-`md_nvt_lj`            | 0.75     | 1.00      | -2.993(3) | 0.965(6) |  2.08(11)        | -3.733(3) | 0.363(6) |  2.09(12) |
-`md_npt_lj`            | 0.749(1) | 1.00      | -2.920(7) | 0.99     |                  | -3.718(8) | 0.395(1) |
-`md_nve_lj`            | 0.75     | 1.0031(1) | -2.9280   | 0.989(2) |  2.25(1)&dagger; | -3.7276   | 0.387(2) |           |
-`md_nve_lj_omp`        | 0.75     | 1.0027(1) | -2.9280   | 0.990(2) |  2.26(1)&dagger; | -3.7276   | 0.388(2) |           |
-`smc_nvt_lj`           | 0.75     | 1.00      | -2.930(1) | 0.969(4) |  2.27(1)         | -3.729(1) | 0.367(4) |  2.27(1)  |
+Source                 | &rho;    | _T_       | _E_ (cs)  | _P_ (cs) | _Cv_ (cs) | _E_ (f)   | _P_ (f)  | _Cv_ (f)  
+------                 | -----    | -----     | --------  | -------- | --------- | -------   | -------  | --------  |
+Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286   | 0.9897   |  2.2787   |           |          |           |
+Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |           | -3.7212   | 0.3996   |  2.2630   |
+`bd_nvt_lj`            | 0.75     | 1.00      | -2.925(3) | 0.980(5) |  2.36(8)  | -3.725(3) | 0.379(5) |  2.37(8)  |
+`md_nvt_lj`            | 0.75     | 1.00      | -2.993(3) | 0.965(6) |  2.08(11) | -3.733(3) | 0.363(6) |  2.09(12) |
+`md_npt_lj`            | 0.749(1) | 1.00      | -2.920(7) | 0.99     |           | -3.718(8) | 0.395(1) |
+`md_nve_lj`            | 0.75     | 1.0023(2) | -2.9280   | 0.991(2) |  2.27(1)  | -3.7275   | 0.390(2) |           |
+`md_nve_lj_omp`        | 0.75     | 1.0027(1) | -2.9280   | 0.990(2) |  2.26(1)  | -3.7276   | 0.388(2) |           |
+`smc_nvt_lj`           | 0.75     | 1.00      | -2.930(1) | 0.969(4) |  2.27(1)  | -3.729(1) | 0.367(4) |  2.27(1)  |
 
 * The `bd_nvt_lj` program seems to give a slightly high _Cv_
 * The `smc_nvt_lj` program seems to have a bug affecting multi-atom moves, needs fixing.
@@ -121,18 +121,14 @@ and hence a larger system. Here are the averages from a typical simulation, with
 
 Source      | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _Cv_ (cs)        | _E_ (f)    | _P_ (f)  | _Cv_ (f)         |
 -------     | ----- | -------   | ---------  | -------- | ---------        | -------    | -------  | --------         |
-`md_lj_mts` | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)&dagger;  | -3.7188(5) | 0.404(2) | 2.27(1)&dagger;  |
+`md_lj_mts` | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)&dagger;  | -3.7188(5) | 0.404(2) |  |
 
 With the default parameters, energy conservation is not great, with MSD average around 0.02. Perhaps needs looking at.
-
-Note(&dagger;): _Cv_ for the MD NVE programs estimated from PE MSD: _Cv/Nk_<sub>B</sub>=9/(6-4 _X_ )
-where _X_=MSD(_PE_/sqrt(_N_))/(_k_<sub>B</sub>_T_)<sup>2</sup>.
 
 For the cut (but not shifted) potential, the value of _Cv_ should be equal to the value for the full potential,
 since the energy LRC is independent of temperature.
 Also the Thol et al (2016) EOS is used to predict results for the cut (but not shifted) potential (denoted c),
-again at _Rc_=2.5&sigma;,
-using the same LRC and delta corrections as in the MC codes.
+again at _Rc_=2.5&sigma;, using the same LRC and delta corrections as in the MC codes.
 
 Source                 | &rho;     | _T_   | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)  | _Cv_ (f)  |
 ------                 | -----     | ----- | -------   | -------  | -------   | -------  | --------  |

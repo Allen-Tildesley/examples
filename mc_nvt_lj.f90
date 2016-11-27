@@ -176,7 +176,7 @@ CONTAINS
 
   SUBROUTINE calculate ( string )
     USE mc_module,       ONLY : potential_lrc, pressure_lrc, pressure_delta, force_sq
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, msd
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
@@ -200,9 +200,9 @@ CONTAINS
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
     !   %nam: used for headings
-    !   %msd: indicating if mean squared deviation required
-    ! If not set below, %msd adopts its default value of .false.
-    ! The %msd and %nam components need only be defined once, at the start of the program,
+    !   %method: indicating averaging method
+    ! If not set below, %method adopts its default value of avg
+    ! The %nam and some other components need only be defined once, at the start of the program,
     ! but for clarity and readability we assign all the values together below
 
     ! Move acceptance ratio
@@ -233,9 +233,10 @@ CONTAINS
     ! Total squared force divided by total Laplacian
     t_c = variable_type ( nam = 'T config', val = fsq/total%lap )
 
-    ! Heat capacity (excess, full)
-    ! Total potential energy divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
-    c_f = variable_type ( nam = 'Cv(ex)/N full', val = total%pot/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+    ! Heat capacity (full)
+    ! MSD potential energy divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
+    ! We add ideal gas contribution, 1.5, afterwards
+    c_f = variable_type ( nam = 'Cv/N full', val = total%pot/(temperature*SQRT(REAL(n))), method = msd, add = 1.5 )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
@@ -243,7 +244,7 @@ CONTAINS
 
     IF ( PRESENT ( string ) ) THEN ! Output required
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(2:6) ) ! Don't write out move ratio or heat capacity variable
+       CALL write_variables ( output_unit, variables(2:6) ) ! Don't write out move ratio or MSD variable
     END IF
 
   END SUBROUTINE calculate

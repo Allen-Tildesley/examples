@@ -12,6 +12,9 @@ MODULE averages_module
   ! Public routines
   PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add, time_stamp, write_variables
 
+  ! Public data
+  INTEGER, PARAMETER, PUBLIC :: avg = 0, msd = 1, cke = 2 ! Options for averaging methods
+  
   ! Private data
   INTEGER,          PARAMETER :: col_width = 15              ! Must be large enough to allow sensible format
   INTEGER,          PARAMETER :: nam_width = 2*col_width+1   ! At most two column widths plus spacer
@@ -23,15 +26,16 @@ MODULE averages_module
 
   INTEGER,                                             SAVE :: n_avg, line_width
   CHARACTER(len=col_width), DIMENSION(:), ALLOCATABLE, SAVE :: headings, subheads
-  REAL,                     DIMENSION(:), ALLOCATABLE, SAVE :: blk_avg, blk_msd, run_avg, run_err
-  LOGICAL,                  DIMENSION(:), ALLOCATABLE, SAVE :: msd
+  REAL,                     DIMENSION(:), ALLOCATABLE, SAVE :: blk_avg, blk_msd, run_avg, run_err, add
+  INTEGER,                  DIMENSION(:), ALLOCATABLE, SAVE :: method
   REAL,                                                SAVE :: run_nrm, blk_nrm
 
   ! Public derived type for variables to average
   TYPE, PUBLIC :: variable_type
-     CHARACTER(len=nam_width) :: nam           ! Name to be used in headings
-     REAL                     :: val           ! Instantaneous value to be averaged
-     LOGICAL                  :: msd = .FALSE. ! Flag indicating if mean square difference required
+     CHARACTER(len=nam_width) :: nam          ! Name to be used in headings
+     REAL                     :: val          ! Instantaneous value to be averaged
+     INTEGER                  :: method = avg ! Selects method: avg (default), msd, or cke
+     REAL                     :: add = 0.0    ! Constant to use in msd method (default zero)
   END TYPE variable_type
 
 CONTAINS
@@ -66,7 +70,7 @@ CONTAINS
     ALLOCATE ( headings(n_avg), subheads(n_avg) )
     ALLOCATE ( blk_avg(n_avg), blk_msd(n_avg) )
     ALLOCATE ( run_avg(n_avg), run_err(n_avg) )
-    ALLOCATE ( msd(n_avg) )
+    ALLOCATE ( method(n_avg), add(n_avg) )
 
     ! First column plus a column for each variable; allow one space between columns 
     line_width = col_width + n_avg * ( col_width + 1 )
@@ -86,8 +90,9 @@ CONTAINS
        subheads(i) = ADJUSTR ( subheads(i) )
     END DO
 
-    ! Store msd flags locally
-    msd = variables%msd
+    ! Store method options and add-constants locally
+    method = variables%method
+    add    = variables%add
 
     ! Zero averages and error accumulators at start of run
     run_nrm = 0.0
@@ -145,8 +150,9 @@ CONTAINS
     blk_avg = blk_avg / blk_nrm ! Normalize block averages
     blk_msd = blk_msd / blk_nrm ! Normalize block averages of squared variables
 
-    ! Replace blk_avg by mean-squared deviations where required
-    WHERE ( msd ) blk_avg = blk_msd - blk_avg**2
+    ! Replace blk_avg by mean-squared deviations plus optional constant where required
+    WHERE ( method == msd .OR. method == cke ) blk_avg = add + blk_msd - blk_avg**2
+    IF ( ANY ( method == cke ) ) CALL cke_calc ! Call special routine for Cv from KE fluctuations
 
     run_avg = run_avg + blk_avg    ! Increment run averages
     run_err = run_err + blk_avg**2 ! Increment error accumulators
@@ -187,7 +193,7 @@ CONTAINS
     WRITE ( unit=output_unit, fmt=colf_fmt                ) run_err
     WRITE ( unit=output_unit, fmt='(a)'                   ) REPEAT('=', line_width )
 
-    DEALLOCATE ( headings, blk_avg, blk_msd, run_avg, run_err, msd )
+    DEALLOCATE ( headings, blk_avg, blk_msd, run_avg, run_err, method, add )
 
   END SUBROUTINE run_end
 
@@ -206,4 +212,38 @@ CONTAINS
 
   END SUBROUTINE write_variables
 
+  SUBROUTINE cke_calc
+    IMPLICIT NONE
+
+    INTEGER :: i
+    LOGICAL :: found
+    REAL    :: temperature
+
+    ! Locate variable corresponding to kinetic temperature
+
+    found = .FALSE.
+    DO i = 1, n_avg
+       IF ( INDEX ( headings(i)//subheads(i),'T' ) /= 0 .AND. INDEX ( headings(i)//subheads(i), 'kin' ) /= 0 ) THEN
+          temperature = blk_avg(i)
+          found       = .TRUE.
+          EXIT
+       END IF
+    END DO
+
+    IF ( .NOT. found ) THEN
+       WRITE ( unit=error_unit, fmt='(a)' ) 'Could not find T kin variable'
+       STOP 'Error in cke_calc'
+    END IF
+
+    ! Apply special fluctuation formula for microcanonical ensemble heat capacity
+    ! blk_avg(i) should contain mean-squared total KE, divided by N
+    
+    DO i = 1, n_avg
+       IF ( method(i) == cke ) THEN
+          blk_avg(i) = 9.0 / ( 6.0 - 4.0 * blk_avg(i) / temperature**2 )
+       END IF
+    END DO
+
+  END SUBROUTINE cke_calc
+  
 END MODULE averages_module

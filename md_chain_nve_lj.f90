@@ -180,9 +180,9 @@ CONTAINS
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
     !   %nam: used for headings
-    !   %msd: indicating if mean squared deviation required
-    ! If not set below, %msd adopts its default value of .false.
-    ! The %msd and %nam components need only be defined once, at the start of the program,
+    !   %method: indicating averaging method
+    ! If not set below, %method adopts its default value of avg
+    ! The %nam and some other components need only be defined once, at the start of the program,
     ! but for clarity and readability we assign all the values together below
 
     ! Internal energy per atom

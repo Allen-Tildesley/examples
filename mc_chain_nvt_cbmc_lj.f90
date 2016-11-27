@@ -133,7 +133,7 @@ CONTAINS
 
   SUBROUTINE calculate ( string )
     USE mc_module,       ONLY : potential, spring_pot, potential_type
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, msd
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
@@ -158,9 +158,9 @@ CONTAINS
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
     !   %nam: used for headings
-    !   %msd: indicating if mean squared deviation required
-    ! If not set below, %msd adopts its default value of .false.
-    ! The %msd and %nam components need only be defined once, at the start of the program,
+    !   %method: indicating averaging method
+    ! If not set below, %method adopts its default value of avg
+    ! The %nam and some other components need only be defined once, at the start of the program,
     ! but for clarity and readability we assign all the values together below
 
     ! Move acceptance ratio
@@ -181,7 +181,7 @@ CONTAINS
     ! Heat Capacity (excess, without ideal gas contribution, extensive)
     ! MSD of total PE / T
     ! Total PE of bond springs plus total LJ PE (not cut, nor shifted), divided by T
-    c_x = variable_type ( nam = 'Cv(ex) whole-chain', val = (spr+total%pot)/temperature, msd = .TRUE. )
+    c_x = variable_type ( nam = 'Cv(ex) whole-chain', val = (spr+total%pot)/temperature, method = msd )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

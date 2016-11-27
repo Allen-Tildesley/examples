@@ -258,7 +258,7 @@ CONTAINS
 
   SUBROUTINE calculate ( string )
     USE smc_module,      ONLY : potential_lrc, pressure_lrc
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, msd
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
@@ -276,9 +276,9 @@ CONTAINS
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
     !   %nam: used for headings
-    !   %msd: indicating if mean squared deviation required
-    ! If not set below, %msd adopts its default value of .false.
-    ! The %msd and %nam components need only be defined once, at the start of the program,
+    !   %method: indicating averaging method
+    ! If not set below, %method adopts its default value of avg
+    ! The %nam and some other components need only be defined once, at the start of the program,
     ! but for clarity and readability we assign all the values together below
 
     ! Move acceptance ratio
@@ -311,11 +311,13 @@ CONTAINS
 
     ! Heat capacity (excess, cut-and-shifted)
     ! Total PE divided by temperature and sqrt(N) to make result intensive
-    c_s = variable_type ( nam = 'Cv(ex)/N cut&shifted', val = total%pot/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+    ! Ideal gas contribution 1.5 added afterwards
+    c_s = variable_type ( nam = 'Cv/N cut&shifted', val = total%pot/(temperature*SQRT(REAL(n))), method = msd, add = 1.5 )
 
     ! Heat capacity (excess, full)
     ! Total PE divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
-    c_f = variable_type ( nam = 'Cv(ex)/N full', val = total%cut/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+    ! Ideal gas contribution 1.5 added afterwards
+    c_f = variable_type ( nam = 'Cv/N full', val = total%cut/(temperature*SQRT(REAL(n))), method = msd, add = 1.5 )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

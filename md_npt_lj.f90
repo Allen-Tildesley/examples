@@ -360,7 +360,7 @@ CONTAINS
 
   SUBROUTINE calculate ( string ) 
     USE md_module,       ONLY : potential_lrc, pressure_lrc
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, msd
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
@@ -382,9 +382,9 @@ CONTAINS
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
     !   %nam: used for headings
-    !   %msd: indicating if mean squared deviation required
-    ! If not set below, %msd adopts its default value of .false.
-    ! The %msd and %nam components need only be defined once, at the start of the program,
+    !   %method: indicating averaging method
+    ! If not set below, %method adopts its default value of avg
+    ! The %nam and some other components need only be defined once, at the start of the program,
     ! but for clarity and readability we assign all the values together below
 
     ! Internal energy (cut-and-shifted ) per atom
@@ -420,19 +420,19 @@ CONTAINS
     ! Heat capacity (cut-and-shifted)
     ! Total "enthalpy" divided by temperature and sqrt(N) to make result intensive
     enp = kin+total%pot+pressure*vol
-    c_s = variable_type ( nam = 'Cp/N cut&shifted', val = enp/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+    c_s = variable_type ( nam = 'Cp/N cut&shifted', val = enp/(temperature*SQRT(REAL(n))), method = msd )
 
     ! Heat capacity (full)
     ! Total "enthalpy" divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
     enp = kin+total%cut+pressure*vol
-    c_f = variable_type ( nam = 'Cp/N full', val = enp/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+    c_f = variable_type ( nam = 'Cp/N full', val = enp/(temperature*SQRT(REAL(n))), method = msd )
 
     ! Volume MSD
-    vol_msd = variable_type ( nam = 'Volume MSD', val = vol, msd = .TRUE. )
+    vol_msd = variable_type ( nam = 'Volume MSD', val = vol, method = msd )
 
     ! Mean-squared deviation of conserved energy-like quantity
     ! Energy plus extra terms defined above
-    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin+total%pot+ext, msd = .TRUE. )
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin+total%pot+ext, method = msd )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

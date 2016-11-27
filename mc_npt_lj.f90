@@ -215,7 +215,7 @@ CONTAINS
 
   SUBROUTINE calculate ( string )
     USE mc_module,       ONLY : potential_lrc, pressure_lrc, pressure_delta, force_sq
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, msd
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
@@ -242,9 +242,9 @@ CONTAINS
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
     !   %nam: used for headings
-    !   %msd: indicating if mean squared deviation required
-    ! If not set below, %msd adopts its default value of .false.
-    ! The %msd and %nam components need only be defined once, at the start of the program,
+    !   %method: indicating averaging method
+    ! If not set below, %method adopts its default value of avg
+    ! The %nam and some other components need only be defined once, at the start of the program,
     ! but for clarity and readability we assign all the values together below
 
     ! Move and volume acceptance ratios
@@ -281,21 +281,21 @@ CONTAINS
     t_c = variable_type ( nam = 'T config', val = fsq/total%lap )
 
     ! Heat capacity (cut but not shifted)
-    ! Excess "enthalpy" divided by temperature and sqrt(N) to make result intensive
+    ! MSD of excess "enthalpy" divided by temperature and sqrt(N) to make result intensive
     ! NB this is not really the excess Cp/NkB, it simply omits the kinetic energy fluctuations
-    ! i.e. add the ideal gas part of Cv/NkB, 1.5, to get total Cp/NkB
+    ! i.e. we add the ideal gas part of Cv/NkB, 1.5, to get total Cp/NkB
     enp = total%pot+pressure*vol
-    c_c = variable_type ( nam = 'Cp(ex)/N cut', val = enp/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+    c_c = variable_type ( nam = 'Cp/N cut', val = enp/(temperature*SQRT(REAL(n))), method = msd, add = 1.5 )
 
     ! Heat capacity (full)
-    ! Excess "enthalpy" divided by temperature and sqrt(N) to make result intensive
+    ! MSD of excess "enthalpy" divided by temperature and sqrt(N) to make result intensive
     ! NB this is not really the excess Cp/NkB, it simply omits the kinetic energy fluctuations
-    ! i.e. add the ideal gas part of Cv/NkB, 1.5, to get total Cp/NkB
+    ! i.e. we add the ideal gas part of Cv/NkB, 1.5, to get total Cp/NkB
     enp = REAL(n)*potential_lrc(rho,r_cut)+total%pot+pressure*vol
-    c_f = variable_type ( nam = 'Cp(ex)/N full', val = enp/(temperature*SQRT(REAL(n))), msd = .TRUE. )
+    c_f = variable_type ( nam = 'Cp/N full', val = enp/(temperature*SQRT(REAL(n))), method = msd, add = 1.5 )
 
     ! Volume MSD
-    vol_msd = variable_type ( nam = 'Volume MSD', val = vol, msd = .TRUE. )
+    vol_msd = variable_type ( nam = 'Volume MSD', val = vol, method = msd )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
