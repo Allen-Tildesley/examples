@@ -2,7 +2,7 @@
 ! Monte Carlo, NVT ensemble, replica exchange
 PROGRAM mc_nvt_lj_re
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, error_unit, iostat_end, iostat_eor
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
@@ -20,15 +20,24 @@ PROGRAM mc_nvt_lj_re
   ! Uses MPI to run replica exchange of configurations with neighbouring temperatures
   ! Assume at most 100 processes numbered 0 to 99
 
+  ! There are a couple of MPI-related points that need particular attention
+  ! Firstly, it is assumed that this program is compiled with a compiler option such as "-fdefault-real-8"
+  ! defining the precision of REAL variables. We set the parameter MY_MPI_REAL = MPI_DOUBLE_PRECISION
+  ! to be compatible with this. Your implementation may require MY_MPI_REAL = MPI_REAL.
+  ! Secondly, all processes write to their standard output, output_unit, but the default in MPI is for all this output
+  ! to be collated (in an undefined order) and written to a single channel. We assume that the program
+  ! will be run with a command-line which includes an option for each process to write to separate files, such as
+  !          mpirun -np 8 -output-filename out ./mc_nvt_lj_re < mc.inp
+  ! where the standard output files are named out##, the ## part being determined by the process rank.
+  ! If your implementation does not have this option, you should edit the code to explicitly open a file for
+  ! standard output, with a process-rank-dependent name, and associate the output_unit with it.
+
+  ! Note that configurations are read, saved, and written to files named cnf##.inp etc
+  ! NB a program intended for real-world application would be much more careful about
+  ! closing down all the MPI processes cleanly in the event of an error on any one process.
+
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
-
-  ! Note that the various processes running this program will share standard input and error units
-  ! but will write "standard output" to a file std##.out where ## is the process rank
-  ! Similarly, configurations are read, saved, and written to files named cnf##.inp etc
-  ! NB a program intended for real-world application would be much more careful about
-  ! closing down all the MPI processes in the event of an error on any one process
-  ! for example, on attempting to open and read the input configuration file
 
   ! Positions r are divided by box length after reading in
   ! However, input configuration, output configuration, most calculations, and all results 
@@ -53,16 +62,14 @@ PROGRAM mc_nvt_lj_re
   ! Arrays holding values for all processes
   REAL, DIMENSION(:), ALLOCATABLE :: every_temperature, every_beta, every_dr_max
 
-  LOGICAL            :: swap
-  INTEGER            :: blk, stp, i, nstep, nblock, moves, swap_interval, swapped, updown, ioerr
+  LOGICAL            :: swap, exists, all_exist
+  INTEGER            :: blk, stp, i, nstep, nblock, moves, updown, ioerr
   REAL               :: beta, other_beta, other_pot, delta, zeta, m_ratio, x_ratio
   REAL, DIMENSION(3) :: ri
 
-  INTEGER                      :: output_unit           ! Output file unit number 
   CHARACTER(len=3),  PARAMETER :: inp_tag    = 'inp'
   CHARACTER(len=3),  PARAMETER :: out_tag    = 'out'
   CHARACTER(len=6)             :: cnf_prefix = 'cnf##.' ! Will have rank inserted
-  CHARACTER(len=6)             :: std_prefix = 'std##.' ! Will have rank inserted
   CHARACTER(len=3)             :: sav_tag    = 'sav'    ! May be overwritten with block number
   CHARACTER(len=2)             :: m_tag                 ! Will contain rank number
 
@@ -76,24 +83,19 @@ PROGRAM mc_nvt_lj_re
   INTEGER, PARAMETER                  :: msg3_id = 777 ! MPI message identifier
   INTEGER, PARAMETER                  :: msg4_id = 666 ! MPI message identifier
 
-  NAMELIST /nml/ nblock, nstep, swap_interval, every_temperature, r_cut, every_dr_max
+  INTEGER, PARAMETER :: MY_MPI_REAL = MPI_DOUBLE_PRECISION ! Specifies precision of MPI reals
 
-  CALL MPI_Init(error)
-  CALL MPI_Comm_rank(MPI_COMM_WORLD,m,error)
-  CALL MPI_Comm_size(MPI_COMM_WORLD,nproc,error)
+  NAMELIST /nml/ nblock, nstep, every_temperature, r_cut, every_dr_max
+
+  CALL MPI_Init ( error )
+  CALL MPI_Comm_rank ( MPI_COMM_WORLD, m, error )
+  CALL MPI_Comm_size ( MPI_COMM_WORLD, nproc, error )
   IF ( nproc > 100 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Number of processes is too large', nproc
      STOP 'Error in mc_nvt_lj_re'
   END IF
   WRITE(m_tag,fmt='(i2.2)') m ! Convert rank into character form
   cnf_prefix(4:5) = m_tag     ! Insert process rank into configuration filename
-  std_prefix(4:5) = m_tag     ! Insert process rank into standard output filename
-
-  OPEN ( newunit=output_unit, file = std_prefix // out_tag, iostat=ioerr ) ! Open file for standard output
-  IF ( ioerr /= 0 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,a)') 'Could not open file ', std_prefix // out_tag
-     STOP 'Error in mc_nvt_lj_re'
-  END IF
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'mc_nvt_lj_re'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT, replica exchange'
@@ -105,43 +107,64 @@ PROGRAM mc_nvt_lj_re
 
   CALL init_random_seed () ! Initialize random number generator (hopefully differently on each process)
   CALL RANDOM_NUMBER ( zeta )
-  WRITE( unit=output_unit, fmt='(a,t40,f15.6)') 'First random number', zeta
-  WRITE( unit=output_unit, fmt='(a)'          ) 'Should be different for different processes!'
+  WRITE( unit=output_unit, fmt='(a,t40,f15.6)') 'Random # (different for each process?)', zeta
 
   ! Allocate processor-dependent arrays
   ALLOCATE ( every_temperature(0:nproc-1), every_beta(0:nproc-1), every_dr_max(0:nproc-1) )
 
   ! Set sensible default run parameters for testing
+  ! Empirical choices for temperature and dr_max give approx 20% swap rate and 35-40% move rate for 256 LJ atoms
   nblock            = 10
-  nstep             = 1000
-  swap_interval     = 20
+  nstep             = 10000
   r_cut             = 2.5
-  every_temperature = [ ( 0.7*(1.05)**i,  i = 0, nproc-1 ) ] ! Just empirical settings for LJ
-  every_dr_max      = [ ( 0.15*(1.05)**i, i = 0, nproc-1 ) ] ! Just empirical settings for LJ
+  every_temperature = [ ( 1.00*(1.14)**(i-1), i = 0, nproc-1 ) ]
+  every_dr_max      = [ ( 0.15*(1.11)**(i-1), i = 0, nproc-1 ) ]
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
-  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+
+  IF ( m == 0 ) THEN ! Process 0 reads data from standard input
+     READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  END IF
+
+  ! Process 0 sends error outcome to all other processes (to allow check and clean failure)
+  CALL MPI_Bcast ( ioerr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, msg_error )
+
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
      IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     CALL MPI_Finalize ( msg_error )
      STOP 'Error in mc_nvt_lj_re'
   END IF
+
+  ! Process 0 sends run parameters to all other processes
+  CALL MPI_Bcast ( nblock,                   1, MPI_INTEGER, 0, MPI_COMM_WORLD, msg_error )
+  CALL MPI_Bcast ( nstep,                    1, MPI_INTEGER, 0, MPI_COMM_WORLD, msg_error )
+  CALL MPI_Bcast ( r_cut,                    1, MY_MPI_REAL, 0, MPI_COMM_WORLD, msg_error )
+  CALL MPI_Bcast ( every_temperature(0), nproc, MY_MPI_REAL, 0, MPI_COMM_WORLD, msg_error )
+  CALL MPI_Bcast ( every_dr_max(0),      nproc, MY_MPI_REAL, 0, MPI_COMM_WORLD, msg_error )
+
   every_beta  = 1.0 / every_temperature ! All the inverse temperatures
   temperature = every_temperature(m)    ! Temperature for this process
   dr_max      = every_dr_max(m)         ! Max displacement for this process
   beta        = every_beta(m)           ! Inverse temperature for this process
 
   ! Write out run parameters
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',               nblock
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block',      nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Replica exchange swap interval', swap_interval
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature',                    temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance',      r_cut
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum displacement',           dr_max
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature',               temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance', r_cut
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum displacement',      dr_max
 
   ! Read in initial configuration and allocate necessary arrays
+  INQUIRE ( file = cnf_prefix//inp_tag, exist = exists ) ! Check that our configuration file exists
+  CALL MPI_Allreduce ( exists, all_exist, 1, MPI_LOGICAL, MPI_LAND, MPI_COMM_WORLD, msg_error ) ! Combine results
+  IF ( .NOT. all_exist ) THEN ! This is a fairly likely error, so we check and allow clean failure
+     WRITE ( unit=error_unit, fmt='(a,2l15)') 'One or more configuration files do not exist', exists, all_exist
+     CALL MPI_Finalize ( msg_error )
+     STOP 'Error in mc_nvt_lj_re'
+  END IF
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
@@ -201,57 +224,50 @@ PROGRAM mc_nvt_lj_re
 
         m_ratio  = REAL(moves) / REAL(n)
 
-        IF ( MOD (stp, swap_interval) == 0 ) THEN ! Test for swap interval
+        x_ratio = 0.0
 
-           swapped = 0
+        DO updown = 1, 2 ! Loop to look one way then the other
 
-           DO updown = 1, 2 ! Loop to look one way then the other
+           IF ( MOD(m,2) == MOD(updown,2) ) THEN ! Look up, partner is m+1
 
-              IF ( MOD(m,2) == MOD(updown,2) ) THEN ! Look up, partner is m+1
+              IF ( m+1 < nproc ) THEN ! Ensure partner exists
+                 other_beta = every_beta(m+1) ! We already know the other beta
+                 CALL MPI_Recv ( other_pot, 1, MY_MPI_REAL, m+1, msg1_id, &
+                      &          MPI_COMM_WORLD, msg_status, msg_error )  ! Receive pot from other process
+                 delta = -(beta - other_beta) * ( total%pot - other_pot ) ! Delta for Metropolis decision
+                 swap  = metropolis ( delta ) ! Decision taken on this process
+                 CALL MPI_Send ( swap, 1, MPI_LOGICAL, m+1, msg2_id, &
+                      &          MPI_COMM_WORLD, msg_error ) ! Send decision to other process
 
-                 IF ( m+1 < nproc ) THEN ! Ensure partner exists
-                    other_beta = every_beta(m+1) ! We already know the other beta
-                    CALL MPI_Recv ( other_pot, 1, MPI_REAL, m+1, msg1_id, &
-                         &          MPI_COMM_WORLD, msg_status, msg_error ) ! Receive pot from other process
+                 IF ( swap ) THEN ! Exchange configurations
+                    CALL MPI_Sendrecv_replace ( r, 3*n, MY_MPI_REAL, m+1, msg3_id, m+1, msg4_id, &
+                         &                      MPI_COMM_WORLD, msg_status, msg_error )
+                    total   = potential ( box, r_cut ) ! Alternatively, we could get this from m+1
+                    x_ratio = 1.0
+                 END IF ! End exchange configurations
 
-                    delta = -(beta - other_beta) * ( total%pot - other_pot ) ! Delta for Metropolis decision
-                    swap  = metropolis ( delta ) ! Decision taken on this process
-                    CALL MPI_Send ( swap, 1, MPI_LOGICAL, m+1, msg2_id, &
-                         &          MPI_COMM_WORLD, msg_error ) ! Send decision to other process
+              END IF ! End ensure partner exists
 
-                    IF ( swap ) THEN ! Exchange configurations
-                       CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m+1, msg3_id, m+1, msg4_id, &
-                            &                      MPI_COMM_WORLD, msg_status, msg_error )
-                       total   = potential ( box, r_cut ) ! Alternatively, we could get this from m+1
-                       swapped = 1
-                    END IF ! End exchange configurations
+           ELSE ! Look down, partner is m-1
 
-                 END IF ! End ensure partner exists
+              IF ( m-1 >= 0 ) THEN ! Ensure partner exists
+                 CALL MPI_Send ( total%pot, 1, MY_MPI_REAL, m-1, msg1_id, &
+                      &          MPI_COMM_WORLD, msg_error ) ! Send pot to other process
 
-              ELSE ! Look down, partner is m-1
+                 CALL MPI_Recv ( swap, 1, MPI_LOGICAL, m-1, msg2_id, &
+                      &          MPI_COMM_WORLD, msg_status, msg_error ) ! Receive decision from other process
 
-                 IF ( m-1 >= 0 ) THEN ! Ensure partner exists
-                    CALL MPI_Send ( total%pot, 1, MPI_REAL, m-1, msg1_id, &
-                         &          MPI_COMM_WORLD, msg_error ) ! Send pot to other process
+                 IF ( swap ) THEN ! Exchange configurations
+                    CALL MPI_Sendrecv_replace ( r, 3*n, MY_MPI_REAL, m-1, msg4_id, m-1, msg3_id, &
+                         &                      MPI_COMM_WORLD, msg_status, msg_error )
+                    total = potential ( box, r_cut ) ! Alternatively, we could get this from m-1
+                 END IF ! End exchange configurations
 
-                    CALL MPI_Recv ( swap, 1, MPI_LOGICAL, m-1, msg2_id, &
-                         &          MPI_COMM_WORLD, msg_status, msg_error ) ! Receive decision from other process
+              END IF ! End ensure partner exists
 
-                    IF ( swap ) THEN ! Exchange configurations
-                       CALL MPI_Sendrecv_replace ( r, 3*n, MPI_REAL, m-1, msg4_id, m-1, msg3_id, &
-                            &                      MPI_COMM_WORLD, msg_status, msg_error )
-                       total = potential ( box, r_cut ) ! Alternatively, we could get this from m-1
-                    END IF ! End exchange configurations
+           END IF ! End choice of which way to look
 
-                 END IF ! End ensure partner exists
-
-              END IF ! End choice of which way to look
-
-           END DO ! End loop to look one way then the other
-
-        END IF ! End test for swap interval
-
-        x_ratio = REAL(swapped*swap_interval) ! Include factor for only attempting at intervals
+        END DO ! End loop to look one way then the other
 
         ! Calculate and accumulate variables for this step
         CALL calculate ( )
@@ -285,14 +301,13 @@ PROGRAM mc_nvt_lj_re
   DEALLOCATE ( every_temperature, every_beta, every_dr_max )
   CALL conclusion ( output_unit )
 
-  CLOSE ( unit=output_unit )
   CALL MPI_Finalize(error)
 
 CONTAINS
 
   SUBROUTINE calculate ( string )
     USE mc_module,       ONLY : potential_lrc, pressure_lrc, pressure_delta, force_sq
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, msd
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
@@ -305,7 +320,7 @@ CONTAINS
     ! estimates of < e_f > and < p_f > for the full (uncut) potential
     ! The value of the cut-and-shifted potential is not used, in this example
 
-    TYPE(variable_type) :: m_r, x_r, e_c, p_c, e_f, p_f, t_c
+    TYPE(variable_type) :: m_r, x_r, e_c, p_c, e_f, p_f, t_c, c_f
     REAL                :: vol, rho, fsq
 
     ! Preliminary calculations (m_ratio, total etc are known already)
@@ -351,13 +366,18 @@ CONTAINS
     ! Total squared force divided by total Laplacian
     t_c = variable_type ( nam = 'T config', val = fsq/total%lap )
 
+    ! Heat capacity (full)
+    ! MSD potential energy divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
+    ! We add ideal gas contribution, 1.5, afterwards
+    c_f = variable_type ( nam = 'Cv/N full', val = total%pot/(temperature*SQRT(REAL(n))), method = msd, add = 1.5 )
+
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ m_r, x_r, e_c, p_c, e_f, p_f, t_c ]
+    variables = [ m_r, x_r, e_c, p_c, e_f, p_f, t_c, c_f ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(3:) ) ! Don't write out move ratios
+       CALL write_variables ( output_unit, variables(3:7) ) ! Don't write out move ratios or MSD variable
     END IF
 
   END SUBROUTINE calculate

@@ -108,7 +108,7 @@ Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |          
 `md_nvt_lj`            | 0.75     | 1.00      | -2.993(3) | 0.965(6) |  2.08(11) | -3.733(3) | 0.363(6) |  2.09(12) |
 `md_npt_lj`            | 0.749(1) | 1.00      | -2.920(7) | 0.99     |           | -3.718(8) | 0.395(1) |
 `md_nve_lj`            | 0.75     | 1.0023(2) | -2.9280   | 0.991(2) |  2.27(1)  | -3.7275   | 0.390(2) |           |
-`md_nve_lj_omp`        | 0.75     | 1.0027(1) | -2.9280   | 0.990(2) |  2.26(1)  | -3.7276   | 0.388(2) |           |
+`md_nve_lj_omp`        | 0.75     | 1.0029(1) | -2.9280   | 0.992(2) |  2.25(1)  | -3.7275   | 0.390(2) |           |
 `smc_nvt_lj`           | 0.75     | 1.00      | -2.930(1) | 0.969(4) |  2.27(1)  | -3.729(1) | 0.367(4) |  2.27(1)  |
 
 * The `bd_nvt_lj` program seems to give a slightly high _Cv_
@@ -119,9 +119,9 @@ Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |          
 Results for `md_lj_mts` are not directly comparable, because they use a larger cutoff (by default _Rc_=4.0&sigma;)
 and hence a larger system. Here are the averages from a typical simulation, with _N_=400.
 
-Source      | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _Cv_ (cs)        | _E_ (f)    | _P_ (f)  | _Cv_ (f)         |
--------     | ----- | -------   | ---------  | -------- | ---------        | -------    | -------  | --------         |
-`md_lj_mts` | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)&dagger;  | -3.7188(5) | 0.404(2) |  |
+Source      | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _Cv_ (cs) | _E_ (f)    | _P_ (f)
+-------     | ----- | -------   | ---------  | -------- | --------- | -------    | -------
+`md_lj_mts` | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)   | -3.7188(5) | 0.404(2)
 
 With the default parameters, energy conservation is not great, with MSD average around 0.02. Perhaps needs looking at.
 
@@ -134,10 +134,12 @@ Source                 | &rho;     | _T_   | _E_ (c)   | _P_ (c)  | _E_ (f)   | 
 ------                 | -----     | ----- | -------   | -------  | -------   | -------  | --------  |
 Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197   | 0.7008   | -3.7212   | 0.3996   |  2.2630   |
 `mc_nvt_lj`            | 0.75      | 1.00  | -3.332(1) | 0.651(3) | -3.734(1) | 0.350(3) |  2.28(1)  |
+`mc_nvt_lj_re`         | 0.75      | 1.00  | -3.332(1) | 0.648(2) | -3.734(1) | 0.347(2) |  2.258(4) |
 `mc_npt_lj`            | 0.7501(2) | 1.00  | -3.331(1) | 0.69     | -3.733(1) | 0.364(2) |           |
 `mc_zvt_lj`            | 0.7504(4) | 1.00  | -3.333(3) | 0.668(4) | -3.735(3) | 0.366(4) |           |
 
 * The `mc_nvt_lj` program seems to give a low pressure, needs investigating.
+* The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
 * The `mc_npt_lj` measured pressure is 0.666(2) which is a little low. Measured Cp (full) is 5.28(7) compared with
 Thol et al (2016) EOS giving 5.22
 * The `mc_zvt_lj` program was run at activity _z_=0.0795, the default value in the program, in a box of length 7&sigma;.
@@ -190,6 +192,23 @@ Trokhymchuk et al MD | 0.6507            | 0.0500            | 0.0380          |
 
 There is a small discrepancy between pressures in the two boxes.
 The values indicated by &Dagger; are from the Thol et al (2016) EOS with cutoff correction.
+
+##Replica exchange program
+The `mc_nvt_lj_re` program conducts runs at several temperatures:
+the default parameters include _T_=1.0, which is reported above, and here are all of them,
+with expected values from the Thol et al (2016) equation of state (with standard LRC).
+All runs are for density &rho;=0.75. Four processes were used for testing.
+
+Source                 | _T_    | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)   | _Cv_ (f)  |
+------                 | -----  | -------   | -------  | -------   | -------   | --------  |
+Thol et al (2016) (f)  | 0.8772 | -3.6001   | 0.1942   | -4.0017   | -0.1070   |  2.3081   |
+`mc_nvt_lj_re`         | 0.8772 | -3.613(1) | 0.140(2) | -4.014(1) | -0.161(2) |  2.31(1)  |
+Thol et al (2016) (f)  | 1.0000 | -3.3197   | 0.7008   | -3.7212   | 0.3996    |  2.2630   |
+`mc_nvt_lj_re`         | 1.0000 | -3.332(1) | 0.648(2) | -3.734(1) |  0.347(2) |  2.258(4) |
+Thol et al (2016) (f)  | 1.1400 | -3.0055   | 1.2571   | -3.4070   |  0.9559   |  2.2278   |
+`mc_nvt_lj_re`         | 1.1400 | -3.016(1) | 1.212(2) | -3.417(1) |  0.911(2) |  2.233(4) |
+Thol et al (2016) (f)  | 1.2996 | -2.6523   | 1.8667   | -3.0539   |  1.5655   |  2.1989   |
+`mc_nvt_lj_re`         | 1.2996 | -2.662(1) | 1.820(3) | -3.063(1) |  1.519(3) |  2.214(5) |
 
 ##Cluster program
 The `cluster` program is self contained. It reads in a configuration of atomic positions
