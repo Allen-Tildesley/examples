@@ -9,7 +9,7 @@ MODULE md_module
 
   ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: force, hessian, potential_lrc, pressure_lrc
+  PUBLIC :: force, hessian
 
   ! Public data
   INTEGER,                              PUBLIC :: n ! Number of atoms
@@ -174,41 +174,7 @@ CONTAINS
     total%lap = total%lap * 24.0 * 2.0 ! 24*epsilon and factor 2 for ij and ji
 
   END SUBROUTINE force
-  
-  FUNCTION potential_lrc ( density, r_cut )
-    IMPLICIT NONE
-    REAL                :: potential_lrc ! Returns long-range energy/atom
-    REAL,    INTENT(in) :: density       ! Number density N/V
-    REAL,    INTENT(in) :: r_cut         ! Cutoff distance
-
-    ! Calculates long-range correction for Lennard-Jones energy per atom
-    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
-
-    REAL            :: sr3
-    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
-
-    sr3           = 1.0 / r_cut**3
-    potential_lrc = pi * ( (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3 ) * density
-
-  END FUNCTION potential_lrc
-
-  FUNCTION pressure_lrc ( density, r_cut )
-    IMPLICIT NONE
-    REAL                :: pressure_lrc ! Returns long-range pressure
-    REAL,    INTENT(in) :: density      ! Number density N/V
-    REAL,    INTENT(in) :: r_cut        ! Cutoff distance
-
-    ! Calculates long-range correction for Lennard-Jones pressure
-    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
-
-    REAL            :: sr3
-    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
-
-    sr3          = 1.0 / r_cut**3
-    pressure_lrc = pi * ( (32.0/9.0) * sr3**3  - (16.0/3.0) * sr3 ) * density**2
-
-  END FUNCTION pressure_lrc
-  
+    
   FUNCTION hessian ( box, r_cut ) RESULT ( hes )
     USE verlet_list_module, ONLY : point, list, make_list
     IMPLICIT NONE

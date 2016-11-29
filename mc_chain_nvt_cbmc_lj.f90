@@ -4,7 +4,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, regrow, n, r
 
   IMPLICIT NONE
@@ -50,7 +50,6 @@ PROGRAM mc_chain_nvt_cbmc_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, CBMC, chain molecule'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Simulation uses full nonbonded potential (no cutoff)'
   CALL introduction
-  CALL time_stamp
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -124,7 +123,6 @@ PROGRAM mc_chain_nvt_cbmc_lj
   CALL calculate ( 'Final values' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r )
-  CALL time_stamp
 
   CALL deallocate_arrays
   CALL conclusion

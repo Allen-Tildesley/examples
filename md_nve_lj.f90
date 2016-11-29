@@ -5,7 +5,7 @@ PROGRAM md_nve_lj
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       force, r, v, f, n, potential_type
 
@@ -52,7 +52,6 @@ PROGRAM md_nve_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE ensemble'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
   CALL introduction
-  CALL time_stamp
 
   ! Set sensible default run parameters for testing
   nblock = 10
@@ -139,7 +138,6 @@ PROGRAM md_nve_lj
      STOP 'Error in md_nve_lj'
   END IF
   CALL calculate ( 'Final values' )
-  CALL time_stamp
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v ) ! Write out final configuration
 
@@ -149,7 +147,8 @@ PROGRAM md_nve_lj
 CONTAINS
 
   SUBROUTINE calculate ( string ) 
-    USE md_module,       ONLY : potential_lrc, pressure_lrc, hessian
+    USE lrc_module,      ONLY : potential_lrc, pressure_lrc
+    USE md_module,       ONLY : hessian
     USE averages_module, ONLY : write_variables, msd, cke
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string

@@ -13,6 +13,10 @@ change the parameters, typical input might be
 ```
 and the `key=value` pairs may be set out on different lines if you wish.
 
+The program `md_nve_lj_vl` expects the input file to contain a second namelist,
+`&nml_list`, which should either be empty or contain the desired value of `r_list_factor`.
+See the file `verlet_list_module.f90` for details.
+
 ##Initial Configuration
 Simulation runs require a starting configuration which can usually be prepared using
 the `initialize` program (in `build_initialize/`).
@@ -96,7 +100,7 @@ For completeness, note that Thol et al also supply C++ programs, and tables of d
 in the Supplementary Information associated with their papers.
 They are not responsible for our (Fortran) program!
 
-Here we compare with typical test runs from our programs using default parameters except where stated.
+Here we compare with typical test runs from our programs using default parameters, N=256, except where stated.
 Note that _E_ is the total internal energy per atom, including the ideal gas part,
 and that _Cv_ and _P_ likewise include the ideal gas contributions.
 
@@ -109,6 +113,8 @@ Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |          
 `md_npt_lj`            | 0.749(1) | 1.00      | -2.920(7) | 0.99     |           | -3.718(8) | 0.395(1) |
 `md_nve_lj`            | 0.75     | 1.0023(2) | -2.9280   | 0.991(2) |  2.27(1)  | -3.7275   | 0.390(2) |           |
 `md_nve_lj_omp`        | 0.75     | 1.0029(1) | -2.9280   | 0.992(2) |  2.25(1)  | -3.7275   | 0.390(2) |           |
+`md_nve_lj_vl`         | 0.75     | 1.0030(2) | -2.9271   | 0.993(2) |  2.24(1)  | -3.7266   | 0.391(2) |           |
+`md_nve_lj_ll` (N=864) | 0.75     | 1.0010(1) | -2.9278   | 0.990(2) |  2.28(1)  | -3.7274   | 0.389(2) |           |
 `smc_nvt_lj`           | 0.75     | 1.00      | -2.930(1) | 0.969(4) |  2.27(1)  | -3.729(1) | 0.367(4) |  2.27(1)  |
 
 * The `bd_nvt_lj` program seems to give a slightly high _Cv_

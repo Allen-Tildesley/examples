@@ -4,7 +4,7 @@ PROGRAM eos_lj
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
-  USE mc_module,     ONLY : potential_lrc, pressure_lrc, pressure_delta
+  USE lrc_module,    ONLY : potential_lrc, pressure_lrc, pressure_delta
   USE eos_lj_module, ONLY : a_res_full, a_res_cutshift
 
   ! The routines in the above module use the fitting function described and parametrized in

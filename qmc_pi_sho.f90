@@ -4,8 +4,8 @@ PROGRAM qmc_pi_sho
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
-  USE averages_module, ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
-  USE maths_module,  ONLY : metropolis
+  USE averages_module, ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE maths_module,    ONLY : metropolis
 
   IMPLICIT NONE
 
@@ -48,7 +48,6 @@ PROGRAM qmc_pi_sho
   WRITE ( unit=output_unit, fmt='(a)' ) 'qmc_pi_sho'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Path Integral Monte Carlo simulation of a quantum oscillator'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Results in atomic units'
-  CALL time_stamp
 
   CALL RANDOM_SEED() ! Initialize random number generator
 

@@ -9,7 +9,7 @@ MODULE qmc_module
 
   ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: potential_1, potential, spring_1, spring, potential_lrc
+  PUBLIC :: potential_1, potential, spring_1, spring
 
   ! Public data
   INTEGER,                                PUBLIC :: n ! Number of atoms
@@ -331,22 +331,5 @@ CONTAINS
     partial_pot = partial_pot * 0.5 * k_spring 
 
   END FUNCTION spring_1
-
-  FUNCTION potential_lrc ( density, r_cut )
-    IMPLICIT NONE
-    REAL                :: potential_lrc ! Returns long-range correction to potential/atom
-    REAL,    INTENT(in) :: density       ! Number density N/V
-    REAL,    INTENT(in) :: r_cut         ! Cutoff distance
-
-    ! Calculates long-range correction for Lennard-Jones potential per atom
-    ! density, r_cut, and the results, are in LJ units where sigma = 1, epsilon = 1
-
-    REAL            :: sr3
-    REAL, PARAMETER :: pi = 4.0 * ATAN(1.0)
-
-    sr3           = 1.0 / r_cut**3
-    potential_lrc = pi * ( (8.0/9.0)  * sr3**3  - (8.0/3.0)  * sr3 ) * density
-
-  END FUNCTION potential_lrc
 
 END MODULE qmc_module

@@ -5,7 +5,7 @@ PROGRAM md_npt_lj
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE maths_module,     ONLY : random_normal, random_normals
-  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       force, r, v, f, n, potential_type
 
@@ -73,7 +73,6 @@ PROGRAM md_npt_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NPT ensemble'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
   CALL introduction
-  CALL time_stamp
 
   ! Set sensible default run parameters for testing
   nblock      = 10
@@ -195,7 +194,6 @@ PROGRAM md_npt_lj
      STOP 'Error in md_npt_lj'
   END IF
   CALL calculate ( 'Final values' )
-  CALL time_stamp
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v ) ! Write out final configuration
 
@@ -359,7 +357,7 @@ CONTAINS
   END SUBROUTINE u4_propagator
 
   SUBROUTINE calculate ( string ) 
-    USE md_module,       ONLY : potential_lrc, pressure_lrc
+    USE lrc_module,      ONLY : potential_lrc, pressure_lrc
     USE averages_module, ONLY : write_variables, msd
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string

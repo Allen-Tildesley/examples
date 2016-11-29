@@ -96,6 +96,10 @@ CONTAINS
     run_err = 0.0
 
     ! Write headings
+    WRITE ( unit=output_unit, fmt=* )
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Run begins'
+    CALL time_stamp
+    WRITE ( unit=output_unit, fmt=* )
     WRITE ( unit=output_unit, fmt='(a)'                   ) REPEAT ( '=', line_width ) 
     WRITE ( unit=output_unit, fmt=col1a_fmt, advance='no' ) 'Block'
     WRITE ( unit=output_unit, fmt=cola_fmt                ) headings
@@ -187,6 +191,10 @@ CONTAINS
     WRITE ( unit=output_unit, fmt=col1a_fmt, advance='no' ) 'Run errors'
     WRITE ( unit=output_unit, fmt=colf_fmt                ) run_err
     WRITE ( unit=output_unit, fmt='(a)'                   ) REPEAT('=', line_width )
+    WRITE ( unit=output_unit, fmt=* )
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Run ends'
+    CALL time_stamp
+    WRITE ( unit=output_unit, fmt=* )
 
     DEALLOCATE ( headings, blk_avg, blk_msd, run_avg, run_err, method, add )
 

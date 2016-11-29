@@ -5,7 +5,7 @@ PROGRAM mc_npt_lj
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE averages_module,  ONLY : time_stamp, run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE maths_module,     ONLY : metropolis, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_1, potential, move, n, r, potential_type
@@ -64,7 +64,6 @@ PROGRAM mc_npt_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NPT ensemble'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Simulation uses cut (but not shifted) potential'
   CALL introduction
-  CALL time_stamp
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -206,7 +205,6 @@ PROGRAM mc_npt_lj
   CALL calculate ( 'Final check' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box ) ! Write out final configuration
-  CALL time_stamp
 
   CALL deallocate_arrays
   CALL conclusion
@@ -214,7 +212,8 @@ PROGRAM mc_npt_lj
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE mc_module,       ONLY : potential_lrc, pressure_lrc, pressure_delta, force_sq
+    USE lrc_module,      ONLY : potential_lrc, pressure_lrc, pressure_delta
+    USE mc_module,       ONLY : force_sq
     USE averages_module, ONLY : write_variables, msd
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
@@ -252,7 +251,7 @@ CONTAINS
     IF ( PRESENT ( string ) ) THEN ! The ratios are meaningless in this case
        m_r = variable_type ( nam = 'Move ratio',   val = 0.0 )
        v_r = variable_type ( nam = 'Volume ratio', val = 0.0 )
-    else
+    ELSE
        m_r = variable_type ( nam = 'Move ratio',   val = m_ratio )
        v_r = variable_type ( nam = 'Volume ratio', val = v_ratio )
     END IF
