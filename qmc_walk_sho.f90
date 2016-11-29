@@ -51,7 +51,7 @@ PROGRAM qmc_walk_sho
   WRITE ( unit=output_unit, fmt='(a)') 'qmc_walk_sho'
   WRITE ( unit=output_unit, fmt='(a)') 'Diffusion Monte Carlo simulation of a quantum oscillator'
   WRITE ( unit=output_unit, fmt='(a)') 'Results in atomic units'
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   ! Set up default parameters for the simulation
   n_max               = 2000  ! max number of walkers
@@ -201,7 +201,7 @@ PROGRAM qmc_walk_sho
      pexact = const * EXP(- 0.5 * x_bin * x_bin)
      WRITE ( unit=output_unit, fmt='(3f15.6)') x_bin, psi(i), pexact
   END DO
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   DEALLOCATE ( x, v, replica, alive, bin, psi )
 

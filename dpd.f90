@@ -49,8 +49,9 @@ PROGRAM dpd
   INTEGER :: blk, stp, nstep, nblock, ioerr
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
-  CHARACTER(len=3), PARAMETER :: inp_tag = 'inp', out_tag = 'out'
-  CHARACTER(len=3)            :: sav_tag = 'sav' ! may be overwritten with block number
+  CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
+  CHARACTER(len=3), PARAMETER :: out_tag    = 'out'
+  CHARACTER(len=3)            :: sav_tag    = 'sav' ! May be overwritten with block number
   CHARACTER(len=10)           :: method
 
   ! Define a procedure pointer with an interface like that of lowe
@@ -61,8 +62,8 @@ PROGRAM dpd
   WRITE ( unit=output_unit, fmt='(a)' ) 'dpd'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Dissipative particle dynamics, constant-NVT ensemble'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 and cutoff=1 throughout'
-  CALL introduction ( output_unit )
-  CALL time_stamp ( output_unit )
+  CALL introduction
+  CALL time_stamp
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -127,7 +128,7 @@ PROGRAM dpd
   CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( output_unit, variables )
+  CALL run_begin ( variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -150,25 +151,25 @@ PROGRAM dpd
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )                              ! Output block averages
+     CALL blk_end ( blk )                                           ! Output block averages
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! Number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! Save configuration
 
   END DO ! End loop over blocks      
 
-  CALL run_end ( output_unit ) ! Output run averages
+  CALL run_end ! Output run averages
 
   ! Final energy etc
   CALL force ( box, a, total )
   CALL calculate ( 'Final values' )
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Approx EOS P = ', p_eos ( )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v ) ! Write out final configuration
 
   CALL deallocate_arrays
-  CALL conclusion ( output_unit )
+  CALL conclusion
 
 CONTAINS
 
@@ -238,7 +239,7 @@ CONTAINS
 
     IF ( PRESENT ( string ) ) THEN ! Output required
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables )
+       CALL write_variables ( variables )
     END IF
 
   END SUBROUTINE calculate

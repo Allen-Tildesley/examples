@@ -32,8 +32,8 @@ MODULE maths_module
 
   ! Generic interface for the outer_product functions
   INTERFACE outer_product
-     MODULE PROCEDURE outer_product_2 ! for 2 vectors giving a rank-2 output
-     MODULE PROCEDURE outer_product_3 ! for 3 vectors giving a rank-3 output
+     MODULE PROCEDURE outer_product_2 ! for 2 vectors giving a rank-2 result
+     MODULE PROCEDURE outer_product_3 ! for 3 vectors giving a rank-3 result
   END INTERFACE outer_product
 
   ! Generic interface for the random_normals functions

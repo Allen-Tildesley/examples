@@ -2,7 +2,7 @@
 ! Force routine for MD, LJ atoms, multiple timesteps
 MODULE md_module
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
   IMPLICIT NONE
   PRIVATE
@@ -42,9 +42,8 @@ CONTAINS
     c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
 
-  SUBROUTINE introduction ( output_unit )
+  SUBROUTINE introduction
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Cut-and-shifted version for dynamics'
@@ -55,9 +54,8 @@ CONTAINS
 
   END SUBROUTINE introduction
 
-  SUBROUTINE conclusion ( output_unit )
+  SUBROUTINE conclusion
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
 

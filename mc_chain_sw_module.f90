@@ -1,7 +1,7 @@
 ! mc_chain_sw_module.f90
 ! Monte Carlo, single chain, square wells
 MODULE mc_module
-  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
   IMPLICIT NONE
   PRIVATE
@@ -23,9 +23,8 @@ MODULE mc_module
 
 CONTAINS
 
-  SUBROUTINE introduction ( output_unit )
+  SUBROUTINE introduction
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Hard-sphere chain with fixed bond length'
     WRITE ( unit=output_unit, fmt='(a)'           ) 'Square-well attractive potential'
@@ -33,9 +32,8 @@ CONTAINS
 
   END SUBROUTINE introduction
 
-  SUBROUTINE conclusion ( output_unit )
+  SUBROUTINE conclusion
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
 

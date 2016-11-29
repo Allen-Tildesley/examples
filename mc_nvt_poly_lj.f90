@@ -56,8 +56,8 @@ PROGRAM mc_nvt_poly_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'mc_nvt_poly_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, polyatomic molecule'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Simulation uses cut-and-shifted potential'
-  CALL introduction ( output_unit )
-  CALL time_stamp ( output_unit )
+  CALL introduction
+  CALL time_stamp
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -106,7 +106,7 @@ PROGRAM mc_nvt_poly_lj
   CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( output_unit, variables )
+  CALL run_begin ( variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -155,13 +155,13 @@ PROGRAM mc_nvt_poly_lj
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )                             ! Output block averages
+     CALL blk_end ( blk )                                          ! Output block averages
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk              ! Number configuration by block
      CALL write_cnf_mols ( cnf_prefix//sav_tag, n, box, r*box, e ) ! Save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit ) ! Output run averages
+  CALL run_end ! Output run averages
 
   CALL calculate ( 'Final values' )
 
@@ -174,10 +174,10 @@ PROGRAM mc_nvt_poly_lj
   CALL calculate ( 'Final check' )
 
   CALL write_cnf_mols ( cnf_prefix//out_tag, n, box, r*box, e ) ! Write out final configuration
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   CALL deallocate_arrays
-  CALL conclusion ( output_unit )
+  CALL conclusion
 
 CONTAINS
 
@@ -231,7 +231,7 @@ CONTAINS
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(2:) ) ! Don't write out move ratio
+       CALL write_variables ( variables(2:) ) ! Don't write out move ratio
     END IF
 
   END SUBROUTINE calculate

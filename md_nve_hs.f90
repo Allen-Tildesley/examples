@@ -51,7 +51,7 @@ PROGRAM md_nve_hs
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_nve_hs'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE, hard spheres'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Results in units sigma = 1, mass = 1'
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   ! Set sensible default run parameters for testing
   nblock = 10
@@ -102,7 +102,7 @@ PROGRAM md_nve_hs
   END DO
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( output_unit, variables )
+  CALL run_begin ( variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -139,20 +139,20 @@ PROGRAM md_nve_hs
      ! Calculate and accumulate variables for this step
      CALL calculate
      CALL blk_add ( variables )
-     CALL blk_end ( blk, output_unit )                              ! Output block averages
+     CALL blk_end ( blk )                                           ! Output block averages
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! Number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! Save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit ) ! Output run averages
+  CALL run_end ! Output run averages
 
   WRITE ( unit=output_unit, fmt='(a,t40,2i5)' ) 'Final colliding pair', i, j
 
   IF ( overlap ( box ) ) STOP 'Particle overlap in final configuration'
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   CALL deallocate_arrays
 

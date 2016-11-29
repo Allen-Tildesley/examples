@@ -2,7 +2,7 @@
 ! Dissipative particle dynamics module
 MODULE dpd_module
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
   IMPLICIT NONE
   PRIVATE
@@ -44,18 +44,16 @@ CONTAINS
     c%lap = a%lap + b%lap
   END FUNCTION add_potential_type
 
-  SUBROUTINE introduction ( output_unit )
+  SUBROUTINE introduction
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)'           ) 'DPD soft potential'
     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Diameter, r_cut = ', r_cut    
 
   END SUBROUTINE introduction
 
-  SUBROUTINE conclusion ( output_unit )
+  SUBROUTINE conclusion
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
 

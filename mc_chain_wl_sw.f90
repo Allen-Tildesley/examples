@@ -79,8 +79,8 @@ PROGRAM mc_chain_wl_sw
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'mc_chain_wl_sw'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, Wang-Landau method, chain molecule, square wells'
-  CALL introduction ( output_unit )
-  CALL time_stamp ( output_unit )
+  CALL introduction
+  CALL time_stamp
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -146,7 +146,7 @@ PROGRAM mc_chain_wl_sw
   q_max = q ! Max q seen so far
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( output_unit, variables )
+  CALL run_begin ( variables )
 
   stage = 1
   blk   = 0
@@ -204,7 +204,7 @@ PROGRAM mc_chain_wl_sw
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit ) ! Output block averages
+     CALL blk_end ( blk ) ! Output block averages
 
      flat = histogram_flat ( flatness ) ! Check for flatness
 
@@ -220,11 +220,11 @@ PROGRAM mc_chain_wl_sw
   END DO ! End loop over blocks
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r ) ! Write out final configuration
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   CALL deallocate_arrays
   DEALLOCATE ( h, g, s )
-  CALL conclusion ( output_unit )
+  CALL conclusion
 
 CONTAINS
 

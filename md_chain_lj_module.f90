@@ -2,7 +2,7 @@
 ! Force & constraint routines for MD, LJ chain
 MODULE md_module
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
   IMPLICIT NONE
   PRIVATE
@@ -47,9 +47,8 @@ CONTAINS
     c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
 
-  SUBROUTINE introduction ( output_unit )
+  SUBROUTINE introduction
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)' ) 'WCA shifted Lennard-Jones chain'
     WRITE ( unit=output_unit, fmt='(a)' ) 'No periodic boundaries'   
@@ -57,12 +56,14 @@ CONTAINS
     WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1'   
     WRITE ( unit=output_unit, fmt='(a)' ) 'All atomic masses the same m = 1'   
     WRITE ( unit=output_unit, fmt='(a)' ) 'All bond lengths the same'   
+
   END SUBROUTINE introduction
 
-  SUBROUTINE conclusion ( output_unit )
+  SUBROUTINE conclusion
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
+
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
+
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays

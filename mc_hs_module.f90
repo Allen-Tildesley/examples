@@ -2,7 +2,7 @@
 ! Overlap routines for MC simulation, hard spheres
 MODULE mc_module
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
   IMPLICIT NONE
   PRIVATE
@@ -17,17 +17,18 @@ MODULE mc_module
 
 CONTAINS
 
-  SUBROUTINE introduction ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
+  SUBROUTINE introduction
 
     WRITE ( unit=output_unit, fmt='(a)' ) 'Hard sphere potential'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'   
     WRITE ( unit=output_unit, fmt='(a)' ) 'Energy, kT = 1'   
+
   END SUBROUTINE introduction
   
-  SUBROUTINE conclusion ( output_unit )
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
+  SUBROUTINE conclusion
+
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
+
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays

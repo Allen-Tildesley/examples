@@ -58,8 +58,8 @@ PROGRAM mc_zvt_lj
 
   WRITE( unit=output_unit, fmt='(a)' ) 'mc_zvt_lj'
   WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-zVT ensemble'
-  CALL introduction ( output_unit )
-  CALL time_stamp ( output_unit )
+  CALL introduction
+  CALL time_stamp
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -114,7 +114,7 @@ PROGRAM mc_zvt_lj
   CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( output_unit, variables )
+  CALL run_begin ( variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -232,13 +232,13 @@ PROGRAM mc_zvt_lj
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )                                  ! Output block averages
+     CALL blk_end ( blk )                                               ! Output block averages
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk                   ! Number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r(:,1:n)*box ) ! Save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit ) ! Output run averages
+  CALL run_end ! Output run averages
 
   CALL calculate ( 'Final values' )
 
@@ -249,12 +249,12 @@ PROGRAM mc_zvt_lj
      STOP 'Error in mc_zvt_lj'
   END IF
   CALL calculate ( 'Final check' )
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r(:,1:n)*box ) ! Write out final configuration
 
   CALL deallocate_arrays
-  CALL conclusion ( output_unit )
+  CALL conclusion
 
 CONTAINS
 
@@ -336,7 +336,7 @@ CONTAINS
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(4:10) ) ! Don't write out move ratios or MSD variables
+       CALL write_variables ( variables(4:10) ) ! Don't write out move ratios or MSD variables
     END IF
 
   END SUBROUTINE calculate

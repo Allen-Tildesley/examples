@@ -61,8 +61,8 @@ PROGRAM qmc_pi_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'qmc_pi_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Path-integral Monte Carlo, constant-NVT ensemble'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Simulation uses cut (but not shifted) potential'
-  CALL introduction ( output_unit )
-  CALL time_stamp ( output_unit )
+  CALL introduction
+  CALL time_stamp
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -126,7 +126,7 @@ PROGRAM qmc_pi_lj
   CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( output_unit, variables )
+  CALL run_begin ( variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -183,7 +183,7 @@ PROGRAM qmc_pi_lj
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )                                     ! Output block averages
+     CALL blk_end ( blk )                                                  ! Output block averages
      IF ( nblock < 1000 ) WRITE(sav_tag,fmt='(i3.3)') blk                  ! Number configuration by block
      DO k = 1, p ! Loop over ring polymer indices
         WRITE(k_tag,fmt='(i2.2)') k                                        ! Convert into character form
@@ -193,7 +193,7 @@ PROGRAM qmc_pi_lj
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit ) ! Output run averages
+  CALL run_end ! Output run averages
 
   CALL calculate ( 'Final values' )
 
@@ -211,10 +211,10 @@ PROGRAM qmc_pi_lj
      cnf_prefix(4:5) = k_tag                                            ! Insert into configuration filename
      CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r(:,:,k)*box ) ! Write to unique file
   END DO ! End loop over ring polymer indices
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   CALL deallocate_arrays
-  CALL conclusion ( output_unit )
+  CALL conclusion
 
 CONTAINS
 
@@ -275,7 +275,7 @@ CONTAINS
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(2:) ) ! Don't write out move ratio
+       CALL write_variables ( variables(2:) ) ! Don't write out move ratio
     END IF
 
   END SUBROUTINE calculate

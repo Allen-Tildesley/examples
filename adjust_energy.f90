@@ -36,7 +36,7 @@ PROGRAM adjust_energy
   WRITE ( unit=output_unit, fmt='(a)'   ) 'Allows user to fix total energy of MD configuration'
   WRITE ( unit=output_unit, fmt='(a)'   ) 'Particle mass=1 throughout'
   WRITE ( unit=output_unit, fmt='(a,a)' ) 'Input and output configuration in ', filename
-  CALL introduction ( output_unit )
+  CALL introduction
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( filename, n, box ) ! First call is just to get n and box

@@ -50,9 +50,8 @@ CONTAINS
     c%ovr = a%ovr .OR. b%ovr ! This is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
 
-  SUBROUTINE introduction ( output_unit )
+  SUBROUTINE introduction
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Cut (but not shifted)'
@@ -62,9 +61,8 @@ CONTAINS
 
   END SUBROUTINE introduction
 
-  SUBROUTINE conclusion ( output_unit )
+  SUBROUTINE conclusion
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit ! Unit for standard output
 
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
 

@@ -2,9 +2,7 @@
 ! Calculation of run averages with output to output_unit
 MODULE averages_module
 
-  ! We use the standard error_unit for error messages
-  ! but allow the output_unit to be passed in as an argument, when needed
-  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit, iostat_end, iostat_eor
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit, iostat_end, iostat_eor
 
   IMPLICIT NONE
   PRIVATE
@@ -40,9 +38,8 @@ MODULE averages_module
 
 CONTAINS
 
-  SUBROUTINE time_stamp ( output_unit )
+  SUBROUTINE time_stamp
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit
 
     CHARACTER(len=8)  :: date
     CHARACTER(len=10) :: time
@@ -56,9 +53,8 @@ CONTAINS
 
   END SUBROUTINE time_stamp
 
-  SUBROUTINE run_begin ( output_unit, variables )
+  SUBROUTINE run_begin ( variables )
     IMPLICIT NONE
-    INTEGER,                           INTENT(in) :: output_unit
     TYPE(variable_type), DIMENSION(:), INTENT(in) :: variables   ! Variables to be averaged
 
     ! Set up averaging variables based on supplied arrays of names & write headings
@@ -136,9 +132,9 @@ CONTAINS
 
   END SUBROUTINE blk_add
 
-  SUBROUTINE blk_end ( blk, output_unit )
+  SUBROUTINE blk_end ( blk )
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: blk, output_unit
+    INTEGER, INTENT(in) :: blk ! Block number
 
     ! Write out averages at end of every block
 
@@ -164,9 +160,8 @@ CONTAINS
 
   END SUBROUTINE blk_end
 
-  SUBROUTINE run_end ( output_unit )
+  SUBROUTINE run_end
     IMPLICIT NONE
-    INTEGER, INTENT(in) :: output_unit
 
     ! Write out averages and error estimates at end of run
     ! NB, these are the crudest possible error estimates, based on the wholly unjustified
@@ -197,10 +192,9 @@ CONTAINS
 
   END SUBROUTINE run_end
 
-  SUBROUTINE write_variables ( output_unit, variables )
+  SUBROUTINE write_variables ( variables )
     IMPLICIT NONE
-    INTEGER,                           INTENT(in) :: output_unit
-    TYPE(variable_type), DIMENSION(:), INTENT(in) :: variables   ! Variables to be written
+    TYPE(variable_type), DIMENSION(:), INTENT(in) :: variables ! Variables to be written
 
     ! Writes out instantaneous values
 

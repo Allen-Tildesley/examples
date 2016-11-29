@@ -51,8 +51,8 @@ PROGRAM md_nve_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_nve_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE ensemble'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
-  CALL introduction ( output_unit )
-  CALL time_stamp ( output_unit )
+  CALL introduction
+  CALL time_stamp
 
   ! Set sensible default run parameters for testing
   nblock = 10
@@ -97,7 +97,7 @@ PROGRAM md_nve_lj
   CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( output_unit, variables )
+  CALL run_begin ( variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -125,13 +125,13 @@ PROGRAM md_nve_lj
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )                              ! Output block averages
+     CALL blk_end ( blk )                                           ! Output block averages
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! Number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! Save configuration
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit ) ! Output run averages
+  CALL run_end ! Output run averages
 
   CALL force ( box, r_cut, total )
   IF ( total%ovr ) THEN ! should never happen
@@ -139,12 +139,12 @@ PROGRAM md_nve_lj
      STOP 'Error in md_nve_lj'
   END IF
   CALL calculate ( 'Final values' )
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v ) ! Write out final configuration
 
   CALL deallocate_arrays
-  CALL conclusion ( output_unit )
+  CALL conclusion
 
 CONTAINS
 
@@ -212,7 +212,7 @@ CONTAINS
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(1:6) ) ! Don't write out MSD variables
+       CALL write_variables ( variables(1:6) ) ! Don't write out MSD variables
     END IF
 
   END SUBROUTINE calculate

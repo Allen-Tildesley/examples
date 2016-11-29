@@ -65,8 +65,8 @@ PROGRAM mc_chain_nvt_sw
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'mc_chain_nvt_sw'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, chain molecule, square wells'
-  CALL introduction ( output_unit )
-  CALL time_stamp ( output_unit )
+  CALL introduction
+  CALL time_stamp
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
@@ -136,7 +136,7 @@ PROGRAM mc_chain_nvt_sw
   CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( output_unit, variables )
+  CALL run_begin ( variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -178,14 +178,14 @@ PROGRAM mc_chain_nvt_sw
 
      END DO ! End loop over steps
 
-     CALL blk_end ( blk, output_unit )                        ! Output block averages
+     CALL blk_end ( blk )                                     ! Output block averages
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk         ! Number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, bond, r ) ! Save configuration
      CALL write_histogram ( his_prefix//sav_tag )             ! Save histogram
 
   END DO ! End loop over blocks
 
-  CALL run_end ( output_unit ) ! Output run averages
+  CALL run_end ! Output run averages
 
   CALL calculate ( 'Final values' )
 
@@ -198,11 +198,11 @@ PROGRAM mc_chain_nvt_sw
   CALL calculate ( 'Final check' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r )
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   CALL deallocate_arrays
   DEALLOCATE ( h, s )
-  CALL conclusion ( output_unit )
+  CALL conclusion
 
 CONTAINS
 
@@ -260,7 +260,7 @@ CONTAINS
 
     IF ( PRESENT ( string ) ) THEN ! Output required
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(4:5) ) ! Not acceptance ratios or heat capacity
+       CALL write_variables ( variables(4:5) ) ! Not acceptance ratios or heat capacity
     END IF
 
   END SUBROUTINE calculate

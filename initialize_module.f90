@@ -2,7 +2,7 @@
 ! Routines to initialize configurations and velocities
 MODULE initialize_module
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit, output_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
   IMPLICIT NONE
   PRIVATE

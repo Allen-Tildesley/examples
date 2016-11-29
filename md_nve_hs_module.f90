@@ -2,7 +2,7 @@
 ! Collisions and overlap for MD of hard spheres
 MODULE md_module
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
   IMPLICIT NONE
   PRIVATE

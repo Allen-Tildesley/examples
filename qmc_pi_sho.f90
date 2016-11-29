@@ -48,7 +48,7 @@ PROGRAM qmc_pi_sho
   WRITE ( unit=output_unit, fmt='(a)' ) 'qmc_pi_sho'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Path Integral Monte Carlo simulation of a quantum oscillator'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Results in atomic units'
-  CALL time_stamp ( output_unit )
+  CALL time_stamp
 
   CALL RANDOM_SEED() ! Initialize random number generator
 
@@ -93,7 +93,7 @@ PROGRAM qmc_pi_sho
   CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( output_unit, variables )
+  CALL run_begin ( variables )
 
   DO blk = 1-nequil, nblock ! Begin loop over blocks (including equilibration)
 
@@ -140,11 +140,11 @@ PROGRAM qmc_pi_sho
 
      END DO ! End loop over steps
 
-     IF ( blk > 0 ) CALL blk_end ( blk, output_unit ) ! Output block averages
+     IF ( blk > 0 ) CALL blk_end ( blk ) ! Output block averages
 
   END DO ! End loop over blocks (including equilibration)
 
-  CALL run_end ( output_unit ) ! Output run averages
+  CALL run_end ! Output run averages
 
   e_qu = e_pi_sho ( p, beta )
   WRITE ( unit=output_unit, fmt='(a,i0.0,a,t40,f15.6)' ) 'Exact P=', p, ' energy', e_qu
@@ -195,7 +195,7 @@ CONTAINS
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( output_unit, variables(2:) ) ! Don't write out move ratio
+       CALL write_variables ( variables(2:) ) ! Don't write out move ratio
     END IF
 
   END SUBROUTINE calculate
