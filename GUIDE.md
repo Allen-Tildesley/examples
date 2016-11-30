@@ -133,29 +133,38 @@ With the default parameters, energy conservation is not great, with MSD average 
 
 For the cut (but not shifted) potential, the value of _Cv_ should be equal to the value for the full potential,
 since the energy LRC is independent of temperature.
-Also the Thol et al (2016) EOS is used to predict results for the cut (but not shifted) potential (denoted c),
+The Thol et al (2016) EOS is used to predict results for the cut (but not shifted) potential (denoted c),
 again at _Rc_=2.5&sigma;, using the same LRC and delta corrections as in the MC codes.
 
-Source                 | &rho;     | _T_   | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)  | _Cv_ (f)  |
-------                 | -----     | ----- | -------   | -------  | -------   | -------  | --------  |
-Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197   | 0.7008   | -3.7212   | 0.3996   |  2.2630   |
-`mc_nvt_lj`            | 0.75      | 1.00  | -3.332(1) | 0.651(3) | -3.734(1) | 0.350(3) |  2.28(1)  |
-`mc_nvt_lj_re`         | 0.75      | 1.00  | -3.332(1) | 0.648(2) | -3.734(1) | 0.347(2) |  2.258(4) |
-`mc_npt_lj`            | 0.7501(2) | 1.00  | -3.331(1) | 0.69     | -3.733(1) | 0.364(2) |           |
-`mc_zvt_lj`            | 0.7504(4) | 1.00  | -3.333(3) | 0.668(4) | -3.735(3) | 0.366(4) |           |
+Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _Cv_ (f)  |
+------                 | -----     | ----- | -------    | -------  | -------    | -------  | --------  |
+Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630   |
+`mc_nvt_lj`            | 0.75      | 1.00  | -3.332(1)  | 0.651(3) | -3.734(1)  | 0.350(3) |  2.28(1)  |
+`mc_nvt_lj_re`         | 0.75      | 1.00  | -3.332(1)  | 0.648(2) | -3.734(1)  | 0.347(2) |  2.258(4) |
+`mc_nvt_lj_ll` (N=864) | 0.75      | 1.00  | -3.3230(3) | 0.669(1) | -3.7246(3) | 0.367(1) |  2.27(1)  |
+`mc_npt_lj`            | 0.7501(2) | 1.00  | -3.331(1)  | 0.69     | -3.733(1)  | 0.364(2) |           |
+`mc_npt_lj_ll` (N=864) | 0.7506(4) | 1.00  | -3.332(3)  | 0.69     | -3.734(3)  | 0.358(3) |           |
+`mc_zvt_lj`            | 0.7504(4) | 1.00  | -3.333(3)  | 0.668(4) | -3.735(3)  | 0.366(4) |           |
+`mc_zvt_lj_ll` (N=864) | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |           |
 
 * The `mc_nvt_lj` program seems to give a low pressure, needs investigating.
 * The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
-* The `mc_npt_lj` measured pressure is 0.666(2) which is a little low. Measured Cp (full) is 5.28(7) compared with
-Thol et al (2016) EOS giving 5.22
+* The `mc_npt_lj` measured pressure (c) is 0.666(2) which is a little low.
+Measured _Cp_ (full) is 5.28(7) compared with Thol et al (2016) EOS giving 5.22
+* The `mc_npt_lj_ll` program was run with `db_max`=0.015 to give a volume acceptance ratio around 9%.
+Measured pressure (c) is 0.660(3) which is again a little low. Is the delta correction wrong somehow?
+Measured _Cp_ (full) is 5.04(16) compared with Thol et al (2016) EOS value of 5.22.
+The program probably needs making more resilient against changes in box size.
 * The `mc_zvt_lj` program was run at activity _z_=0.0795, the default value in the program, in a box of length 7&sigma;.
 The Thol et al (2016) LRC-corrected value to give &rho;=0.75 would be _z_=0.080627.
 Acceptance rate of creation/destruction moves is quite small, at about 0.3%.
 For other state points see below.
+* The `mc_zvt_lj_ll` program has the same acceptance ratio of moves.
+It seems to run very slowly, which needs looking into.
 
 Tests for the grand canonical MC program were initially conducted at a slightly lower density,
 very close to the liquid-vapour coexistence line (see Gibbs simulations below).
-A box length of 7&sigma; was used, and creation/destruction ratios were around 1.5%.
+A box length of 7&sigma; was used, and creation/destruction acceptance ratios were around 1.5%.
 Comparison was made with the Thol et al (2016) equation of state, with corrections for the cutoff.
 The corresponding density is lower than the liquid coexistence density for the full potential,
 so there is no guarantee that the EOS will be accurate.
@@ -183,6 +192,7 @@ which is below the critical point for the cut (but not shifted) LJ potential
 It was found convenient to start from a lower temperature,
 with configurations at gas and liquid densities, with roughly equal numbers of particles,
 and slowly work upwards in temperature, to equilibrate.
+Note that the program expects two starting configurations: cnf1.inp and cnf2.inp.
 Exchanges of box identity are expected as the critical temperature is approached,
 and so one should not place blind trust in the separate box averages reported by the program,
 but refer to histograms of density, energy etc.
@@ -200,10 +210,10 @@ There is a small discrepancy between pressures in the two boxes.
 The values indicated by &Dagger; are from the Thol et al (2016) EOS with cutoff correction.
 
 ##Replica exchange program
-The `mc_nvt_lj_re` program conducts runs at several temperatures:
-the default parameters include _T_=1.0, which is reported above, and here are all of them,
+The `mc_nvt_lj_re` program conducts runs at several temperatures: four were used in testing.
+The default program values include _T_=1.0, which is reported above, and here are all of them,
 with expected values from the Thol et al (2016) equation of state (with standard LRC).
-All runs are for density &rho;=0.75. Four processes were used for testing.
+All runs are for density &rho;=0.75.
 
 Source                 | _T_    | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)   | _Cv_ (f)  |
 ------                 | -----  | -------   | -------  | -------   | -------   | --------  |

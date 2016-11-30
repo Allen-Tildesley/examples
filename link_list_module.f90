@@ -11,10 +11,10 @@ MODULE link_list_module
   PUBLIC :: move_in_list, create_in_list, destroy_in_list, c_index, neighbours
 
   ! Public (protected) data
-  INTEGER,                                PROTECTED, PUBLIC :: sc     ! dimensions of head array
-  INTEGER, DIMENSION(:,:,:), ALLOCATABLE, PROTECTED, PUBLIC :: head   ! head(0:sc-1,0:sc-1,0:sc-1)
-  INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED, PUBLIC :: list   ! list(n)
-  INTEGER, DIMENSION(:,:),   ALLOCATABLE, PROTECTED, PUBLIC :: c      ! c(3,n) 3D cell index of each atom
+  INTEGER,                                PROTECTED, SAVE, PUBLIC :: sc     ! dimensions of head array
+  INTEGER, DIMENSION(:,:,:), ALLOCATABLE, PROTECTED, SAVE, PUBLIC :: head   ! head(0:sc-1,0:sc-1,0:sc-1)
+  INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED, SAVE, PUBLIC :: list   ! list(n)
+  INTEGER, DIMENSION(:,:),   ALLOCATABLE, PROTECTED, SAVE, PUBLIC :: c      ! c(3,n) 3D cell index of each atom
 
 CONTAINS
 
@@ -50,7 +50,7 @@ CONTAINS
     REAL,    DIMENSION(3,n), INTENT(in) :: r ! Atom coordinates
 
     INTEGER :: i
-
+    
     head(:,:,:) = 0
 
     DO i = 1, n ! Loop over all atoms
@@ -85,7 +85,7 @@ CONTAINS
     IMPLICIT NONE
     INTEGER,               INTENT(in) :: i  ! Index of atom
     INTEGER, DIMENSION(3), INTENT(in) :: ci ! 3D index of cell in which i lies
-
+    
     list(i)                 = head(ci(1),ci(2),ci(3)) ! Transfer old head to list
     head(ci(1),ci(2),ci(3)) = i                       ! Atom i becomes new head for this list
     c(:,i)                  = ci(:)                   ! Store 3D index in array
@@ -98,7 +98,7 @@ CONTAINS
     INTEGER, DIMENSION(3), INTENT(in) :: ci ! 3D index of cell in which i lies
 
     INTEGER :: this, next
-
+    
     this = head(ci(1),ci(2),ci(3)) ! Locate head of list corresponding to cell
 
     IF ( this == i ) THEN ! Atom i is the head atom in that cell
@@ -132,7 +132,7 @@ CONTAINS
     IMPLICIT NONE
     INTEGER,               INTENT(in) :: i
     INTEGER, DIMENSION(3), INTENT(in) :: ci
-
+    
     IF ( ALL ( ci(:) == c(:,i) ) ) RETURN ! No need to do anything
 
     CALL destroy_in_list ( i, c(:,i) ) ! Remove atom i from old cell
@@ -251,17 +251,20 @@ CONTAINS
        DO ! Begin loop over j atoms in list
 
           IF ( j == 0 ) EXIT  ! Exhausted list
-          IF ( j == i ) CYCLE ! Skip self
 
-          nj = nj + 1 ! Increment count of j atoms
+          IF ( j /= i ) THEN ! Skip self
 
-          IF ( nj >= n ) THEN ! Check more than n-1 neighbours (should never happen)
-             WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Neighbour error for j_list', nj, n
-             STOP 'Impossible error in get_neighbours'
-          END IF ! End check more than n-1 neighbours
+             nj = nj + 1 ! Increment count of j atoms
 
-          j_list(nj) = j       ! Store new j atom
-          j          = list(j) ! Next atom in j cell
+             IF ( nj >= n ) THEN ! Check more than n-1 neighbours (should never happen)
+                WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Neighbour error for j_list', nj, n
+                STOP 'Impossible error in get_neighbours'
+             END IF ! End check more than n-1 neighbours
+
+             j_list(nj) = j       ! Store new j atom
+          END IF
+
+          j = list(j) ! Next atom in j cell
 
        END DO ! End loop over j atoms in list
 

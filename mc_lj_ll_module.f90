@@ -134,7 +134,7 @@ CONTAINS
     TYPE(potential_type) :: partial
     INTEGER              :: i
     LOGICAL, SAVE        :: first_call = .TRUE.
-
+    
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
        STOP 'Impossible error in potential'
@@ -195,7 +195,7 @@ CONTAINS
     INTEGER, DIMENSION(3) :: ci
     REAL, PARAMETER       :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
     TYPE(potential_type)  :: pair
-
+    
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
        STOP 'Error in potential_1'
@@ -275,7 +275,7 @@ CONTAINS
     REAL                  :: r_cut_box, r_cut_box_sq, box_sq, rij_sq
     REAL                  :: sr2, sr6, sr12
     REAL,    DIMENSION(3) :: rij, fij
-
+    
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
@@ -329,7 +329,7 @@ CONTAINS
     REAL,    DIMENSION(3), INTENT(in) :: ri
 
     INTEGER, DIMENSION(3) :: ci
-
+    
     r(:,i) = ri                ! New position
     ci(:)  = c_index ( ri(:) ) ! New cell index
     CALL move_in_list ( i, ci(:) )
