@@ -54,12 +54,12 @@ PROGRAM mc_chain_nvt_cbmc_lj
   CALL RANDOM_SEED () ! Initialize random number generator
 
   ! Set sensible default run parameters for testing
-  nblock      = 10    ! Number of blocks
-  nstep       = 10000 ! Number of steps per block
-  m_max       = 3     ! Maximum atoms in regrow
-  k_max       = 32    ! Number of random tries per atom in regrow
-  temperature = 1.0   ! Temperature (in units of well depth)
-  k_spring    = 400.0 ! Strength of intramolecular bond springs (same units)
+  nblock      = 10     ! Number of blocks
+  nstep       = 100000 ! Number of steps per block
+  m_max       = 3      ! Maximum atoms in regrow
+  k_max       = 32     ! Number of random tries per atom in regrow
+  temperature = 1.0    ! Temperature (in units of well depth)
+  k_spring    = 400.0  ! Strength of intramolecular bond springs (same units)
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -169,17 +169,17 @@ CONTAINS
        m_r = variable_type ( nam = 'Regrow ratio', val = m_ratio )
     END IF
 
-    ! Total potential energy (extensive, i.e. not divided by N)
-    ! Total PE of bond springs plus total LJ PE (not cut, nor shifted)
-    e_x = variable_type ( nam = 'PE whole chain', val = spr+total%pot )
+    ! Total potential energy per atom (excess, without ideal gas contribution)
+    ! Total PE of bond springs plus total LJ PE (not cut, nor shifted) divided by N
+    e_x = variable_type ( nam = 'PE/N', val = (spr+total%pot)/REAL(n) )
 
     ! Radius of gyration
     r_g = variable_type ( nam = 'Rg', val = SQRT(rsq) )
 
-    ! Heat Capacity (excess, without ideal gas contribution, extensive)
-    ! MSD of total PE / T
+    ! Heat Capacity per atom (excess, without ideal gas contribution)
+    ! MSD of PE / (sqrt(N)*T)
     ! Total PE of bond springs plus total LJ PE (not cut, nor shifted), divided by T
-    c_x = variable_type ( nam = 'Cv(ex) whole-chain', val = (spr+total%pot)/temperature, method = msd )
+    c_x = variable_type ( nam = 'Cv(ex)/N', val = (spr+total%pot)/(SQRT(REAL(n))*temperature), method = msd )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

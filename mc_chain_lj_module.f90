@@ -58,7 +58,7 @@ CONTAINS
     ! Both types of model are also studied by
     ! P Grassberger, R Hegger, J Phys Cond Matt 7, 3089 (1995)
     
-    WRITE ( unit=output_unit, fmt='(a)' ) 'LJ chain, no cutoff, no shift'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'LJ chain, no cutoff, no shift, no periodic box'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'   
     WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1'   
     WRITE ( unit=output_unit, fmt='(a)' ) 'Harmonic spring bond potential'
@@ -124,7 +124,7 @@ CONTAINS
 
     std   = SQRT(temperature/k_spring) ! Spring bond standard deviation
     d_max = 3.0*std                    ! Impose a limit on variation, say 3*std
-    IF ( d_max > 0.5*bond ) THEN       ! Must not be too large, say 0.5*bond
+    IF ( d_max > 0.75*bond ) THEN      ! Must not be too large, say 0.75*bond
        WRITE ( unit=error_unit, fmt='(a,2f15.6)' ) 'Spring bond strength error', d_max, bond
        STOP 'Error in regrow'
     END IF

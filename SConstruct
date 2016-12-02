@@ -83,6 +83,7 @@ variants['build_test_pot_dq']          = (['test_pot_linear.f90','test_pot_dq.f9
 variants['build_test_pot_qq']          = (['test_pot_linear.f90','test_pot_qq.f90','maths_module.f90'],env_normal)
 variants['build_test_pot_gb']          = (['test_pot_linear.f90','test_pot_gb.f90','maths_module.f90'],env_normal)
 variants['build_t_tensor']             = (['t_tensor.f90','maths_module.f90'],env_normal)
+variants['build_wl_hist']              = (['wl_hist.f90'],env_normal)
 
 # Build each variant in appropriate variant directory
 for variant_dir,(sources,env) in variants.iteritems():

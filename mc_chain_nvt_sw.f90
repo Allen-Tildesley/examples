@@ -49,6 +49,7 @@ PROGRAM mc_chain_nvt_sw
   ! Histograms and tables
   REAL, DIMENSION(:), ALLOCATABLE :: h ! Histogram of q values (0:nq)
   REAL, DIMENSION(:), ALLOCATABLE :: s ! Entropy histogram used in acceptance (0:nq)
+  REAL, DIMENSION(:), ALLOCATABLE :: e ! Energy histogram
 
   INTEGER :: blk, stp, nstep, nblock, ioerr, try, n_acc
   LOGICAL :: accepted
@@ -70,16 +71,16 @@ PROGRAM mc_chain_nvt_sw
   CALL RANDOM_SEED () ! Initialize random number generator
 
   ! Set sensible default run parameters for testing
-  nblock         = 10    ! Number of blocks
-  nstep          = 10000 ! Number of sweeps per block
-  m_max          = 3     ! Maximum atoms in regrow
-  k_max          = 32    ! Number of random tries per atom in regrow
-  crank_max      = 0.5   ! Maximum move angle in crankshaft
-  crank_fraction = 0.5   ! Fraction of atoms to try in crank moves
-  pivot_max      = 0.5   ! Maximum move angle in pivot
-  pivot_fraction = 0.2   ! Fraction of atoms to try in pivot moves
-  temperature    = 1.0   ! Temperature (in units of well depth)
-  range          = 1.5   ! Range of attractive well
+  nblock         = 10     ! Number of blocks
+  nstep          = 100000 ! Number of sweeps per block
+  m_max          = 3      ! Maximum atoms in regrow
+  k_max          = 32     ! Number of random tries per atom in regrow
+  crank_max      = 0.5    ! Maximum move angle in crankshaft
+  crank_fraction = 0.5    ! Fraction of atoms to try in crank moves
+  pivot_max      = 0.5    ! Maximum move angle in pivot
+  pivot_fraction = 0.2    ! Fraction of atoms to try in pivot moves
+  temperature    = 1.0    ! Temperature (in units of well depth)
+  range          = 1.5    ! Range of attractive well
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -112,7 +113,7 @@ PROGRAM mc_chain_nvt_sw
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Bond length (in sigma units)', bond
   CALL allocate_arrays
   nq = 6*n ! Anticipated maximum number of pair interactions within range
-  ALLOCATE ( h(0:nq), s(0:nq) )
+  ALLOCATE ( h(0:nq), s(0:nq), e(0:nq) )
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r ) ! Second call gets r
 
   ! Set number of crankshaft and pivot moves per step
@@ -121,8 +122,9 @@ PROGRAM mc_chain_nvt_sw
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of crankshaft tries per step', n_crank
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of pivot tries per step',      n_pivot
 
-  ! Initialize Boltzmann exponents, s(q), which are just values of E/kT
-  s = [ ( -REAL(q)/temperature, q = 0, nq ) ]
+  ! Calculate energy histogram and Boltzmann exponents, s(q), which are just values of E/kT
+  e = [ ( -REAL(q), q = 0, nq ) ]
+  s = e /temperature
 
   ! Initial energy calculation plus overlap check
   IF ( weight() == 0 ) THEN
@@ -199,7 +201,7 @@ PROGRAM mc_chain_nvt_sw
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r )
 
   CALL deallocate_arrays
-  DEALLOCATE ( h, s )
+  DEALLOCATE ( h, s, e )
   CALL conclusion
 
 CONTAINS
@@ -240,9 +242,9 @@ CONTAINS
        p_r = variable_type ( nam = 'Pivot ratio',  val = p_ratio )
     END IF
 
-    ! Total potential energy of system  (extensive, i.e. not divided by N)
-    ! PE=negative of the number of square-well contacts
-    e_x = variable_type ( nam = 'PE whole-chain', val = -REAL(q) )
+    ! Total potential energy of system pe atom
+    ! PE=negative of the number of square-well contacts divided by N
+    e_x = variable_type ( nam = 'PE', val = -REAL(q)/real(n) )
 
     ! Radius of gyration
     r_g = variable_type ( nam = 'Rg', val = SQRT(rsq) )
@@ -250,7 +252,7 @@ CONTAINS
     ! Heat Capacity (excess, without ideal gas contribution, extensive)
     ! MSD of total PE / T
     ! PE=negative of the number of square-well contacts
-    c_x = variable_type ( nam = 'Cv(ex) whole-chain', val = -REAL(q)/temperature, method = msd )
+    c_x = variable_type ( nam = 'Cv(ex)', val = -REAL(q)/(SQRT(REAL(n))*temperature), method = msd )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

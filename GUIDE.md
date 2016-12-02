@@ -226,6 +226,85 @@ Thol et al (2016) (f)  | 1.1400 | -3.0055   | 1.2571   | -3.4070   |  0.9559   |
 Thol et al (2016) (f)  | 1.2996 | -2.6523   | 1.8667   | -3.0539   |  1.5655   |  2.1989   |
 `mc_nvt_lj_re`         | 1.2996 | -2.662(1) | 1.820(3) | -3.063(1) |  1.519(3) |  2.214(5) |
 
+##Chain simulation programs
+The program `mc_chain_nvt_cbmc_lj` simulates a single Lennard-Jones chain,
+where the atoms are linked by harmonic springs.
+For comparison with the paper of Calvo, Doye and Wales, _J Chem Phys,_ __116,__ 2642 (2002),
+test runs were carried out using _N_=13 atoms, a bond length of 1.122462&sigma;
+(prepared using `build_initialize/initialize` with random non-overlapping atom positions)
+and a rather low spring potential _k_<sub>spring</sub>=20 (the program default is 400).
+We only use CBMC moves in this code: for a practical application it would be advisable
+to include other kinds of move, for example crankshaft, pivot, and bridging moves.
+Replica exchange (as used by Calvo et al) would also improve the sampling at low temperature.
+The program default run length is 10 blocks of 100000 steps.
+
+_T_          |  0.40     |  0.45     |  0.5
+_PE/N_       | -1.50(1)  | -1.40(1)  | -1.291(8)
+_Rg_         |  1.173(3) |  1.201(3) |  1.226(2)
+_Cv_(ex)/_N_ |  2.51(17) |  2.26(8)  |  1.85(5)
+
+For lower temperatures (below), longer runs (10 blocks of 1000000 steps) were used.
+
+_T_          |  0.26      |  0.28      |  0.29      |  0.30      |  0.31      |  0.32      |  0.33      |  0.34     |  0.35
+_PE/N_       | -2.044(7)  | -1.967(5)  | -1.905(4)  | -1.893(7)  | -1.819(3)  | -1.789(2)  | -1.742(3)  | -1.705(4) | -1.672(3)
+_Rg_         |  1.074(1)  |  1.086(1)  |  1.096(1)  |  1.098(1)  |  1.1105(8) |  1.1162(5) |  1.1254(5) |  1.133(1) |  1.140(1)
+_Cv_(ex)/_N_ |  3.3(2)    |  4.16(9)   |  4.6(1)    |  4.71(9)   |  4.34(6)   |  4.2(1 )   |  4.05(1)   |  3.7(1)   |  3.49(8)
+
+At the lowest temperatures, the acceptance rate of CBMC moves (with the default parameters) was around 2%,
+while at _T_=0.35 it was around 11%, increasing further at higher temperatures.
+The results are broadly in agreement with Calvo et al (2002) showing a similar sized peak in _Cv_,
+although at a somewhat lower temperature (0.30 as opposed to 0.35).
+
+For the square-well system, the aim was to show the operation of the Wang-Landau method.
+Here we used pivot and crankshaft moves as well as CBMC regrowth.
+In a practical application it would be advisable to include some bridging moves as well.
+Reasonably long chains have been studied by Taylor, Paul and Binder, _J Chem Phys,_ __131,__ 114907 (2009),
+who provide references to earlier simulation work, as well as exact results for very short chains.
+Here we just choose _N_=13, bond length equal to &sigma;, and an interaction range of 1.5&sigma;.
+The starting chain configuration can be prepared using `build_initialize/initialize` in the usual way.
+
+For comparison, we ran a set of canonical ensemble calculations with `mc_chain_nvt_sw`.
+The program default is to run for 10 blocks, each of 100000 steps;
+this was increased to 10 blocks of 500000 steps for temperatures below 0.25.
+
+_T_          |  0.15     |  0.18     |  0.2      |  0.22     |  0.25     |  0.3      |  0.5      |  1.0      |  2.0      |  5.0
+_PE/N_       | -2.81(1)  | -2.759(8) | -2.699(8) | -2.645(4) | -2.586(8) | -2.482(6) | -2.127(2) | -1.547(2) | -0.885(1) | -0.566(1)
+_Rg_         |  1.070(2) |  1.072(2) |  1.077(2) |  1.082(1) |  1.090(2) |  1.104(2) |  1.161(1) |  1.318(1) |  1.658(1) |  1.889(1)
+_Cv_(ex)/_N_ |  1.1(2)   |  2.2(2)   |  2.4(1)   |  2.16(7)  |  2.15(9)  |  1.97(6)  |  1.50(2)  |  1.024(6) |  0.330(2) |  0.0318(1)
+
+Results obtained from a run of the Wang-Landau program `mc_chain_wl_sw`,
+using the same model, are given in the table below.
+The program was run with default parameters: there were 20 stages during which the entropy
+modification constant ds was halved at each stage.
+This particular test run illustrated one drawback of the simplest Wang-Landau implementation:
+two low-lying energies (corresponding to _q_=38 and 39 square-well interactions) were discovered
+during the very last stage, in which ds is very small.
+Accordingly, the system remained stuck in these low-energy states for a very long time,
+until their tabulated entropy _s(q)_ reached a high enough value to allow _q_ to change;
+even then, the final weight of the lowest state in the final "flat" histogram appears a little low.
+The overall run length was of order 90000 blocks of 10000 steps each.
+Results from the 20th stage are as follows.
+
+_T_          |  0.15  |  0.18  |  0.2   |  0.22  |  0.25  |  0.3   |  0.5   |  1.0   |  2.0   |  5.0
+_PE/N_       | -2.814 | -2.744 | -2.694 | -2.649 | -2.584 | -2.481 | -2.128 | -1.543 | -0.883 | -0.565
+_Rg_         |  1.068 |  1.073 |  1.078 |  1.082 |  1.089 |  1.103 |  1.161 |  1.319 |  1.660 |  1.890
+_Cv_(ex)/_N_ |  2.053 |  2.498 |  2.366 |  2.226 |  2.121 |  2.010 |  1.491 |  1.020 |  0.332 |  0.032
+
+This analysis can also be performed (for any desired temperature) by the program `wl_hist`, after the run.
+The results are generally in good agreement with the canonical ensemble test runs.
+The most significant discrepancies are in the heat capacities at the lowest two temperatures,
+which reflects the poor sampling of the canonical ensemble program (with these basic MC moves),
+and (probably to a lesser extent) the WL sampling problems mentioned above.
+
+If the run were repeated with the same parameters,
+one cannot guarantee that the same result will be obtained:
+indeed, it is more likely that the run will conclude much earlier, within a few thousand blocks,
+without ever discovering these low-lying energies.
+This will affect the results, particularly at the lower temperatures.
+This is always a danger with any Monte Carlo method, including Wang-Landau.
+
+* We might consider adding a fixed-length production run at the end of `mc_chain_wl_sw`.
+
 ##Cluster program
 The `cluster` program is self contained. It reads in a configuration of atomic positions
 and produces a circular linked list for each cluster identified within it.
