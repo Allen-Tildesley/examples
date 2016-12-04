@@ -102,7 +102,7 @@ They are not responsible for our (Fortran) program!
 
 Here we compare with typical test runs from our programs using default parameters, _N_=256, except where stated.
 Note that _E_ is the total internal energy per atom, including the ideal gas part,
-and that _C<sub>v</sub>_ and _P_ likewise include the ideal gas contributions.
+and that _C<sub>v</sub>_ (per atom) and _P_ likewise include the ideal gas contributions.
 
 Source | &rho;    | _T_ | _E_ (cs)  | _P_ (cs) | _C<sub>v</sub>_ (cs) | _E_ (f)   | _P_ (f)  | _C<sub>v</sub>_ (f)  
 ------ | -----    | -----     | --------  | -------- | --------- | -------   | -------  | --------
@@ -210,14 +210,16 @@ Trokhymchuk et al MC | 0.6542   | 0.0439   | 0.0336   | 0.0336   |              
 Trokhymchuk et al MD | 0.6507   | 0.0500   | 0.0380   | 0.0380   | -2.713 &Dagger; | 1.047 &Dagger;
 `mc_gibbs_lj`        | 0.652(1) | 0.050(1) | 0.028(1) | 0.038(1) | -2.730(5)       | 1.054(8)
 
-There is a small discrepancy between pressures in the two boxes.
-The values indicated by &Dagger; are from the Thol et al (2016) EOS with cutoff correction.
+* There is a small discrepancy between pressures in the two boxes.
+* &Dagger; indicates values for given &rho; and _T_ from the Thol et al (2016) EOS (f) with cutoff correction.
 
 ##Replica exchange program
 The `mc_nvt_lj_re` program conducts runs at several temperatures: four were used in testing.
-The default program values include _T_=1.0, which is reported above, and here are all of them,
-with expected values from the Thol et al (2016) equation of state (with standard LRC).
+The default program values include _T_=1.0, which is reported above, and here is the complete set,
+with expected values from the Thol et al (2016) equation of state (f) corrected for cutoff.
+As usual the program employed the cut (but not shifted) potential.
 All runs are for density &rho;=0.75.
+At the lowest temperature, the full-potential system would lie in the coexistence region.
 
 Source                 | _T_    | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)   | _C<sub>v</sub>_ (f)
 ------                 | -----  | -------   | -------  | -------   | -------   | --------
@@ -245,9 +247,12 @@ and a rather low spring potential _k_<sub>spring</sub>=20 (the program default i
 We only use CBMC moves in this code: for a practical application it would be advisable
 to include other kinds of move, for example crankshaft, pivot, and bridging moves.
 Replica exchange (as used by Calvo et al) would also improve the sampling at low temperature.
+Below we report the excess, potential, energy per atom _PE_,
+and the excess heat capacity per atom _C<sub>v</sub>_(ex),
+as well as the radius of gyration _R_<sub>g</sub>.
 The program default run length is 10 blocks of 100000 steps.
 
-_T_   |  _PE/N_   | _R_<sub>g</sub>     | _C<sub>v</sub>_(ex)/_N_
+_T_   | _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 ----- | ------    | ------   | ------
 0.40  | -1.50(1)  | 1.173(3) | 2.51(17)
 0.45  | -1.40(1)  | 1.201(3) | 2.26(8)
@@ -255,7 +260,7 @@ _T_   |  _PE/N_   | _R_<sub>g</sub>     | _C<sub>v</sub>_(ex)/_N_
 
 For lower temperatures (below), longer runs (10 blocks of 1000000 steps) were used.
 
-_T_   |  _PE/N_   | _R_<sub>g</sub>      | _C<sub>v</sub>_(ex)/_N_
+_T_   | _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 ----- | ------    | ------    | ------
 0.26  | -2.044(7) | 1.074(1)  | 3.3(2)
 0.28  | -1.967(5) | 1.086(1)  | 4.16(9)
@@ -285,18 +290,18 @@ The program default is to run for 10 blocks, each of 100000 steps;
 this was increased to 10 blocks of 500000 steps for temperatures below 0.25.
 The results are shown on the left of the following table.
 
-_T_   |  _PE/N_   | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)/_N_ |  _PE/N_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)/_N_
------ | ------    | ------    | ------       | ------  | ------ | ------
-0.15  | -2.81(1)  |  1.070(2) |  1.1(2)      | -2.814  |  1.068 |  2.053
-0.18  | -2.759(8) |  1.072(2) |  2.2(2)      | -2.744  |  1.073 |  2.498
-0.20  | -2.699(8) |  1.077(2) |  2.4(1)      | -2.694  |  1.078 |  2.366
-0.22  | -2.645(4) |  1.082(1) |  2.16(7)     | -2.649  |  1.082 |  2.226
-0.25  | -2.586(8) |  1.090(2) |  2.15(9)     | -2.584  |  1.089 |  2.121
-0.30  | -2.482(6) |  1.104(2) |  1.97(6)     | -2.481  |  1.103 |  2.010
-0.50  | -2.127(2) |  1.161(1) |  1.50(2)     | -2.128  |  1.161 |  1.491
-1.00  | -1.547(2) |  1.318(1) |  1.024(6)    | -1.543  |  1.319 |  1.020
-2.00  | -0.885(1) |  1.658(1) |  0.330(2)    | -0.883  |  1.660 |  0.332
-5.00  | -0.566(1) |  1.889(1) |  0.0318(1)   | -0.565  |  1.890 |  0.032
+_T_   |  _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex) | _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+----- | ------    | ------    | ------     | ------  | ------ | ------
+0.15  | -2.81(1)  |  1.070(2) |  1.1(2)    | -2.814  |  1.068 |  2.053
+0.18  | -2.759(8) |  1.072(2) |  2.2(2)    | -2.744  |  1.073 |  2.498
+0.20  | -2.699(8) |  1.077(2) |  2.4(1)    | -2.694  |  1.078 |  2.366
+0.22  | -2.645(4) |  1.082(1) |  2.16(7)   | -2.649  |  1.082 |  2.226
+0.25  | -2.586(8) |  1.090(2) |  2.15(9)   | -2.584  |  1.089 |  2.121
+0.30  | -2.482(6) |  1.104(2) |  1.97(6)   | -2.481  |  1.103 |  2.010
+0.50  | -2.127(2) |  1.161(1) |  1.50(2)   | -2.128  |  1.161 |  1.491
+1.00  | -1.547(2) |  1.318(1) |  1.024(6)  | -1.543  |  1.319 |  1.020
+2.00  | -0.885(1) |  1.658(1) |  0.330(2)  | -0.883  |  1.660 |  0.332
+5.00  | -0.566(1) |  1.889(1) |  0.0318(1) | -0.565  |  1.890 |  0.032
 
 Results obtained from a run of the Wang-Landau program `mc_chain_wl_sw`,
 using the same model, are given on the right of the table above.
@@ -308,7 +313,7 @@ This analysis can also be performed (for any desired temperature) by the program
 The results are generally in good agreement with the canonical ensemble test runs.
 The most significant discrepancies are in the heat capacities at the lowest two temperatures,
 which reflects the poor sampling of the canonical ensemble program (with these basic MC moves),
-and (probably to a lesser extent) the WL sampling problems about to be discussed.
+and (probably to a lesser extent) the sampling problems about to be discussed.
 
 This particular test run illustrated one drawback of the simplest Wang-Landau implementation:
 two low-lying energies (corresponding to _q_=38 and 39 square-well interactions) were discovered
@@ -330,9 +335,9 @@ It is always a danger with any Monte Carlo method, including Wang-Landau,
 that inaccessible configurations will not be sampled.
 Various improvements of the method may be found in the literature.
 (The reader is invited to work out the structure of the 13-atom chain configuration
-with hard sphere diameter and bond length equal to &sigma;
+with hard sphere diameter and bond length both equal to &sigma;
 having 39 nonbonded interactions within range 1.5&sigma;.
-Hint: it is not one of the highest-symmetry clusters such as the icosahedron;
+_Hint:_ it is not one of the highest-symmetry clusters such as the icosahedron;
 however, it is based on a fairly symmetric cluster,
 with small distortions due to the fixed bond length and the need to maximise interactions.)
 
