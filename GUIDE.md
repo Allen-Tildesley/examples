@@ -38,7 +38,7 @@ produce a configuration with a desired internal energy per atom, while
 and scales the positions (and the box length) to produce a desired density.
 
 ##State points for different Lennard-Jones models
-For most of the examples, we use a cutoff of _Rc_=2.5&sigma;.
+For most of the examples, we use a cutoff of _R<sub>c</sub>_=2.5&sigma;.
 For MC programs the cut (but not shifted) potential (c) is used in the simulation,
 while for MD programs the cut-and-shifted potential (cs) is used.
 In all cases, an attempt is made to produce results without, and with, long-range corrections,
@@ -100,22 +100,22 @@ For completeness, note that Thol et al also supply C++ programs, and tables of d
 in the Supplementary Information associated with their papers.
 They are not responsible for our (Fortran) program!
 
-Here we compare with typical test runs from our programs using default parameters, N=256, except where stated.
+Here we compare with typical test runs from our programs using default parameters, _N_=256, except where stated.
 Note that _E_ is the total internal energy per atom, including the ideal gas part,
 and that _Cv_ and _P_ likewise include the ideal gas contributions.
 
 Source                 | &rho;    | _T_       | _E_ (cs)  | _P_ (cs) | _Cv_ (cs) | _E_ (f)   | _P_ (f)  | _Cv_ (f)  
-------                 | -----    | -----     | --------  | -------- | --------- | -------   | -------  | --------  |
-Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286   | 0.9897   |  2.2787   |           |          |           |
-Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |           | -3.7212   | 0.3996   |  2.2630   |
-`bd_nvt_lj`            | 0.75     | 1.00      | -2.925(3) | 0.980(5) |  2.36(8)  | -3.725(3) | 0.379(5) |  2.37(8)  |
-`md_nvt_lj`            | 0.75     | 1.00      | -2.993(3) | 0.965(6) |  2.08(11) | -3.733(3) | 0.363(6) |  2.09(12) |
+------                 | -----    | -----     | --------  | -------- | --------- | -------   | -------  | --------
+Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286   | 0.9897   |  2.2787   |           |          |          
+Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |           | -3.7212   | 0.3996   |  2.2630  
+`bd_nvt_lj`            | 0.75     | 1.00      | -2.925(3) | 0.980(5) |  2.36(8)  | -3.725(3) | 0.379(5) |  2.37(8)
+`md_nvt_lj`            | 0.75     | 1.00      | -2.993(3) | 0.965(6) |  2.08(11) | -3.733(3) | 0.363(6) |  2.09(12)
 `md_npt_lj`            | 0.749(1) | 1.00      | -2.920(7) | 0.99     |           | -3.718(8) | 0.395(1) |
-`md_nve_lj`            | 0.75     | 1.0023(2) | -2.9280   | 0.991(2) |  2.27(1)  | -3.7275   | 0.390(2) |           |
-`md_nve_lj_omp`        | 0.75     | 1.0029(1) | -2.9280   | 0.992(2) |  2.25(1)  | -3.7275   | 0.390(2) |           |
-`md_nve_lj_vl`         | 0.75     | 1.0030(2) | -2.9271   | 0.993(2) |  2.24(1)  | -3.7266   | 0.391(2) |           |
-`md_nve_lj_ll` (N=864) | 0.75     | 1.0010(1) | -2.9278   | 0.990(2) |  2.28(1)  | -3.7274   | 0.389(2) |           |
-`smc_nvt_lj`           | 0.75     | 1.00      | -2.930(1) | 0.969(4) |  2.27(1)  | -3.729(1) | 0.367(4) |  2.27(1)  |
+`md_nve_lj`            | 0.75     | 1.0023(2) | -2.9280   | 0.991(2) |  2.27(1)  | -3.7275   | 0.390(2) |          
+`md_nve_lj_omp`        | 0.75     | 1.0029(1) | -2.9280   | 0.992(2) |  2.25(1)  | -3.7275   | 0.390(2) |          
+`md_nve_lj_vl`         | 0.75     | 1.0030(2) | -2.9271   | 0.993(2) |  2.24(1)  | -3.7266   | 0.391(2) |          
+`md_nve_lj_ll` (N=864) | 0.75     | 1.0010(1) | -2.9278   | 0.990(2) |  2.28(1)  | -3.7274   | 0.389(2) |          
+`smc_nvt_lj`           | 0.75     | 1.00      | -2.930(1) | 0.969(4) |  2.27(1)  | -3.729(1) | 0.367(4) |  2.27(1)
 
 * The `bd_nvt_lj` program seems to give a slightly high _Cv_
 * The `smc_nvt_lj` program seems to have a bug affecting multi-atom moves, needs fixing.
@@ -133,19 +133,20 @@ Source      | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _Cv_ (cs) | _E_ (f)   
 
 For the cut (but not shifted) potential, the value of _Cv_ should be equal to the value for the full potential,
 since the energy LRC is independent of temperature.
-The Thol et al (2016) EOS is used to predict results for the cut (but not shifted) potential (denoted c),
-again at _Rc_=2.5&sigma;, using the same LRC and delta corrections as in the MC codes.
+The Thol et al (2016) EOS is for the full potential
+is used to predict results for the cut (but not shifted) potential (denoted c),
+at _Rc_=2.5&sigma;, using the same LRC and delta corrections as in the MC codes.
 
-Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _Cv_ (f)  |
-------                 | -----     | ----- | -------    | -------  | -------    | -------  | --------  |
-Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630   |
-`mc_nvt_lj`            | 0.75      | 1.00  | -3.332(1)  | 0.651(3) | -3.734(1)  | 0.350(3) |  2.28(1)  |
-`mc_nvt_lj_re`         | 0.75      | 1.00  | -3.332(1)  | 0.648(2) | -3.734(1)  | 0.347(2) |  2.258(4) |
-`mc_nvt_lj_ll` (N=864) | 0.75      | 1.00  | -3.3230(3) | 0.669(1) | -3.7246(3) | 0.367(1) |  2.27(1)  |
-`mc_npt_lj`            | 0.7501(2) | 1.00  | -3.331(1)  | 0.69     | -3.733(1)  | 0.364(2) |           |
-`mc_npt_lj_ll` (N=864) | 0.7506(4) | 1.00  | -3.332(3)  | 0.69     | -3.734(3)  | 0.358(3) |           |
-`mc_zvt_lj`            | 0.7504(4) | 1.00  | -3.333(3)  | 0.668(4) | -3.735(3)  | 0.366(4) |           |
-`mc_zvt_lj_ll` (N=864) | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |           |
+Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _Cv_ (f)
+------                 | -----     | ----- | -------    | -------  | -------    | -------  | --------
+Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630  
+`mc_nvt_lj`            | 0.75      | 1.00  | -3.332(1)  | 0.651(3) | -3.734(1)  | 0.350(3) |  2.28(1)
+`mc_nvt_lj_re`         | 0.75      | 1.00  | -3.332(1)  | 0.648(2) | -3.734(1)  | 0.347(2) |  2.258(4)
+`mc_nvt_lj_ll` (N=864) | 0.75      | 1.00  | -3.3230(3) | 0.669(1) | -3.7246(3) | 0.367(1) |  2.27(1)
+`mc_npt_lj`            | 0.7501(2) | 1.00  | -3.331(1)  | 0.69     | -3.733(1)  | 0.364(2) |          
+`mc_npt_lj_ll` (N=864) | 0.7506(4) | 1.00  | -3.332(3)  | 0.69     | -3.734(3)  | 0.358(3) |          
+`mc_zvt_lj`            | 0.7504(4) | 1.00  | -3.333(3)  | 0.668(4) | -3.735(3)  | 0.366(4) |          
+`mc_zvt_lj_ll` (N=864) | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |          
 
 * The `mc_nvt_lj` program seems to give a low pressure, needs investigating.
 * The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
@@ -170,10 +171,10 @@ The corresponding density is lower than the liquid coexistence density for the f
 so there is no guarantee that the EOS will be accurate
 (it is only fitted in the single-phase regions of the full potential).
 
-Source                |  z     | &rho;     | _T_  | _E_ (c)   | _P_ (c)    | _E_ (f)   | _P_ (f)   |
--------               | ----   | -----     | ---- | --------- | -------    | -------   | -------   |
-Thol et al (2016) (c) | 0.032  | 0.65325   | 1.0  | -2.7212   | 0.0457     | -3.0710   | -0.1828   |
-`mc_zvt_lj`           | 0.032  | 0.6532(5) | 1.0  | -2.728(3) | 0.0325(25) | -3.078(4) | -0.196(2) |
+Source                |  z     | &rho;     | _T_  | _E_ (c)   | _P_ (c)    | _E_ (f)   | _P_ (f)  
+-------               | ----   | -----     | ---- | --------- | -------    | -------   | -------  
+Thol et al (2016) (c) | 0.032  | 0.65325   | 1.0  | -2.7212   | 0.0457     | -3.0710   | -0.1828  
+`mc_zvt_lj`           | 0.032  | 0.6532(5) | 1.0  | -2.728(3) | 0.0325(25) | -3.078(4) | -0.196(2)
 
 ##Brownian dynamics program
 The program `bd_nvt_lj` carries out a Brownian dynamics simulation for a set of atoms
@@ -216,16 +217,16 @@ The default program values include _T_=1.0, which is reported above, and here ar
 with expected values from the Thol et al (2016) equation of state (with standard LRC).
 All runs are for density &rho;=0.75.
 
-Source                 | _T_    | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)   | _Cv_ (f)  |
-------                 | -----  | -------   | -------  | -------   | -------   | --------  |
-Thol et al (2016) (f)  | 0.8772 | -3.6001   | 0.1942   | -4.0017   | -0.1070   |  2.3081   |
-`mc_nvt_lj_re`         | 0.8772 | -3.613(1) | 0.140(2) | -4.014(1) | -0.161(2) |  2.31(1)  |
-Thol et al (2016) (f)  | 1.0000 | -3.3197   | 0.7008   | -3.7212   | 0.3996    |  2.2630   |
-`mc_nvt_lj_re`         | 1.0000 | -3.332(1) | 0.648(2) | -3.734(1) |  0.347(2) |  2.258(4) |
-Thol et al (2016) (f)  | 1.1400 | -3.0055   | 1.2571   | -3.4070   |  0.9559   |  2.2278   |
-`mc_nvt_lj_re`         | 1.1400 | -3.016(1) | 1.212(2) | -3.417(1) |  0.911(2) |  2.233(4) |
-Thol et al (2016) (f)  | 1.2996 | -2.6523   | 1.8667   | -3.0539   |  1.5655   |  2.1989   |
-`mc_nvt_lj_re`         | 1.2996 | -2.662(1) | 1.820(3) | -3.063(1) |  1.519(3) |  2.214(5) |
+Source                 | _T_    | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)   | _Cv_ (f)
+------                 | -----  | -------   | -------  | -------   | -------   | --------
+Thol et al (2016) (f)  | 0.8772 | -3.6001   | 0.1942   | -4.0017   | -0.1070   |  2.3081  
+`mc_nvt_lj_re`         | 0.8772 | -3.613(1) | 0.140(2) | -4.014(1) | -0.161(2) |  2.31(1)
+Thol et al (2016) (f)  | 1.0000 | -3.3197   | 0.7008   | -3.7212   | 0.3996    |  2.2630  
+`mc_nvt_lj_re`         | 1.0000 | -3.332(1) | 0.648(2) | -3.734(1) |  0.347(2) |  2.258(4)
+Thol et al (2016) (f)  | 1.1400 | -3.0055   | 1.2571   | -3.4070   |  0.9559   |  2.2278  
+`mc_nvt_lj_re`         | 1.1400 | -3.016(1) | 1.212(2) | -3.417(1) |  0.911(2) |  2.233(4)
+Thol et al (2016) (f)  | 1.2996 | -2.6523   | 1.8667   | -3.0539   |  1.5655   |  2.1989  
+`mc_nvt_lj_re`         | 1.2996 | -2.662(1) | 1.820(3) | -3.063(1) |  1.519(3) |  2.214(5)
 
 ##Chain simulation programs
 The program `mc_chain_nvt_cbmc_lj` simulates a single Lennard-Jones chain,
