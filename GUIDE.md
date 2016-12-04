@@ -38,7 +38,7 @@ produce a configuration with a desired internal energy per atom, while
 and scales the positions (and the box length) to produce a desired density.
 
 ##State points for different Lennard-Jones models
-For most of the examples, we use a cutoff of _R<sub>c</sub>_=2.5&sigma;.
+For most of the examples, we use a cutoff of _R_<sub>c</sub>=2.5&sigma;.
 For MC programs the cut (but not shifted) potential (c) is used in the simulation,
 while for MD programs the cut-and-shifted potential (cs) is used.
 In all cases, an attempt is made to produce results without, and with, long-range corrections,
@@ -56,7 +56,7 @@ f: full, with LRC        | 1.31               | 0.31                 | 0.13
 c: cut (but not shifted) | 1.19               | 0.32                 | 0.11
 cs: cut-and-shifted      | 1.08               | 0.32                 | 0.09
 
-At any temperature below _Tc_, the liquid state is bounded below by the
+At any temperature below _T_<sub>crit</sub>, the liquid state is bounded below by the
 liquid-gas coexistence density, and using Tables II-IV of the same reference as a guide,
 we take the values for three example temperatures as
 
@@ -93,7 +93,7 @@ For testing our programs we used the more recent fitted equations of state prese
 * M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)
 * M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, _J Phys Chem Ref Data,_ __45,__ 023101 (2016)
 
-for both the cut-and-shifted potential (denoted cs below), at _Rc_=2.5&sigma;,
+for both the cut-and-shifted potential (denoted cs below), at _R_<sub>c</sub>=2.5&sigma;,
 and the full potential (denoted f).
 The formulae are implemented in the supplied program `eos_lj`.
 For completeness, note that Thol et al also supply C++ programs, and tables of data,
@@ -104,7 +104,7 @@ Here we compare with typical test runs from our programs using default parameter
 Note that _E_ is the total internal energy per atom, including the ideal gas part,
 and that _Cv_ and _P_ likewise include the ideal gas contributions.
 
-Source                 | &rho;    | _T_       | _E_ (cs)  | _P_ (cs) | _Cv_ (cs) | _E_ (f)   | _P_ (f)  | _Cv_ (f)  
+Source                 | &rho;    | _T_       | _E_ (cs)  | _P_ (cs) | _C<sub>v</sub>_ (cs) | _E_ (f)   | _P_ (f)  | _C<sub>v</sub>_ (f)  
 ------                 | -----    | -----     | --------  | -------- | --------- | -------   | -------  | --------
 Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286   | 0.9897   |  2.2787   |           |          |          
 Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |           | -3.7212   | 0.3996   |  2.2630  
@@ -117,27 +117,27 @@ Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |          
 `md_nve_lj_ll` (N=864) | 0.75     | 1.0010(1) | -2.9278   | 0.990(2) |  2.28(1)  | -3.7274   | 0.389(2) |          
 `smc_nvt_lj`           | 0.75     | 1.00      | -2.930(1) | 0.969(4) |  2.27(1)  | -3.729(1) | 0.367(4) |  2.27(1)
 
-* The `bd_nvt_lj` program seems to give a slightly high _Cv_
+* The `bd_nvt_lj` program seems to give a slightly high _C<sub>v</sub>_
 * The `smc_nvt_lj` program seems to have a bug affecting multi-atom moves, needs fixing.
-* The `md_nvt_lj` program seems to give a low _Cv_, and low pressure, maybe needs looking at.
-* The `md_npt_lj` program does not conserve well. Calculated _Cp_ (cs)=4.2(2) while EOS gives 4.84.
+* The `md_nvt_lj` program seems to give a low _C<sub>v</sub>_, and low pressure, maybe needs looking at.
+* The `md_npt_lj` program does not conserve well. Calculated _C<sub>p</sub>_ (cs)=4.2(2) while EOS gives 4.84.
 
 Results for `md_lj_mts` are not directly comparable, because they use a larger cutoff (by default _Rc_=4.0&sigma;)
 and hence a larger system. Here are the averages from a typical simulation, with _N_=400.
 
-Source      | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _Cv_ (cs) | _E_ (f)    | _P_ (f)
+Source      | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _C<sub>v</sub>_ (cs) | _E_ (f)    | _P_ (f)
 -------     | ----- | -------   | ---------  | -------- | --------- | -------    | -------
 `md_lj_mts` | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)   | -3.7188(5) | 0.404(2)
 
 * With the default parameters, energy conservation of `md_lj_mts` is not great, with MSD average around 0.02. Perhaps needs looking at.
 
-For the cut (but not shifted) potential, the value of _Cv_ should be equal to the value for the full potential,
+For the cut (but not shifted) potential, the value of _C<sub>v</sub>_ should be equal to the value for the full potential,
 since the energy LRC is independent of temperature.
 The Thol et al (2016) EOS is for the full potential
 is used to predict results for the cut (but not shifted) potential (denoted c),
-at _Rc_=2.5&sigma;, using the same LRC and delta corrections as in the MC codes.
+at _R_<sub>c</sub>=2.5&sigma;, using the same LRC and delta corrections as in the MC codes.
 
-Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _Cv_ (f)
+Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C<sub>v</sub>_ (f)
 ------                 | -----     | ----- | -------    | -------  | -------    | -------  | --------
 Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630  
 `mc_nvt_lj`            | 0.75      | 1.00  | -3.332(1)  | 0.651(3) | -3.734(1)  | 0.350(3) |  2.28(1)
@@ -151,10 +151,10 @@ Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    
 * The `mc_nvt_lj` program seems to give a low pressure, needs investigating.
 * The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
 * The `mc_npt_lj` measured pressure (c) is 0.666(2) which is a little low.
-Measured _Cp_ (full) is 5.28(7) compared with Thol et al (2016) EOS giving 5.22
+Measured _C<sub>p</sub>_ (full) is 5.28(7) compared with Thol et al (2016) EOS giving 5.22
 * The `mc_npt_lj_ll` program was run with `db_max`=0.015 to give a volume acceptance ratio around 9%.
 Measured pressure (c) is 0.660(3) which is again a little low. Is the delta correction wrong somehow?
-Measured _Cp_ (full) is 5.04(16) compared with Thol et al (2016) EOS value of 5.22.
+Measured _C<sub>p</sub>_ (full) is 5.04(16) compared with Thol et al (2016) EOS value of 5.22.
 The program probably needs making more resilient against changes in box size.
 * The `mc_zvt_lj` program was run at activity _z_=0.0795, the default value in the program, in a box of length 7&sigma;.
 The Thol et al (2016) LRC-corrected value to give &rho;=0.75 would be _z_=0.080627.
@@ -217,7 +217,7 @@ The default program values include _T_=1.0, which is reported above, and here ar
 with expected values from the Thol et al (2016) equation of state (with standard LRC).
 All runs are for density &rho;=0.75.
 
-Source                 | _T_    | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)   | _Cv_ (f)
+Source                 | _T_    | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)   | _C<sub>v</sub>_ (f)
 ------                 | -----  | -------   | -------  | -------   | -------   | --------
 Thol et al (2016) (f)  | 0.8772 | -3.6001   | 0.1942   | -4.0017   | -0.1070   |  2.3081  
 `mc_nvt_lj_re`         | 0.8772 | -3.613(1) | 0.140(2) | -4.014(1) | -0.161(2) |  2.31(1)
@@ -245,7 +245,7 @@ to include other kinds of move, for example crankshaft, pivot, and bridging move
 Replica exchange (as used by Calvo et al) would also improve the sampling at low temperature.
 The program default run length is 10 blocks of 100000 steps.
 
-_T_   |  _PE/N_   | _Rg_     | _Cv_(ex)/_N_
+_T_   |  _PE/N_   | _R_<sub>g</sub>     | _C<sub>v</sub>_(ex)/_N_
 ----- | ------    | ------   | ------
 0.40  | -1.50(1)  | 1.173(3) | 2.51(17)
 0.45  | -1.40(1)  | 1.201(3) | 2.26(8)
@@ -253,7 +253,7 @@ _T_   |  _PE/N_   | _Rg_     | _Cv_(ex)/_N_
 
 For lower temperatures (below), longer runs (10 blocks of 1000000 steps) were used.
 
-_T_   |  _PE/N_   | _Rg_      | _Cv_(ex)/_N_
+_T_   |  _PE/N_   | _R_<sub>g</sub>      | _C<sub>v</sub>_(ex)/_N_
 ----- | ------    | ------    | ------
 0.26  | -2.044(7) | 1.074(1)  | 3.3(2)
 0.28  | -1.967(5) | 1.086(1)  | 4.16(9)
@@ -267,7 +267,7 @@ _T_   |  _PE/N_   | _Rg_      | _Cv_(ex)/_N_
 
 At the lowest temperatures, the acceptance rate of CBMC moves (with the default parameters) was around 2%,
 while at _T_=0.35 it was around 11%, increasing further at higher temperatures.
-The results are broadly in agreement with Calvo et al (2002) showing a similar sized peak in _Cv_,
+The results are broadly in agreement with Calvo et al (2002) showing a similar sized peak in _C<sub>v</sub>_,
 although at a somewhat lower temperature (0.30 as opposed to 0.35).
 
 For the hard-sphere square-well chain, the aim was to show the operation of the Wang-Landau method.
@@ -283,7 +283,7 @@ The program default is to run for 10 blocks, each of 100000 steps;
 this was increased to 10 blocks of 500000 steps for temperatures below 0.25.
 The results are shown on the left of the following table.
 
-_T_   |  _PE/N_   | _Rg_      | _Cv_(ex)/_N_ |  _PE/N_ | _Rg_   | _Cv_(ex)/_N_
+_T_   |  _PE/N_   | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)/_N_ |  _PE/N_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)/_N_
 ----- | ------    | ------    | ------       | ------  | ------ | ------
 0.15  | -2.81(1)  |  1.070(2) |  1.1(2)      | -2.814  |  1.068 |  2.053
 0.18  | -2.759(8) |  1.072(2) |  2.2(2)      | -2.744  |  1.073 |  2.498
@@ -300,7 +300,7 @@ Results obtained from a run of the Wang-Landau program `mc_chain_wl_sw`,
 using the same model, are given on the right of the table above.
 The program was run with default parameters:
 the flatness criterion was set at 80% and there were 20 stages during which the entropy
-modification constant ds was halved at each stage.
+modification constant `ds` was halved at each stage.
 The results are from the histograms produced in the 20th stage.
 This analysis can also be performed (for any desired temperature) by the program `wl_hist`, after the run.
 The results are generally in good agreement with the canonical ensemble test runs.
@@ -310,7 +310,7 @@ and (probably to a lesser extent) the WL sampling problems about to be discussed
 
 This particular test run illustrated one drawback of the simplest Wang-Landau implementation:
 two low-lying energies (corresponding to _q_=38 and 39 square-well interactions) were discovered
-during the very last stage, in which ds is very small.
+during the very last stage, in which `ds` is very small.
 Accordingly, the system remained stuck in these low-energy states for a very long time,
 until their tabulated entropy _s(q)_ reached a high enough value to allow _q_ to change;
 even then, the final weight of the lowest state in the final "flat" histogram
@@ -332,7 +332,7 @@ with hard sphere diameter and bond length equal to &sigma;
 having 39 nonbonded interactions within range 1.5&sigma;.
 Hint: it is not one of the highest-symmetry clusters such as the icosahedron;
 however, it is based on a fairly symmetric cluster,
-with small distortions due to the fixed bond length.)
+with small distortions due to the fixed bond length and the need to maximise interactions.)
 
 * We might consider adding a fixed-length production run at the end of `mc_chain_wl_sw`.
 
