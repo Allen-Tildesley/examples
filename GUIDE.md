@@ -25,7 +25,7 @@ writing out just the positions (for an MC program) to a file `cnf.inp`.
 If the parameter `velocities=.true.` is supplied, then positions and velocities are
 written to the file, corresponding to a reduced temperature _T_ = 1.0.
 These values of &rho; and _T_ (see below) lie in the liquid region of the Lennard-Jones phase diagram.
-Non-default values may, of course, be preferable for this or other models.
+Non-default values may, of course, be supplied for this or other models.
 The `cnf.inp` file may then be copied to the directory in which the run is carried out.
 Typically, runs produce a final configuration `cnf.out`
 (which may be renamed to `cnf.inp` as a starting point for further runs)
@@ -102,10 +102,10 @@ They are not responsible for our (Fortran) program!
 
 Here we compare with typical test runs from our programs using default parameters, _N_=256, except where stated.
 Note that _E_ is the total internal energy per atom, including the ideal gas part,
-and that _Cv_ and _P_ likewise include the ideal gas contributions.
+and that _C<sub>v</sub>_ and _P_ likewise include the ideal gas contributions.
 
-Source                 | &rho;    | _T_       | _E_ (cs)  | _P_ (cs) | _C<sub>v</sub>_ (cs) | _E_ (f)   | _P_ (f)  | _C<sub>v</sub>_ (f)  
-------                 | -----    | -----     | --------  | -------- | --------- | -------   | -------  | --------
+Source | &rho;    | _T_ | _E_ (cs)  | _P_ (cs) | _C<sub>v</sub>_ (cs) | _E_ (f)   | _P_ (f)  | _C<sub>v</sub>_ (f)  
+------ | -----    | -----     | --------  | -------- | --------- | -------   | -------  | --------
 Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286   | 0.9897   |  2.2787   |           |          |          
 Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |           | -3.7212   | 0.3996   |  2.2630  
 `bd_nvt_lj`            | 0.75     | 1.00      | -2.925(3) | 0.980(5) |  2.36(8)  | -3.725(3) | 0.379(5) |  2.37(8)
@@ -114,9 +114,10 @@ Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |          
 `md_nve_lj`            | 0.75     | 1.0023(2) | -2.9280   | 0.991(2) |  2.27(1)  | -3.7275   | 0.390(2) |          
 `md_nve_lj_omp`        | 0.75     | 1.0029(1) | -2.9280   | 0.992(2) |  2.25(1)  | -3.7275   | 0.390(2) |          
 `md_nve_lj_vl`         | 0.75     | 1.0030(2) | -2.9271   | 0.993(2) |  2.24(1)  | -3.7266   | 0.391(2) |          
-`md_nve_lj_ll` (N=864) | 0.75     | 1.0010(1) | -2.9278   | 0.990(2) |  2.28(1)  | -3.7274   | 0.389(2) |          
+`md_nve_lj_ll`&Dagger; | 0.75     | 1.0010(1) | -2.9278   | 0.990(2) |  2.28(1)  | -3.7274   | 0.389(2) |          
 `smc_nvt_lj`           | 0.75     | 1.00      | -2.930(1) | 0.969(4) |  2.27(1)  | -3.729(1) | 0.367(4) |  2.27(1)
 
+* &Dagger; indicates a larger system size, _N_=864.
 * The `bd_nvt_lj` program seems to give a slightly high _C<sub>v</sub>_
 * The `smc_nvt_lj` program seems to have a bug affecting multi-atom moves, needs fixing.
 * The `md_nvt_lj` program seems to give a low _C<sub>v</sub>_, and low pressure, maybe needs looking at.
@@ -142,12 +143,13 @@ Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    
 Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630  
 `mc_nvt_lj`            | 0.75      | 1.00  | -3.332(1)  | 0.651(3) | -3.734(1)  | 0.350(3) |  2.28(1)
 `mc_nvt_lj_re`         | 0.75      | 1.00  | -3.332(1)  | 0.648(2) | -3.734(1)  | 0.347(2) |  2.258(4)
-`mc_nvt_lj_ll` (N=864) | 0.75      | 1.00  | -3.3230(3) | 0.669(1) | -3.7246(3) | 0.367(1) |  2.27(1)
+`mc_nvt_lj_ll`&Dagger; | 0.75      | 1.00  | -3.3230(3) | 0.669(1) | -3.7246(3) | 0.367(1) |  2.27(1)
 `mc_npt_lj`            | 0.7501(2) | 1.00  | -3.331(1)  | 0.69     | -3.733(1)  | 0.364(2) |          
-`mc_npt_lj_ll` (N=864) | 0.7506(4) | 1.00  | -3.332(3)  | 0.69     | -3.734(3)  | 0.358(3) |          
+`mc_npt_lj_ll`&Dagger; | 0.7506(4) | 1.00  | -3.332(3)  | 0.69     | -3.734(3)  | 0.358(3) |          
 `mc_zvt_lj`            | 0.7504(4) | 1.00  | -3.333(3)  | 0.668(4) | -3.735(3)  | 0.366(4) |          
-`mc_zvt_lj_ll` (N=864) | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |          
+`mc_zvt_lj_ll`&Dagger; | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |          
 
+* &Dagger; indicates a larger system size, _N_=864 (or approximately so for `mc_zvt_lj_ll`)
 * The `mc_nvt_lj` program seems to give a low pressure, needs investigating.
 * The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
 * The `mc_npt_lj` measured pressure (c) is 0.666(2) which is a little low.
@@ -202,11 +204,11 @@ At _T_=1.0, however, these exchanges of box identity are quite infrequent,
 and the averages corresponded well to literature values for the coexistence parameters.
 The production run corresponded to default parameters in the program.
 
-Source               | &rho;<sub>L</sub> | &rho;<sub>G</sub> | _P_<sub>L</sub> | _P_<sub>G</sub> | _E_<sub>L</sub>/_N_ (c) | _E_<sub>G</sub>/_N_ (c)
--------              | -----------       | -----------       | -------         | --------        | --------------          | --------------
-Trokhymchuk et al MC | 0.6542            | 0.0439            | 0.0336          | 0.0336          |                         |
-Trokhymchuk et al MD | 0.6507            | 0.0500            | 0.0380          | 0.0380          | -2.713 &Dagger;         | 1.047 &Dagger;
-`mc_gibbs_lj`        | 0.652(1)          | 0.050(1)          | 0.028(1)        | 0.038(1)        | -2.730(5)               | 1.054(8)
+Source  | &rho;<sub>L</sub> | &rho;<sub>G</sub> | _P_<sub>L</sub> | _P_<sub>G</sub> | _E_<sub>L</sub> (c) | _E_<sub>G</sub> (c)
+------- | -------- | -------- | -------  | -------- | --------------  | --------------
+Trokhymchuk et al MC | 0.6542   | 0.0439   | 0.0336   | 0.0336   |                 |
+Trokhymchuk et al MD | 0.6507   | 0.0500   | 0.0380   | 0.0380   | -2.713 &Dagger; | 1.047 &Dagger;
+`mc_gibbs_lj`        | 0.652(1) | 0.050(1) | 0.028(1) | 0.038(1) | -2.730(5)       | 1.054(8)
 
 There is a small discrepancy between pressures in the two boxes.
 The values indicated by &Dagger; are from the Thol et al (2016) EOS with cutoff correction.
