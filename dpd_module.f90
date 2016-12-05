@@ -9,7 +9,7 @@ MODULE dpd_module
 
   ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: force, lowe, shardlow
+  PUBLIC :: force, lowe, shardlow, p_approx
 
   ! Public data
   INTEGER,                              PUBLIC :: n  ! Number of atoms
@@ -287,5 +287,18 @@ CONTAINS
     END DO ! End loop over all pairs within range
 
   END SUBROUTINE shardlow
+
+  FUNCTION p_approx ( a, rho, temperature ) RESULT ( p )
+    REAL             :: p           ! Returns approximate pressure
+    REAL, INTENT(in) :: a           ! Force strength parameter
+    REAL, INTENT(in) :: rho         ! Density
+    REAL, intent(in) :: temperature ! Temperature
+
+    ! This expression is given by Groot and Warren, J Chem Phys 107, 4423 (1997)
+    REAL, PARAMETER :: alpha = 0.101
+
+    p = rho * temperature + alpha * a * rho**2
+
+  END FUNCTION p_approx
 
 END MODULE dpd_module

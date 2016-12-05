@@ -243,7 +243,7 @@ which govern the acceptance/rejection of moves.
 For comparison with the paper of Calvo, Doye and Wales, _J Chem Phys,_ __116,__ 2642 (2002),
 test runs were carried out using _N_=13 atoms, a bond length of 1.122462&sigma;
 (prepared using `build_initialize/initialize` with random non-overlapping atom positions)
-and a rather low spring potential _k_<sub>spring</sub>=20 (the program default is 400).
+and a rather low spring potential _k_<sub>spring</sub>=20.
 We only use CBMC moves in this code: for a practical application it would be advisable
 to include other kinds of move, for example crankshaft, pivot, and bridging moves.
 Replica exchange (as used by Calvo et al) would also improve the sampling at low temperature.
@@ -251,31 +251,71 @@ Below we report the excess, potential, energy per atom _PE_,
 and the excess heat capacity per atom _C<sub>v</sub>_(ex),
 as well as the radius of gyration _R_<sub>g</sub>.
 The program default run length is 10 blocks of 100000 steps.
+For the highest temperatures,
+the bond length fluctuations become unphysically large for this value of _k_<sub>spring</sub>;
+on the right of the table are analogous results for the program default value of _k_<sub>spring</sub>=400.
 
-_T_   | _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
------ | ------    | ------   | ------
-0.40  | -1.50(1)  | 1.173(3) | 2.51(17)
-0.45  | -1.40(1)  | 1.201(3) | 2.26(8)
-0.50  | -1.291(8) | 1.226(2) | 1.85(5)
+_T_   | _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex) | _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+----- | ------    | ------   | ------  | ------ | ------ | ------
+_k_<sub>spring</sub> | 20 | 20 | 20 | 400 | 400 | 400
+0.40  | -1.50(1)  | 1.173(3) | 2.51(17)  | -1.505(5) | 1.183(1) | 3.06(14)
+0.45  | -1.40(1)  | 1.201(3) | 2.26(8)   | -1.379(3) | 1.212(1) | 2.32(6)
+0.50  | -1.297(8) | 1.224(1) | 1.99(2)   | -1.266(3) | 1.240(1) | 2.03(3)
+1.00  | -0.438(2) | 1.538(2) | 1.371(3)  | -0.459(1) | 1.512(1) | 1.233(6)
+2.00  |   -       |   -      |  -        |  0.387(2) | 1.850(1) | 0.591(3)
+5.00  |   -       |   -      |  -        |  1.986(3) | 2.035(2) | 0.465(2)
 
 For lower temperatures (below), longer runs (10 blocks of 1000000 steps) were used.
 
-_T_   | _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+_T_   | _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex) | _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 ----- | ------    | ------    | ------
-0.26  | -2.044(7) | 1.074(1)  | 3.3(2)
-0.28  | -1.967(5) | 1.086(1)  | 4.16(9)
-0.29  | -1.905(4) | 1.096(1)  | 4.6(1)
-0.30  | -1.893(7) | 1.098(1)  | 4.71(9)
-0.31  | -1.819(3) | 1.1105(8) | 4.34(6)
-0.32  | -1.789(2) | 1.1162(5) | 4.2(1 )
-0.33  | -1.742(3) | 1.1254(5) | 4.05(1)
-0.34  | -1.705(4) | 1.133(1)  | 3.7(1)
-0.35  | -1.672(3) | 1.140(1)  | 3.49(8)
+_k_<sub>spring</sub> | 20 | 20 | 20 | 400 | 400 | 400
+0.26  | -2.044(7) | 1.074(1)  | 3.3(2)  | -2.076(3) | 1.069(1) | 2.13(5)
+0.28  | -1.967(5) | 1.086(1)  | 4.16(9) | -2.027(5) | 1.075(1) | 2.91(15)
+0.29  | -1.905(4) | 1.096(1)  | 4.6(1)  | -1.993(4) | 1.081(1) | 3.41(8)
+0.30  | -1.893(7) | 1.098(1)  | 4.71(9) | -1.958(4) | 1.087(1) | 3.79(8)
+0.31  | -1.819(3) | 1.1105(8) | 4.34(6) | -1.915(4) | 1.094(1) | 4.40(6)
+0.32  | -1.789(2) | 1.1162(5) | 4.2(1)  | -1.859(6) | 1.105(1) | 4.74(8)
+0.33  | -1.742(3) | 1.1254(5) | 4.05(1) | -1.816(4) | 1.114(1) | 4.94(6)
+0.34  | -1.705(4) | 1.133(1)  | 3.7(1)  | -1.765(5) | 1.125(1) | 4.90(9)
+0.35  | -1.672(3) | 1.140(1)  | 3.49(8) | -1.719(4) | 1.135(1) | 4.75(7)
 
 At the lowest temperatures, the acceptance rate of CBMC moves (with the default parameters) was around 2%,
 while at _T_=0.35 it was around 11%, increasing further at higher temperatures.
 The results are broadly in agreement with Calvo et al (2002) showing a similar sized peak in _C<sub>v</sub>_,
 although at a somewhat lower temperature (0.30 as opposed to 0.35).
+
+Similar models were employed in `md_chain_nve_lj` and `md_chain_mts_lj`:
+_N_=13 atoms and equilibrium bond length of 1.122462&sigma;.
+Here we report results for constrained bond lengths, using the first program,
+and for _k_<sub>spring</sub>=400 and 10000 (the program default value), using the second program.
+In all cases, the primary indicator of a correctly-functioning program is energy conservation,
+and this was checked in all cases.
+
+_E_   | _T_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex) | _E_ | _T_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex) | _E_ | _T_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
+constrained | constrained | constrained | constrained | _k_<sub>spring</sub>=10000 | _k_<sub>spring</sub>=10000 | _k_<sub>spring</sub>=10000 | _k_<sub>spring</sub>=10000 | _k_<sub>spring</sub>=400 | _k_<sub>spring</sub>=400 | _k_<sub>spring</sub>=400 | _k_<sub>spring</sub>=400
+-2.0246 | 0.2485(2) | 1.06374(4)| 2.176(6) | -1.7734  | 0.2496(2) | 1.0695(1) | 2.96(4) | -1.7934 | 0.2487(2) | 1.0646(1) | 2.89(5)
+-1.9145 | 0.296(2)  | 1.073(1)  | 2.38(8)  | -1.3444  | 0.301(2)  | 1.144(2)  | 5.5(3)  | -1.6250 | 0.299(1)  | 1.0753(4) | 3.24(7)
+-1.6145 | 0.345(4)  | 1.125(2)  | 3.14(8)  | -1.1394  | 0.350(2)  | 1.173(2)  | 3.70(5) | -1.2900 | 0.346(5)  | 1.127(3)  | 5.7(3)
+-1.3495 | 0.404(1)  | 1.182(2)  | 2.39(1)  | -0.9494  | 0.399(1)  | 1.199(1)  | 3.19(5) | -0.9942 | 0.401(2)  | 1.179(2)  | 3.58(8)
+-1.2195 | 0.451(1)  | 1.207(1)  | 2.36(2)  | -0.7694  | 0.448(1)  | 1.230(2)  | 3.09(3) | -0.8042 | 0.451(2)  | 1.208(2)  | 3.21(4)
+-1.0968 | 0.499(2)  | 1.234(1)  | 2.28(1)  | -0.5943  | 0.497(2)  | 1.262(3)  | 3.04(5) | -0.6558 | 0.497(2)  | 1.224(2)  | 3.03(3)
+-0.1244 | 1.009(5)  | 1.471(5)  | 2.04(2)  |  0.7857  | 1.000(4)  | 1.467(12) | 2.50(3) |  0.7565 | 0.995(3)  | 1.447(6)  | 2.55(3)
+ 1.0456 | 2.008(5)  | 1.754(9)  | 1.653(3) |  2.8858  | 1.98(2)   | 1.752(14) | 2.08(6) |  2.9036 | 2.006(6)  | 1.757(9)  | 2.08(1)
+ 3.6459 | 4.996(4)  | 1.889(7)  | 1.534(1) |  8.3859  | 5.04(4)   | 1.904(2)  | 1.94(2) |  8.3488 | 5.00(1)   | 1.92(1)   | 1.97(1)
+
+When comparing results with the MC program, several points should be remembered.
+Firstly, constraining the bond lengths affects average potential energy, kinetic energy, and heat capacity.
+Secondly, while we use _k_<sub>spring</sub>=10000 to highlight the multiple timestep method,
+it is quite likely that energy flow between bond vibrations and other degrees of freedom will be inefficient,
+due to the timescale separation.
+Thirdly,
+the constant-_NVE_ and constant-_NVT_ ensembles are expected to yield different behaviour around the collapse transition.
+Finally,
+molecular dynamics is not expected to thoroughly explore the energy landscape at low temperatures,
+giving instead (typically) quasi-harmonic vibrations in a single basin.
+The default run lengths are fairly modest here: 10 blocks, each consisting of 100000 steps of length 0.002.
 
 For the hard-sphere square-well chain, the aim was to show the operation of the Wang-Landau method.
 Here we used pivot and crankshaft moves as well as CBMC regrowth.
@@ -292,6 +332,7 @@ The results are shown on the left of the following table.
 
 _T_   |  _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex) | _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 ----- | ------    | ------    | ------     | ------  | ------ | ------
+method | _NVT_    | _NVT_     | _NVT_      |   WL    |   WL   |  WL
 0.15  | -2.81(1)  |  1.070(2) |  1.1(2)    | -2.814  |  1.068 |  2.053
 0.18  | -2.759(8) |  1.072(2) |  2.2(2)    | -2.744  |  1.073 |  2.498
 0.20  | -2.699(8) |  1.077(2) |  2.4(1)    | -2.694  |  1.078 |  2.366

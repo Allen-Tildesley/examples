@@ -50,13 +50,12 @@ PROGRAM md_chain_mts_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_chain_mts_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE ensemble, chain molecule, multiple time steps'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Uses a potential shifted to vanish smoothly at cutoff, no LRC'
   WRITE ( unit=output_unit, fmt='(a)' ) 'No periodic boundaries'
   CALL introduction
 
   ! Set sensible default run parameters for testing
   nblock   = 10
-  nstep    = 1000
+  nstep    = 100000
   dt       = 0.0002
   k_spring = 10000.0
   n_mts    = 10
@@ -152,22 +151,22 @@ PROGRAM md_chain_mts_lj
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, msd, cke
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
 
-    ! In this example we simulate using a specified potential (e.g. WCA LJ)
-    ! which goes to zero smoothly at the cutoff to highlight energy conservation
-    ! so long-range corrections do not arise
-
-    TYPE(variable_type) :: e_f, t_k
+    TYPE(variable_type) :: e_f, t_k, r_g, c_f, conserved_msd
     REAL                :: kin
+    REAL, DIMENSION(3)  :: rcm
+    REAL                :: rsq
 
     ! Preliminary calculations
     kin = 0.5*SUM(v**2)
+    rcm = SUM ( r, dim=2 ) / REAL(n)                                 ! Centre of mass
+    rsq = SUM ( ( r - SPREAD(rcm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) ! Mean-squared distance from CM
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -185,13 +184,23 @@ CONTAINS
     ! Remove 6 degrees of freedom for conserved linear and angular momentum
     t_k = variable_type ( nam = 'T kinetic', val = 2.0*kin/REAL(3*n-6) )
 
+    ! Radius of gyration
+    r_g = variable_type ( nam = 'Rg', val = SQRT(rsq) )
+
+    ! MSD of kinetic energy, intensive
+    ! Use special method to convert to Cv/N
+    c_f = variable_type ( nam = 'Cv/N', val = kin/SQRT(REAL(n)), method = cke )
+
+    ! Mean-squared deviation of conserved energy (not divided by N)
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin+total%pot+total_spr, method = msd )
+
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ e_f, t_k ]
+    variables = [ e_f, t_k, r_g, c_f, conserved_msd ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables )
+       CALL write_variables ( variables(1:3) ) ! Not MSD variables
     END IF
 
   END SUBROUTINE calculate

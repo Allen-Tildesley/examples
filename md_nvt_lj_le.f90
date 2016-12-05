@@ -33,12 +33,11 @@ PROGRAM md_nvt_lj_le
   REAL :: dt          ! Time step
   REAL :: strain_rate ! Strain_rate (velocity gradient) dv_x/dr_y
   REAL :: strain      ! Strain (integrated velocity gradient) dr_x/dr_y
-  REAL :: r_cut       ! Potential cutoff distance
 
   ! Quantities to be averaged
   TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
-  ! Composite interaction = pot & cut & vir & lap & ovr variables
+  ! Composite interaction = pot & vir & lap & ovr variables
   TYPE(potential_type) :: total
 
   INTEGER            :: blk, stp, nstep, nblock, ioerr
@@ -49,7 +48,7 @@ PROGRAM md_nvt_lj_le
   CHARACTER(len=3), PARAMETER :: out_tag    = 'out'
   CHARACTER(len=3)            :: sav_tag    = 'sav' ! May be overwritten with block number
 
-  NAMELIST /nml/ nblock, nstep, r_cut, dt, strain_rate
+  NAMELIST /nml/ nblock, nstep, dt, strain_rate
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_nvt_lj_le'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVT ensemble, Lees-Edwards'
@@ -59,7 +58,6 @@ PROGRAM md_nvt_lj_le
   ! Set sensible default run parameters for testing
   nblock      = 10
   nstep       = 1000
-  r_cut       = 2.5
   dt          = 0.005
   strain_rate = 0.01
 
@@ -76,7 +74,6 @@ PROGRAM md_nvt_lj_le
   ! Write out run parameters
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance', r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step',                 dt
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Strain rate',               strain_rate
 
@@ -86,7 +83,7 @@ PROGRAM md_nvt_lj_le
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
   density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density', density
-  CALL allocate_arrays ( box, r_cut )
+  CALL allocate_arrays ( box )
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r, v ) ! Second call gets r and v
   strain = 0.0                                              ! For simplicity assume that this is true
   r(:,:) = r(:,:) / box                                     ! Convert positions to box units
@@ -96,7 +93,7 @@ PROGRAM md_nvt_lj_le
   v(:,:) = v(:,:) - SPREAD ( vcm(:), dim = 2, ncopies = n ) ! Set COM velocity to zero
 
   ! Initial forces, potential, etc plus overlap check
-  CALL force ( box, r_cut, strain, total )
+  CALL force ( box, strain, total )
   IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in md_nvt_lj_le'
@@ -117,7 +114,7 @@ PROGRAM md_nvt_lj_le
         CALL a_propagator  ( dt/2.0)
         CALL b1_propagator ( dt/2.0 )
 
-        CALL force ( box, r_cut, strain, total )
+        CALL force ( box, strain, total )
         IF ( total%ovr ) THEN
            WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
            STOP 'Error in md_nvt_lj_le'
@@ -141,7 +138,7 @@ PROGRAM md_nvt_lj_le
 
   CALL run_end
 
-  CALL force ( box, r_cut, strain, total )
+  CALL force ( box, strain, total )
   IF ( total%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in md_nvt_lj_le'
@@ -207,7 +204,6 @@ CONTAINS
   END SUBROUTINE b2_propagator
 
   SUBROUTINE calculate ( string ) 
-    USE lrc_module,      ONLY : potential_lrc, pressure_lrc
     USE averages_module, ONLY : write_variables
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
@@ -215,7 +211,11 @@ CONTAINS
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
 
-    TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c
+    ! In this example we simulate using a specified potential (e.g. WCA LJ)
+    ! which goes to zero smoothly at the cutoff to highlight energy conservation
+    ! so long-range corrections do not arise
+
+    TYPE(variable_type) :: e_s, p_s, t_k, t_c
     REAL                :: vol, rho, kin, fsq, tmp
 
     ! Preliminary calculations
@@ -233,21 +233,13 @@ CONTAINS
     ! The %nam and some other components need only be defined once, at the start of the program,
     ! but for clarity and readability we assign all the values together below
 
-    ! Internal energy (cut-and-shifted) per atom
-    ! Total KE plus total cut-and-shifted PE divided by N
-    e_s = variable_type ( nam = 'E/N cut&shifted', val = (kin+total%pot)/REAL(n) )
+    ! Internal energy per atom
+    ! Total KE plus total PE divided by N
+    e_s = variable_type ( nam = 'E/N', val = (kin+total%pot)/REAL(n) )
 
-    ! Internal energy (full, including LRC) per atom
-    ! LRC plus total KE plus total cut (but not shifted) PE divided by N
-    e_f = variable_type ( nam = 'E/N full', val = potential_lrc(rho,r_cut) + (kin+total%cut)/REAL(n) )
-
-    ! Pressure (cut-and-shifted)
+    ! Pressure
     ! Ideal gas contribution plus total virial divided by V 
-    p_s = variable_type ( nam = 'P cut&shifted', val = rho*tmp + total%vir/vol )   
-
-    ! Pressure (full, including LRC)
-    ! LRC plus ideal gas contribution plus total virial divided by V 
-    p_f = variable_type ( nam = 'P full', val = pressure_lrc(rho,r_cut) + rho*tmp + total%vir/vol )
+    p_s = variable_type ( nam = 'P', val = rho*tmp + total%vir/vol )   
 
     ! Kinetic temperature
     t_k = variable_type ( nam = 'T kinetic', val = tmp )
@@ -258,7 +250,7 @@ CONTAINS
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c ]
+    variables = [ e_s, p_s, t_k, t_c ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string

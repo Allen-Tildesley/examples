@@ -30,7 +30,7 @@ MODULE md_module
 
   ! Public derived type
   TYPE, PUBLIC :: potential_type ! A composite variable for interactions comprising
-     REAL    :: pot ! the potential energy cut-and-shifted at r_cut and
+     REAL    :: pot ! the potential energy
      LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
    CONTAINS
      PROCEDURE :: add_potential_type
@@ -50,8 +50,7 @@ CONTAINS
   SUBROUTINE introduction
     IMPLICIT NONE
 
-    WRITE ( unit=output_unit, fmt='(a)' ) 'WCA shifted Lennard-Jones chain'
-    WRITE ( unit=output_unit, fmt='(a)' ) 'No periodic boundaries'   
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones chain, no cutoff, no shift, no periodic box'   
     WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'    
     WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1'   
     WRITE ( unit=output_unit, fmt='(a)' ) 'All atomic masses the same m = 1'   
@@ -104,7 +103,7 @@ CONTAINS
     IMPLICIT NONE
     TYPE(potential_type), INTENT(out) :: total ! Composite of pot, ovr
 
-    ! total%pot is the nonbonded WCA LJ potential energy for atomic chain (omitting bonded neighbours)
+    ! total%pot is the LJ potential energy for the atomic chain (omitting bonded neighbours)
     ! total%ovr is a warning flag that there is an overlap
     ! The Lennard-Jones energy and sigma parameters are taken to be epsilon = 1, sigma = 1
     ! Positions are assumed to be in these units
@@ -113,7 +112,6 @@ CONTAINS
 
     INTEGER              :: i, j
     REAL                 :: rij_sq, sr2, sr6, sr12, pair_vir
-    REAL, PARAMETER      :: r_cut_sq = 2.0**(1.0/3.0) ! minimum of LJ potential
     REAL, DIMENSION(3)   :: rij, fij
     REAL, PARAMETER      :: sr2_ovr = 1.77 ! Overlap threshold (pot > 100)
     TYPE(potential_type) :: pair
@@ -129,23 +127,18 @@ CONTAINS
           rij(:) = r(:,i) - r(:,j) ! Separation vector
           rij_sq = SUM ( rij**2 )  ! Squared separation
 
-          IF ( rij_sq < r_cut_sq ) THEN ! Test within cutoff
+          sr2      = 1.0 / rij_sq  ! (sigma/rij)**2
+          pair%ovr = sr2 > sr2_ovr ! Overlap if too close
 
-             sr2      = 1.0 / rij_sq  ! (sigma/rij)**2
-             pair%ovr = sr2 > sr2_ovr ! Overlap if too close
+          sr6      = sr2 ** 3
+          sr12     = sr6 ** 2
+          pair%pot = sr12 - sr6           ! LJ pair potential
+          pair_vir = pair%pot + sr12      ! LJ pair virial
+          fij      = rij * pair_vir * sr2 ! LJ Pair forces
 
-             sr6      = sr2 ** 3
-             sr12     = sr6 ** 2
-             pair%pot = sr12 - sr6           ! Cut (but not shifted) LJ potential
-             pair_vir = pair%pot + sr12      ! WCA LJ pair virial
-             pair%pot = pair%pot + 0.25      ! WCA LJ pair potential
-             fij      = rij * pair_vir * sr2 ! WCA LJ Pair forces
-
-             total  = total  + pair
-             f(:,i) = f(:,i) + fij
-             f(:,j) = f(:,j) - fij
-
-          END IF ! End test within cutoff
+          total  = total  + pair
+          f(:,i) = f(:,i) + fij
+          f(:,j) = f(:,j) - fij
 
        END DO ! End inner loop over atoms
 

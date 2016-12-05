@@ -8,7 +8,7 @@ PROGRAM dpd
   USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE maths_module,     ONLY : lowercase
   USE dpd_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       force, lowe, shardlow, r, v, f, n, potential_type
+       &                       force, lowe, shardlow, p_approx, r, v, f, n, potential_type
 
   IMPLICIT NONE
 
@@ -68,7 +68,7 @@ PROGRAM dpd
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 1000
+  nstep       = 10000
   dt          = 0.02
   temperature = 1.0
   a           = 75.0 ! actually a*rho/kT: to be multiplied by kT/rho later
@@ -162,7 +162,7 @@ PROGRAM dpd
   CALL force ( box, a, total )
   CALL calculate ( 'Final values' )
 
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Approx EOS P = ', p_eos ( )
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Approx P = ', p_approx ( a, rho, temperature )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v ) ! Write out final configuration
 
@@ -241,15 +241,6 @@ CONTAINS
     END IF
 
   END SUBROUTINE calculate
-
-  FUNCTION p_eos ( )
-    REAL :: p_eos ! Returns approximate equation of state
-
-    REAL, PARAMETER :: alpha = 0.101
-
-    p_eos = rho * temperature + alpha * a * rho**2
-
-  END FUNCTION p_eos
 
 END PROGRAM dpd
 

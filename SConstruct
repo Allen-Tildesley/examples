@@ -30,6 +30,7 @@ env_omp.Append(F90FLAGS=OMP_F90FLAGS,LINKFLAGS=OMP_LINKFLAGS,FORTRANMODDIRPREFIX
 
 variants={}
 variants['build_adjust_energy']        = (['adjust_energy.f90','md_lj_module.f90','config_io_module.f90'],env_normal)
+variants['build_adjust_kinetic_energy']= (['adjust_kinetic_energy.f90','config_io_module.f90'],env_normal)
 variants['build_adjust_density']       = (['adjust_density.f90','config_io_module.f90'],env_normal)
 variants['build_bd_nvt_lj']            = (['bd_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
 variants['build_dpd']                  = (['dpd.f90','dpd_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
@@ -66,8 +67,8 @@ variants['build_md_nve_lj_vl']         = (['md_nve_lj.f90','md_lj_vl_module.f90'
 variants['build_md_nve_lj_ll']         = (['md_nve_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90','config_io_module.f90','averages_module.f90'],env_normal)
 variants['build_md_nve_lj_omp']        = (['md_nve_lj.f90','md_lj_omp_module.f90','lrc_lj_module.f90','config_io_module.f90','averages_module.f90'],env_omp)
 variants['build_md_nvt_lj']            = (['md_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
-variants['build_md_nvt_lj_le']         = (['md_nvt_lj_le.f90','md_lj_le_module.f90','lrc_lj_module.f90','config_io_module.f90','averages_module.f90'],env_normal)
-variants['build_md_nvt_lj_llle']       = (['md_nvt_lj_le.f90','md_lj_llle_module.f90','lrc_lj_module.f90','link_list_module.f90','config_io_module.f90','averages_module.f90'],env_normal)
+variants['build_md_nvt_lj_le']         = (['md_nvt_lj_le.f90','md_lj_le_module.f90','config_io_module.f90','averages_module.f90'],env_normal)
+variants['build_md_nvt_lj_llle']       = (['md_nvt_lj_le.f90','md_lj_llle_module.f90','link_list_module.f90','config_io_module.f90','averages_module.f90'],env_normal)
 variants['build_mesh']                 = (['mesh.f90'],env_normal)
 variants['build_pair_distribution']    = (['pair_distribution.f90','config_io_module.f90'],env_normal)
 variants['build_qmc_pi_sho']           = (['qmc_pi_sho.f90','averages_module.f90','maths_module.f90'],env_normal)

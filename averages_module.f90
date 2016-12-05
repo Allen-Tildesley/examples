@@ -68,7 +68,7 @@ CONTAINS
     ALLOCATE ( run_avg(n_avg), run_err(n_avg) )
     ALLOCATE ( method(n_avg), add(n_avg) )
 
-    ! First column plus a column for each variable; allow one space between columns 
+    ! First column plus a column for each variable; allow one space between columns
     line_width = col_width + n_avg * ( col_width + 1 )
 
     ! Store variable names locally in tidied-up format

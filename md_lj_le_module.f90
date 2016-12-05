@@ -12,15 +12,17 @@ MODULE md_module
   PUBLIC :: force
 
   ! Public data
-  INTEGER,                              PUBLIC :: n ! number of atoms
-  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! positions (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v ! velocities (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: f ! forces (3,n)
+  INTEGER,                              PUBLIC :: n ! Number of atoms
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! Positions (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v ! Velocities (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: f ! Forces (3,n)
+
+  ! Private data
+  REAL, PARAMETER :: r_cut_sq = 2.0**(1.0/3.0), r_cut = SQRT(r_cut_sq) ! Minimum and cutoff of WCA LJ potential
 
   ! Public derived type
   TYPE, PUBLIC :: potential_type ! A composite variable for interactions comprising
-     REAL    :: cut ! the potential energy cut (but not shifted) at r_cut and
-     REAL    :: pot ! the potential energy cut-and-shifted at r_cut and
+     REAL    :: pot ! the potential energy
      REAL    :: vir ! the virial and
      REAL    :: lap ! the Laplacian and
      LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
@@ -35,7 +37,6 @@ CONTAINS
     IMPLICIT NONE
     TYPE(potential_type)              :: c    ! Result is the sum of
     CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
-    c%cut = a%cut  +   b%cut
     c%pot = a%pot  +   b%pot
     c%vir = a%vir  +   b%vir
     c%lap = a%lap  +   b%lap
@@ -45,9 +46,7 @@ CONTAINS
   SUBROUTINE introduction
     IMPLICIT NONE
 
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential'
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Cut-and-shifted version for dynamics'
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Cut (but not shifted) version also calculated'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'WCA shifted Lennard-Jones potential'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'  
     WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Lees-Edwards boundaries'
@@ -61,10 +60,9 @@ CONTAINS
 
   END SUBROUTINE conclusion
 
-  SUBROUTINE allocate_arrays ( box, r_cut )
+  SUBROUTINE allocate_arrays ( box )
     IMPLICIT NONE
     REAL, INTENT(in) :: box   ! Simulation box length
-    REAL, INTENT(in) :: r_cut ! Potential cutoff distance
 
     REAL :: r_cut_box
 
@@ -85,20 +83,17 @@ CONTAINS
 
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE force ( box, r_cut, strain, total )
+  SUBROUTINE force ( box, strain, total )
     IMPLICIT NONE
     REAL,                 INTENT(in)  :: box    ! Simulation box length
-    REAL,                 INTENT(in)  :: r_cut  ! Potential cutoff distance
     REAL,                 INTENT(in)  :: strain ! Shear strain
     TYPE(potential_type), INTENT(out) :: total  ! Composite of pot, vir, lap etc
 
-    ! total%pot is the nonbonded cut-and-shifted potential energy for whole system
-    ! total%cut is the nonbonded cut (but not shifted) potential energy for whole system
+    ! total%pot is the WCA LJ potential energy for whole system
     ! total%vir is the corresponding virial
     ! total%lap is the corresponding Laplacian
     ! total%ovr is a warning flag that there is an overlap
     ! This routine also calculates forces and stores them in the array f
-    ! Forces are derived from pot, not cut (which has a discontinuity)
     ! If total%ovr is set to .true., the forces etc should not be used
 
     ! It is assumed that positions are in units where box = 1
@@ -108,7 +103,7 @@ CONTAINS
 
     INTEGER              :: i, j
     REAL                 :: r_cut_box, r_cut_box_sq, box_sq, rij_sq
-    REAL                 :: sr2, sr6, sr12, pot_cut
+    REAL                 :: sr2, sr6, sr12
     REAL, DIMENSION(3)   :: rij, fij
     REAL, PARAMETER      :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
     TYPE(potential_type) :: pair
@@ -117,15 +112,9 @@ CONTAINS
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
 
-    ! Calculate potential at cutoff
-    sr2     = 1.0 / r_cut**2 ! in sigma=1 units
-    sr6     = sr2 ** 3
-    sr12    = sr6 **2
-    pot_cut = sr12 - sr6 ! Without numerical factor 4
-
     ! Initialize
     f     = 0.0
-    total = potential_type (  pot=0.0, cut=0.0, vir=0.0, lap=0.0, ovr=.FALSE. )
+    total = potential_type (  pot=0.0, vir=0.0, lap=0.0, ovr=.FALSE. )
 
     DO i = 1, n - 1 ! Begin outer loop over atoms
 
@@ -145,9 +134,9 @@ CONTAINS
 
              sr6      = sr2 ** 3
              sr12     = sr6 ** 2
-             pair%cut = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
-             pair%vir = pair%cut + sr12               ! LJ pair virial
-             pair%pot = pair%cut - pot_cut            ! LJ pair potential (cut-and-shifted)
+             pair%pot = sr12 - sr6                    ! LJ pair potential (cut but not shifted)
+             pair%vir = pair%pot + sr12               ! LJ pair virial
+             pair%pot = pair%pot + 0.25               ! WCA LJ pair potential (cut-and-shifted)
              pair%lap = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
              fij      = rij * pair%vir * sr2          ! LJ pair forces
 
@@ -163,7 +152,6 @@ CONTAINS
 
     ! Multiply results by numerical factors
     f         = f         * 24.0       ! 24*epsilon
-    total%cut = total%cut * 4.0        ! 4*epsilon
     total%pot = total%pot * 4.0        ! 4*epsilon
     total%vir = total%vir * 24.0 / 3.0 ! 24*epsilon and divide virial by 3
     total%lap = total%lap * 24.0 * 2.0 ! 24*epsilon and factor 2 for ij and ji

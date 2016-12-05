@@ -504,6 +504,7 @@ CONTAINS
     ! In between, we take steps to remove linear and angular momentum
     ! since the configuration may be used in MD simulations without periodic boundaries
     ! in which case both these quantities are conserved
+    ! NB there is at present no check for a singular inertia tensor in the angular momentum fix!
     ! We assume centre of mass is already at the origin
     ! We assume unit molecular mass and employ Lennard-Jones units
     ! property                  units
@@ -512,7 +513,7 @@ CONTAINS
     ! velocity v                sqrt(epsilon/m)
 
     REAL                 :: temp
-    REAL, DIMENSION(3)   :: v_cm, ang_mom, ang_vel
+    REAL, DIMENSION(3)   :: v_cm, r_cm, ang_mom, ang_vel
     REAL, DIMENSION(3,3) :: inertia
     INTEGER              :: i, xyz
     REAL, PARAMETER      :: tol = 1.e-6
@@ -529,14 +530,22 @@ CONTAINS
        STOP 'Error in initialize_chain_velocities'
     END IF
 
+    ! Confirm centre-of-mass is at origin
+    r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL ( n ) ! Compute centre of mass
+    IF ( ANY ( ABS ( r_cm ) > tol ) ) THEN
+       WRITE ( unit=error_unit, fmt='(a,3f15.8)' ) 'Centre of mass error', r_cm
+       STOP 'Error in initialize_chain_velocities'
+    END IF
+
     CALL random_normals ( 0.0, SQRT(temperature), v ) ! Choose 3N random velocities
 
     ! Compute and remove total momentum
     v_cm(:) = SUM ( v(:,:), dim=2 ) / REAL ( n )            ! Compute centre of mass velocity
     v(:,:)  = v(:,:) - SPREAD ( v_cm(:), dim=2, ncopies=n ) ! Set net momentum to zero
-
+    
     ! Compute total angular momentum and moment of inertia tensor
     ang_mom = 0.0
+    inertia = 0.0
     DO i = 1, n
        ang_mom = ang_mom + cross_product ( r(:,i), v(:,i) )
        inertia = inertia - outer_product ( r(:,i), r(:,i) )
@@ -559,7 +568,7 @@ CONTAINS
     temp   = SUM(v(:,:)**2) / REAL ( 3*n - (n-1) - 6 )
     v(:,:) = v(:,:) * SQRT ( temperature / temp )
 
-    ! Check angular and linear momenta
+    ! Final check on angular and linear momenta
     v_cm    = 0.0
     ang_mom = 0.0
     DO i = 1, n
