@@ -232,6 +232,44 @@ Thol et al (2016) (f)  | 1.1400 | -3.0055   | 1.2571   | -3.4070   |  0.9559   |
 Thol et al (2016) (f)  | 1.2996 | -2.6523   | 1.8667   | -3.0539   |  1.5655   |  2.1989  
 `mc_nvt_lj_re`         | 1.2996 | -2.662(1) | 1.820(3) | -3.063(1) |  1.519(3) |  2.214(5)
 
+##Lees-Edwards programs
+The programs `md_nvt_lj_le` and `md_nvt_lj_llle` are intended to illustrate:
+the moving boundaries used in nonequilibrium shear flow simulations;
+an algorithm for integrating the SLLOD equations of motion with constrained kinetic energy;
+and an adapted link-cell method required to handle the modified boundaries.
+These programs both use the short-ranged WCA Lennard-Jones potential,
+in order to compare results with the following papers:
+
+* G Pan, JF Ely, C McCabe, DJ Isbister, _J Chem Phys,_ __122,__ 094114 (2005)
+* KP Travis, DJ Searles, DJ Evans, _Mol Phys,_ __95,__ 195 (1998)
+
+Testing was performed at the state point used in those papers: &rho;=0.8442, _T_=0.722.
+A system size _N_=256 was used.
+The given program defaults, including a time step of 0.005, were used throughout,
+except for the strain rate which was varied.
+
+Strain rate | _E_       | _P_       | &eta;
+-----       | -----     | -----     | -----
+0.04        | 1.8043(1) | 6.3907(7) | 2.30(4)
+0.04        | 1.8039(3) | 6.389(2)  | 2.31(4)
+0.16        | 1.8103(2) | 6.431(1)  | 2.254(8)
+0.16        | 1.8098(2) | 6.427(1)  | 2.23(1)
+0.64        | 1.8649(2) | 6.778(1)  | 1.939(2)
+0.64        | 1.8646(2) | 6.776(1)  | 1.935(2)
+
+In the table above, for each strain rate,
+the first line comes from `md_nvt_lj_le`
+and the second from `md_nvt_lj_llle`
+(essentially identical, but roughly twice as fast for _N_=256).
+In all cases the kinetic energy was conserved very accurately by the algorithm.
+The results, particularly the increase in _E_ and _P_,
+and the decrease in shear viscosity &eta;,
+as the strain rate increases,
+are in good agreement with the above papers.
+
+* Although the link-list program seems to be working fine, it might be worth double-checking
+the logic in the force routine, as it is a bit fiddly.
+
 ##Chain simulation programs
 The program `mc_chain_nvt_cbmc_lj` simulates a single Lennard-Jones chain,
 where the atoms are linked by harmonic springs.
@@ -254,27 +292,32 @@ The program default run length is 10 blocks of 100000 steps.
 For lower temperatures (below 0.40), longer runs (10 blocks of 1000000
 steps) were used.
 For temperatures higher than 1.0,
-the bond length fluctuations become unphysically large for this value of _k_<sub>spring</sub>;
+the bond length fluctuations become unphysically large for this value of _k_<sub>spring</sub>.
 
 _T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
------ | ------    | ------          | ------ 
+----- | ------    | ------          | ------
 0.26  | -2.044(7) | 1.074(1)        | 3.3(2)  
 0.28  | -1.967(5) | 1.086(1)        | 4.16(9)
 0.29  | -1.905(4) | 1.096(1)        | 4.6(1)  
-0.30  | -1.893(7) | 1.098(1)        | 4.71(9) 
-0.31  | -1.819(3) | 1.1105(8)       | 4.34(6) 
+0.30  | -1.893(7) | 1.098(1)        | 4.71(9)
+0.31  | -1.819(3) | 1.1105(8)       | 4.34(6)
 0.32  | -1.789(2) | 1.1162(5)       | 4.2(1)  
-0.33  | -1.742(3) | 1.1254(5)       | 4.05(1) 
+0.33  | -1.742(3) | 1.1254(5)       | 4.05(1)
 0.34  | -1.705(4) | 1.133(1)        | 3.7(1)  
-0.35  | -1.672(3) | 1.140(1)        | 3.49(8) 
-0.40  | -1.50(1)  | 1.173(3)        | 2.51(17) 
+0.35  | -1.672(3) | 1.140(1)        | 3.49(8)
+0.40  | -1.50(1)  | 1.173(3)        | 2.51(17)
 0.45  | -1.40(1)  | 1.201(3)        | 2.26(8)  
 0.50  | -1.297(8) | 1.224(1)        | 1.99(2)  
-1.00  | -0.438(2) | 1.538(2)        | 1.371(3) 
+1.00  | -0.438(2) | 1.538(2)        | 1.371(3)
+
+At the lowest temperatures, the acceptance rate of CBMC moves (with the default parameters) was around 2%,
+while at _T_=0.35 it was around 11%, increasing further at higher temperatures.
+The results are broadly in agreement with Calvo et al (2002) showing a similar sized peak in _C<sub>v</sub>_,
+although at a somewhat lower temperature (0.30 as opposed to 0.35).
 
 Here we give analogous results for the program default value of _k_<sub>spring</sub>=400.
 
-_T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex) 
+_T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 ----- | -------   | --------        | --------
 0.26  | -2.076(3) | 1.069(1)        | 2.13(5)
 0.28  | -2.027(5) | 1.075(1)        | 2.91(15)
@@ -292,11 +335,6 @@ _T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 2.00  |  0.387(2) | 1.850(1)        | 0.591(3)
 5.00  |  1.986(3) | 2.035(2)        | 0.465(2)
 
-At the lowest temperatures, the acceptance rate of CBMC moves (with the default parameters) was around 2%,
-while at _T_=0.35 it was around 11%, increasing further at higher temperatures.
-The results are broadly in agreement with Calvo et al (2002) showing a similar sized peak in _C<sub>v</sub>_,
-although at a somewhat lower temperature (0.30 as opposed to 0.35).
-
 Similar models were employed in `md_chain_nve_lj` and `md_chain_mts_lj`:
 _N_=13 atoms and equilibrium bond length of 1.122462&sigma;.
 Here we report results for constrained bond lengths, using the first program,
@@ -307,35 +345,35 @@ and this was checked in all cases.
 
 constrained
 
-_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex) 
+_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 -----   | -----     | -----           | -----
--2.0246 | 0.2485(2) | 1.06374(4)      | 2.176(6) 
+-2.0246 | 0.2485(2) | 1.06374(4)      | 2.176(6)
 -1.9145 | 0.296(2)  | 1.073(1)        | 2.38(8)  
 -1.6145 | 0.345(4)  | 1.125(2)        | 3.14(8)  
 -1.3495 | 0.404(1)  | 1.182(2)        | 2.39(1)  
 -1.2195 | 0.451(1)  | 1.207(1)        | 2.36(2)  
 -1.0968 | 0.499(2)  | 1.234(1)        | 2.28(1)  
 -0.1244 | 1.009(5)  | 1.471(5)        | 2.04(2)  
- 1.0456 | 2.008(5)  | 1.754(9)        | 1.653(3) 
+ 1.0456 | 2.008(5)  | 1.754(9)        | 1.653(3)
  3.6459 | 4.996(4)  | 1.889(7)        | 1.534(1)
 
 _k_<sub>spring</sub>=10000
 
-_E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex) 
+_E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 -----    | -----     | -----           | -----
--1.7734  | 0.2496(2) | 1.0695(1)       | 2.96(4) 
+-1.7734  | 0.2496(2) | 1.0695(1)       | 2.96(4)
 -1.3444  | 0.301(2)  | 1.144(2)        | 5.5(3)  
--1.1394  | 0.350(2)  | 1.173(2)        | 3.70(5) 
--0.9494  | 0.399(1)  | 1.199(1)        | 3.19(5) 
--0.7694  | 0.448(1)  | 1.230(2)        | 3.09(3) 
--0.5943  | 0.497(2)  | 1.262(3)        | 3.04(5) 
- 0.7857  | 1.000(4)  | 1.467(12)       | 2.50(3) 
- 2.8858  | 1.98(2)   | 1.752(14)       | 2.08(6) 
- 8.3859  | 5.04(4)   | 1.904(2)        | 1.94(2) 
+-1.1394  | 0.350(2)  | 1.173(2)        | 3.70(5)
+-0.9494  | 0.399(1)  | 1.199(1)        | 3.19(5)
+-0.7694  | 0.448(1)  | 1.230(2)        | 3.09(3)
+-0.5943  | 0.497(2)  | 1.262(3)        | 3.04(5)
+ 0.7857  | 1.000(4)  | 1.467(12)       | 2.50(3)
+ 2.8858  | 1.98(2)   | 1.752(14)       | 2.08(6)
+ 8.3859  | 5.04(4)   | 1.904(2)        | 1.94(2)
 
 _k_<sub>spring</sub>=400
 
-_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex) 
+_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 -----   | -----     | -----           | -----
 -1.7934 | 0.2487(2) | 1.0646(1)       | 2.89(5)
 -1.6250 | 0.299(1)  | 1.0753(4)       | 3.24(7)

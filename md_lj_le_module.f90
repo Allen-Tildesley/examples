@@ -25,6 +25,7 @@ MODULE md_module
      REAL    :: pot ! the potential energy
      REAL    :: vir ! the virial and
      REAL    :: lap ! the Laplacian and
+     REAL    :: pyx ! the off-diagonal virial part of the pressure tensor
      LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
    CONTAINS
      PROCEDURE :: add_potential_type
@@ -39,6 +40,7 @@ CONTAINS
     CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  +   b%pot
     c%vir = a%vir  +   b%vir
+    c%pyx = a%pyx  +   b%pyx
     c%lap = a%lap  +   b%lap
     c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
@@ -91,6 +93,7 @@ CONTAINS
 
     ! total%pot is the WCA LJ potential energy for whole system
     ! total%vir is the corresponding virial
+    ! total%pyx is the virial part of the yx-element of the pressure tensor
     ! total%lap is the corresponding Laplacian
     ! total%ovr is a warning flag that there is an overlap
     ! This routine also calculates forces and stores them in the array f
@@ -114,7 +117,7 @@ CONTAINS
 
     ! Initialize
     f     = 0.0
-    total = potential_type (  pot=0.0, vir=0.0, lap=0.0, ovr=.FALSE. )
+    total = potential_type (  pot=0.0, vir=0.0, pyx=0.0, lap=0.0, ovr=.FALSE. )
 
     DO i = 1, n - 1 ! Begin outer loop over atoms
 
@@ -139,6 +142,7 @@ CONTAINS
              pair%pot = pair%pot + 0.25               ! WCA LJ pair potential (cut-and-shifted)
              pair%lap = ( 22.0*sr12 - 5.0*sr6 ) * sr2 ! LJ pair Laplacian
              fij      = rij * pair%vir * sr2          ! LJ pair forces
+             pair%pyx = rij(2)*fij(1)                 ! Off-diagonal element of pressure tensor
 
              total  = total  + pair
              f(:,i) = f(:,i) + fij
@@ -154,6 +158,7 @@ CONTAINS
     f         = f         * 24.0       ! 24*epsilon
     total%pot = total%pot * 4.0        ! 4*epsilon
     total%vir = total%vir * 24.0 / 3.0 ! 24*epsilon and divide virial by 3
+    total%pyx = total%pyx * 24.0       ! 24*epsilon
     total%lap = total%lap * 24.0 * 2.0 ! 24*epsilon and factor 2 for ij and ji
 
   END SUBROUTINE force

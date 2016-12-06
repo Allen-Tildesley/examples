@@ -42,6 +42,7 @@ PROGRAM md_nvt_lj_le
 
   INTEGER            :: blk, stp, nstep, nblock, ioerr
   REAL, DIMENSION(3) :: vcm
+  REAL, PARAMETER    :: tol = 1.0e-6
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
@@ -57,9 +58,9 @@ PROGRAM md_nvt_lj_le
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 1000
+  nstep       = 100000
   dt          = 0.005
-  strain_rate = 0.01
+  strain_rate = 0.04
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -77,6 +78,14 @@ PROGRAM md_nvt_lj_le
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step',                 dt
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Strain rate',               strain_rate
 
+  ! Insist that strain be zero (i.e. an integer) at end of each block
+  strain = strain_rate * dt * REAL(nstep)
+  strain = strain - ANINT ( strain )
+  IF ( ABS ( strain ) > tol ) THEN
+     WRITE ( unit=error_unit, fmt='(a,es15.6)') 'Strain must be zero at end of block', strain
+     STOP 'Error in md_nvt_lj_le'
+  END IF
+  
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
@@ -111,7 +120,7 @@ PROGRAM md_nvt_lj_le
 
         ! Isokinetic SLLOD algorithm (Pan et al)
 
-        CALL a_propagator  ( dt/2.0)
+        CALL a_propagator  ( dt/2.0 )
         CALL b1_propagator ( dt/2.0 )
 
         CALL force ( box, strain, total )
@@ -163,6 +172,7 @@ CONTAINS
     r(1,:) = r(1,:) + x * r(2,:)        ! Extra strain term
     r(:,:) = r(:,:) + t * v(:,:) / box  ! Drift half-step (positions in box=1 units)
     strain = strain + x                 ! Advance strain and hence boundaries
+    strain = strain - ANINT ( strain )  ! Keep strain within (-0.5,0.5)
 
     r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain ! Extra PBC correction (box=1 units)
     r(:,:) = r(:,:) - ANINT ( r(:,:) )          ! Periodic boundaries (box=1 units)
@@ -173,15 +183,16 @@ CONTAINS
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
 
-    REAL :: x, c1, c2
+    REAL :: x, c1, c2, g
     
     x = t * strain_rate ! Change in strain (dimensionless)
 
     c1 = x * SUM ( v(1,:)*v(2,:) ) / SUM ( v(:,:)**2 )
     c2 = ( x**2 ) * SUM ( v(2,:)**2 ) / SUM ( v(:,:)**2 )
+    g  = 1.0 / SQRT ( 1.0 - 2.0*c1 + c2 )
 
     v(1,:) = v(1,:) - x*v(2,:)
-    v(:,:) = v(:,:) / SQRT ( 1.0 - 2.0*c1 + c2 )
+    v(:,:) = g * v(:,:)
 
   END SUBROUTINE b1_propagator
 
@@ -198,13 +209,13 @@ CONTAINS
 
     dt_factor = ( 1 + h - e - h / e ) / ( ( 1 - h ) * beta )
     prefactor = ( 1 - h ) / ( e - h / e )
-
+    
     v(:,:) = prefactor * ( v(:,:) + dt_factor * f(:,:) )
 
   END SUBROUTINE b2_propagator
 
   SUBROUTINE calculate ( string ) 
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, msd
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
@@ -215,15 +226,17 @@ CONTAINS
     ! which goes to zero smoothly at the cutoff to highlight energy conservation
     ! so long-range corrections do not arise
 
-    TYPE(variable_type) :: e_s, p_s, t_k, t_c
-    REAL                :: vol, rho, kin, fsq, tmp
+    TYPE(variable_type) :: e_s, p_s, t_k, t_c, eta, conserved_msd
+    REAL                :: vol, rho, kin, fsq, tmp, kyx
+    REAL, PARAMETER     :: tol = 1.0e-6
 
     ! Preliminary calculations
-    vol = box**3                  ! Volume
-    rho = REAL(n) / vol           ! Density
-    kin = 0.5*SUM(v**2)           ! NB v(:,:) are taken to be peculiar velocities
-    fsq = SUM(f**2)               ! Total squared force
-    tmp = 2.0 * kin / REAL(3*n-3) ! Remove three degrees of freedom for momentum conservation
+    vol = box**3                   ! Volume
+    rho = REAL(n) / vol            ! Density
+    kin = 0.5*SUM(v**2)            ! NB v(:,:) are taken to be peculiar velocities
+    fsq = SUM(f**2)                ! Total squared force
+    tmp = 2.0 * kin / REAL(3*n-3)  ! Remove three degrees of freedom for momentum conservation
+    kyx = SUM(v(1,:)*v(2,:)) / vol ! Kinetic part of off-diagonal pressure tensor
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -248,13 +261,23 @@ CONTAINS
     ! Total squared force divided by total Laplacian
     t_c = variable_type ( nam = 'T config', val = fsq/total%lap )
 
+    ! Shear viscosity
+    IF ( ABS(strain_rate) < tol ) THEN ! Guard against simulation with zero strain rate
+       eta = variable_type ( nam = 'Shear viscosity', val = 0.0 )
+    ELSE
+       eta = variable_type ( nam = 'Shear viscosity', val = -( kyx+total%pyx/vol ) / strain_rate )
+    END IF
+
+    ! MSD of conserved kinetic energy
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin, method = msd )
+
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
-    variables = [ e_s, p_s, t_k, t_c ]
+    variables = [ e_s, p_s, t_k, t_c, eta, conserved_msd ]
 
     IF ( PRESENT ( string ) ) THEN
        WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables )
+       CALL write_variables ( variables(1:5) ) ! Not MSD variable
     END IF
 
   END SUBROUTINE calculate
