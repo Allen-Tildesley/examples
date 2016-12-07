@@ -6,8 +6,8 @@ PROGRAM md_nve_hs
 
   USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
-  USE md_module,        ONLY : allocate_arrays, deallocate_arrays, update, overlap, collide, &
-       &                       n, r, v, coltime, partner, lt, gt
+  USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
+       &                       update, overlap, collide, n, r, v, coltime, partner, gt, lt
 
   IMPLICIT NONE
 
@@ -32,7 +32,7 @@ PROGRAM md_nve_hs
   REAL :: vir        ! Total collisional virial
   REAL :: kin        ! Kinetic energy
   REAL :: temp_kinet ! Temperature (conserved)
-  REAL :: t          ! Time
+  REAL :: dt         ! Time step
 
   ! Quantities to be averaged
   TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
@@ -42,19 +42,20 @@ PROGRAM md_nve_hs
   CHARACTER(len=3), PARAMETER :: out_tag    = 'out'
   CHARACTER(len=3)            :: sav_tag    = 'sav' ! May be overwritten with block number
 
-  INTEGER            :: i, j, k, ncoll, coll, blk, nblock, ioerr
-  REAL               :: tij, vir_sum
+  INTEGER            :: i, j, k, ncoll, col_sum, blk, stp, nblock, nstep, ioerr
+  REAL               :: tij, t_now, vir_sum
   REAL, DIMENSION(3) :: vcm
 
-  NAMELIST /nml/ nblock, ncoll
+  NAMELIST /nml/ nblock, nstep, dt
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'md_nve_hs'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE, hard spheres'
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Results in units sigma = 1, mass = 1'
+  CALL introduction
 
   ! Set sensible default run parameters for testing
   nblock = 10
-  ncoll  = 10000
+  nstep  = 2000
+  dt     = 0.05
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -67,8 +68,9 @@ PROGRAM md_nve_hs
   END IF
 
   ! Write out run parameters
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Number of blocks',               nblock
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Number of collisions per block', ncoll
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Timestep',                  dt
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
@@ -83,15 +85,18 @@ PROGRAM md_nve_hs
   v(:,:) = v(:,:) - SPREAD ( vcm(:), dim = 2, ncopies = n ) ! Set COM velocity to zero
   kin        = 0.5 * SUM ( v**2 )
   temp_kinet = 2.0 * kin / REAL ( 3*(n-1) )
+  v          = v / SQRT ( temp_kinet ) ! We fix the temperature to be 1.0
+  kin        = 0.5 * SUM ( v**2 )
+  temp_kinet = 2.0 * kin / REAL ( 3*(n-1) )
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature', temp_kinet
-
+  
   ! Initial overlap check
   IF ( overlap ( box ) ) THEN
      WRITE ( unit=error_unit, fmt='(a)' ) 'Particle overlap in initial configuration'
      STOP 'Error in md_nve_hs'
   END IF
 
-  ALLOCATE ( variables(2) )
+  CALL calculate
 
   ! Initial search for collision partners >i
   coltime(:) = HUGE(1.0)
@@ -103,41 +108,53 @@ PROGRAM md_nve_hs
   ! Initialize arrays for averaging and write column headings
   CALL run_begin ( variables )
 
+  ncoll = 0
+  
   DO blk = 1, nblock ! Begin loop over blocks
 
      CALL blk_begin
-     vir_sum = 0.0
-     t       = 0.0
 
-     DO coll = 1, ncoll ! Begin loop over collisions
+     DO stp = 1, nstep ! Begin loop over steps
 
-        i   = MINLOC ( coltime, dim=1 ) ! Locate minimum collision time
-        j   = partner(i)                ! Collision partner
-        tij = coltime(i)                ! Time to collision
+        vir_sum = 0.0 ! Zero collisional virial accumulator for this step
+        col_sum = 0   ! Zero collision counter for this step
+        t_now   = 0.0 ! Keep track of time within this step
 
-        t          = t + tij                     ! Advance time by tij
-        coltime(:) = coltime(:) - tij            ! Reduce times to next collision by tij
-        r(:,:)     = r(:,:) + tij * v(:,:) / box ! Advance all positions by tij (box=1 units)
-        r(:,:)     = r(:,:) - ANINT ( r(:,:) )   ! Apply periodic boundaries
+        DO ! Loop over collisions within this step
 
-        CALL collide ( i, j, box, vir ) ! Compute collision dynamics
+           i   = MINLOC ( coltime, dim=1 ) ! Locate minimum collision time
+           j   = partner(i)                ! Collision partner
+           tij = coltime(i)                ! Time to collision
 
-        vir_sum = vir_sum + vir
+           IF ( t_now + tij > dt ) THEN
+              CALL advance ( dt - t_now ) ! Advance to end of time step
+              EXIT                        ! Exit loop over collisions
+           END IF
 
-        DO k = 1, n
-           IF ( ( k == i ) .OR. ( partner(k) == i ) .OR. ( k == j ) .OR. ( partner(k) == j ) ) THEN
-              CALL update ( k, box, gt ) ! Search for partners >k
-           ENDIF
-        END DO
+           CALL advance ( tij )            ! Advance to time of next collision
+           CALL collide ( i, j, box, vir ) ! Compute collision dynamics
+           col_sum = col_sum + 1           ! Increment collision counter
+           vir_sum = vir_sum + vir         ! Increment collisional virial accumulator
 
-        CALL update ( i, box, lt ) ! search for partners <i
-        CALL update ( j, box, lt ) ! search for partners <j
+           ! Update collision lists
+           DO k = 1, n
+              IF ( k==i .or. k==j .or. partner(k) == i .OR.  partner(k) == j ) THEN
+                 CALL update ( k, box, gt ) ! Search for partners >k
+              END IF
+           END DO
+           CALL update ( i, box, lt ) ! Search for partners <i
+           CALL update ( j, box, lt ) ! Search for partners <j
 
-     END DO ! End loop over collisions
+        END DO ! End loop over collisions within this step
 
-     ! Calculate and accumulate variables for this step
-     CALL calculate
-     CALL blk_add ( variables )
+        ncoll = ncoll + col_sum
+
+        ! Calculate and accumulate variables for this step
+        CALL calculate
+        CALL blk_add ( variables )
+
+     END DO ! End loop over steps
+
      CALL blk_end ( blk )                                           ! Output block averages
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk               ! Number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, box, r*box, v ) ! Save configuration
@@ -146,15 +163,33 @@ PROGRAM md_nve_hs
 
   CALL run_end ! Output run averages
 
-  WRITE ( unit=output_unit, fmt='(a,t40,2i5)' ) 'Final colliding pair', i, j
-
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Total collisions', ncoll
+  
   IF ( overlap ( box ) ) STOP 'Particle overlap in final configuration'
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
 
   CALL deallocate_arrays
+  CALL conclusion
 
 CONTAINS
+
+  SUBROUTINE advance ( t )
+    IMPLICIT NONE
+    REAL, INTENT(in) :: t ! Time interval over which to advance configuration
+
+    ! Guard against going back in time
+    IF ( t < 0.0 ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,f15.6)' ) 'Negative time step', t
+       STOP 'Error in md_nve_hs/advance'
+    END IF
+    
+    t_now      = t_now + t                 ! Advance current time by t
+    coltime(:) = coltime(:) - t            ! Reduce times to next collision by t
+    r(:,:)     = r(:,:) + t * v(:,:) / box ! Advance all positions by t (box=1 units)
+    r(:,:)     = r(:,:) - ANINT ( r(:,:) ) ! Apply periodic boundaries
+
+  END SUBROUTINE advance
 
   SUBROUTINE calculate
     IMPLICIT NONE
@@ -164,6 +199,8 @@ CONTAINS
 
     TYPE(variable_type) :: coll_rate, p_coll
     REAL                :: vol, rho
+
+    LOGICAL, SAVE :: first_call = .TRUE.
 
     ! Preliminary calculations
     vol = box**3        ! Volume
@@ -177,16 +214,28 @@ CONTAINS
     ! The %nam and some other components need only be defined once, at the start of the program,
     ! but for clarity and readability we assign all the values together below
 
-    ! Collision rate per particle
-    coll_rate = variable_type ( nam = 'Collision rate', val = 2.0*REAL(ncoll)/t/REAL(n) )
+    IF ( first_call ) THEN
 
-    ! Collisional pressure
-    ! ideal + collisional virial / volume
-    p_coll = variable_type ( nam = 'P', val = rho*temp_kinet + vir_sum/t/vol )
+       coll_rate  = variable_type ( nam = 'Collision rate', val = 0.0 )
+       p_coll     = variable_type ( nam = 'P', val = 0.0 )
+       first_call = .FALSE.
+
+    ELSE
+
+       ! Collision rate per particle
+       ! We average over the time step
+       coll_rate = variable_type ( nam = 'Collision rate', val = 2.0*REAL(col_sum)/dt/REAL(n) )
+
+       ! Collisional pressure
+       ! ideal + collisional virial / volume averaged over the time step
+       p_coll = variable_type ( nam = 'P', val = rho*temp_kinet + vir_sum/dt/vol )
+
+    END IF
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time
     variables = [ coll_rate, p_coll ]
+
   END SUBROUTINE calculate
 
 END PROGRAM md_nve_hs

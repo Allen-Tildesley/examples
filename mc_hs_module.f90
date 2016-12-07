@@ -6,13 +6,16 @@ MODULE mc_module
 
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: n, r
+
+  ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: overlap_1, overlap, n_overlap
 
-  INTEGER                             :: n ! Number of atoms
-  REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! Positions (3,n)
+  ! Public data
+  INTEGER,                             PUBLIC :: n ! Number of atoms
+  REAL,   DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! Positions (3,n)
 
+  ! Private data
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! j-range options
 
 CONTAINS
@@ -24,7 +27,7 @@ CONTAINS
     WRITE ( unit=output_unit, fmt='(a)' ) 'Energy, kT = 1'   
 
   END SUBROUTINE introduction
-  
+
   SUBROUTINE conclusion
 
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
@@ -192,9 +195,9 @@ CONTAINS
        IF ( i == j ) CYCLE ! Skip self
 
        rij(:) = ri(:) - r(:,j)
-       rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units
+       rij(:) = rij(:) - ANINT ( rij(:) ) ! Periodic boundaries in box=1 units
        rij_sq = SUM ( rij**2 )
-       rij_sq = rij_sq * box_sq ! now in sigma=1 units
+       rij_sq = rij_sq * box_sq ! Now in sigma=1 units
 
        IF ( rij_sq < 1.0 ) n_overlap = n_overlap + 1
 

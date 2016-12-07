@@ -53,7 +53,7 @@ PROGRAM mc_nvt_hs
 
   ! Set sensible default run parameters for testing
   nblock  = 10
-  nstep   = 1000
+  nstep   = 10000
   dr_max  = 0.15
   eps_box = 0.005
 

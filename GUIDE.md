@@ -270,6 +270,40 @@ are in good agreement with the above papers.
 * Although the link-list program seems to be working fine, it might be worth double-checking
 the logic in the force routine, as it is a bit fiddly.
 
+##Hard-particle programs
+The programs `mc_nvt_hs` and `md_nve_hs` illustrate, respectively,
+the simplest MC and MD methods for the basic hard-sphere model.
+The temperature is not important in the first case: a factor _kT_ is used to normalize the energies.
+The energy, in the second case, is identical with the (exactly conserved) kinetic energy,
+and hence closely related to the temperature.
+Equations of state for this model have been reported many times.
+Here we refer to some fairly recent, useful, sources of data and/or fitted equations
+
+* H Hansen-Goos, _J Chem Phys,_ __144,__ 164506 (2016)
+* MN Bannerman, L Lue, LV Woodcock, _J Chem Phys,_ __132,__ 084507 (2010)
+* J Kolafa, S Labik, A Malijevsky, _Phys Chem Chem Phys,_ __6,__ 2335 (2004)
+
+The paper of Kolafa et al (2004) is particularly careful to discuss corrections
+due to different ensembles and system size. Here we just present the raw results
+for a small system, _N_=256; programs are run with default parameters.
+Starting configurations may be prepared using `build_initialize/initialize` in
+the usual way.
+The EOS is taken from the Hansen-Goos (2016) paper, and a program to evaluate it
+may be found in `eos_hs.f90`.
+
+&rho; | _P_ (EOS) | _P_ (MC) | _P_ (MD)
+----- | -----     | -----    | -----
+0.75  | 4.9910    | 4.960(7) | 4.985(4)
+0.70  | 4.0087    | 3.996(8) | 4.005(3)
+0.65  | 3.2171    | 3.210(8) | 3.215(2)
+0.60  | 2.5769    | 2.573(4) | 2.573(1)
+0.55  | 2.0574    | 2.051(3) | 2.055(1)
+0.50  | 1.6347    | 1.634(2) | 1.632(1)
+
+We must remember that _P_ is calculated by a box-scaling method in the MC simulation,
+which may introduce a small systematic error. This can be reduced by reducing the
+scaling factor, at the expense of worsening the statistics.
+
 ##Chain simulation programs
 The program `mc_chain_nvt_cbmc_lj` simulates a single Lennard-Jones chain,
 where the atoms are linked by harmonic springs.
