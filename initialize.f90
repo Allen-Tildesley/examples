@@ -7,10 +7,8 @@ PROGRAM initialize
   USE config_io_module,  ONLY : write_cnf_atoms, write_cnf_mols
   USE maths_module,      ONLY : lowercase
   USE initialize_module, ONLY : allocate_arrays, deallocate_arrays, &
-       &                        initialize_positions_lattice, initialize_orientations_lattice, &
-       &                        initialize_positions_random,  initialize_orientations_random, &
+       &                        initialize_lattice, initialize_random, initialize_velocities, &
        &                        initialize_chain_lattice, initialize_chain_random, initialize_chain_velocities, &
-       &                        initialize_velocities, initialize_angular_velocities, &
        &                        n, r, e, v, w
 
   IMPLICIT NONE
@@ -19,26 +17,29 @@ PROGRAM initialize
   ! Leave namelist empty to accept supplied defaults
 
   ! Most important variables
-  INTEGER :: nc                  ! Number of fcc unit cells in each coordinate direction; n = 4*nc**3
-  REAL    :: temperature         ! Specified temperature
-  REAL    :: inertia             ! Specified moment of inertia (for linear and nonlinear molecules)
-  REAL    :: density             ! Specified number density
-  REAL    :: bond                ! Specified bond length (for chain molecules)
-  LOGICAL :: velocities          ! User option requiring velocities for MD (otherwise just positions)
-  LOGICAL :: random_positions    ! User option for random positions (otherwise on a lattice)
-  LOGICAL :: random_orientations ! User option for random orientations (otherwise on a lattice)
+  INTEGER :: nc               ! Number of fcc unit cells in each coordinate direction; n = 4*nc**3
+  REAL    :: temperature      ! Specified temperature
+  REAL    :: inertia          ! Specified moment of inertia (for linear and nonlinear molecules)
+  REAL    :: density          ! Specified number density
+  LOGICAL :: velocities       ! User option requiring velocities for MD (otherwise just positions)
+  LOGICAL :: random_positions ! User option for random positions (otherwise on a lattice)
+  REAL    :: length           ! Spherocylinder length
+  REAL    :: box              ! Box length
+  REAL    :: bond             ! Bond length
+  LOGICAL :: soft             ! Flag for soft interactions (i.e. ignore overlaps)
 
   CHARACTER(len=10)  :: molecules       ! Character string, input, used to specify molecule_option
   INTEGER            :: molecule_option ! User option for atoms, linear, nonlinear or chain molecule
   INTEGER, PARAMETER :: atoms = 0, linear = 1, nonlinear = 2, chain = 3
 
   INTEGER            :: ioerr
-  REAL               :: box ! Deduced from N and density (for atoms, linear, and nonlinear molecules)
+
+  REAL, PARAMETER :: tol = 1.0e-6
 
   CHARACTER(len=7), PARAMETER :: filename = 'cnf.inp' ! Will be used as an input file by later simulations
 
-  NAMELIST /nml/ nc, n, temperature, inertia, density, bond, &
-       &         velocities, molecules, random_positions, random_orientations
+  NAMELIST /nml/ nc, n, temperature, inertia, density, bond, length, &
+       &         velocities, molecules, random_positions, soft
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'initialize'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Sets up initial configuration file for various simulations'
@@ -54,10 +55,11 @@ PROGRAM initialize
   inertia             = 1.0     ! Only relevant for linear and nonlinear molecules
   density             = 0.75    ! Should lie in the liquid region for temperature > 0.9 or so
   bond                = 1.0     ! Only relevant for chains
+  length              = 0.0     ! By default, atoms are spherical
   velocities          = .FALSE. ! By default, produce positions only, for MC simulations
   molecules           = 'atoms' ! Options are 'atoms', 'chain', 'linear', 'nonlinear'
-  random_positions    = .FALSE. ! By default, arrange atoms on a lattice
-  random_orientations = .FALSE. ! By default, use predetermined molecular orientations
+  random_positions    = .FALSE. ! By default, arrange atoms on a lattice with predetermined orientations
+  soft                = .FALSE. ! By default, check for overlaps when placing molecules
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -92,11 +94,16 @@ PROGRAM initialize
 
   ! Use molecules string to deduce molecule_option
   molecules = lowercase(molecules)
-  
+
   IF ( INDEX ( molecules, 'chain' ) /= 0 ) THEN
 
      molecule_option = chain
      WRITE ( unit=output_unit, fmt='(a)' ) 'Chain of atoms, no periodic boundaries'
+     IF ( ABS(length) > tol ) THEN
+        WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'Warning, length = ', length
+        WRITE ( unit=output_unit, fmt='(a)' ) 'Resetting to zero'
+        length = 0.0
+     END IF
 
   ELSE IF ( INDEX ( molecules, 'nonlinear' ) /= 0 ) THEN
 
@@ -108,10 +115,19 @@ PROGRAM initialize
      molecule_option = linear
      WRITE ( unit=output_unit, fmt='(a)' ) 'Linear molecules, periodic boundaries'
 
+     IF ( ABS(length) < tol ) THEN
+        WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'Warning, length = ', length
+     END IF
+
   ELSE IF ( INDEX ( molecules, 'atoms') /= 0 ) THEN
 
      molecule_option = atoms
      WRITE ( unit=output_unit, fmt='(a)' ) 'Atoms, periodic boundaries'
+     IF ( ABS(length) > tol ) THEN
+        WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'Warning, length = ', length
+        WRITE ( unit=output_unit, fmt='(a)' ) 'Resetting to zero'
+        length = 0.0
+     END IF
 
   ELSE
 
@@ -124,49 +140,41 @@ PROGRAM initialize
   CALL allocate_arrays ( quaternions = ( molecule_option == nonlinear ) )
 
   ! Initialize positions and optionally velocities
+
+  IF ( soft ) WRITE ( unit=output_unit, fmt='(a)' ) 'Soft option selected - no overlap checking'
   
-  SELECT CASE ( molecule_option)
+  SELECT CASE ( molecule_option )
 
   CASE ( chain )
 
      IF ( random_positions ) THEN
-        CALL initialize_chain_random ! Random with unit bond length
+        CALL initialize_chain_random ( bond, soft ) ! Random with chosen bond length
      ELSE
-        CALL initialize_chain_lattice ! On a lattice with unit bond length
+        CALL initialize_chain_lattice ( bond, soft ) ! On a lattice with chosen bond length
      END IF
 
      IF ( velocities ) CALL initialize_chain_velocities ( temperature )
 
   CASE default
 
+     ! Periodic boundaries apply
+     ! Box length is deduced from density
+     box = ( REAL(n) / density ) ** ( 1.0/3.0 )
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',    density
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Box length', box
+
      IF ( random_positions ) THEN
-        CALL initialize_positions_random ! Random within unit box
+        CALL initialize_random ( box, length, soft ) ! Random within box
      ELSE
-        CALL initialize_positions_lattice ! On a lattice within unit box
+        CALL initialize_lattice ( box, length, soft ) ! On a lattice within box
      END IF
 
-     IF ( velocities ) CALL initialize_velocities ( temperature )
-
-  END SELECT
-
-  ! For linear and nonlinear molecules, initialize orientations and optionally angular velocities
-  
-  SELECT CASE ( molecule_option )
-
-  CASE ( linear, nonlinear )
-
-     IF ( random_orientations ) THEN
-        CALL initialize_orientations_random
-     ELSE
-        CALL initialize_orientations_lattice
-     END IF
-
-     IF ( velocities ) CALL initialize_angular_velocities ( temperature, inertia )
+     IF ( velocities ) CALL initialize_velocities ( temperature, inertia )
 
   END SELECT
 
   ! Write out configuration
-  
+
   WRITE ( unit=output_unit, fmt='(a,a)' ) 'Writing configuration to filename ', filename
 
   SELECT CASE ( molecule_option )
@@ -174,13 +182,10 @@ PROGRAM initialize
   CASE ( atoms )
 
      ! Write out coordinates in same units as box
-     box = ( REAL(n) / density ) ** ( 1.0/3.0 )
-     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',    density
-     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Box length', box
      IF ( velocities ) THEN
-        CALL write_cnf_atoms ( filename, n, box, box*r, v )
+        CALL write_cnf_atoms ( filename, n, box, r, v )
      ELSE
-        CALL write_cnf_atoms ( filename, n, box, box*r )
+        CALL write_cnf_atoms ( filename, n, box, r )
      END IF
 
   CASE ( chain )
@@ -189,21 +194,18 @@ PROGRAM initialize
      ! Instead, use "box" variable to store bond length
      WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Bond length', bond
      IF ( velocities ) THEN
-        CALL write_cnf_atoms ( filename, n, bond, bond*r, v )
+        CALL write_cnf_atoms ( filename, n, bond, r, v )
      ELSE
-        CALL write_cnf_atoms ( filename, n, bond, bond*r )
+        CALL write_cnf_atoms ( filename, n, bond, r )
      END IF
 
   CASE ( linear, nonlinear )
 
      ! Write out coordinates in same units as box
-     box = ( REAL(n) / density ) ** ( 1.0/3.0 )
-     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',    density
-     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Box length', box
      IF ( velocities ) THEN
-        CALL write_cnf_mols ( filename, n, box, box*r, e, v, w )
+        CALL write_cnf_mols ( filename, n, box, r, e, v, w )
      ELSE
-        CALL write_cnf_mols ( filename, n, box, box*r, e )
+        CALL write_cnf_mols ( filename, n, box, r, e )
      END IF
 
   END SELECT

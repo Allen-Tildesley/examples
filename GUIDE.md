@@ -286,23 +286,100 @@ Here we refer to some fairly recent, useful, sources of data and/or fitted equat
 The paper of Kolafa et al (2004) is particularly careful to discuss corrections
 due to different ensembles and system size. Here we just present the raw results
 for a small system, _N_=256; programs are run with default parameters.
-Starting configurations may be prepared using `build_initialize/initialize` in
+Starting fcc lattice configurations may be prepared using `build_initialize/initialize` in
 the usual way.
 The EOS is taken from the Hansen-Goos (2016) paper, and a program to evaluate it
 may be found in `eos_hs.f90`.
 
-&rho; | _P_ (EOS) | _P_ (MC) | _P_ (MD)
------ | -----     | -----    | -----
-0.75  | 4.9910    | 4.960(7) | 4.985(4)
-0.70  | 4.0087    | 3.996(8) | 4.005(3)
-0.65  | 3.2171    | 3.210(8) | 3.215(2)
-0.60  | 2.5769    | 2.573(4) | 2.573(1)
-0.55  | 2.0574    | 2.051(3) | 2.055(1)
-0.50  | 1.6347    | 1.634(2) | 1.632(1)
+&rho; | _P_ (EOS) | _P_ `mc_nvt_hs`| _P_ `md_nve_hs` | &rho; `mc_npt_hs`
+----- | -----     | -----    | ----- | -----
+0.75  | 4.9910    | 4.960(7) | 4.985(4) | 0.749(2)
+0.70  | 4.0087    | 3.996(8) | 4.005(3) | 0.700(2)
+0.65  | 3.2171    | 3.210(8) | 3.215(2) | 0.651(3)
+0.60  | 2.5769    | 2.573(4) | 2.573(1) | 0.600(3)
+0.55  | 2.0574    | 2.051(3) | 2.055(1) | 0.553(3)
+0.50  | 1.6347    | 1.634(2) | 1.632(1) | 0.502(2)
 
-We must remember that _P_ is calculated by a box-scaling method in the MC simulation,
+We must remember that _P_ is calculated by a box-scaling method in the NVT simulation,
 which may introduce a small systematic error. This can be reduced by reducing the
 scaling factor, at the expense of worsening the statistics.
+We also provide a program `mc_npt_hs` to illustrate the constant-_NPT_ method.
+For the averages of &rho; reported above, the input pressure was that given by
+the corresponding EOS entry.
+With default parameters, volume move acceptance ratio was nearly 5% at the highest pressure,
+and around 11% at the lowest pressure studied here.
+
+We also provide two programs to simulate the hard spherocylinder model,
+of cylinder length _L_ and diameter _D_:
+`mc_npt_sc` and `mc_nvt_sc`.
+In preparing configurations for these programs,
+one must not allow overlap between the hard particles.
+A simple approach is to
+run `build_initialize/initialize` with `molecules="linear", random_positions=.t.`,
+and to request a very low density.
+For the default `length=5` spherocylinders,
+(_L_=5, _D_=1) a value of `density=0.05` is suitable.
+Then,
+the constant-pressure program may be used to compress the system slowly to higher density.
+This is a fairly slow process,
+requiring the density and nematic order parameter to be carefully monitored.
+Once suitable high-density state points have been prepared,
+a configuration at a precisely specified density, for use in the constant-volume program,
+may be obtained by a small expansion (using `adjust_density`).
+
+For testing we use `N=256`;
+such a small system is not recommended for serious work,
+but allows us to explore up to &rho;=0.148
+(box length 12_D_, twice the interaction range of 6_D_)
+which is more than sufficient for our purposes.
+Equations of state from MC simulations are presented in two papers
+
+* SC McGrother, DC Williamson, G Jackson, _J Chem Phys,_ __104,__ 6755 (1996)
+* PG Bolhuis, D Frenkel, _J Chem Phys,_ __106,__ 666 (1997)
+
+In making comparisons, care must be taken with the units.
+McGrother et al (1996) quote
+densities in the form of the packing fraction &eta;=&rho; _v_<sub>mol</sub>
+and pressures as _P_ _v_<sub>mol</sub>.
+We translate selected values from their Table V into our reduced units based on _D_=1 below;
+for _L/D_=5, _v_<sub>mol</sub>=4.4506.
+(Bolhuis and Frenkel (1997) define reduced densities relative to
+the density of closest packing of spherocylinders,
+while reporting pressures the same way as McGrother et al.)
+
+_P_ _v_<sub>mol</sub> | &rho; _v_<sub>mol</sub> | _P_ | &rho; | _S_ | &rho; | _S_ | _P_ | _S_
+----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | -----
+McGrother | McGrother | McGrother | McGrother | McGrother | `mc_npt_sc` | `mc_npt_sc` | `mc_nvt_sc` | `mc_nvt_sc`
+2.53 | 0.310 | 0.568 | 0.070 | 0.041 | 0.0698(2) | 0.081(7) | 0.579(2) | 0.073(6)
+3.63 | 0.352 | 0.816 | 0.079 | 0.053 | 0.0799(2) | 0.098(6) | 0.810(3) | 0.098(6)
+4.89 | 0.397 | 1.099 | 0.089 | 0.136 | 0.0895(2) | 0.25(1)  | 1.126(5) | 0.23(1)
+5.05 | 0.400 | 1.135 | 0.090 | 0.170 | 0.0903(2) | 0.32(3)  | 1.136(3) | 0.149(7) &Dagger;
+5.05 | 0.400 | 1.135 | 0.090 | 0.170 | 0.0923(3) | 0.502(7) | 1.061(3) | 0.592(8) &Dagger;
+5.40 | 0.419 | 1.213 | 0.094 | 0.574 | 0.0966(3) | 0.764(6) | 1.193(6) | 0.596(3)
+5.80 | 0.436 | 1.303 | 0.098 | 0.714 | 0.0984(2) | 0.783(8) | 1.325(6) | 0.751(6)
+6.20 | 0.448 | 1.393 | 0.101 | 0.754 | 0.1021(3) | 0.839(3) | 1.406(6) | 0.795(4)
+
+The `mc_npt_sc` runs use pressures from column 3 above;
+the `mc_nvt_sc` runs are at densities taken from column 4.
+At the highest pressure, using default parameters,
+move acceptance ratio was around 30%,
+and volume acceptance ratio around 10%.
+These values rose to 50% and 15% respectively at the lowest pressure.
+Several successive runs (10 blocks of 10000 steps each)
+were undertaken for state points
+near the isotropic-nematic transition,
+where very slow evolution of the nematic order parameter could be observed.
+Considerable sluggishness is expected around this transition,
+giving irreproducible results, an example indicated by &Dagger; in the table.
+Much longer runs are needed to achieve consistency!
+Also the system size is about 25% that used by McGrother,
+which has a direct effect on the measured nematic order parameter.
+With these caveats in mind,
+which apply mainly to the middle three state points in the table,
+agreement between the two programs, and with the results of McGrother,
+is reasonable.
+
+* Perhaps we should increase the default number of steps in the programs and/or increase the system size
 
 ##Chain simulation programs
 The program `mc_chain_nvt_cbmc_lj` simulates a single Lennard-Jones chain,

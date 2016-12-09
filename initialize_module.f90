@@ -9,27 +9,26 @@ MODULE initialize_module
 
   ! Public routines
   PUBLIC :: allocate_arrays, deallocate_arrays
-  PUBLIC :: initialize_positions_lattice, initialize_orientations_lattice
-  PUBLIC :: initialize_positions_random, initialize_orientations_random
-  PUBLIC :: initialize_velocities, initialize_angular_velocities
+  PUBLIC :: initialize_lattice, initialize_random, initialize_velocities
   PUBLIC :: initialize_chain_lattice, initialize_chain_random, initialize_chain_velocities
 
   ! Public data
-  INTEGER,                           PUBLIC :: n ! Number of atoms
-  REAL, DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! Positions (3,n)
-  REAL, DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v ! Velocities (3,n)
-  REAL, DIMENSION(:,:), ALLOCATABLE, PUBLIC :: e ! Orientations (3,n) or (0:3,n)
-  REAL, DIMENSION(:,:), ALLOCATABLE, PUBLIC :: w ! Angular velocities (3,n)
+  INTEGER,                           PUBLIC :: n      ! Number of atoms
+  REAL, DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r      ! Positions (3,n)
+  REAL, DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v      ! Velocities (3,n)
+  REAL, DIMENSION(:,:), ALLOCATABLE, PUBLIC :: e      ! Orientations (3,n) or (0:3,n)
+  REAL, DIMENSION(:,:), ALLOCATABLE, PUBLIC :: w      ! Angular velocities (3,n)
 
   ! Private data
-  LOGICAL, DIMENSION(:), ALLOCATABLE :: move, moved
+  INTEGER, PARAMETER :: iter_max = 10000 ! Max random placement iterations
   
 CONTAINS
 
   SUBROUTINE allocate_arrays ( quaternions )
+    IMPLICIT NONE
     LOGICAL, INTENT(in) :: quaternions
 
-    ALLOCATE ( r(3,n), v(3,n), w(3,n), move(n), moved(n) )
+    ALLOCATE ( r(3,n), v(3,n), w(3,n) )
 
     IF ( quaternions ) THEN
        ALLOCATE ( e(0:3,n) )
@@ -40,16 +39,22 @@ CONTAINS
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
+    IMPLICIT NONE
 
-    DEALLOCATE ( r, v, w, e, move, moved )
+    DEALLOCATE ( r, v, w, e )
 
   END SUBROUTINE deallocate_arrays
 
-  SUBROUTINE initialize_positions_lattice
+  SUBROUTINE initialize_lattice ( box, length, soft )
+    IMPLICIT NONE
+    REAL,    INTENT(in) :: box    ! Simulation box length
+    REAL,    INTENT(in) :: length ! Molecule length
+    LOGICAL, INTENT(in) :: soft   ! Flag for soft interactions (no overlap check)
 
     ! Sets up the fcc lattice: four molecules per unit cell
-    ! Initially, employ a unit cell of unit length
-    ! Afterwards, rescale into simulation box of unit length centred at the origin
+    ! For atoms, for which length=0.0, the e-coordinates will be ignored
+    ! For linear molecules, the orientations comply with the alpha-fcc pattern
+    ! For nonlinear molecules, the 0-element is set to zero
 
     REAL, DIMENSION(3,4), PARAMETER :: r_fcc = RESHAPE ( [ &
          & 0.25, 0.25, 0.25, &
@@ -57,26 +62,27 @@ CONTAINS
          & 0.75, 0.75, 0.25, &
          & 0.75, 0.25, 0.75 ], [3,4] ) ! Positions in unit cell
 
-    REAL, DIMENSION(3) :: r_cm
-    INTEGER            :: nc, ix, iy, iz, a, i
+    REAL, DIMENSION(3,4), PARAMETER :: e_fcc = RESHAPE ( SQRT(1.0/3.0) * [ &
+         &  1.0,  1.0,  1.0,  &
+         &  1.0, -1.0, -1.0,  &
+         & -1.0,  1.0, -1.0,  &
+         & -1.0, -1.0,  1.0  ], [3,4] ) ! Orientations in unit cell
 
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Close-packed lattice positions'
+    REAL    :: cell, box2
+    INTEGER :: nc, ix, iy, iz, a, i
+
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Close-packed fcc lattice positions'
 
     nc = NINT ( REAL(n/4) ** (1.0/3.0) )
     IF ( n /= 4 * nc ** 3 ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'n, nc mismatch ', n, 4 * nc ** 3
-       STOP 'Error in initialize_positions_lattice'
+       STOP 'Error in initialize_lattice'
     END IF
 
-    IF ( .NOT. ALLOCATED ( r ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
-       STOP 'Error in initialize_positions_lattice'
-    END IF
+    cell = box / REAL(nc) ! Unit cell
+    box2 = box / 2.0      ! Half box length
 
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of r', SHAPE(r), 3, n
-       STOP 'Error in initialize_positions_lattice'
-    END IF
+    IF ( LBOUND(e,dim=1) == 0 ) e(0,:) = 0.0 ! For quaternions
 
     i = 0
 
@@ -87,7 +93,16 @@ CONTAINS
 
              DO a = 1, 4 ! Begin loop over atoms in unit cell
                 i = i + 1
-                r(:,i) = r_fcc(:,a) + REAL ( [ ix, iy, iz ] )
+                r(1:3,i) = r_fcc(:,a) + REAL ( [ ix, iy, iz ] ) ! In range 0 .. real(nc)
+                r(1:3,i) = r(1:3,i) * cell                      ! In range 0 .. box
+                r(1:3,i) = r(1:3,i) - box2                      ! In range -box/2 .. box/2
+                e(1:3,i) = e_fcc(:,a)
+                IF ( .NOT. soft ) THEN
+                   IF ( overlap ( i, 1, i-1, box, length ) ) THEN
+                      WRITE ( unit=error_unit, fmt='(a)' ) 'Density too high'
+                      STOP 'Error in initialize_lattice'
+                   END IF
+                END IF
              END DO ! End loop over atoms in unit cell
 
           END DO
@@ -95,181 +110,59 @@ CONTAINS
     END DO
     ! End triple loop over unit cell indices
 
-    r(:,:)  = r(:,:)  / REAL ( nc )                         ! Scale positions into unit cell
-    r_cm(:) = SUM ( r, dim=2 ) / REAL(n)                    ! Compute centre of mass position
-    r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of mass to the origin
-
-  END SUBROUTINE initialize_positions_lattice
+  END SUBROUTINE initialize_lattice
  
-  SUBROUTINE initialize_positions_random
+  SUBROUTINE initialize_random ( box, length, soft )
+    USE maths_module, ONLY : random_vector, random_quaternion
+    IMPLICIT NONE
+    REAL, INTENT(in)    :: box    ! Simulation box length
+    REAL,    INTENT(in) :: length ! Molecule length
+    LOGICAL, INTENT(in) :: soft   ! Flag for soft interactions (no overlap check)
 
     ! Places atoms at random positions
     ! Unlikely to be useful, unless the interaction potential is soft
-    ! Simulation box is a unit cube centred at the origin
+    ! or the density rather low
 
-    REAL, DIMENSION(3) :: r_cm
+    INTEGER :: i, iter
 
     WRITE ( unit=output_unit, fmt='(a)' ) 'Random positions'
 
-    IF ( .NOT. ALLOCATED ( r ) ) THEN
-       WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
-       STOP 'Error in initialize_positions_random'
-    END IF
+    DO i = 1, n
 
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
-       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of r', SHAPE(r), 3, n
-       STOP 'Error in initialize_positions_random'
-    END IF
+       iter = 0
+       DO ! Loop until non-overlapping position found
 
-    CALL RANDOM_NUMBER ( r(:,:) )                           ! All in range (0,1)
-    r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL(n)               ! Compute centre of mass position
-    r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of mass to the origin
-    
-  END SUBROUTINE initialize_positions_random
- 
-  SUBROUTINE initialize_orientations_lattice
+          CALL RANDOM_NUMBER ( r(:,i) )   ! All in range (0,1)
+          r(:,i) = ( r(:,i) - 0.5 ) * box ! In range -box/2 .. box/2
+          IF ( LBOUND(e,dim=1) == 0 ) THEN
+             e(:,i) = random_quaternion ( )
+          ELSE
+             e(:,i) = random_vector ( )
+          END IF
 
-    ! Sets up the alpha-fcc lattice (4 per unit cell) for linear molecules
-    ! Sets up perfectly aligned configuration for nonlinear molecules
+          IF ( soft ) EXIT ! No overlap test
+          IF ( .NOT. overlap ( i, 1, i-1, box, length ) ) EXIT
+          
+          iter = iter + 1
+          IF ( iter > iter_max ) THEN
+             WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Too many iterations ', iter, iter_max
+             STOP 'Error in initialize_random'
+          END IF
+       END DO ! End loop until non-overlapping position found
 
-    REAL, DIMENSION(3,4), PARAMETER :: e_fcc = RESHAPE ( SQRT(1.0/3.0) * [ &
-         &  1.0,  1.0,  1.0,  &
-         &  1.0, -1.0, -1.0,  &
-         & -1.0,  1.0, -1.0,  &
-         & -1.0, -1.0,  1.0  ], [3,4] ) ! Orientations in unit cell
+    END DO
 
-    INTEGER :: nc, k
+  END SUBROUTINE initialize_random
 
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Regular lattice of orientations'
-
-    nc = NINT ( REAL(n/4) ** (1.0/3.0) )
-    IF ( n /= 4 * nc ** 3 ) THEN
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'n, nc mismatch ', n, 4 * nc ** 3
-       STOP 'Error in initialize_orientations_lattice'
-    END IF
-
-    IF ( .NOT. ALLOCATED ( e ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a)' ) 'Array e is not allocated'
-       STOP 'Error in initialize_orientations_lattice'
-    END IF
-
-    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e lower bound mismatch ', LBOUND(e,dim=1)
-       STOP 'Error in initialize_orientations_lattice'
-    END IF
-
-    IF ( UBOUND(e,dim=1) /= 3 ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e upper bound mismatch ', UBOUND(e,dim=1)
-       STOP 'Error in initialize_orientations_lattice'
-    END IF
-
-    IF ( SIZE(e,dim=2) /= n   ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array e bounds mismatch ', SIZE(e,dim=2), n
-       STOP 'Error in initialize_orientations_lattice'
-    END IF
-
-    IF ( LBOUND(e,dim=1) == 0 ) THEN
-
-       DO k = 1, n
-          e(:,k) = [1.0,0.0,0.0,0.0] ! For nonlinear molecules simply set all orientations the same
-       END DO
-
-    ELSE
-
-       DO k = 0, n-4, 4 ! Loop over unit cells (4 molecules per unit cell)
-          e(:,k+1:k+4) = e_fcc(:,1:4) ! Copy unit cell orientations
-       END DO ! End loop over unit cells
-
-    END IF
-
-  END SUBROUTINE initialize_orientations_lattice
-
-  SUBROUTINE initialize_orientations_random
-    USE maths_module, ONLY : random_quaternion, random_vector
-
-    ! Sets up random orientations for linear or nonlinear molecules
-
-    INTEGER :: i
-
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Random orientations'
-
-    IF ( .NOT. ALLOCATED ( e ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a)' ) 'Array e is not allocated'
-       STOP 'Error in initialize_orientations_random'
-    END IF
-
-    IF ( LBOUND(e,dim=1) /= 0 .AND. LBOUND(e,dim=1) /= 1 ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e lower bound mismatch ', LBOUND(e,dim=1)
-       STOP 'Error in initialize_orientations_random'
-    END IF
-
-    IF ( UBOUND(e,dim=1) /= 3 ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Array e upper bound mismatch ', UBOUND(e,dim=1)
-       STOP 'Error in initialize_orientations_random'
-    END IF
-
-    IF ( SIZE(e,dim=2) /= n   ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array e bounds mismatch ', SIZE(e,dim=2), n
-       STOP 'Error in initialize_orientations_random'
-    END IF
-
-    IF ( LBOUND(e,dim=1) == 0 ) THEN
-
-       DO i = 1, n
-          e(:,i) = random_quaternion ( )
-       END DO
-
-    ELSE
-
-       DO i = 1, n
-          e(:,i) = random_vector ( )
-       END DO
-
-    END IF
-
-  END SUBROUTINE initialize_orientations_random
-
-  SUBROUTINE initialize_velocities ( temperature )
-    USE maths_module, ONLY : random_normals
-    REAL, INTENT(in) :: temperature ! Reduced temperature
-
-    ! Chooses velocities from Maxwell-Boltzmann (Gaussian) distribution
-    ! We set the total momentum to zero afterwards
-    ! We assume unit molecular mass and employ simulation (e.g. Lennard-Jones) units
-    ! property                  units
-    ! energy                    epsilon ( = 1 )
-    ! molecular mass            m ( = 1 )
-    ! velocity v                sqrt(epsilon/m)
-    ! angular velocity w        sqrt(epsilon/m*sigma**2)
-    ! moment of inertia         m*sigma**2
-
-    REAL               :: v_rms ! Root-mean-square velocity component
-    REAL, DIMENSION(3) :: v_cm  ! Centre of mass velocity
-
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Velocities at temperature', temperature
-
-    IF ( .NOT. ALLOCATED ( v ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a)' ) 'Array v is not allocated'
-       STOP 'Error in initialize_velocities'
-    END IF
-
-    IF ( ANY ( SHAPE(v) /= [3,n] ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of v', SHAPE(v), 3, n
-       STOP 'Error in initialize_velocities'
-    END IF
-
-    v_rms = SQRT ( temperature )
-    CALL random_normals ( 0.0, v_rms, v )
-
-    v_cm(:) = SUM ( v(:,:), dim=2 ) / REAL ( n )            ! Compute centre of mass velocity
-    v(:,:)  = v(:,:) - SPREAD ( v_cm(:), dim=2, ncopies=n ) ! Set net momentum to zero
-
-  END SUBROUTINE initialize_velocities
-
-  SUBROUTINE initialize_angular_velocities ( temperature, inertia )
+  SUBROUTINE initialize_velocities ( temperature, inertia )
     USE maths_module, ONLY : random_perpendicular_vector, random_normals
+    IMPLICIT NONE
     REAL, INTENT(in) :: temperature ! Reduced temperature
     REAL, INTENT(in) :: inertia     ! Reduced moment of inertia
+
+    ! Chooses linear velocities from Maxwell-Boltzmann (Gaussian) distribution
+    ! We set the total momentum to zero
+    ! We assume unit molecular mass
 
     ! For linear molecules we choose the direction of the angular velocity
     ! randomly but perpendicular to the molecular axis.
@@ -279,31 +172,24 @@ CONTAINS
     ! from a Gaussian distribution, assuming equal moments of inertia
     ! There is no attempt to set the total angular momentum to zero
 
-    REAL    ::  w_sq, w_sq_mean, w_std_dev,  zeta
+    REAL               :: factor
+    REAL, DIMENSION(3) :: v_cm
+    REAL    ::  w_sq, w_sq_mean, w_std_dev, zeta
     INTEGER ::  i
 
-    WRITE ( unit=output_unit, fmt='(a,t40,2f15.6)' ) 'Angular velocities at temperature, inertia', temperature, inertia
+    WRITE ( unit=output_unit, fmt='(a,t40,2f15.6)' ) 'Velocities at temperature, inertia', temperature, inertia
 
-    IF ( .NOT. ALLOCATED ( w ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a)' ) 'Array w is not allocated'
-       STOP 'Error in initialize_angular_velocities'
-    END IF
+    ! Linear velocities
 
-    IF ( ANY ( SHAPE(w) /= [3,n] ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of w', SHAPE(r), 3, n
-       STOP 'Error in initialize_angular_velocities'
-    END IF
+    CALL random_normals ( 0.0, 1.0, v ) ! Unit normal random numbers
 
-    IF ( .NOT. ALLOCATED ( e ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a)' ) 'Array e is not allocated'
-       STOP 'Error in initialize_angular_velocities'
-    END IF
+    v_cm(:) = SUM ( v(:,:), dim=2 ) / REAL ( n )            ! Compute centre of mass velocity
+    v(:,:)  = v(:,:) - SPREAD ( v_cm(:), dim=2, ncopies=n ) ! Set net momentum to zero
+    factor  = SQRT ( REAL(3*n-3)*temperature / SUM (v**2) ) ! Sqrt of ratio of kinetic energies
+    v       = factor * v
 
-    IF ( SIZE(e,dim=2) /= n ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array e bounds mismatch ', SIZE(e,dim=2), n
-       STOP 'Error in initialize_angular_velocities'
-    END IF
-
+    ! Angular velocities
+    
     IF ( LBOUND(e,dim=1) == 0 ) THEN ! Nonlinear molecule, treat as spherical top
 
        w_std_dev = SQRT(temperature/inertia)
@@ -322,13 +208,16 @@ CONTAINS
 
     END IF
 
-  END SUBROUTINE initialize_angular_velocities
+  END SUBROUTINE initialize_velocities
 
-  SUBROUTINE initialize_chain_lattice
+  SUBROUTINE initialize_chain_lattice ( bond, soft )
+    IMPLICIT NONE
+    REAL,    INTENT(in) :: bond ! Chain bond length
+    LOGICAL, INTENT(in) :: soft ! Flag for soft interactions (no overlap check)
 
     ! Sets up the fcc lattice, four molecules per unit cell
     ! Unit cell is a unit cube, nearest neighbour distance is sqrt(0.5)
-    ! Results are then scaled to give unit bond length
+    ! re-scaled by a factor bond/sqrt(0.5) to give specified bond length
 
     ! The aim of the slightly complicated triple loop over unit cells
     ! with various options for atom positions within the unit cell
@@ -345,11 +234,11 @@ CONTAINS
     INTEGER, DIMENSION(4,2,2), PARAMETER :: atoms_inp = RESHAPE ( [ 1,4,2,3, 3,4,1,2, 1,2,3,4, 3,2,4,1 ], [4,2,2] )
     INTEGER, DIMENSION(4,2,2), PARAMETER :: atoms_out = RESHAPE ( [ 1,2,3,4, 4,1,3,2, 2,3,1,4, 3,4,1,2 ], [4,2,2] )
 
+    REAL, DIMENSION(3) :: r_cm
     INTEGER, DIMENSION(4)     :: atoms
-    REAL                      :: r_sq
-    REAL,    DIMENSION(3)     :: r_cm
+    REAL                      :: diff_sq, cell, box, box2, overlap_box, length
     INTEGER                   :: nc, ix, iy, iz
-    INTEGER                   :: a, i, j, x_direction, y_direction, plane_count
+    INTEGER                   :: a, i, x_direction, y_direction, plane_count
     INTEGER, DIMENSION(2)     :: istart, istop, istep
     REAL, PARAMETER           :: tol = 1.0e-9
 
@@ -361,15 +250,12 @@ CONTAINS
        STOP 'Error in initialize_chain_lattice'
     END IF
 
-    IF ( .NOT. ALLOCATED ( r ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
-       STOP 'Error in initialize_chain_lattice'
-    END IF
-
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of r', SHAPE(r), 3, n
-       STOP 'Error in initialize_chain_lattice'
-    END IF
+    ! Periodic boundaries do not apply     
+    overlap_box = REAL ( 2 * n ) * bond ! For overlap check, box length is made large enough to be irrelevant
+    cell        = bond / SQRT(0.5)      ! Unit cell size to give desired bond length
+    box         = REAL(nc) * cell       ! Box length corresponding to unit cell size
+    box2        = box / 2.0             ! Half box length
+    length      = 0.0                   ! All the atoms are spherical
 
     ! Forward and reverse options to traverse cells in xy plane
     istart = [ 1, nc ]
@@ -396,7 +282,16 @@ CONTAINS
 
              DO a = 1, 4 ! Begin loop over atoms in unit cell
                 i = i+1
-                r(:,i) = r_fcc(:,atoms(a)) + REAL ( [ ix-1, iy-1, iz-1 ] )
+                r(:,i) = r_fcc(:,atoms(a)) + REAL ( [ ix-1, iy-1, iz-1 ] ) ! In range 0 .. real(nc)
+                r(:,i) = r(:,i) * cell                                     ! In range 0 .. box
+                r(:,i) = r(:,i) - box2                                     ! In range -box/2 .. box/2
+                e(:,i) = [ 0.0, 0.0, 1.0 ]                                 ! Irrelevant, but for completeness
+                IF ( .NOT. soft ) THEN
+                   IF ( overlap ( i, 1, i-2, overlap_box, length ) ) THEN ! Check all so far except bonded neighbour
+                      WRITE ( unit=error_unit, fmt='(a)' ) 'Density too high'
+                      STOP 'Error in initialize_chain_lattice'
+                   END IF
+                END IF
              END DO ! End loop over atoms in unit cell
 
           END DO
@@ -404,66 +299,48 @@ CONTAINS
     END DO
     ! End triple loop over unit cell indices
 
-    r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL(n)               ! Compute centre of mass position
-    r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of box to the origin
-    r(:,:)  = r(:,:) / SQRT(0.5)                            ! Scale to give unit bond length
+    DO i = 1, n-1 ! Loop to confirm bond lengths
+       diff_sq = SUM ( (r(:,i)-r(:,i+1))**2 ) - bond**2
+       IF ( ABS(diff_sq) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, i+1, diff_sq
+    END DO ! End loop to confirm bond lengths
 
-    DO i = 1, n-1 ! Loop to confirm unit bond lengths
-       r_sq = SUM ( (r(:,i)-r(:,i+1))**2 )
-       IF ( ABS(r_sq-1.0) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, i+1, r_sq
-    END DO ! End loop to confirm unit bond lengths
-
-    ! Double loop to confirm no overlaps
-    DO i = 1, n-2
-       DO j = i+2, n
-          r_sq = SUM((r(:,i)-r(:,j))**2)
-          IF ( ABS(r_sq) < 1.0 - tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Overlap warning ', i, j, r_sq
-       END DO
-    END DO
-    ! End double loop to confirm no overlaps
+        r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL(n)               ! Compute centre of mass positions
+    r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of mass to the origin
 
   END SUBROUTINE initialize_chain_lattice
 
-  SUBROUTINE initialize_chain_random
+  SUBROUTINE initialize_chain_random ( bond, soft )
     USE maths_module, ONLY : random_vector
+    IMPLICIT NONE
+    REAL,    INTENT(in) :: bond ! Chain bond length
+    LOGICAL, INTENT(in) :: soft ! Flag for soft interactions (no overlap check)
 
-    ! Chooses chain positions randomly, at unit bond length, avoiding overlap
+    ! Chooses chain positions randomly, at desired bond length, avoiding overlap
 
-    REAL               :: r_sq
+    REAL               :: diff_sq, overlap_box, length
     REAL, DIMENSION(3) :: r_cm
-    INTEGER            :: i, j, iter
-    LOGICAL            :: overlap
+    INTEGER            :: i, iter
 
     REAL,    PARAMETER :: tol = 1.0e-9
-    INTEGER, PARAMETER :: iter_max = 1000
+
+    ! Periodic boundaries do not apply     
+    overlap_box = REAL ( 2 * n ) * bond ! For overlap check, box length is made large enough to be irrelevant
+    length      = 0.0                   ! All the atoms are spherical
 
     WRITE ( unit=output_unit, fmt='(a)' ) 'Chain, bonds randomly oriented, avoiding overlaps'
 
-    IF ( .NOT. ALLOCATED ( r ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a)' ) 'Array r is not allocated'
-       STOP 'Error in initialize_chain_random'
-    END IF
-    IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of r', SHAPE(r), 3, n
-       STOP 'Error in initialize_chain_random'
-    END IF
-
-    r(:,1) = [0.0,0.0,0.0]   ! First atom at origin
-    r(:,2) = random_vector() ! Second atom at random position (unit bond length away)
+    r(:,1) = [0.0,0.0,0.0]        ! First atom at origin
+    r(:,2) = bond*random_vector() ! Second atom at random position (bond length away)
 
     DO i = 3, n ! Begin loop over atom indices
 
        iter = 0
        DO ! Loop until non-overlapping position found (N must not be too large!)
-          r(:,i) = r(:,i-1) + random_vector() ! Subsequent atoms randomly placed (unit bond length)
-          overlap = .FALSE.
+          r(:,i) = r(:,i-1) + bond*random_vector() ! Subsequent atoms randomly placed (bond length away)
+          e(:,i) = [ 0.0, 0.0, 1.0 ]               ! Superfluous but for completeness
 
-          DO j = 1, i-2 ! Loop to check for overlap
-             overlap = SUM ( (r(:,i)-r(:,j))**2 ) < 1.0
-             IF ( overlap ) EXIT
-          END DO ! End loop to check for overlap
-
-          IF ( .NOT. overlap ) EXIT
+          IF ( soft ) EXIT ! No overlap test
+          IF ( .NOT. overlap ( i, 1, i-2, overlap_box, length ) ) EXIT ! Check all so far except bonded neighbour
 
           iter = iter + 1
           IF ( iter > iter_max ) THEN
@@ -478,24 +355,16 @@ CONTAINS
     r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL(n)               ! Compute centre of mass positions
     r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of mass to the origin
 
-    DO i = 1, n-1 ! Loop to confirm unit bond lengths
-       r_sq = SUM ( (r(:,i)-r(:,i+1))**2 )
-       IF ( ABS(r_sq-1.0) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, i+1, r_sq
-    END DO ! End loop to confirm unit bond lengths
-
-    ! Double loop to confirm no overlaps
-    DO i = 1, n-2
-       DO j = i+2, n
-          r_sq = SUM((r(:,i)-r(:,j))**2)
-          IF ( ABS(r_sq) < 1.0 - tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Overlap warning ', i, j, r_sq
-       END DO
-    END DO
-    ! End double loop to confirm no overlaps
+    DO i = 1, n-1 ! Loop to confirm bond lengths
+       diff_sq = SUM ( (r(:,i)-r(:,i+1))**2 ) - bond**2
+       IF ( ABS(diff_sq) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, i+1, diff_sq
+    END DO ! End loop to confirm bond lengths
 
   END SUBROUTINE initialize_chain_random
 
   SUBROUTINE initialize_chain_velocities ( temperature )
     USE maths_module, ONLY : random_normals, cross_product, solve, outer_product
+    IMPLICIT NONE
     REAL, INTENT(in) :: temperature ! reduced temperature
 
     ! Chooses velocities from Maxwell-Boltzmann (Gaussian) distribution
@@ -519,16 +388,6 @@ CONTAINS
     REAL, PARAMETER      :: tol = 1.e-6
 
     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Chain velocities at temperature', temperature
-
-    IF ( .NOT. ALLOCATED ( v ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a)' ) 'Array v is not allocated'
-       STOP 'Error in initialize_chain_velocities'
-    END IF
-
-    IF ( ANY ( SHAPE(v) /= [3,n] ) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'Error in shape of v', SHAPE(v), 3, n
-       STOP 'Error in initialize_chain_velocities'
-    END IF
 
     ! Confirm centre-of-mass is at origin
     r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL ( n ) ! Compute centre of mass
@@ -600,7 +459,10 @@ CONTAINS
     INTEGER            :: i, j, iter
     REAL,    PARAMETER :: tol = 1.0e-9
     INTEGER, PARAMETER :: iter_max = 500
+  LOGICAL, DIMENSION(:), ALLOCATABLE :: move, moved
 
+  ALLOCATE ( move(n), moved(n) )
+  
     iter     = 0
     done     = .FALSE.
     moved(:) = .TRUE.
@@ -647,6 +509,95 @@ CONTAINS
 
     END DO ! End iterative loop until done
 
+    DEALLOCATE ( move, moved )
+    
   END SUBROUTINE rattle_b
 
-END MODULE initialize_module
+  FUNCTION overlap ( i, j1, j2, box, ell )
+    IMPLICIT NONE
+    LOGICAL             :: overlap ! Returns a flag indicating overlap with any j<i
+    INTEGER, INTENT(in) :: i       ! Index of atom/molecule to be checked
+    INTEGER, INTENT(in) :: j1      ! First j index
+    INTEGER, INTENT(in) :: j2      ! Last j index
+    REAL,    INTENT(in) :: box     ! Simulation box length for PBC
+    REAL,    INTENT(in) :: ell     ! Molecule length
+
+    ! This routine checks for overlaps of atoms (ell=0) or spherocylinders (ell>0)
+
+    INTEGER            :: j
+    REAL, DIMENSION(3) :: rij
+    REAL               :: rij_sq, rei, rej, eij, sij_sq
+    REAL               :: sin_sq, ci, cj, ai, aj, di, dj, ell2
+    REAL, PARAMETER    :: tol = 1.0e-6
+
+    overlap = .FALSE.
+    IF ( j2 < j1 ) RETURN
+
+    IF ( ABS ( ell ) < tol ) THEN ! Handle spherical case separately
+
+       DO j = j1, j2
+          rij    = r(:,i) - r(:,j)
+          rij    = rij - ANINT ( rij / box ) * box
+          rij_sq = SUM ( rij**2 )
+
+          IF ( rij_sq < 1.0 ) THEN
+             overlap = .TRUE.
+             RETURN
+          END IF
+
+       END DO
+
+    ELSE ! Handle non-spherical case
+
+       ell2   = ell / 2.0    ! Half the line segment length
+
+       DO j = j1, j2
+
+          rij    = r(:,i) - r(:,j)
+          rij    = rij - ANINT ( rij / box ) * box
+          rij_sq = SUM ( rij**2 )
+          rei    = DOT_PRODUCT ( rij, e(:,i) )
+          rej    = DOT_PRODUCT ( rij, e(:,j) )
+          eij    = DOT_PRODUCT ( e(:,i), e(:,j ) )
+
+          sin_sq = 1.0 - eij**2 ! Squared sine of angle between line segments
+
+          IF ( sin_sq < tol ) THEN ! Guard against nearly-parallel lines
+             ci = -rei
+             cj =  rej
+          ELSE
+             ci = ( - rei + eij * rej ) / sin_sq
+             cj = (   rej - eij * rei ) / sin_sq
+          ENDIF
+
+          ai = ABS ( ci )
+          aj = ABS ( cj )
+          IF ( ai > ell2 ) ci = SIGN ( ell2, ci )
+          IF ( aj > ell2 ) cj = SIGN ( ell2, cj )
+
+          IF ( ai > aj ) THEN
+             cj =  rej + ci * eij
+          ELSE
+             ci = -rei + cj * eij
+          ENDIF
+
+          ai = ABS ( ci )
+          aj = ABS ( cj )
+          IF ( ai > ell2 ) ci = SIGN ( ell2, ci )
+          IF ( aj > ell2 ) cj = SIGN ( ell2, cj )
+
+          di =  2.0 * rei + ci - cj * eij
+          dj = -2.0 * rej + cj - ci * eij
+
+          sij_sq = rij_sq + ci * di + cj * dj ! Squared distance between line segments
+
+          IF ( sij_sq < 1.0 ) THEN
+             overlap = .TRUE.
+             RETURN
+          END IF
+       END DO
+    END IF
+
+  END FUNCTION overlap
+
+  END MODULE initialize_module

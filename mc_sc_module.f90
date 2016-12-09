@@ -7,44 +7,60 @@ MODULE mc_module
   IMPLICIT NONE
   PRIVATE
 
-  PUBLIC :: n, r, e
+  ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
   PUBLIC :: overlap_1, overlap, n_overlap
 
-  INTEGER                             :: n ! number of atoms
-  REAL,   DIMENSION(:,:), ALLOCATABLE :: r ! positions (3,n)
-  REAL,   DIMENSION(:,:), ALLOCATABLE :: e ! orientations (3,n)
+  ! Public data
+  INTEGER,                             PUBLIC :: n ! Number of atoms
+  REAL,   DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! Positions (3,n)
+  REAL,   DIMENSION(:,:), ALLOCATABLE, PUBLIC :: e ! Orientations (3,n)
+
+  ! Private data
+  REAL,    PARAMETER :: pi     = 4.0*atan(1.0)
+  REAL,    PARAMETER :: length = 5.0                            ! Cylinder length L (in units where D=1)
+  REAL,    PARAMETER :: vmol   = pi * ( 0.25*length + 1.0/6.0 ) ! Spherocylinder volume
 
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
 
 CONTAINS
 
   SUBROUTINE introduction
+    IMPLICIT NONE
 
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Hard spherocylinder potential'
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'  
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Energy, kT = 1'   
+    WRITE ( unit=output_unit, fmt='(a)'       ) 'Hard spherocylinder potential'
+    WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'Spherocylinder L/D ratio',    length
+    WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'Spherocylinder volume/D**3',  vmol
+    WRITE ( unit=output_unit, fmt='(a)'       ) 'Diameter, D = 1'  
+    WRITE ( unit=output_unit, fmt='(a)'       ) 'Energy, kT = 1'   
 
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion
+    IMPLICIT NONE
 
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
 
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays
+    IMPLICIT NONE
+
     ALLOCATE ( r(3,n), e(3,n) )
+
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
+    IMPLICIT NONE
+
     DEALLOCATE ( r, e )
+
   END SUBROUTINE deallocate_arrays
-  
-  FUNCTION overlap ( box, length )
+
+  FUNCTION overlap ( box )
+    IMPLICIT NONE
     LOGICAL             :: overlap ! Shows if an overlap was detected
     REAL,    INTENT(in) :: box     ! Simulation box length
-    REAL,    INTENT(in) :: length  ! Cylinder length
 
     ! Actual calculation is performed by function overlap_1
 
@@ -60,9 +76,9 @@ CONTAINS
     END IF
 
     DO i = 1, n - 1
-       IF ( overlap_1 ( r(:,i), e(:,i), i, box, length, gt ) ) THEN
+       IF ( overlap_1 ( r(:,i), e(:,i), i, box, gt ) ) THEN
           overlap = .TRUE. ! Overlap detected
-          return           ! Return immediately
+          RETURN           ! Return immediately
        END IF
     END DO
 
@@ -70,13 +86,13 @@ CONTAINS
 
   END FUNCTION overlap
 
-  FUNCTION overlap_1 ( ri, ei, i, box, length, j_range ) RESULT ( overlap )
+  FUNCTION overlap_1 ( ri, ei, i, box, j_range ) RESULT ( overlap )
+    IMPLICIT NONE
     LOGICAL                        :: overlap ! Shows if an overlap was detected
     REAL, DIMENSION(3), INTENT(in) :: ri      ! Coordinates of molecule of interest
     REAL, DIMENSION(3), INTENT(in) :: ei      ! Orientation (vector) of molecule of interest
     INTEGER,            INTENT(in) :: i       ! Index of molecule of interest
     REAL,               INTENT(in) :: box     ! Simulation box length
-    REAL,               INTENT(in) :: length  ! Cylinder length
     INTEGER, OPTIONAL,  INTENT(in) :: j_range ! Optional partner index range
 
     ! Detects overlap of molecule in ri/ei
@@ -114,29 +130,35 @@ CONTAINS
        j2 = n
     END IF
 
-    box_sq       = box**2
-    range        = 1.0 + length         ! centre-centre interaction range
-    range_box_sq = ( range / box ) ** 2 ! squared range in box=1 units
+    range = 1.0 + length ! Centre-centre interaction range (D=1 units)
+
+    IF ( range > 0.5*box ) THEN ! Check for box being too small
+       WRITE ( unit=error_unit, fmt='(a,2f15.6)' ) 'Box too small', box, range
+       STOP 'Error in overlap_1'
+    END IF
+
+    range_box_sq = ( range / box ) ** 2 ! Squared range in box=1 units
+    box_sq       = box**2               ! Squared box length
 
     DO j = j1, j2 ! Loop over selected range of partners
 
-       IF ( i == j ) CYCLE
+       IF ( i == j ) CYCLE ! Skip self
 
        rij(:) = ri(:) - r(:,j)
-       rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units
+       rij(:) = rij(:) - ANINT ( rij(:) ) ! Periodic boundaries in box=1 units
        rij_sq = SUM ( rij**2 )
        IF ( rij_sq > range_box_sq ) CYCLE ! No possibility of overlap
 
-       rij_sq = rij_sq * box_sq ! now in sigma=1 units
-       rij    = rij    * box    ! now in sigma=1 units
+       rij_sq = rij_sq * box_sq ! Now in D=1 units
+       rij    = rij    * box    ! Now in D=1 units
        rei = DOT_PRODUCT ( rij, ei     )
        rej = DOT_PRODUCT ( rij, e(:,j) )
        eij = DOT_PRODUCT ( ei,  e(:,j) )
 
-       sij_sq = sc_dist_sq ( rij_sq, rei, rej, eij, length )
+       sij_sq = dist_sq ( rij_sq, rei, rej, eij, length ) ! Squared distance between line segments
        IF ( sij_sq < 1.0 ) THEN
           overlap = .TRUE. ! Overlap detected
-          return           ! Return immediately
+          RETURN           ! Return immediately
        END IF
 
     END DO ! End loop over selected range of partners
@@ -145,10 +167,10 @@ CONTAINS
 
   END FUNCTION overlap_1
 
-  FUNCTION n_overlap ( box, length )
+  FUNCTION n_overlap ( box )
+    IMPLICIT NONE
     INTEGER             :: n_overlap ! Returns number of overlaps
-    REAL,    INTENT(in) :: box       ! simulation box length
-    REAL,    INTENT(in) :: length    ! cylinder length
+    REAL,    INTENT(in) :: box       ! Simulation box length
 
     ! This routine is used in the calculation of pressure
     ! Actual calculation is performed by function n_overlap_1
@@ -167,18 +189,18 @@ CONTAINS
     n_overlap  = 0
 
     DO i = 1, n - 1
-       n_overlap = n_overlap + n_overlap_1 ( r(:,i), e(:,i), i, box, length, gt )
+       n_overlap = n_overlap + n_overlap_1 ( r(:,i), e(:,i), i, box, gt )
     END DO
 
   END FUNCTION n_overlap
 
-  FUNCTION n_overlap_1 ( ri, ei, i, box, length, j_range ) RESULT ( n_overlap )
+  FUNCTION n_overlap_1 ( ri, ei, i, box, j_range ) RESULT ( n_overlap )
+    IMPLICIT NONE
     INTEGER                        :: n_overlap ! Returns number of overlaps
     REAL, DIMENSION(3), INTENT(in) :: ri        ! Coordinates of molecule of interest
     REAL, DIMENSION(3), INTENT(in) :: ei        ! Orientation (vector) of molecule of interest
     INTEGER,            INTENT(in) :: i         ! Index of molecule of interest
     REAL,               INTENT(in) :: box       ! Simulation box length
-    REAL,               INTENT(in) :: length    ! Cylinder length
     INTEGER, OPTIONAL,  INTENT(in) :: j_range   ! Optional partner index range
 
     ! Counts overlaps of molecule in ri/ei
@@ -217,9 +239,15 @@ CONTAINS
        j2 = n
     END IF
 
-    box_sq       = box**2
-    range        = 1.0 + length         ! centre-centre interaction range
-    range_box_sq = ( range / box ) ** 2 ! squared range in box=1 units
+    range = 1.0 + length ! Centre-centre interaction range (D=1 units)
+
+    IF ( range > 0.5*box ) THEN ! Check for box being too small
+       WRITE ( unit=error_unit, fmt='(a,2f15.6)' ) 'Box too small', box, range
+       STOP 'Error in n_overlap_1'
+    END IF
+
+    range_box_sq = ( range / box ) ** 2 ! Squared range in box=1 units
+    box_sq       = box**2               ! Squared box length
 
     n_overlap = 0
 
@@ -228,17 +256,17 @@ CONTAINS
        IF ( i == j ) CYCLE
 
        rij(:) = ri(:) - r(:,j)
-       rij(:) = rij(:) - ANINT ( rij(:) ) ! periodic boundaries in box=1 units
+       rij(:) = rij(:) - ANINT ( rij(:) ) ! Periodic boundaries in box=1 units
        rij_sq = SUM ( rij**2 )
-       IF ( rij_sq > range_box_sq ) CYCLE
+       IF ( rij_sq > range_box_sq ) CYCLE ! No possibility of overlap
 
-       rij_sq = rij_sq * box_sq ! now in sigma=1 units
-       rij    = rij    * box    ! now in sigma=1 units
+       rij_sq = rij_sq * box_sq ! Now in D=1 units
+       rij    = rij    * box    ! Now in D=1 units
        rei = DOT_PRODUCT ( rij, ei     )
        rej = DOT_PRODUCT ( rij, e(:,j) )
        eij = DOT_PRODUCT ( ei,  e(:,j) )
 
-       sij_sq = sc_dist_sq ( rij_sq, rei, rej, eij, length )
+       sij_sq = dist_sq ( rij_sq, rei, rej, eij, length ) ! Squared distance between line segments
 
        IF ( sij_sq < 1.0 ) n_overlap = n_overlap + 1
 
@@ -246,39 +274,50 @@ CONTAINS
 
   END FUNCTION n_overlap_1
 
-  FUNCTION sc_dist_sq ( rij_sq, rei, rej, eij, length ) RESULT ( sij_sq )
-    REAL             :: sij_sq                        ! squared distance between line segments
-    REAL, INTENT(in) :: rij_sq, rei, rej, eij, length ! geometric parameters
+  FUNCTION dist_sq ( rij_sq, rei, rej, eij, ell ) RESULT ( sij_sq )
+    IMPLICIT NONE
+    REAL             :: sij_sq ! Returns squared distance between line segments
+    REAL, INTENT(in) :: rij_sq ! Squared centre-centre distance
+    REAL, INTENT(in) :: rei    ! Scalar product rij.ei where ei is unit vector along i
+    REAL, INTENT(in) :: rej    ! Scalar product rij.ej where ej is unit vector along j
+    REAL, INTENT(in) :: eij    ! Scalar product ei.ej
+    REAL, INTENT(in) :: ell    ! Line segment length
 
-    REAL            :: sin_sq, ci, cj, ai, aj, di, dj, length2
-    REAL, PARAMETER :: tol = 0.000001
+    REAL            :: sin_sq, ci, cj, ai, aj, di, dj, ell2
+    REAL, PARAMETER :: tol = 1.e-6
 
-    sin_sq  = 1.0 - eij**2
-    length2 = length
+    sin_sq = 1.0 - eij**2 ! Squared sine of angle between line segments
+    ell2   = ell / 2.0    ! Half the line segment length
 
-    IF ( sin_sq < tol ) THEN
+    IF ( sin_sq < tol ) THEN ! Guard against nearly-parallel lines
        ci = -rei
        cj =  rej
     ELSE
        ci = ( - rei + eij * rej ) / sin_sq
        cj = (   rej - eij * rei ) / sin_sq
     ENDIF
+
     ai = ABS ( ci )
     aj = ABS ( cj )
-    IF ( ai > length2 ) ci = SIGN ( length2, ci )
-    IF ( aj > length2 ) cj = SIGN ( length2, cj )
+    IF ( ai > ell2 ) ci = SIGN ( ell2, ci )
+    IF ( aj > ell2 ) cj = SIGN ( ell2, cj )
+
     IF ( ai > aj ) THEN
        cj =  rej + ci * eij
     ELSE
        ci = -rei + cj * eij
     ENDIF
+
     ai = ABS ( ci )
     aj = ABS ( cj )
-    IF ( ai > length2 ) ci = SIGN ( length2, ci )
-    IF ( aj > length2 ) cj = SIGN ( length2, cj )
+    IF ( ai > ell2 ) ci = SIGN ( ell2, ci )
+    IF ( aj > ell2 ) cj = SIGN ( ell2, cj )
+
     di =  2.0 * rei + ci - cj * eij
     dj = -2.0 * rej + cj - ci * eij
+
     sij_sq = rij_sq + ci * di + cj * dj
-  END FUNCTION sc_dist_sq
+
+  END FUNCTION dist_sq
 
 END MODULE mc_module
