@@ -300,7 +300,7 @@ may be found in `eos_hs.f90`.
 0.55  | 2.0574    | 2.051(3) | 2.055(1) | 0.553(3)
 0.50  | 1.6347    | 1.634(2) | 1.632(1) | 0.502(2)
 
-We must remember that _P_ is calculated by a box-scaling method in the NVT simulation,
+We must remember that _P_ is calculated by a box-scaling method in the _NVT_ simulation,
 which may introduce a small systematic error. This can be reduced by reducing the
 scaling factor, at the expense of worsening the statistics.
 We also provide a program `mc_npt_hs` to illustrate the constant-_NPT_ method.
@@ -317,12 +317,12 @@ one must not allow overlap between the hard particles.
 A simple approach is to
 run `build_initialize/initialize` with `molecules="linear", random_positions=.t.`,
 and to request a very low density.
-For the default `length=5` spherocylinders,
+For the default `length=5` spherocylinders
 (_L_=5, _D_=1) a value of `density=0.05` is suitable.
 Then,
 the constant-pressure program may be used to compress the system slowly to higher density.
 This is a fairly slow process,
-requiring the density and nematic order parameter to be carefully monitored.
+requiring the density &rho; and nematic order parameter _S_ to be carefully monitored.
 Once suitable high-density state points have been prepared,
 a configuration at a precisely specified density, for use in the constant-volume program,
 may be obtained by a small expansion (using `adjust_density`).
@@ -330,7 +330,7 @@ may be obtained by a small expansion (using `adjust_density`).
 For testing we use `N=256`;
 such a small system is not recommended for serious work,
 but allows us to explore up to &rho;=0.148
-(box length 12_D_, twice the interaction range of 6_D_)
+(box length 12 _D_, twice the interaction range of 6 _D_)
 which is more than sufficient for our purposes.
 Equations of state from MC simulations are presented in two papers
 
@@ -341,23 +341,25 @@ In making comparisons, care must be taken with the units.
 McGrother et al (1996) quote
 densities in the form of the packing fraction &eta;=&rho; _v_<sub>mol</sub>
 and pressures as _P_ _v_<sub>mol</sub>.
-We translate selected values from their Table V into our reduced units based on _D_=1 below;
+We translate selected values from their Table V
+(denoted (M) below)
+into our reduced units based on _D_=1 below;
 for _L/D_=5, _v_<sub>mol</sub>=4.4506.
 (Bolhuis and Frenkel (1997) define reduced densities relative to
 the density of closest packing of spherocylinders,
 while reporting pressures the same way as McGrother et al.)
 
 _P_ _v_<sub>mol</sub> | &rho; _v_<sub>mol</sub> | _P_ | &rho; | _S_ | &rho; | _S_ | _P_ | _S_
------ | ----- | ----- | ----- | ----- | ----- | ----- | ----- | -----
-McGrother | McGrother | McGrother | McGrother | McGrother | `mc_npt_sc` | `mc_npt_sc` | `mc_nvt_sc` | `mc_nvt_sc`
-2.53 | 0.310 | 0.568 | 0.070 | 0.041 | 0.0698(2) | 0.081(7) | 0.579(2) | 0.073(6)
-3.63 | 0.352 | 0.816 | 0.079 | 0.053 | 0.0799(2) | 0.098(6) | 0.810(3) | 0.098(6)
-4.89 | 0.397 | 1.099 | 0.089 | 0.136 | 0.0895(2) | 0.25(1)  | 1.126(5) | 0.23(1)
-5.05 | 0.400 | 1.135 | 0.090 | 0.170 | 0.0903(2) | 0.32(3)  | 1.136(3) | 0.149(7) &Dagger;
-5.05 | 0.400 | 1.135 | 0.090 | 0.170 | 0.0923(3) | 0.502(7) | 1.061(3) | 0.592(8) &Dagger;
-5.40 | 0.419 | 1.213 | 0.094 | 0.574 | 0.0966(3) | 0.764(6) | 1.193(6) | 0.596(3)
-5.80 | 0.436 | 1.303 | 0.098 | 0.714 | 0.0984(2) | 0.783(8) | 1.325(6) | 0.751(6)
-6.20 | 0.448 | 1.393 | 0.101 | 0.754 | 0.1021(3) | 0.839(3) | 1.406(6) | 0.795(4)
+----- | ----- | ----- | ----- | ----- | -----       | -----       | -----       | -----
+(M)   | (M)   | (M)   | (M)   | (M)   | `mc_npt_sc` | `mc_npt_sc` | `mc_nvt_sc` | `mc_nvt_sc`
+2.53  | 0.310 | 0.568 | 0.070 | 0.041 | 0.0698(2)   | 0.081(7)    | 0.579(2)    | 0.073(6)
+3.63  | 0.352 | 0.816 | 0.079 | 0.053 | 0.0799(2)   | 0.098(6)    | 0.810(3)    | 0.098(6)
+4.89  | 0.397 | 1.099 | 0.089 | 0.136 | 0.0895(2)   | 0.25(1)     | 1.126(5)    | 0.23(1)
+5.05  | 0.400 | 1.135 | 0.090 | 0.170 | 0.0903(2)   | 0.32(3)     | 1.136(3)    | 0.149(7)&Dagger;
+5.05  | 0.400 | 1.135 | 0.090 | 0.170 | 0.0923(3)   | 0.502(7)    | 1.061(3)    | 0.592(8)&Dagger;
+5.40  | 0.419 | 1.213 | 0.094 | 0.574 | 0.0966(3)   | 0.764(6)    | 1.193(6)    | 0.596(3)
+5.80  | 0.436 | 1.303 | 0.098 | 0.714 | 0.0984(2)   | 0.783(8)    | 1.325(6)    | 0.751(6)
+6.20  | 0.448 | 1.393 | 0.101 | 0.754 | 0.1021(3)   | 0.839(3)    | 1.406(6)    | 0.795(4)
 
 The `mc_npt_sc` runs use pressures from column 3 above;
 the `mc_nvt_sc` runs are at densities taken from column 4.
