@@ -577,6 +577,43 @@ with small distortions due to the fixed bond length and the need to maximise int
 
 * We might consider adding a fixed-length production run at the end of `mc_chain_wl_sw`.
 
+##Polyatomic Lennard-Jones program
+The program `mc_nvt_poly_lj` conducts Monte Carlo simulations of a system of rigid molecules
+composed of Lennard-Jones interaction sites.
+For simplicity the sites are taken to be identical, although the program is easily generalized.
+Molecular orientations are represented by quaternions,
+which are used to calculate the rotation matrix
+and hence the LJ site positions.
+
+We test this with the three-site model of orthoterphenyl, a fragile glassformer,
+described in the following publications amongst others.
+
+* LJ Lewis, G Wahnstrom, _Sol State Commun,_ __86,__ 295 (1993)
+* LJ Lewis, G Wahnstrom, _Phys Rev E,_ __50,__ 3865 (1994)
+* S Mossa, E La Nave, HE Stanley, C Donati, F Sciortino, P Tartaglia, _Phys Rev E,_ __65,__ 041205 (2002)
+* E La Nave, S Mossa, F Sciortino, P Tartaglia, _J Chem Phys,_ __120,__ 6128 (2004)
+
+The sites are arranged at the vertices of an isosceles triangle with bond angle 75 degrees,
+LJ parameters &epsilon;/_k_<sub>B</sub> = 600K
+or &epsilon; = 5 kJ mol<sup>-1</sup> to a good approximation,
+&sigma;=0.483nm,
+and bond lengths equal to &sigma;.
+
+Tests were performed at &rho;=0.32655 which is equivalent to &rho<sub>4</sub>=1.108g cm<sup>-3</sup>
+in Mossa et al (2002).
+Comparisons of potential energy (=_E_-3_T_ converted to kJ/mol)
+were made with the fit given by eqn (6) of that paper.
+
+_T_   | _E_       | _P_      | _T_ /K | _PE_ / kJ mol<sup>-1</sup> | eqn (6)
+----- | -----     | -----    | -----  | -----     | -----
+0.5   | -14.30(1) | 1.63(3)  |  300   | -79.00(5) | -77.52
+1.0   | -11.21(1) | 5.52(3)  |  600   | -71.05(5) | -68.55
+1.5   | -8.262(7) | 8.95(2)  |  900   | -63.81(4) | -61.19
+2.0   | -5.52(1)  | 11.86(3) | 1200   | -57.60(5) | -54.69
+
+Exact agreement is not expected because the potential of Mossa et al (2002) has a different
+cutoff correction, but the agreement is reasonable.
+
 ##Cluster program
 The `cluster` program is self contained. It reads in a configuration of atomic positions
 and produces a circular linked list for each cluster identified within it.

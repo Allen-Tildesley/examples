@@ -31,7 +31,7 @@ env_omp.Append(F90FLAGS=OMP_F90FLAGS,LINKFLAGS=OMP_LINKFLAGS,FORTRANMODDIRPREFIX
 variants={}
 variants['build_adjust_energy']        = (['adjust_energy.f90','md_lj_module.f90','config_io_module.f90'],env_normal)
 variants['build_adjust_kinetic_energy']= (['adjust_kinetic_energy.f90','config_io_module.f90'],env_normal)
-variants['build_adjust_density']       = (['adjust_density.f90','config_io_module.f90'],env_normal)
+variants['build_adjust_density']       = (['adjust_density.f90','config_io_module.f90','maths_module.f90'],env_normal)
 variants['build_bd_nvt_lj']            = (['bd_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
 variants['build_dpd']                  = (['dpd.f90','dpd_module.f90','config_io_module.f90','averages_module.f90','maths_module.f90'],env_normal)
 variants['build_cluster']              = (['cluster.f90','config_io_module.f90'],env_normal)

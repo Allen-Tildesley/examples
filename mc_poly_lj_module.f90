@@ -17,11 +17,15 @@ MODULE mc_module
   REAL,    DIMENSION(:,:),   ALLOCATABLE, PUBLIC :: e ! quaternions (0:3,n)
 
   ! Private data
-  INTEGER, PARAMETER                  :: na = 3 ! Number of atoms per molecule
-  REAL,    PARAMETER, DIMENSION(3,na) :: db = RESHAPE ( [ &
-       &  0.0, 0.0,  1.0/SQRT(3.0), & 
-       & -0.5, 0.0, -0.5/SQRT(3.0), &
-       &  0.5, 0.0, -0.5/SQRT(3.0) ], [3,na] ) ! Bond vectors in body-fixed frame
+  ! Bond vectors in body-fixed frame
+  ! Isosceles triangle, 3 sites, with unit bond length and bond angle alpha, which we set to 75 degrees here
+  REAL,                  PARAMETER :: pi = 4.0*atan(1.0)
+  REAL,                  PARAMETER :: alpha = 75.0 * pi / 180.0, alpha2 = alpha / 2.0
+  INTEGER,               PARAMETER :: na = 3
+  REAL, DIMENSION(3,na), PARAMETER :: db = RESHAPE ( [ &
+       & -SIN(alpha2), 0.0,    -COS(alpha2)/3.0, & 
+       &  0.0,         0.0, 2.0*COS(alpha2)/3.0, &
+       &  SIN(alpha2), 0.0,    -COS(alpha2)/3.0 ], [3,na] )
 
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
 

@@ -62,11 +62,11 @@ PROGRAM mc_nvt_poly_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 1000
-  temperature = 0.7
+  nstep       = 10000
+  temperature = 1.0
   r_cut       = 2.5
-  dr_max      = 0.15
-  de_max      = 0.1
+  dr_max      = 0.05
+  de_max      = 0.05
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
