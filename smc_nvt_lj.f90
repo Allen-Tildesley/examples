@@ -74,7 +74,7 @@ PROGRAM smc_nvt_lj
   temperature = 1.0           ! Default temperature T
   dt          = 0.1           ! Together with v_rms=sqrt(T) determines typical displacement
   mode        = 'single-atom' ! Other option is 'multi-atom', probably requiring smaller dt
-  fraction    = 0.5           ! Only applicable in multi-atom mode
+  fraction    = 1.0           ! Only applicable in multi-atom mode
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -183,8 +183,8 @@ PROGRAM smc_nvt_lj
 
         CASE ( multi_atom )
 
-           CALL RANDOM_NUMBER ( zeta )                         ! Select n uniform random numbers
-           move = SPREAD ( zeta < fraction, dim=2, ncopies=3 ) ! Construct mask for moving atoms
+           CALL RANDOM_NUMBER ( zeta )                         ! Select N uniform random numbers
+           move = SPREAD ( zeta < fraction, dim=1, ncopies=3 ) ! Construct mask for moving atoms
 
            r_old     = r                         ! Store old positions
            total_old = total                     ! Store old totals

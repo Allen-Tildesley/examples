@@ -66,9 +66,9 @@ PROGRAM md_nvt_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 50000
+  nstep       = 20000
   r_cut       = 2.5
-  dt          = 0.002
+  dt          = 0.005
   temperature = 1.0 ! specified temperature
   tau         = 2.0 ! desired thermostat timescale
 
@@ -256,7 +256,7 @@ CONTAINS
     ! They are collected together in the variables array, for use in the main program
 
     TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, conserved, c_s, c_f, conserved_msd
-    REAL                :: vol, rho, kin, fsq, ext
+    REAL                :: vol, rho, kin, fsq, ext, eng
 
     ! Preliminary calculations
     vol = box**3        ! Volume
@@ -264,6 +264,7 @@ CONTAINS
     kin = 0.5*SUM(v**2) ! Kinetic energy
     fsq = SUM(f**2)     ! Total squared force
     ext = SUM(0.5*p_eta**2/q) + temperature * ( g*eta(1) + SUM(eta(2:m)) ) ! Extra terms for conserved variable
+    eng = kin + total%pot ! Total energy
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -275,7 +276,7 @@ CONTAINS
 
     ! Internal energy (cut-and-shifted ) per atom
     ! Total KE plus total cut-and-shifted PE divided by N
-    e_s = variable_type ( nam = 'E/N cut&shifted', val = (kin+total%pot)/REAL(n) )
+    e_s = variable_type ( nam = 'E/N cut&shifted', val = eng/REAL(n) )
 
     ! Internal energy (full, including LRC) per atom
     ! LRC plus total KE plus total cut (but not shifted) PE divided by N
@@ -298,7 +299,7 @@ CONTAINS
 
     ! Conserved energy-like quantity per atom
     ! Energy plus extra terms defined above
-    conserved = variable_type ( nam = 'Conserved/N', val = (kin+total%pot+ext)/REAL(n) )
+    conserved = variable_type ( nam = 'Conserved/N', val = (eng+ext)/REAL(n) )
 
     ! Heat capacity (cut-and-shifted)
     ! Total energy divided by temperature and sqrt(N) to make result intensive
@@ -310,7 +311,7 @@ CONTAINS
 
     ! Mean-squared deviation of conserved energy-like quantity
     ! Energy plus extra terms defined above
-    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin+total%pot+ext, method = msd )
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = (eng+ext)/REAL(n), method = msd, es_format = .true. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

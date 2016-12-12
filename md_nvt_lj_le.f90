@@ -227,7 +227,7 @@ CONTAINS
     ! so long-range corrections do not arise
 
     TYPE(variable_type) :: e_s, p_s, t_k, t_c, eta, conserved_msd
-    REAL                :: vol, rho, kin, fsq, tmp, kyx
+    REAL                :: vol, rho, kin, fsq, tmp, kyx, eng
     REAL, PARAMETER     :: tol = 1.0e-6
 
     ! Preliminary calculations
@@ -237,6 +237,7 @@ CONTAINS
     fsq = SUM(f**2)                ! Total squared force
     tmp = 2.0 * kin / REAL(3*n-3)  ! Remove three degrees of freedom for momentum conservation
     kyx = SUM(v(1,:)*v(2,:)) / vol ! Kinetic part of off-diagonal pressure tensor
+    eng = kin + total%pot          ! Total energy
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -248,7 +249,7 @@ CONTAINS
 
     ! Internal energy per atom
     ! Total KE plus total PE divided by N
-    e_s = variable_type ( nam = 'E/N', val = (kin+total%pot)/REAL(n) )
+    e_s = variable_type ( nam = 'E/N', val = eng/REAL(n) )
 
     ! Pressure
     ! Ideal gas contribution plus total virial divided by V 
@@ -269,7 +270,7 @@ CONTAINS
     END IF
 
     ! MSD of conserved kinetic energy
-    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin, method = msd )
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin/REAL(n), method = msd, es_format = .TRUE. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

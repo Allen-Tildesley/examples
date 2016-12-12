@@ -101,44 +101,59 @@ in the Supplementary Information associated with their papers.
 They are not responsible for our (Fortran) program!
 
 Here we compare with typical test runs from our programs using default parameters, _N_=256, except where stated.
-Note that _E_ is the total internal energy per atom, including the ideal gas part,
-and that _C<sub>v</sub>_ (per atom) and _P_ likewise include the ideal gas contributions.
+Note that _E_ is the total internal energy per atom,
+that _C_ is short for _C<sub>v</sub>_ (per atom) and _P_ is the pressure,
+all including the ideal gas contributions.
+The Smart Monte Carlo code `smc_nvt_lj` is included here since it uses the
+cut-and-shifted potential which corresponds to the force calculation
+(although it is not essential to do so).
 
-Source | &rho;    | _T_ | _E_ (cs)  | _P_ (cs) | _C<sub>v</sub>_ (cs) | _E_ (f)   | _P_ (f)  | _C<sub>v</sub>_ (f)  
-------                 | -----    | -----     | --------  | -------- | --------- | -------   | -------  | --------
-Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286   | 0.9897   |  2.2787   |           |          |          
-Thol et al (2016) (f)  | 0.75     | 1.00      |           |          |           | -3.7212   | 0.3996   |  2.2630  
-`bd_nvt_lj`            | 0.75     | 1.00      | -2.925(3) | 0.980(5) |  2.36(8)  | -3.725(3) | 0.379(5) |  2.37(8)
-`md_nvt_lj`            | 0.75     | 1.00      | -2.993(3) | 0.965(6) |  2.08(11) | -3.733(3) | 0.363(6) |  2.09(12)
-`md_npt_lj`            | 0.749(1) | 1.00      | -2.920(7) | 0.99     |           | -3.718(8) | 0.395(1) |
-`md_nve_lj`            | 0.75     | 1.0023(2) | -2.9280   | 0.991(2) |  2.27(1)  | -3.7275   | 0.390(2) |          
-`md_nve_lj_omp`        | 0.75     | 1.0029(1) | -2.9280   | 0.992(2) |  2.25(1)  | -3.7275   | 0.390(2) |          
-`md_nve_lj_vl`         | 0.75     | 1.0030(2) | -2.9271   | 0.993(2) |  2.24(1)  | -3.7266   | 0.391(2) |          
-`md_nve_lj_ll`&Dagger; | 0.75     | 1.0010(1) | -2.9278   | 0.990(2) |  2.28(1)  | -3.7274   | 0.389(2) |          
-`smc_nvt_lj`           | 0.75     | 1.00      | -2.930(1) | 0.969(4) |  2.27(1)  | -3.729(1) | 0.367(4) |  2.27(1)
+Source                 | &rho;    | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
+------                 | -----    | -----     | --------   | -------- | --------- | -------    | -------  | --------
+Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |          
+Thol et al (2016) (f)  | 0.75     | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
+`bd_nvt_lj`            | 0.75     | 1.00      | -2.934(4)  | 0.974(7) |  2.26(8)  | -3.733(4)  | 0.373(7) | 2.27(8)
+`md_nvt_lj`            | 0.75     | 1.00      | -2.940(4)  | 0.965(6) |  2.27(12) | -3.740(4)  | 0.363(6) | 2.27(12)
+`md_npt_lj`            | 0.749(1) | 1.00      | -2.920(8)  | 0.99     |           | -3.719(9)  | 0.395(1) |
+`md_nve_lj`            | 0.75     | 1.0022(3) | -2.9289    | 0.987(2) |  2.24(1)  | -3.7284    | 0.386(2) |          
+`md_nve_lj_omp`        | 0.75     | 1.0027(2) | -2.9278    | 0.986(2) |  2.28(1)  | -3.7273    | 0.385(2) |          
+`md_nve_lj_vl`         | 0.75     | 1.0023(3) | -2.9278    | 0.992(2) |  2.24(1)  | -3.7274    | 0.391(2) |          
+`md_nve_lj_ll`&Dagger; | 0.75     | 1.0010(1) | -2.9272    | 0.992(1) |  2.28(1)  | -3.7268    | 0.391(1) |          
+`smc_nvt_lj`           | 0.75     | 1.00      | -2.9300(5) | 0.971(2) |  2.263(5) | -3.7296(5) | 0.369(2) | 2.270(5)
+`smc_nvt_lj` (100%)    | 0.75     | 1.00      | -2.928(2)  | 0.99(1)  |  2.26(2)  | -3.728(2)  | 0.39(1)  | 2.27(2)
+`smc_nvt_lj` (30%)     | 0.75     | 1.00      | -2.930(3)  | 0.98(2)  |  2.26(3)  | -3.729(3)  | 0.38(2)  | 2.27(3)
 
-* &Dagger; indicates a larger system size, _N_=864.
-* The `bd_nvt_lj` program seems to give a slightly high _C<sub>v</sub>_
+* &Dagger; indicates a larger system size, _N_=864, needed to make the link-list method viable.
 * The `smc_nvt_lj` program seems to have a bug affecting multi-atom moves, needs fixing.
-* The `md_nvt_lj` program seems to give a low _C<sub>v</sub>_, and low pressure, maybe needs looking at.
-* The `md_npt_lj` program does not conserve well. Calculated _C<sub>p</sub>_ (cs)=4.2(2) while EOS gives 4.84.
+* The `md_nvt_lj` program seems to give a low pressure, maybe needs looking at.
+* The `md_npt_lj` program does not conserve well,
+MSD of order 10<sup>-3</sup> rather than 10<sup>-8</sup> which is what we see for `md_nvt_lj`.
+Are the barostat parameters poorly chosen??? Calculated _C<sub>p</sub>_ (cs)=5.0(4) while EOS gives 4.84.
+* The `smc_nvt_lj` program was tested in default, single-particle-move, mode, with &delta;t=0.1,
+in multi-particle mode, moving 100% of particles, with &delta;t=0.02,
+and in multi-particle mode, moving 30% of particles, with &delta;t=0.03.
+These values give acceptance rates in the 45% &ndash; 55% range.
 
-Results for `md_lj_mts` are not directly comparable, because they use a larger cutoff (by default _Rc_=4.0&sigma;)
-and hence a larger system. Here are the averages from a typical simulation, with _N_=400.
+Results for `md_lj_mts` are not directly comparable,
+because a larger cutoff (by default _Rc_=4.0&sigma;) is used to illustrate the method.
+Here are the averages from a typical simulation, with _N_=400.
 
-Source      | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _C<sub>v</sub>_ (cs) | _E_ (f)    | _P_ (f)
+Source      | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)
 -------     | ----- | -------   | ---------  | -------- | --------- | -------    | -------
 `md_lj_mts` | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)   | -3.7188(5) | 0.404(2)
 
 * With the default parameters, energy conservation of `md_lj_mts` is not great, with MSD average around 0.02. Perhaps needs looking at.
 
-For the cut (but not shifted) potential, the value of _C<sub>v</sub>_ should be equal to the value for the full potential,
+For the cut (but not shifted) potential,
+the value of _C<sub>v</sub>_ (reported as _C_ below)
+should be equal to the value for the full potential,
 since the energy LRC is independent of temperature.
-The Thol et al (2016) EOS is for the full potential
+The Thol et al (2016) EOS for the full potential
 is used to predict results for the cut (but not shifted) potential (denoted c),
 at _R_<sub>c</sub>=2.5&sigma;, using the same LRC and delta corrections as in the MC codes.
+Once again, all values in the table include the ideal gas contribution.
 
-Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C<sub>v</sub>_ (f)
+Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C_ (f)
 ------                 | -----     | ----- | -------    | -------  | -------    | -------  | --------
 Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630  
 `mc_nvt_lj`            | 0.75      | 1.00  | -3.332(1)  | 0.651(3) | -3.734(1)  | 0.350(3) |  2.28(1)
@@ -601,18 +616,39 @@ and bond lengths equal to &sigma;.
 
 Tests were performed at &rho;=0.32655 which is equivalent to &rho<sub>4</sub>=1.108g cm<sup>-3</sup>
 in Mossa et al (2002).
-Comparisons of potential energy (=_E_-3_T_ converted to kJ/mol)
+Comparisons of potential energy (_PE_=_E_-3_T_ converted to kJ/mol with a factor 5)
 were made with the fit given by eqn (6) of that paper.
 
-_T_   | _E_       | _P_      | _T_ /K | _PE_ / kJ mol<sup>-1</sup> | eqn (6)
------ | -----     | -----    | -----  | -----     | -----
-0.5   | -14.30(1) | 1.63(3)  |  300   | -79.00(5) | -77.52
-1.0   | -11.21(1) | 5.52(3)  |  600   | -71.05(5) | -68.55
-1.5   | -8.262(7) | 8.95(2)  |  900   | -63.81(4) | -61.19
-2.0   | -5.52(1)  | 11.86(3) | 1200   | -57.60(5) | -54.69
+_T_   | _E_       | _P_      | _T_ (K) | _PE_ (kJ/mol) | eqn (6)
+----- | -----     | -----    | -----   | -----         | -----
+0.5   | -14.30(1) | 1.63(3)  |  300    | -79.00(5)     | -77.52
+1.0   | -11.21(1) | 5.52(3)  |  600    | -71.05(5)     | -68.55
+1.5   | -8.262(7) | 8.95(2)  |  900    | -63.81(4)     | -61.19
+2.0   | -5.52(1)  | 11.86(3) | 1200    | -57.60(5)     | -54.69
 
 Exact agreement is not expected because the potential of Mossa et al (2002) has a different
 cutoff correction, but the agreement is reasonable.
+A second set of tests were performed at _T_=0.63333=380K
+at the specified densities &rho;<sub>1</sub>, &hellip; &rho;<sub>5</sub>.
+Here the excess pressure (_P_(ex)=_P_-&rho;_T_ converted to MPa
+with a factor 73.54 based on the values of &epsilon; and &sigma;)
+is compared with the fit given by eqn (28) and the coefficients in Table III of Mossa et al (2002).
+NB the volumes to insert into the equation are those of their Table I,
+which are specific to their system size.
+
+Id | &rho;   | _E_        | _P_     | _P_(ex) (MPa) | eqn (28)
+1  | 0.30533 | -12.737(7) | 0.35(2) | 12(2)         | 19.077
+2  | 0.31240 | -13.025(7) | 0.99(2) | 58(2)         | 60.143
+3  | 0.31918 | -13.293(8) | 1.66(2) | 107(2)        | 112.798
+4  | 0.32655 | -13.50(1)  | 2.60(2) | 176(1)        | 177.222
+5  | 0.33451 | -13.65(1)  | 3.95(2) | 274(1)        | 253.510
+
+Although not perfect at the ends of the range, the agreement is not bad;
+once more, the difference in cutoff correction should be borne in mind.
+
+* The comparisons are perhaps not the best, since Mossa et al (2002) used a different value
+&epsilon;=5.276 kJ/mol which, with their cutoff term, gives a well depth 4.985 kJ/mol.
+Maybe better to compare with another paper, or modify the potential to copmare more precisely with this one.
 
 ##Cluster program
 The `cluster` program is self contained. It reads in a configuration of atomic positions

@@ -55,9 +55,9 @@ PROGRAM md_nve_lj
 
   ! Set sensible default run parameters for testing
   nblock = 10
-  nstep  = 50000
+  nstep  = 20000
   r_cut  = 2.5
-  dt     = 0.002
+  dt     = 0.005
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -157,7 +157,7 @@ CONTAINS
     ! They are collected together in the variables array, for use in the main program
 
     TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, c_s, conserved_msd
-    REAL                :: vol, rho, fsq, kin, hes, tmp
+    REAL                :: vol, rho, fsq, kin, eng, hes, tmp
 
     ! Preliminary calculations
     vol = box**3                  ! Volume
@@ -166,6 +166,7 @@ CONTAINS
     tmp = 2.0 * kin / REAL(3*n-3) ! Remove three degrees of freedom for momentum conservation
     fsq = SUM ( f**2 )            ! Total squared force
     hes = hessian(box,r_cut)      ! Total Hessian
+    eng = kin + total%pot         ! Total energy for simulated system
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -177,7 +178,7 @@ CONTAINS
 
     ! Internal energy (cut-and-shifted) per atom
     ! Total KE plus total cut-and-shifted PE divided by N
-    e_s = variable_type ( nam = 'E/N cut&shifted', val = (kin+total%pot)/REAL(n) )
+    e_s = variable_type ( nam = 'E/N cut&shifted', val = eng/REAL(n) )
 
     ! Internal energy (full, including LRC) per atom
     ! LRC plus total KE plus total cut (but not shifted) PE divided by N
@@ -202,8 +203,8 @@ CONTAINS
     ! Use special method to convert to Cv/N
     c_s = variable_type ( nam = 'Cv/N cut&shifted', val = kin/SQRT(REAL(n)), method = cke )
 
-    ! Mean-squared deviation of conserved energy (not divided by N)
-    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin+total%pot, method = msd )
+    ! Mean-squared deviation of conserved energy per atom
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = eng/REAL(n), method = msd, es_format = .TRUE. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

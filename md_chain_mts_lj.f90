@@ -159,7 +159,7 @@ CONTAINS
     ! They are collected together in the variables array, for use in the main program
 
     TYPE(variable_type) :: e_f, t_k, r_g, c_f, conserved_msd
-    REAL                :: kin
+    REAL                :: kin, eng
     REAL, DIMENSION(3)  :: rcm
     REAL                :: rsq
 
@@ -167,6 +167,7 @@ CONTAINS
     kin = 0.5*SUM(v**2)
     rcm = SUM ( r, dim=2 ) / REAL(n)                                 ! Centre of mass
     rsq = SUM ( ( r - SPREAD(rcm,dim=2,ncopies=n) ) ** 2 ) / REAL(n) ! Mean-squared distance from CM
+    eng = kin+total%pot+total_spr                                    ! Total energy
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -178,7 +179,7 @@ CONTAINS
 
     ! Internal energy per atom
     ! Total KE plus total LJ nonbonded energy plus total spring energy divided by N
-    e_f = variable_type ( nam = 'E/N', val = (kin+total%pot+total_spr)/REAL(n) )
+    e_f = variable_type ( nam = 'E/N', val = eng/REAL(n) )
 
     ! Kinetic temperature
     ! Remove 6 degrees of freedom for conserved linear and angular momentum
@@ -191,8 +192,8 @@ CONTAINS
     ! Use special method to convert to Cv/N
     c_f = variable_type ( nam = 'Cv/N', val = kin/SQRT(REAL(n)), method = cke )
 
-    ! Mean-squared deviation of conserved energy (not divided by N)
-    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin+total%pot+total_spr, method = msd )
+    ! Mean-squared deviation of conserved energy
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = eng/REAL(n), method = msd, es_format = .TRUE. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

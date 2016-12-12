@@ -61,9 +61,9 @@ PROGRAM bd_nvt_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 50000
+  nstep       = 20000
   r_cut       = 2.5
-  dt          = 0.002
+  dt          = 0.005
   gamma       = 1.0
   temperature = 1.0
 

@@ -76,9 +76,9 @@ PROGRAM md_npt_lj
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 50000
+  nstep       = 20000
   r_cut       = 2.5
-  dt          = 0.002
+  dt          = 0.005
   temperature = 1.0  ! Specified temperature
   pressure    = 0.99 ! Specified pressure
   tau         = 2.0  ! Desired thermostat timescale
@@ -367,7 +367,7 @@ CONTAINS
 
     TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, density
     TYPE(variable_type) :: c_s, c_f, vol_msd, conserved, conserved_msd
-    REAL                :: vol, rho, kin, fsq, ext, enp
+    REAL                :: vol, rho, kin, fsq, ext, enp, eng
 
     ! Preliminary calculations
     vol = box**3        ! Volume
@@ -376,6 +376,7 @@ CONTAINS
     fsq = SUM(f**2)     ! Total squared force
     ext = SUM(0.5*p_eta**2/q) + SUM(0.5*p_eta_baro**2/q_baro) + 0.5*p_eps**2/w_eps &
          & + temperature * ( g*eta(1) + SUM(eta(2:m)) + SUM(eta_baro) ) ! Extra terms for conserved variable
+    eng = kin + total%pot ! Total energy (contributes to conserved variable)
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -387,7 +388,7 @@ CONTAINS
 
     ! Internal energy (cut-and-shifted ) per atom
     ! Total KE plus total cut-and-shifted PE divided by N
-    e_s = variable_type ( nam = 'E/N cut&shifted', val = (kin+total%pot)/REAL(n) )
+    e_s = variable_type ( nam = 'E/N cut&shifted', val = eng/REAL(n) )
 
     ! Internal energy (full, including LRC) per atom
     ! LRC plus total KE plus total cut (but not shifted) PE divided by N
@@ -413,7 +414,7 @@ CONTAINS
 
     ! Conserved energy-like quantity per atom
     ! Energy plus extra terms defined above
-    conserved = variable_type ( nam = 'Conserved/N', val = (kin+total%pot+ext)/REAL(n) )
+    conserved = variable_type ( nam = 'Conserved/N', val = (eng+ext)/REAL(n) )
 
     ! Heat capacity (cut-and-shifted)
     ! Total "enthalpy" divided by temperature and sqrt(N) to make result intensive
@@ -430,7 +431,7 @@ CONTAINS
 
     ! Mean-squared deviation of conserved energy-like quantity
     ! Energy plus extra terms defined above
-    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin+total%pot+ext, method = msd )
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = (eng+ext)/REAL(n), method = msd, es_format = .TRUE. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

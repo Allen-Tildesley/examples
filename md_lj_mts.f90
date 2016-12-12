@@ -255,7 +255,7 @@ CONTAINS
 
     TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, c_s, conserved_msd
 
-    REAL :: kin, vol, rho, tmp, pot, cut, vir, lap, fsq, hes
+    REAL :: kin, vol, rho, tmp, pot, cut, eng, vir, lap, fsq, hes
 
     ! Preliminary calculations
     kin = 0.5*SUM(v**2)                      ! Total kinetic energy
@@ -268,6 +268,7 @@ CONTAINS
     lap = SUM ( total(:)%lap )               ! Sum Laplacian over shells
     fsq = SUM ( SUM ( f(:,:,:), dim=3 )**2 ) ! Sum forces over shells before squaring
     hes = hessian ( box, r_cut(k_max) )      ! Hessian (not resolved into shells)
+    eng = kin + pot                          ! Total energy (should be conserved)
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -282,7 +283,7 @@ CONTAINS
 
     ! Internal energy (cut-and-shifted) per atom
     ! Total KE plus cut-and-shifted PE divided by N
-    e_s = variable_type ( nam = 'E/N cut&shifted', val = (kin+pot)/REAL(n) ) 
+    e_s = variable_type ( nam = 'E/N cut&shifted', val = eng/REAL(n) ) 
 
     ! Internal energy (full, including LRC) per atom
     ! LRC plus total KE plus total cut (but not shifted) PE divided by N
@@ -304,8 +305,8 @@ CONTAINS
     ! Use special method to convert to Cv/N
     c_s = variable_type ( nam = 'Cv/N cut&shifted', val = kin/SQRT(REAL(n)), method = cke )
 
-    ! Mean-squared deviation of conserved energy (not divided by N)
-    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin+pot, method = msd )
+    ! Mean-squared deviation of conserved energy
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = eng/REAL(n), method = msd, es_format = .TRUE. )
 
     ! Collect together for averaging
     ! Fortran 2003 should automatically allocate this first time

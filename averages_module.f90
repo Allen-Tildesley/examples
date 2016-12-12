@@ -12,28 +12,31 @@ MODULE averages_module
 
   ! Public data
   INTEGER, PARAMETER, PUBLIC :: avg = 0, msd = 1, cke = 2 ! Options for averaging methods
-  
+
   ! Private data
   INTEGER,          PARAMETER :: col_width = 15              ! Must be large enough to allow sensible format
   INTEGER,          PARAMETER :: nam_width = 2*col_width+1   ! At most two column widths plus spacer
-  CHARACTER(len=*), PARAMETER :: colf_fmt  = '(*(1x,f15.6))' ! Format for floats; we assume that 6 dp will be sufficient
-  CHARACTER(len=*), PARAMETER :: cola_fmt  = '(*(1x,a15))'   ! Format for strings
+  CHARACTER(len=*), PARAMETER :: colf_fmt  = 'f15.6'         ! Format for floats; we assume that 6 dp will be sufficient
+  CHARACTER(len=*), PARAMETER :: cole_fmt  = 'es15.4'        ! Alternative format for floats, suitable for small numbers
+  CHARACTER(len=*), PARAMETER :: head_fmt  = '(*(1x,a15))'   ! Format for heading strings
   CHARACTER(len=*), PARAMETER :: col1a_fmt = '(a15)'         ! Format for column 1 strings
   CHARACTER(len=*), PARAMETER :: col1i_fmt = '(i15)'         ! Format for column 1 integers
-  CHARACTER(len=*), PARAMETER :: line_fmt  = '(a,t40,f15.6)' ! Format for single line output
+  CHARACTER(len=*), PARAMETER :: sngl_fmt  = '(a,t40,f15.6)' ! Format for single line output
 
   INTEGER,                                             SAVE :: n_avg, line_width
   CHARACTER(len=col_width), DIMENSION(:), ALLOCATABLE, SAVE :: headings, subheads
   REAL,                     DIMENSION(:), ALLOCATABLE, SAVE :: blk_avg, blk_msd, run_avg, run_err, add
   INTEGER,                  DIMENSION(:), ALLOCATABLE, SAVE :: method
   REAL,                                                SAVE :: run_nrm, blk_nrm
+  CHARACTER(len=:),                       ALLOCATABLE, SAVE :: line_fmt ! Format for single line of output
 
   ! Public derived type for variables to average
   TYPE, PUBLIC :: variable_type
-     CHARACTER(len=nam_width) :: nam          ! Name to be used in headings
-     REAL                     :: val          ! Instantaneous value to be averaged
-     INTEGER                  :: method = avg ! Selects method: avg (default), msd, or cke
-     REAL                     :: add = 0.0    ! Constant to use in msd method (default zero)
+     CHARACTER(len=nam_width) :: nam                 ! Name to be used in headings
+     REAL                     :: val                 ! Instantaneous value to be averaged
+     INTEGER                  :: method = avg        ! Selects method: avg (default), msd, or cke
+     REAL                     :: add = 0.0           ! Constant to use in msd method (default zero)
+     LOGICAL                  :: es_format = .FALSE. ! Flag to indicate scientific format (small numbers)
   END TYPE variable_type
 
 CONTAINS
@@ -71,8 +74,11 @@ CONTAINS
     ! First column plus a column for each variable; allow one space between columns
     line_width = col_width + n_avg * ( col_width + 1 )
 
+    line_fmt = '(' ! Fortran 2003 will automatically allocate and reallocate as we build this up
+
     ! Store variable names locally in tidied-up format
     ! Attempt to split name string at first space
+    ! Build up format string for line of averages
     DO i = 1, n_avg
        space = SCAN ( TRIM(variables(i)%nam), ' ' )
        IF ( space > 0 ) THEN
@@ -84,7 +90,18 @@ CONTAINS
        END IF
        headings(i) = ADJUSTR ( headings(i) )
        subheads(i) = ADJUSTR ( subheads(i) )
+
+       IF ( variables(i)%es_format ) THEN
+          line_fmt = line_fmt // '1x,' // cole_fmt // ','
+       ELSE
+          line_fmt = line_fmt // '1x,' // colf_fmt // ','
+       END IF
+
     END DO
+
+    ! Replace last comma in format string by closing parenthesis
+    i = LEN(line_fmt)
+    line_fmt(i:i) = ')'
 
     ! Store method options and add-constants locally
     method = variables%method
@@ -102,9 +119,9 @@ CONTAINS
     WRITE ( unit=output_unit, fmt=* )
     WRITE ( unit=output_unit, fmt='(a)'                   ) REPEAT ( '=', line_width ) 
     WRITE ( unit=output_unit, fmt=col1a_fmt, advance='no' ) 'Block'
-    WRITE ( unit=output_unit, fmt=cola_fmt                ) headings
+    WRITE ( unit=output_unit, fmt=head_fmt                ) headings
     WRITE ( unit=output_unit, fmt=col1a_fmt, advance='no' ) '     '
-    WRITE ( unit=output_unit, fmt=cola_fmt                ) subheads
+    WRITE ( unit=output_unit, fmt=head_fmt                ) subheads
     WRITE ( unit=output_unit, fmt='(a)'                   ) REPEAT ( '-', line_width )
 
   END SUBROUTINE run_begin
@@ -160,7 +177,7 @@ CONTAINS
 
     ! Write out block averages
     WRITE ( unit=output_unit, fmt=col1i_fmt, advance='no' ) blk
-    WRITE ( unit=output_unit, fmt=colf_fmt                ) blk_avg
+    WRITE ( unit=output_unit, fmt=line_fmt                ) blk_avg
 
   END SUBROUTINE blk_end
 
@@ -187,9 +204,9 @@ CONTAINS
 
     WRITE ( unit=output_unit, fmt='(a)'                   ) REPEAT('-', line_width )
     WRITE ( unit=output_unit, fmt=col1a_fmt, advance='no' ) 'Run averages'
-    WRITE ( unit=output_unit, fmt=colf_fmt                ) run_avg
+    WRITE ( unit=output_unit, fmt=line_fmt                ) run_avg
     WRITE ( unit=output_unit, fmt=col1a_fmt, advance='no' ) 'Run errors'
-    WRITE ( unit=output_unit, fmt=colf_fmt                ) run_err
+    WRITE ( unit=output_unit, fmt=line_fmt                ) run_err
     WRITE ( unit=output_unit, fmt='(a)'                   ) REPEAT('=', line_width )
     WRITE ( unit=output_unit, fmt=* )
     WRITE ( unit=output_unit, fmt='(a)' ) 'Run ends'
@@ -209,7 +226,7 @@ CONTAINS
     INTEGER :: i
 
     DO i = 1, SIZE(variables)
-       WRITE ( unit=output_unit, fmt=line_fmt ) variables(i)%nam, variables(i)%val
+       WRITE ( unit=output_unit, fmt=sngl_fmt ) variables(i)%nam, variables(i)%val
     END DO
 
   END SUBROUTINE write_variables
