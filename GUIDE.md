@@ -762,16 +762,38 @@ and hence the diffusion coefficient.
 
 ##DPD program
 For the `dpd` example, we recommend generating an initial configuration
-using the `initialize` program, with the
-following namelist input
+using the `initialize` program, with namelist input similar to the following
 ```
 &nml n = 100, density = 3.0, random_positions = .true.,
 velocities = .true., soft=.true. /
 ```
-The value of the density is typical when using this method to model water.
-The approximate DPD equation of state is used to estimate the pressure,
-at the chosen density, temperature, and interaction strength, for comparison.
-This is expected to become inaccurate for densities lower than about 2.
+The above value of the density is typical when using this method to model water.
+
+For testing we compare with an approximate DPD equation of state for _P_.
+
+* RD Groot, PB Warren, _J Chem Phys,_ __107,__ 4423 (1997)
+* TP Liyana-Arachchi, SN Jamadagni, D Eike, PH Koenig, JI Siepmann,
+_J Chem Phys,_ __142,__ 044902 (2015)
+
+The paper of Liyana-Arachchi et al (2015) is an improvement of the original
+EOS of Groot and Warren (1997), which is more accurate and
+applicable over a wider range of state points.
+The function is included in the `dpd` program,
+and the expected value of _P_ (labelled EOS below)
+is printed for comparison at the end.
+We give results obtained by both
+the Lowe thermostat (L) and the Shardlow algorithm (S).
+We take the default values of _a_ &rho;/T=75, and of other parameters not mentioned below.
+
+ _T_   | &rho; | _P_ (EOS) | _P_ (L)   | _P_ (S)
+ ----- | ----- | -----     | -----     | -----
+ 0.5   | 3.0   | 11.864    | 11.814(2) | 11.819(2)
+ 1.0   | 3.0   | 23.587    | 23.637(2) | 23.635(2)
+ 1.5   | 3.0   | 35.276    | 35.449(3) | 35.455(4)
+ 2.0   | 3.0   | 46.951    | 47.257(4) | 47.265(5)
+ 1.0   | 2.0   | 14.187    | 14.320(2) | 14.316(2)
+ 1.0   | 4.0   | 32.811    | 32.622(3) | 32.628(3)
+ 1.0   | 5.0   | 41.887    | 41.539(4) | 41.533(3)
 
 ##Error calculation
 The program `error_calc` is a self-contained illustration of the effects of

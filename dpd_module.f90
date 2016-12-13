@@ -294,11 +294,35 @@ CONTAINS
     REAL, INTENT(in) :: rho         ! Density
     REAL, intent(in) :: temperature ! Temperature
 
-    ! This expression is given by Groot and Warren, J Chem Phys 107, 4423 (1997)
-    REAL, PARAMETER :: alpha = 0.101
+    REAL :: alpha, b2
 
+    REAL, DIMENSION(0:4), PARAMETER :: b = [ 9.755e-2, -4.912e-3, 1.556e-4, -2.585e-6, 1.705e-8 ]
+    REAL,                 PARAMETER :: c1 = 0.0802, c2 = 0.7787
+
+    ! This expression is given by Groot and Warren, J Chem Phys 107, 4423 (1997)
+!    alpha = 0.101
+
+    ! This is the revised formula due to Liyana-Arachchi, Jamadagni, Elke, Koenig, Siepmann,
+    ! J Chem Phys 142, 044902 (2015)
+    b2    = polynomial ( b, a )                                         ! This is B2/a, eqn (10) of above paper
+    alpha = b2 / ( 1.0 + rho**3 ) + ( c1*rho**2 ) / ( 1.0 + c2*rho**2 ) ! This is eqn (14) of above paper
+    
     p = rho * temperature + alpha * a * rho**2
 
   END FUNCTION p_approx
+
+  FUNCTION polynomial ( c, x ) RESULT ( f )
+    REAL, DIMENSION(:), INTENT(in) :: c ! coefficients of x**0, x**1, x**2 etc
+    REAL,               INTENT(in) :: x ! argument
+    REAL                           :: f ! result
+
+    INTEGER :: i
+
+    f = 0.0
+    DO i = SIZE(c), 1, -1
+       f = f * x + c(i)
+    END DO
+
+  END FUNCTION polynomial
 
 END MODULE dpd_module
