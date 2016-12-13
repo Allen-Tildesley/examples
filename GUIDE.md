@@ -19,7 +19,7 @@ See the file `verlet_list_module.f90` for details.
 
 ##Initial Configuration
 Simulation runs require a starting configuration which can usually be prepared using
-the `initialize` program (in `build_initialize/`).
+the `initialize` program (built, by the default SConstruct file, in `build_initialize/`).
 The default parameters produce an FCC configuration of 256 atoms at reduced density &rho;=0.75,
 writing out just the positions (for an MC program) to a file `cnf.inp`.
 If the parameter `velocities=.true.` is supplied, then positions and velocities are
@@ -100,6 +100,8 @@ For completeness, note that Thol et al also supply C++ programs, and tables of d
 in the Supplementary Information associated with their papers.
 They are not responsible for our (Fortran) program!
 
+### Lennard-Jones MD programs
+First we look at the MD (and related) programs, which use the cut-and-shifted potential.
 Here we compare with typical test runs from our programs using default parameters, _N_=256, except where stated.
 Note that _E_ is the total internal energy per atom,
 that _C_ is short for _C<sub>v</sub>_ (per atom) and _P_ is the pressure,
@@ -124,8 +126,7 @@ Thol et al (2016) (f)  | 0.75     | 1.00      |            |          |         
 `smc_nvt_lj` (30%)     | 0.75     | 1.00      | -2.930(3)  | 0.98(2)  |  2.26(3)  | -3.729(3)  | 0.38(2)  | 2.27(3)
 
 * &Dagger; indicates a larger system size, _N_=864, needed to make the link-list method viable.
-* The `smc_nvt_lj` program seems to have a bug affecting multi-atom moves, needs fixing.
-* The `md_nvt_lj` program seems to give a low pressure, maybe needs looking at.
+* The `md_nvt_lj` program seems to give a low energy and pressure, maybe needs looking at???
 * The `md_npt_lj` program does not conserve well,
 MSD of order 10<sup>-3</sup> rather than 10<sup>-8</sup> which is what we see for `md_nvt_lj`.
 Are the barostat parameters poorly chosen??? Calculated _C<sub>p</sub>_ (cs)=5.0(4) while EOS gives 4.84.
@@ -135,23 +136,55 @@ and in multi-particle mode, moving 30% of particles, with &delta;t=0.03.
 These values give acceptance rates in the 45% &ndash; 55% range.
 
 Results for `md_lj_mts` are not directly comparable,
-because a larger cutoff (by default _Rc_=4.0&sigma;) is used to illustrate the method.
-Here are the averages from a typical simulation, with _N_=400.
+because a larger cutoff (by default _R<sub>c</sub>_=4.0&sigma;) is used to illustrate the method.
+Here are the averages from a typical simulation, with _N_=400 (box length 8.1).
+The usual state point is simulated (&rho;=0.75 throughout)
+No fitted EOS for the cs potential for this cutoff is available; obviously the estimates for the full potential
+should be comparable with the values given above from Thol et al (2016).
+Smallest timestep &delta;t (called `dt1` in the program)
+and multiple-timestep-multipliers (the `n_mts` array) are given in column 2.
+In all cases the run length was equal to 10 blocks of 20000 steps of length 0.005.
+So, for example, 0.005 (142) means 10 blocks of 2500 steps of length 0.04,
+each subdivided into 2 steps of length 0.02,
+each subdivided again into 4 steps of length 0.005.
+We also tried 0.002 (142) meaning 10 blocks of 6250 steps of length 0.016,
+each subdivided into 2 steps of length 0.008,
+each subdivided again into 4 steps of length 0.002.
+The first line in the table below is from a run of `md_nve_lj` with the same system, for reference.
 
-Source      | &rho; | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)
--------     | ----- | -------   | ---------  | -------- | --------- | -------    | -------
-`md_lj_mts` | 0.75  | 1.0025(4) | -3.5230(5) | 0.551(2) | 2.27(1)   | -3.7188(5) | 0.404(2)
+Source          | &delta;t    | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | CPU (mins) | _E_ (MSD)
+-------         | --------    | -------   | ---------  | -------- | --------- | -------    | -------  | ------     | ------
+`md_nve_lj`     | 0.005       | 1.0038(1) | -3.5199    | 0.557(2) | 2.26(1)   | -3.7157    | 0.410(2) | 30         | 1.7x10<sup>-8</sup>
+`md_lj_mts` (0) | 0.005 (111) | 1.002(3)  | -3.5199    | 0.58(1)  | 2.4(1)    | -3.7157    | 0.43(2)  | 75         | 1.6x10<sup>-8</sup>
+`md_lj_mts` (1) | 0.002 (142) | 1.0040(2) | -3.5196(2) | 0.559(1) | 2.26(1)   | -3.7153(2) | 0.412(1) | 50         | 1.1x10<sup>-7</sup>
+`md_lj_mts` (2) | 0.005 (142) | 1.017(2)  | -3.491(4)  | 0.610(7) | 2.26(1)   | -3.686(4)  | 0.463(7) | 20         | 6.8x10<sup>-6</sup>
+`md_lj_mts` (3) | 0.005 (142) | 1.0094(8) | -3.508(2)  | 0.576(3) | 2.26(1)   | -3.703(2)  | 0.429(3) | 30         | 7.8x10<sup>-7</sup>
 
-* With the default parameters, energy conservation of `md_lj_mts` is not great, with MSD average around 0.02. Perhaps needs looking at.
+* Run (0) was run with all the timesteps the same length, as a check of the program book-keeping.
+The energy conservation is excellent, but the statistical errors on measured properties seem to be an order of magnitude
+larger than for `md_nve_lj` and the pressure seems a bit off. Why is this so bad??
+* Run (1), program default parameters, has quite good energy conservation, and statistical errors,
+but this is partly a result of the smaller timestep.
+* Run (2) uses the 0.005 timestep,
+has worse energy MSD, and the average energies and pressure are deviating significantly from the expected values.
+That's rather disappointing.
+* Run (3) is identical to run (2) except that the switching length lambda is increased from 0.1 to 0.15.
+This improves the energy conservation, but the pressure still looks a bit off.
 
-For the cut (but not shifted) potential,
-the value of _C<sub>v</sub>_ (reported as _C_ below)
+Perhaps this program needs looking at???
+Be aware that there have been some cosmetic changes to the introductory output since these first few test runs.
+
+###Lennard-Jones MC programs
+Our MC programs use the cut (but not shifted) potential
+(which means that there is a delta correction, in the program, for the pressure).
+In this case, the value of _C<sub>v</sub>_ (reported as _C_ below)
 should be equal to the value for the full potential,
 since the energy LRC is independent of temperature.
 The Thol et al (2016) EOS for the full potential
 is used to predict results for the cut (but not shifted) potential (denoted c),
 at _R_<sub>c</sub>=2.5&sigma;, using the same LRC and delta corrections as in the MC codes.
 Once again, all values in the table include the ideal gas contribution.
+Except where indicated, tests are performed for _N_=256.
 
 Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C_ (f)
 ------                 | -----     | ----- | -------    | -------  | -------    | -------  | --------
@@ -167,18 +200,26 @@ Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    
 * &Dagger; indicates a larger system size, _N_=864 (or approximately so for `mc_zvt_lj_ll`)
 * The `mc_nvt_lj` program seems to give a low pressure, needs investigating.
 * The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
-* The `mc_npt_lj` measured pressure (c) is 0.666(2) which is a little low.
+* The `mc_npt_lj` _measured_ pressure (c) is 0.666(2) which is a little low.
 Measured _C<sub>p</sub>_ (full) is 5.28(7) compared with Thol et al (2016) EOS giving 5.22
 * The `mc_npt_lj_ll` program was run with `db_max`=0.015 to give a volume acceptance ratio around 9%.
-Measured pressure (c) is 0.660(3) which is again a little low. Is the delta correction wrong somehow?
+Measured pressure (c) is 0.660(3) which is again a little low. Is the delta correction wrong somehow???
+Or the constant-pressure algorithm???
 Measured _C<sub>p</sub>_ (full) is 5.04(16) compared with Thol et al (2016) EOS value of 5.22.
-The program probably needs making more resilient against changes in box size.
+The program probably needs making more resilient against changes in box size (list array reallocation).
 * The `mc_zvt_lj` program was run at activity _z_=0.0795, the default value in the program, in a box of length 7&sigma;.
 The Thol et al (2016) LRC-corrected value to give &rho;=0.75 would be _z_=0.080627.
 Acceptance rate of creation/destruction moves is quite small, at about 0.3%.
 For other state points see below.
+We could look at including a reallocate_arrays routine to cope better with varying _N_.
 * The `mc_zvt_lj_ll` program has the same acceptance ratio of moves.
-It seems to run very slowly, which needs looking into.
+It seems to run very slowly, which needs looking into???
+Again, it would be more satisfying to use list array reallocation to make the program resilient to _N_ increasing.
+* In principle, there should be a delta correction for the configurational temperature.
+Long-range corrections are discussed by A Baranyai _J Chem Phys,_ __112,__ 3964 (2000) and by
+A Lervik, O Wilhelmsen, TT Trinh, HR Nagel, _J Chem Phys,_ __143,__ 114106 (2015),
+but they do not seem to discuss the truncation discontinuity.
+This needs looking into ???
 
 Tests for the grand canonical MC program were initially conducted at a slightly lower density,
 very close to the liquid-vapour coexistence line (see Gibbs simulations below).
