@@ -9,7 +9,7 @@ The input file, or string, should usually begin with `&nml` and end with `/`.
 As a minimum, the program will expect to read `&nml /` (an empty list), but to
 change the parameters, typical input might be
 ```
-&nml nblock=20, nstep=1000, dt=0.001 /
+&nml nblock=20, nstep=10000, dt=0.002 /
 ```
 and the `key=value` pairs may be set out on different lines if you wish.
 
@@ -31,13 +31,18 @@ Typically, runs produce a final configuration `cnf.out`
 (which may be renamed to `cnf.inp` as a starting point for further runs)
 and intermediate configurations `cnf.001`, `cnf.002` etc during the run.
 
-A couple of utility programs are provided:
-`adjust_energy` takes in an MD configuration and scales the velocities to
-produce a configuration with a desired internal energy per atom, while
-`adjust_density` takes in an MC or MD configuration
-and scales the positions (and the box length) to produce a desired density.
+A utility program,
+`adjust` takes in an MC or MD configuration and
+scales the velocities to change the kinetic energy per atom by a specified amount,
+and/or the positions (and the box length) to change the density by a specified amount.
 
-##State points for different Lennard-Jones models
+##Lennard-Jones simulation programs
+A large number of the examples simulate the Lennard-Jones liquid.
+Before discussing these in detail,
+we consider the different variants of the model that appear in the programs,
+and the state points used for testing.
+
+###State points for different Lennard-Jones models
 For most of the examples, we use a cutoff of _R_<sub>c</sub>=2.5&sigma;.
 For MC programs the cut (but not shifted) potential (c) is used in the simulation,
 while for MD programs the cut-and-shifted potential (cs) is used.
@@ -137,8 +142,8 @@ These values give acceptance rates in the 45% &ndash; 55% range.
 
 Results for `md_lj_mts` are not directly comparable,
 because a larger cutoff (by default _R<sub>c</sub>_=4.0&sigma;) is used to illustrate the method.
-Here are the averages from a typical simulation, with _N_=400 (box length 8.1).
-The usual state point is simulated (&rho;=0.75 throughout)
+The program was tested with _N_=400 (box length 8.1).
+The usual state point is simulated: &rho;=0.75 throughout.
 No fitted EOS for the cs potential for this cutoff is available; obviously the estimates for the full potential
 should be comparable with the values given above from Thol et al (2016).
 Smallest timestep &delta;t (called `dt1` in the program)
@@ -342,7 +347,7 @@ Here we refer to some fairly recent, useful, sources of data and/or fitted equat
 The paper of Kolafa et al (2004) is particularly careful to discuss corrections
 due to different ensembles and system size. Here we just present the raw results
 for a small system, _N_=256; programs are run with default parameters.
-Starting fcc lattice configurations may be prepared using `build_initialize/initialize` in
+Starting fcc lattice configurations may be prepared using `initialize` in
 the usual way.
 The EOS is taken from the Hansen-Goos (2016) paper, and a program to evaluate it
 may be found in `eos_hs.f90`.
@@ -371,17 +376,17 @@ of cylinder length _L_ and diameter _D_:
 In preparing configurations for these programs,
 one must not allow overlap between the hard particles.
 A simple approach is to
-run `build_initialize/initialize` with `molecules="linear", random_positions=.t.`,
+run `initialize` with `molecules="linear", random_positions=.t.`,
 and to request a very low density.
 For the default `length=5` spherocylinders
 (_L_=5, _D_=1) a value of `density=0.05` is suitable.
 Then,
-the constant-pressure program may be used to compress the system slowly to higher density.
+the constant-pressure program may be used to compress the system to higher density.
 This is a fairly slow process,
 requiring the density &rho; and nematic order parameter _S_ to be carefully monitored.
 Once suitable high-density state points have been prepared,
 a configuration at a precisely specified density, for use in the constant-volume program,
-may be obtained by a small expansion (using `adjust_density`).
+may be obtained by a small expansion (using the `adjust` program).
 
 For testing we use `N=256`;
 such a small system is not recommended for serious work,
@@ -449,7 +454,7 @@ and the latter appearing in Rosenbluth weights,
 which govern the acceptance/rejection of moves.
 For comparison with the paper of Calvo, Doye and Wales, _J Chem Phys,_ __116,__ 2642 (2002),
 test runs were carried out using _N_=13 atoms, a bond length of 1.122462&sigma;
-(prepared using `build_initialize/initialize` with random non-overlapping atom positions)
+(prepared using `initialize` with random non-overlapping atom positions)
 and a rather low spring potential _k_<sub>spring</sub>=20.
 We only use CBMC moves in this code: for a practical application it would be advisable
 to include other kinds of move, for example crankshaft, pivot, and bridging moves.
@@ -484,7 +489,7 @@ while at _T_=0.35 it was around 11%, increasing further at higher temperatures.
 The results are broadly in agreement with Calvo et al (2002) showing a similar sized peak in _C<sub>v</sub>_,
 although at a somewhat lower temperature (0.30 as opposed to 0.35).
 
-Here we give analogous results for the program default value of _k_<sub>spring</sub>=400.
+Here we give analogous results for the program default spring constant of _k_<sub>spring</sub>=400.
 
 _T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 ----- | -------   | --------        | --------
@@ -564,7 +569,8 @@ the constant-_NVE_ and constant-_NVT_ ensembles are expected to yield different 
 Finally,
 molecular dynamics is not expected to thoroughly explore the energy landscape at low temperatures,
 giving instead (typically) quasi-harmonic vibrations in a single basin.
-The default run lengths are fairly modest here: 10 blocks, each consisting of 100000 steps of length 0.002.
+The default run lengths are fairly modest here: 10 blocks,
+each consisting of 100000 steps of length &delta;t=0.002.
 
 For the hard-sphere square-well chain, the aim was to show the operation of the Wang-Landau method.
 Here we used pivot and crankshaft moves as well as CBMC regrowth.
@@ -572,7 +578,7 @@ In a practical application it would be advisable to include some bridging moves 
 Reasonably long chains have been studied by Taylor, Paul and Binder, _J Chem Phys,_ __131,__ 114907 (2009),
 who provide references to earlier simulation work, as well as exact results for very short chains.
 Here we choose _N_=13, bond length equal to &sigma;, and a nonbonded interaction range of 1.5&sigma;.
-The starting chain configuration can be prepared using `build_initialize/initialize` in the usual way.
+The starting chain configuration can be prepared using `initialize` in the usual way.
 
 As a reference for comparison, we ran a set of canonical ensemble calculations with `mc_chain_nvt_sw`.
 The program default is to run for 10 blocks, each of 100000 steps;
@@ -689,7 +695,11 @@ once more, the difference in cutoff correction should be borne in mind.
 
 * The comparisons are perhaps not the best, since Mossa et al (2002) used a different value
 &epsilon;=5.276 kJ/mol which, with their cutoff term, gives a well depth 4.985 kJ/mol.
-Maybe better to compare with another paper, or modify the potential to copmare more precisely with this one.
+Maybe better to compare with another paper,
+or modify the potential to compare more precisely with this one??
+* Interestingly, in the book, it seems we never offer an example of a polyatomic molecular dynamics program,
+for either linear or nonlinear molecules. It is tempting to write examples of both,
+but I cannot give this a high priority.
 
 ##Cluster program
 The `cluster` program is self contained. It reads in a configuration of atomic positions
@@ -752,10 +762,11 @@ and hence the diffusion coefficient.
 
 ##DPD program
 For the `dpd` example, we recommend generating an initial configuration
-using the `initialize` program (in `build_initialize/`), with the
+using the `initialize` program, with the
 following namelist input
 ```
-&nml n = 100, density = 3.0, random_positions = .true., velocities = .true. /
+&nml n = 100, density = 3.0, random_positions = .true.,
+velocities = .true., soft=.true. /
 ```
 The value of the density is typical when using this method to model water.
 The approximate DPD equation of state is used to estimate the pressure,

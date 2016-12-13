@@ -1,6 +1,6 @@
-! adjust_density.f90
-! Utility program to allow user to change the density of MC or MD configuration
-PROGRAM adjust_density
+! adjust.f90
+! Utility program to allow user to change the density or kinetic energy of MC or MD configuration
+PROGRAM adjust
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
@@ -9,19 +9,24 @@ PROGRAM adjust_density
 
   IMPLICIT NONE
 
-  ! Takes in a configuration of atoms or molecules (positions, possibly orientations, and optionally, velocities)
+  ! Takes in a configuration of atoms or molecules
+  ! positions, possibly orientations, and optionally, velocities and angular velocities
   ! Cubic periodic boundary conditions
-  ! Adjusts the density by an amount delta
+  ! Adjusts the density by an amount delta_rho
+  ! and kinetic energy per particle by an amount delta_kin
 
   ! Input configuration and output configuration are assumed to be in simulation units defined by the model
   ! For example, for Lennard-Jones, sigma = 1
   ! There is nothing here specific to Lennard-Jones
+  ! We assume unit mass and adjust only the translational kinetic energy
 
   ! Most important variables
-  REAL :: box     ! Box length
-  REAL :: density ! Current density
-  real :: delta   ! Desired density change
-  REAL :: scale   ! Scaling factor
+  REAL :: box       ! Box length
+  REAL :: rho       ! Current density
+  REAL :: kin       ! Current kinetic energy per particle
+  REAL :: delta_rho ! Desired density change
+  REAL :: delta_kin ! Desired kinetic energy change
+  REAL :: scale     ! Scaling factor
 
   LOGICAL :: velocities
   INTEGER :: n, ioerr
@@ -37,14 +42,15 @@ PROGRAM adjust_density
   INTEGER            :: molecule_option ! User option for atoms, linear, nonlinear or chain molecule
   INTEGER, PARAMETER :: atoms = 0, linear = 1, nonlinear = 2, chain = 3
 
-  REAL, PARAMETER :: tol = 1.e-6
+  REAL, PARAMETER :: tol = 1.e-9
 
-  NAMELIST /nml/ delta, velocities, molecules
+  NAMELIST /nml/ delta_rho, delta_kin, velocities, molecules
 
   ! Set default parameters
   velocities = .FALSE. ! By default, assume MC configuration
   molecules  = 'atoms' ! Options are 'atoms', 'chain', 'linear', 'nonlinear'
-  delta      = 0.0     ! If not changed, program will just write out information
+  delta_rho  = 0.0     ! If neither of these two items is changed ...
+  delta_kin  = 0.0     ! ... program will just write out information
 
   ! Read parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -53,7 +59,7 @@ PROGRAM adjust_density
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
      IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
-     STOP 'Error in adjust_density'
+     STOP 'Error in adjust'
   END IF
 
   ! Use molecules string to deduce molecule_option
@@ -63,7 +69,6 @@ PROGRAM adjust_density
 
      molecule_option = chain
      WRITE ( unit=output_unit, fmt='(a)' ) 'Chain of atoms, no periodic boundaries, no density'
-     STOP 'Error in adjust_density'
 
   ELSE IF ( INDEX ( molecules, 'nonlinear' ) /= 0 ) THEN
 
@@ -83,21 +88,24 @@ PROGRAM adjust_density
   ELSE
 
      WRITE ( unit=error_unit, fmt='(a,a)') 'Unrecognized molecules option: ', molecules
-     STOP 'Error in adjust_density'
+     STOP 'Error in adjust'
 
   END IF
 
-  ! The read_cnf_atoms routine should work in all cases, just to get n and box
+  IF ( (.NOT. velocities)       .AND. ABS(delta_kin) > tol ) STOP 'No kinetic energy change possible'
+  IF ( molecule_option == chain .AND. ABS(delta_rho) > tol ) STOP 'No density change possible'
+
+  ! The read_cnf_atoms routine should work in all cases, just to get n and box (or bond)
   CALL read_cnf_atoms ( filename, n, box )
-  density = REAL(n) / box**3
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',               density
+  IF ( molecule_option == chain ) THEN
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Molecular bond length', box ! box plays role of bond
+  ELSE
+     rho = REAL(n) / box**3
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',               rho
+  END IF
 
-  IF ( ABS(delta) < tol ) STOP 'No density change requested'
-
-  IF ( delta+density < 0.0 ) STOP 'New requested density would be negative'
-  
   SELECT CASE ( molecule_option )
 
   CASE ( nonlinear)
@@ -110,14 +118,14 @@ PROGRAM adjust_density
 
   SELECT CASE ( molecule_option )
 
-  CASE ( atoms )
+  CASE ( atoms, chain )
      IF ( velocities ) THEN
         CALL read_cnf_atoms ( filename, n, box, r, v )
      ELSE
         CALL read_cnf_atoms ( filename, n, box, r )
      END IF
 
-  CASE default
+  CASE ( linear, nonlinear )
      IF ( velocities ) THEN
         CALL read_cnf_mols ( filename, n, box, r, e, v, w )
      ELSE
@@ -126,33 +134,62 @@ PROGRAM adjust_density
 
   END SELECT
 
-  scale   = ( density / (density+delta) )**(1.0/3.0)
-  box     = box * scale
-  r(:,:)  = r(:,:) * scale
-  density = REAL(n) / box**3
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'New density', density
+  IF ( velocities ) THEN
+     kin = 0.5*SUM(v**2) / REAL(n)
+     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Kinetic energy', kin
+  END IF
 
-  SELECT CASE ( molecule_option )
+  IF ( ABS(delta_rho) < tol .AND. ABS(delta_kin) < tol ) THEN
 
-  CASE ( atoms )
+     WRITE ( unit=output_unit, fmt='(a)' ) 'No changes requested'
 
-     IF ( velocities ) THEN
-        CALL write_cnf_atoms ( filename, n, box, r, v )
-     ELSE
-        CALL write_cnf_atoms ( filename, n, box, r )
+  ELSE
+
+     IF ( ABS(delta_rho) > tol ) THEN
+
+        IF ( rho+delta_rho < 0.0 ) STOP 'New requested density would be negative'
+
+        scale   = ( rho / (rho+delta_rho) )**(1.0/3.0)
+        box     = box * scale
+        r(:,:)  = r(:,:) * scale
+        rho     = REAL(n) / box**3
+        WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'New density', rho
+
      END IF
 
-  CASE default
+     IF ( ABS(delta_kin) > tol ) THEN
 
-     IF ( velocities ) THEN
-        CALL write_cnf_mols ( filename, n, box, r, e, v, w )
-     ELSE
-        CALL write_cnf_mols ( filename, n, box, r, e )
+        IF ( kin+delta_kin < 0.0 ) STOP 'New requested kinetic energy would be negative'
+
+        scale  = SQRT ( (kin+delta_kin) / kin )
+        v(:,:) = v(:,:) * scale
+        kin    = 0.5*SUM(v**2) / REAL(n) 
+        WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'New kinetic energy', kin
      END IF
 
-  END SELECT
+     SELECT CASE ( molecule_option )
+
+     CASE ( atoms, chain )
+
+        IF ( velocities ) THEN
+           CALL write_cnf_atoms ( filename, n, box, r, v )
+        ELSE
+           CALL write_cnf_atoms ( filename, n, box, r )
+        END IF
+
+     CASE ( linear, nonlinear )
+
+        IF ( velocities ) THEN
+           CALL write_cnf_mols ( filename, n, box, r, e, v, w )
+        ELSE
+           CALL write_cnf_mols ( filename, n, box, r, e )
+        END IF
+
+     END SELECT
+
+  END IF
 
   DEALLOCATE ( r, v, e, w )
 
-END PROGRAM adjust_density
+END PROGRAM adjust
 
