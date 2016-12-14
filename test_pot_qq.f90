@@ -7,31 +7,32 @@ MODULE test_pot_module
   IMPLICIT NONE
   PRIVATE
 
-  PUBLIC :: n, force
+  ! Public routine
+  PUBLIC :: force
 
-  INTEGER, PARAMETER :: n = 2 ! pair potential
+  ! Public data
+  INTEGER, PARAMETER, PUBLIC :: n = 2 ! Pair potential
 
 CONTAINS
 
   SUBROUTINE force  ( r, e, pot, f, t )
     USE maths_module, ONLY : cross_product
     IMPLICIT NONE
-
     REAL, DIMENSION(:,:),           INTENT(in)  :: r, e
     REAL,                           INTENT(out) :: pot
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out) :: f, t
 
     REAL, DIMENSION(3) :: rij, sij, fij, gi, gj
     REAL               :: rij_mag, ci, cj, cij
-    REAL               :: vij, dvdrij, dvdci, dvdcj, dvdcij ! potential derivatives
+    REAL               :: vij, dvdrij, dvdci, dvdcj, dvdcij ! Potential derivatives
     REAL, PARAMETER    :: tol = 1.e-6
-    INTEGER, PARAMETER :: i = 1, j = 2, n = 2 ! notation to match appendix
+    INTEGER, PARAMETER :: i = 1, j = 2 ! Notation to match appendix
 
     ! Routine to demonstrate the calculation of forces and torques from the
     ! quadrupole-quadrupole potential
     ! Written for ease of comparison with the text, rather than efficiency!
 
-    ! check dimensions to be sure
+    ! Check dimensions to be sure
     IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
        WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'r shape error', SHAPE(r), 3, n
        STOP 'Error in test_pot_qq'
@@ -49,12 +50,12 @@ CONTAINS
     END IF
 
     rij = r(:,i) - r(:,j)
-    rij_mag = SQRT ( SUM(rij**2) ) ! magnitude of separation vector
-    sij = rij / rij_mag ! unit vector
+    rij_mag = SQRT ( SUM(rij**2) ) ! Magnitude of separation vector
+    sij = rij / rij_mag            ! Unit vector
     ci  = DOT_PRODUCT ( e(:,i), sij )
     cj  = DOT_PRODUCT ( e(:,j), sij )
     cij = DOT_PRODUCT ( e(:,i), e(:,j) )
-    
+
     ! The quadrupole-quadrupole potential with Q_i = 1, Q_j = 1
     vij = 0.75 * (1.0 - 5.0*ci**2 - 5.0*cj**2 + 2.0*cij**2 &
          & + 35.0*(ci*cj)**2 - 20.0*ci*cj*cij) / rij_mag**5
@@ -97,4 +98,4 @@ CONTAINS
   END SUBROUTINE force
 
 END MODULE test_pot_module
-  
+

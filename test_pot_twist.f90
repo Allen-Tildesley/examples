@@ -7,15 +7,16 @@ MODULE test_pot_module
   IMPLICIT NONE
   PRIVATE
 
-  PUBLIC :: n, force
+  ! Public routine
+  PUBLIC :: force
 
-  INTEGER, PARAMETER :: n = 4 ! four-body potential
+  ! Public data
+  INTEGER, PARAMETER, PUBLIC :: n = 4 ! Four-body potential
 
 CONTAINS
 
   SUBROUTINE force  ( r, pot, f )
     IMPLICIT NONE
-
     REAL, DIMENSION(:,:),           INTENT(in)  :: r
     REAL,                           INTENT(out) :: pot
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out) :: f
@@ -30,12 +31,12 @@ CONTAINS
     ! polymer angle-twisting potential
     ! Written for ease of comparison with the text, rather than efficiency!
 
-    ! check dimensions to be sure
+    ! Check dimensions to be sure
     IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
        WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'r shape error', SHAPE(r), 3, n
        STOP 'Error in test_pot_twist'
     END IF
-    
+
     ! Set up d vectors
     DO a = 2, n
        d(:,a) = r(:,a) - r(:,a-1)
@@ -68,7 +69,7 @@ CONTAINS
 
     prefac = 1.0 /  SQRT(dd(a,a-1)*dd(a-1,a-2))
     fac = (cc(a,a-1)*cc(a-1,a-2)-cc(a,a-2)*cc(a-1,a-1))
-    pot = prefac * fac ! this is -cos(phi)
+    pot = prefac * fac ! This is -cos(phi)
 
     IF ( .NOT. PRESENT(f) ) RETURN
 
@@ -98,4 +99,4 @@ CONTAINS
   END SUBROUTINE force
 
 END MODULE test_pot_module
-  
+

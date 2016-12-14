@@ -7,16 +7,17 @@ MODULE test_pot_module
   IMPLICIT NONE
   PRIVATE
 
-  PUBLIC :: n, force
+  ! Public routine
+  PUBLIC :: force
 
-  INTEGER, PARAMETER :: n = 2 ! pair potential
+  ! Public data
+  INTEGER, PARAMETER, PUBLIC :: n = 2 ! Pair potential
 
 CONTAINS
 
   SUBROUTINE force  ( r, e, pot, f, t )
     USE maths_module, ONLY : cross_product
     IMPLICIT NONE
-
     REAL, DIMENSION(:,:),           INTENT(in)  :: r, e
     REAL,                           INTENT(out) :: pot
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out) :: f, t
@@ -37,6 +38,7 @@ CONTAINS
     !                                                           
     ! For convenience kappa' is spelt xappa, chi' is spelt xhi
     ! We choose units such that sigma_s = 1.0 and epsilon_0 = 1.0
+    ! Two of the following three varieties should be commented out
 
     ! Original Gay-Berne-deMiguel potential [J. Chem. Phys, 74, 3316; Mol. Phys. 74, 405 (1991)]
     INTEGER, PARAMETER :: mu = 2, nu = 1
@@ -61,15 +63,15 @@ CONTAINS
     REAL               :: deps_dci, deps_dcj, deps_dcij
     REAL               :: dpot_dci, dpot_dcj, dpot_dcij, dpot_drij
     REAL               :: rho, rho6, rho12, rhoterm, drhoterm, cutterm, dcutterm
-    REAL,    PARAMETER :: r_cut = 4.0   ! normally would use a larger value of r_cut
+    REAL,    PARAMETER :: r_cut = 4.0   ! Normally would use a larger value of r_cut
     REAL,    PARAMETER :: tol = 1.e-6
-    INTEGER, PARAMETER :: i = 1, j = 2 ! notation to match appendix
+    INTEGER, PARAMETER :: i = 1, j = 2 ! Notation to match appendix
 
     ! Routine to demonstrate the calculation of forces and torques from the
     ! Gay-Berne potential, including the spherical cutoff contribution.
     ! Written for ease of comparison with the text, rather than efficiency!
 
-    ! check dimensions to be sure
+    ! Check dimensions to be sure
     IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
        WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'r shape error', SHAPE(r), 3, n
        STOP 'Error in test_pot_gb'
@@ -85,11 +87,11 @@ CONTAINS
        WRITE ( unit=error_unit, fmt='(4f10.5)' ) e(:,i), SUM(e(:,i)**2)
        WRITE ( unit=error_unit, fmt='(4f10.5)' ) e(:,j), SUM(e(:,j)**2)
     END IF
-    
+
     rij     = r(:,i) - r(:,j)
     rij_sq  = SUM ( rij**2 )
-    rij_mag = SQRT(rij_sq)
-    sij     = rij / rij_mag ! unit vector along rij
+    rij_mag = SQRT(rij_sq)  ! Magnitude of separation
+    sij     = rij / rij_mag ! Unit vector along rij
 
     ! Orientation-dependent terms
     ci  = DOT_PRODUCT ( sij, e(:,i) )
@@ -104,26 +106,26 @@ CONTAINS
     sigma = 1.0/SQRT(1.0-0.5*chi*(cp*cpchi+cm*cmchi))
 
     ! Epsilon formula
-    eps1    = 1.0/SQRT(1.0-(chi*cij)**2) ! depends on chi, not xhi
+    eps1    = 1.0/SQRT(1.0-(chi*cij)**2) ! Depends on chi, not xhi
     cpxhi   = cp/(1.0+xhi*cij)
     cmxhi   = cm/(1.0-xhi*cij)
-    eps2    = 1.0-0.5*xhi*(cp*cpxhi+cm*cmxhi) ! depends on xhi
+    eps2    = 1.0-0.5*xhi*(cp*cpxhi+cm*cmxhi) ! Depends on xhi
     epsilon = (eps1**nu) * (eps2**mu)
 
     ! Potential at rij
     rho      = rij_mag - sigma + 1.0
     rho6     = 1.0 / rho**6
     rho12    = rho6**2
-    rhoterm  = 4.0*(rho12 - rho6)                 ! needed for forces and torques
-    drhoterm = -24.0 * (2.0 * rho12 - rho6) / rho ! needed for forces and torques
+    rhoterm  = 4.0*(rho12 - rho6)                 ! Needed for forces and torques
+    drhoterm = -24.0 * (2.0 * rho12 - rho6) / rho ! Needed for forces and torques
     pot      = epsilon*rhoterm
 
     ! Potential at r_cut
     rho      = r_cut - sigma + 1.0
     rho6     = 1.0 / rho**6
     rho12    = rho6**2
-    cutterm  = 4.0*(rho12 - rho6)                 ! needed for cutoff forces and torques
-    dcutterm = -24.0 * (2.0 * rho12 - rho6) / rho ! needed for cutoff forces and torques
+    cutterm  = 4.0*(rho12 - rho6)                 ! Needed for cutoff forces and torques
+    dcutterm = -24.0 * (2.0 * rho12 - rho6) / rho ! Needed for cutoff forces and torques
     pot      = pot - epsilon * cutterm
 
     IF ( .NOT. PRESENT(f) ) RETURN
@@ -142,19 +144,19 @@ CONTAINS
     END IF
 
     ! Derivatives of sigma
-    prefac   = 0.5*chi*sigma**3
+    prefac    = 0.5*chi*sigma**3
     dsig_dci  = prefac*(cpchi+cmchi)
     dsig_dcj  = prefac*(cpchi-cmchi)
-    prefac   = prefac*(0.5*chi)
+    prefac    = prefac*(0.5*chi)
     dsig_dcij = -prefac*(cpchi**2-cmchi**2)
 
     ! Derivatives of epsilon
-    prefac   = -mu*xhi*(eps1**nu)*eps2**(mu-1)
+    prefac    = -mu*xhi*(eps1**nu)*eps2**(mu-1)
     deps_dci  = prefac*(cpxhi+cmxhi)
     deps_dcj  = prefac*(cpxhi-cmxhi)
-    prefac   = prefac*(0.5*xhi)
-    deps_dcij = -prefac*(cpxhi**2-cmxhi**2)                          ! from derivative of eps2
-    deps_dcij = deps_dcij + nu*(chi**2)*(eps1**(nu+2))*(eps2**mu)*cij ! from derivative of eps1
+    prefac    = prefac*(0.5*xhi)
+    deps_dcij = -prefac*(cpxhi**2-cmxhi**2)                           ! From derivative of eps2
+    deps_dcij = deps_dcij + nu*(chi**2)*(eps1**(nu+2))*(eps2**mu)*cij ! From derivative of eps1
 
     ! Derivatives of potential
     dpot_drij  = epsilon * drhoterm
@@ -189,4 +191,4 @@ CONTAINS
   END SUBROUTINE force
 
 END MODULE test_pot_module
-  
+

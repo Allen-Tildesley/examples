@@ -2,79 +2,118 @@
 ! Test potential, forces for atoms
 PROGRAM test_pot_atom
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE test_pot_module, ONLY : n, force
-  USE maths_module,  ONLY : init_random_seed, cross_product
+  USE maths_module,    ONLY : init_random_seed, cross_product
 
   IMPLICIT NONE
 
-  LOGICAL              :: ok
-  INTEGER              :: i, xyz, try
-  REAL, DIMENSION(3,n) :: r, f ! positions, forces
-  REAL, DIMENSION(3)   :: axis, rsave, ftot, ttot
-  REAL                 :: pot, potp, potm, fnum
+  REAL, DIMENSION(3,n) :: r     ! Positions
+  REAL, DIMENSION(3,n) :: f     ! Forces
+  REAL, DIMENSION(3)   :: axis  ! Axis of translation
+  REAL, DIMENSION(3)   :: rsave ! Saves reference position
+  REAL, DIMENSION(3)   :: tot   ! Total force or torque to check conservation
+
+  LOGICAL :: ok
+  INTEGER :: i, xyz, try, ntry, npos, ioerr
+  REAL    :: pot, potp, potm, fnum
+  REAL    :: delta, d_min, d_max, pot_max
 
   CHARACTER(len=2), DIMENSION(3), PARAMETER :: cf = ['Fx','Fy','Fz']
 
-  ! Any of the following parameters could be empirically adjusted
-  REAL,    PARAMETER :: delta = 0.00001, d_min = 0.3, d_max = 1.5, pot_max = 10.0
-  INTEGER, PARAMETER :: ntry = 1000
+  NAMELIST /nml/ delta, d_min, d_max, pot_max, ntry, npos
 
-  ! Initialize random number generator                          
+  ! Initialize random number generator (hopefully different every time!)
   CALL init_random_seed
+
+  ! Default values: any of the following could be empirically adjusted
+  delta   = 1.e-5 ! Small displacement
+  d_min   = 0.3   ! Minimum separation between atoms
+  d_max   = 1.5   ! Maximum separation between atoms
+  pot_max = 10.0  ! Maximum potential to allow in atom placement
+  ntry    = 1000  ! Number of attempts to make in order to place atoms
+  npos    = 1000  ! Number of attempts to position each atom
+
+  ! Read parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in test_pot_atom'
+  END IF
+
+  ! Write out parameters
+  WRITE ( unit=output_unit, fmt='(a,t40,es15.4)' ) 'Displacement delta',      delta
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)'  ) 'Min separation d_min',    d_min
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)'  ) 'Max separation d_max',    d_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)'  ) 'Min potential pot_max',   pot_max
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'    ) 'Max placement tries',     ntry
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'    ) 'Max atom position tries', npos
 
   ! Make a number of attempts to place the atoms
   ok = .FALSE.
   DO try = 1, ntry 
-     CALL random_positions ( d_min, d_max, r )
+     CALL random_positions ( d_min, d_max, npos, r )
      CALL force ( r, pot )
      IF ( ABS(pot) < pot_max ) THEN
         ok = .TRUE.
         EXIT
      END IF
   END DO
-  IF (.NOT.ok) WRITE ( output_unit, fmt='(a)' ) 'Warning: atom placement failed'
+  IF ( .NOT. ok ) THEN
+     WRITE ( unit=error_unit, fmt='(a)') 'Exceeded allowed number of tries'
+     STOP 'Error in test_pot_atom'
+  END IF
 
   CALL force ( r, pot, f ) ! Calculation of potential, and analytical forces
-  WRITE ( output_unit, fmt='(a,t25,f15.6)' ) 'Potential energy = ', pot
+  WRITE ( output_unit, fmt='(/,a,t40,f15.6)' ) 'Potential energy', pot
 
   ! Check momentum and angular momentum conservation
-  ftot = SUM ( f, dim=2 )
-  ttot = 0.0
+  tot = SUM ( f, dim=2 )
+  WRITE ( output_unit, fmt='(a,t40,3es15.4)') 'Total force', tot
+  tot = 0.0
   DO i = 1, n
-     ttot = ttot + cross_product ( r(:,i), f(:,i) )
+     tot = tot + cross_product ( r(:,i), f(:,i) )
   END DO
-  WRITE ( output_unit, fmt='(a,t25,3es15.3)') 'Total force      = ', ftot
-  WRITE ( output_unit, fmt='(a,t25,3es15.3)') 'Total torque     = ', ttot
+  WRITE ( output_unit, fmt='(a,t40,3es15.4)') 'Total torque', tot
 
-  WRITE ( output_unit, fmt='(2a10,3a15)') 'Atom', 'Component', 'Exact', 'Numerical', 'Difference'
+  WRITE ( output_unit, fmt='(/,2a15,t40,3a15)') 'Atom', 'Component', 'Exact', 'Numerical', 'Difference'
 
-  DO i = 1, n
+  DO i = 1, n ! Loop over atoms
 
-     DO xyz = 1, 3 ! Loop to calculate numerical forces
+     DO xyz = 1, 3 ! Loop over Cartesian components
+
+        ! Pick axis
         axis      = 0.0
-        axis(xyz) = 1.0 ! Pick axis
-        rsave     = r(:,i) ! Save position
-        r(:,i)    = rsave + delta*axis ! translate
-        CALL force ( r, potp )
-        r(:,i)    = rsave - delta*axis ! translate
-        CALL force ( r, potm )
-        r(:,i)    = rsave ! Restore position
-        fnum      = -(potp-potm)/(2.0*delta)
-        WRITE ( output_unit, fmt='(i10,a10,2f15.6,es15.3)' ) i, cf(xyz), f(xyz,i), fnum, f(xyz,i)-fnum
-     END DO ! End loop to calculate numerical forces
+        axis(xyz) = 1.0
 
-  END DO ! End loop over molecules
+        rsave  = r(:,i) ! Save position
+        r(:,i) = rsave + delta*axis ! Translate
+        CALL force ( r, potp )
+        r(:,i) = rsave - delta*axis ! Translate
+        CALL force ( r, potm )
+        r(:,i) = rsave ! Restore position
+        fnum   = -(potp-potm)/(2.0*delta)
+
+        WRITE ( output_unit, fmt='(i15,a15,t40,2f15.6,es15.4)' ) i, cf(xyz), f(xyz,i), fnum, f(xyz,i)-fnum
+
+     END DO ! End loop over Cartesian components
+
+  END DO ! End loop over atoms
 
 CONTAINS
 
-  SUBROUTINE random_positions ( d_min, d_max, r )
+  SUBROUTINE random_positions ( d_min, d_max, npos, r )
     USE maths_module, ONLY : random_vector
+    IMPLICIT NONE
     REAL,                  INTENT(in)  :: d_min, d_max
+    INTEGER,               INTENT(in)  :: npos
     REAL, DIMENSION (3,n), INTENT(out) :: r
 
-    INTEGER :: i, j
+    INTEGER :: i, j, pos_try
     REAL    :: d, zeta
     LOGICAL :: ok
 
@@ -82,21 +121,28 @@ CONTAINS
     ! the desired range d_min ... d_max of each other.
     ! Obviously this approach can fail, depending on the value of n
     ! and the supplied distances.
-    r(:,1) = [0.0,0.0,0.0] ! first one at origin
+
+    r(:,1) = [0.0,0.0,0.0] ! First one at origin
 
     DO i = 2, n ! Loop over remaining atoms
 
-       DO ! loop until successful
-          r(:,i) = random_vector ( ) ! direction of r
+       pos_try = 0
+       DO ! Loop until successful
+          r(:,i) = random_vector ( ) ! Direction of r
           CALL RANDOM_NUMBER ( zeta )
-          d      = d_min + (d_max-d_min)*zeta ! magnitude of r
-          r(:,i) = r(:,i) * d                 ! within desired range of origin
+          d      = d_min + (d_max-d_min)*zeta ! Magnitude of r
+          r(:,i) = r(:,i) * d                 ! Within desired range of origin
           ok = .TRUE.
-          DO j = 2, i-1 ! check intermediate atoms if any
+          DO j = 2, i-1 ! Check intermediate atoms if any
              d  = SQRT ( SUM((r(:,i)-r(:,j))**2) )
              ok = ok .AND. ( d >= d_min ) .AND. ( d <= d_max )
           END DO ! end check intermediate atoms if any
           IF ( ok ) EXIT
+          pos_try = pos_try + 1
+          IF ( pos_try > npos ) THEN
+             WRITE ( unit=error_unit, fmt='(a)') 'Exceeded allowed number of tries'
+             STOP 'Error in random_positions'
+          END IF
        END DO ! End loop until successful
 
     END DO ! End loop over remaining atoms

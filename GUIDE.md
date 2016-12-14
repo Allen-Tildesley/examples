@@ -1,7 +1,7 @@
-#Brief Guide
+# Brief Guide
 Here are some notes to assist in running the programs.
 
-##Data Input
+## Data Input
 Most of the Fortran codes use a `namelist` to input a few parameters from standard input.
 This gives an easy way to specify default values in the program itself, and to use a
 keyword-based syntax to specify values different from the default ones at run-time.
@@ -17,7 +17,7 @@ The program `md_nve_lj_vl` expects the input file to contain a second namelist,
 `&nml_list`, which should either be empty or contain the desired value of `r_list_factor`.
 See the file `verlet_list_module.f90` for details.
 
-##Initial Configuration
+## Initial Configuration
 Simulation runs require a starting configuration which can usually be prepared using
 the `initialize` program (built, by the default SConstruct file, in `build_initialize/`).
 The default parameters produce an FCC configuration of 256 atoms at reduced density &rho;=0.75,
@@ -36,13 +36,13 @@ A utility program,
 scales the velocities to change the kinetic energy per atom by a specified amount,
 and/or the positions (and the box length) to change the density by a specified amount.
 
-##Lennard-Jones simulation programs
+## Lennard-Jones simulation programs
 A large number of the examples simulate the Lennard-Jones liquid.
 Before discussing these in detail,
 we consider the different variants of the model that appear in the programs,
 and the state points used for testing.
 
-###State points for different Lennard-Jones models
+### State points for different Lennard-Jones models
 For most of the examples, we use a cutoff of _R_<sub>c</sub>=2.5&sigma;.
 For MC programs the cut (but not shifted) potential (c) is used in the simulation,
 while for MD programs the cut-and-shifted potential (cs) is used.
@@ -179,7 +179,7 @@ This improves the energy conservation, but the pressure still looks a bit off.
 Perhaps this program needs looking at???
 Be aware that there have been some cosmetic changes to the introductory output since these first few test runs.
 
-###Lennard-Jones MC programs
+### Lennard-Jones MC programs
 Our MC programs use the cut (but not shifted) potential
 (which means that there is a delta correction, in the program, for the pressure).
 In this case, the value of _C<sub>v</sub>_ (reported as _C_ below)
@@ -239,7 +239,7 @@ Source                |  z     | &rho;     | _T_  | _E_ (c)   | _P_ (c)    | _E_
 Thol et al (2016) (c) | 0.032  | 0.65325   | 1.0  | -2.7212   | 0.0457     | -3.0710   | -0.1828  
 `mc_zvt_lj`           | 0.032  | 0.6532(5) | 1.0  | -2.728(3) | 0.0325(25) | -3.078(4) | -0.196(2)
 
-##Brownian dynamics program
+### Brownian dynamics program
 The program `bd_nvt_lj` carries out a Brownian dynamics simulation for a set of atoms
 interacting through the cut-and-shifted Lennard-Jones potential.
 An initial configuration may be prepared, at a typical Lennard-Jones state point,
@@ -249,7 +249,7 @@ the user specifies a friction coefficient.
 The calculated average thermodynamic quantities should be as expected for an
 equilibrium simulation of this model at the chosen state point (see e.g. the table above).
 
-##Gibbs Monte Carlo program
+### Gibbs Monte Carlo program
 The program `mc_gibbs_lj` carries out Gibbs ensemble Monte Carlo,
 and to test it we selected a temperature _T_=1.0,
 which is below the critical point for the cut (but not shifted) LJ potential
@@ -274,7 +274,7 @@ Trokhymchuk et al MD | 0.6507   | 0.0500   | 0.0380   | 0.0380   | -2.713 &Dagge
 * There is a small discrepancy between pressures in the two boxes.
 * &Dagger; indicates values for given &rho; and _T_ from the Thol et al (2016) EOS (f) with cutoff correction.
 
-##Replica exchange program
+### Replica exchange program
 The `mc_nvt_lj_re` program conducts runs at several temperatures: four were used in testing.
 The default program values include _T_=1.0, which is reported above, and here is the complete set,
 with expected values from the Thol et al (2016) equation of state (f) corrected for cutoff.
@@ -293,7 +293,7 @@ Thol et al (2016) (f)  | 1.1400 | -3.0055   | 1.2571   | -3.4070   |  0.9559   |
 Thol et al (2016) (f)  | 1.2996 | -2.6523   | 1.8667   | -3.0539   |  1.5655   |  2.1989  
 `mc_nvt_lj_re`         | 1.2996 | -2.662(1) | 1.820(3) | -3.063(1) |  1.519(3) |  2.214(5)
 
-##Lees-Edwards programs
+## Lees-Edwards programs
 The programs `md_nvt_lj_le` and `md_nvt_lj_llle` are intended to illustrate:
 the moving boundaries used in nonequilibrium shear flow simulations;
 an algorithm for integrating the SLLOD equations of motion with constrained kinetic energy;
@@ -331,7 +331,7 @@ are in good agreement with the above papers.
 * Although the link-list program seems to be working fine, it might be worth double-checking
 the logic in the force routine, as it is a bit fiddly.
 
-##Hard-particle programs
+## Hard-particle programs
 The programs `mc_nvt_hs` and `md_nve_hs` illustrate, respectively,
 the simplest MC and MD methods for the basic hard-sphere model.
 The temperature is not important in the first case: a factor _kT_ is used to normalize the energies.
@@ -444,7 +444,7 @@ is reasonable.
 
 * Perhaps we should increase the default number of steps in the programs and/or increase the system size
 
-##Chain simulation programs
+## Chain simulation programs
 The program `mc_chain_nvt_cbmc_lj` simulates a single Lennard-Jones chain,
 where the atoms are linked by harmonic springs.
 There are, therefore,
@@ -639,7 +639,7 @@ with small distortions due to the fixed bond length and the need to maximise int
 
 * We might consider adding a fixed-length production run at the end of `mc_chain_wl_sw`.
 
-##Polyatomic Lennard-Jones program
+## Polyatomic Lennard-Jones program
 The program `mc_nvt_poly_lj` conducts Monte Carlo simulations of a system of rigid molecules
 composed of Lennard-Jones interaction sites.
 For simplicity the sites are taken to be identical, although the program is easily generalized.
@@ -702,7 +702,74 @@ or modify the potential to compare more precisely with this one??
 for either linear or nonlinear molecules. It is tempting to write examples of both,
 but I cannot give this a high priority.
 
-##Cluster program
+## DPD program
+For the `dpd` example, we recommend generating an initial configuration
+using the `initialize` program, with namelist input similar to the following
+```
+&nml n = 100, density = 3.0, random_positions = .true.,
+velocities = .true., soft=.true. /
+```
+The above value of the density is typical when using this method to model water.
+
+For testing we compare with an approximate DPD equation of state for _P_.
+
+* RD Groot, PB Warren, _J Chem Phys,_ __107,__ 4423 (1997)
+* TP Liyana-Arachchi, SN Jamadagni, D Eike, PH Koenig, JI Siepmann,
+_J Chem Phys,_ __142,__ 044902 (2015)
+
+The paper of Liyana-Arachchi et al (2015) is an improvement of the original
+EOS of Groot and Warren (1997), which is more accurate and
+applicable over a wider range of state points.
+The function is included in the `dpd` program,
+and the expected value of _P_ (labelled EOS below)
+is printed for comparison at the end.
+We give results obtained by both
+the Lowe thermostat (L) and the Shardlow algorithm (S).
+We take the default values of _a_ &rho;/T=75, and of other parameters not mentioned below.
+
+ _T_   | &rho; | _P_ (EOS) | _P_ (L)   | _P_ (S)
+ ----- | ----- | -----     | -----     | -----
+ 0.5   | 3.0   | 11.864    | 11.814(2) | 11.819(2)
+ 1.0   | 3.0   | 23.587    | 23.637(2) | 23.635(2)
+ 1.5   | 3.0   | 35.276    | 35.449(3) | 35.455(4)
+ 2.0   | 3.0   | 46.951    | 47.257(4) | 47.265(5)
+ 1.0   | 2.0   | 14.187    | 14.320(2) | 14.316(2)
+ 1.0   | 4.0   | 32.811    | 32.622(3) | 32.628(3)
+ 1.0   | 5.0   | 41.887    | 41.539(4) | 41.533(3)
+
+## Test programs for potentials, forces and torques
+Two program files are provided: `test_pot_atom.f90` and `test_pot_linear.f90`,
+for pair potentials between, respectively, atoms and linear molecules.
+These are combined, as appropriate, with modules which contain a subroutine to calculate
+the necessary potential, forces and torques.
+The aim is to demonstrate the numerical testing of the analytical derivatives
+which go into the forces and torques:
+small displacements and rotations are applied in order to do this.
+The test is performed for a randomly selected configuration.
+Some parameters are used to prevent serious overlap,
+which might produce numerical overflow,
+while keeping the particles close enough together to give non-zero results.
+The values of these parameters may be adjusted via the namelist in individual cases;
+to run the programs without any tweaking,
+simply give an empty namelist `&nml /` to standard input in the usual way.
+The supplied examples are:
+
+* `test_pot_at` the Axilrod-Teller three-body potential
+* `test_pot_bend` the angle-bending part of a polymer chain potential
+* `test_pot_dd` the dipole-dipole potential
+* `test_pot_dq` the dipole-quadrupole and quadrupole-dipole potential
+* `test_pot_gb` the Gay-Berne potential
+* `test_pot_qq` the quadrupole-quadrupole potential
+* `test_pot_twist` the angle-torsion part of a polymer chain potential
+
+In all cases, the SConstruct file builds these programs in a directory
+whose name is taken from the module name above,
+but the executable file is named `test_pot_atom` or `test_pot_linear`
+as appropriate.
+
+## T-tensor program
+
+## Cluster program
 The `cluster` program is self contained. It reads in a configuration of atomic positions
 and produces a circular linked list for each cluster identified within it.
 The best value of the critical separation `r_cl` depends on the particular physical system
@@ -711,7 +778,7 @@ most likely identify almost all atoms as belonging to a single cluster, with at 
 a few atoms being isolated on their own. However, this is unlikely to be the type of system
 for which this analysis is useful.
 
-##Correlation function program
+## Correlation function program
 The aim of the program `corfun` is to illustrate the direct method, and the FFT method,
 for calculating time correlation functions.
 The program is self contained: it generates the time dependent data itself,
@@ -735,7 +802,7 @@ due to the finite length of the latter.
 
 ![alt text](corfun.png "corfun test results")
 
-##Diffusion program
+## Diffusion program
 The program `diffusion` reads in a sequence of configurations and calculates
 the velocity auto correlation function (vacf),
 the mean square displacement (msd), and
@@ -779,42 +846,7 @@ while the exact results are indicated as lines.
 
 ![alt text](diffusion.png "diffusion test results")
 
-##DPD program
-For the `dpd` example, we recommend generating an initial configuration
-using the `initialize` program, with namelist input similar to the following
-```
-&nml n = 100, density = 3.0, random_positions = .true.,
-velocities = .true., soft=.true. /
-```
-The above value of the density is typical when using this method to model water.
-
-For testing we compare with an approximate DPD equation of state for _P_.
-
-* RD Groot, PB Warren, _J Chem Phys,_ __107,__ 4423 (1997)
-* TP Liyana-Arachchi, SN Jamadagni, D Eike, PH Koenig, JI Siepmann,
-_J Chem Phys,_ __142,__ 044902 (2015)
-
-The paper of Liyana-Arachchi et al (2015) is an improvement of the original
-EOS of Groot and Warren (1997), which is more accurate and
-applicable over a wider range of state points.
-The function is included in the `dpd` program,
-and the expected value of _P_ (labelled EOS below)
-is printed for comparison at the end.
-We give results obtained by both
-the Lowe thermostat (L) and the Shardlow algorithm (S).
-We take the default values of _a_ &rho;/T=75, and of other parameters not mentioned below.
-
- _T_   | &rho; | _P_ (EOS) | _P_ (L)   | _P_ (S)
- ----- | ----- | -----     | -----     | -----
- 0.5   | 3.0   | 11.864    | 11.814(2) | 11.819(2)
- 1.0   | 3.0   | 23.587    | 23.637(2) | 23.635(2)
- 1.5   | 3.0   | 35.276    | 35.449(3) | 35.455(4)
- 2.0   | 3.0   | 46.951    | 47.257(4) | 47.265(5)
- 1.0   | 2.0   | 14.187    | 14.320(2) | 14.316(2)
- 1.0   | 4.0   | 32.811    | 32.622(3) | 32.628(3)
- 1.0   | 5.0   | 41.887    | 41.539(4) | 41.533(3)
-
-##Error calculation
+## Error calculation
 The program `error_calc` is a self-contained illustration of the effects of
 correlations on the estimation of errors for a time series.
 We produce the series using a generalized Langevin equation,
@@ -824,7 +856,7 @@ we can predict the effects, and compare with the empirical estimates
 obtained by different methods.
 The program contains extensive comments to explain what is being calculated at each stage.
 
-##FFT program
+## FFT program
 The aim of `fft3dwrap` is to illustrate the way a standard Fast Fourier Transform
 library routine is wrapped in a user program.
 We numerically transform a 3D Gaussian function,
@@ -833,7 +865,7 @@ User input defines the number of grid points and the box size;
 sensible defaults are provided.
 The library that we use for this example is [FFTW](http://www.fftw.org/).
 
-##Hit-and-miss and sample-mean
+## Hit-and-miss and sample-mean
 The two programs `hit_and_miss` and `sample_mean` illustrate two very simple
 Monte Carlo methods to estimate the volume of a 3D object.
 They are both described in detail at the start of Chapter 4.

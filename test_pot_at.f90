@@ -7,15 +7,16 @@ MODULE test_pot_module
   IMPLICIT NONE
   PRIVATE
 
-  PUBLIC :: n, force
+  ! Public routine
+  PUBLIC :: force
 
-  INTEGER, PARAMETER :: n = 3 ! three-body potential
+  ! Public data
+  INTEGER, PARAMETER, PUBLIC :: n = 3 ! Three-body potential
 
 CONTAINS
 
   SUBROUTINE force  ( r, pot, f )
     IMPLICIT NONE
-
     REAL, DIMENSION(:,:),           INTENT(in)  :: r
     REAL,                           INTENT(out) :: pot
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out) :: f
@@ -23,18 +24,19 @@ CONTAINS
     REAL, DIMENSION(3) :: rij, rjk, rki
     REAL               :: rij_sq, rjk_sq, rki_sq, rij_mag, rjk_mag, rki_mag
     REAL               :: rij2, rjk2, rki2, ci, cj, ck, prefac, fac
-    INTEGER, PARAMETER :: i = 1, j = 2, k = 3 ! notation to match appendix
+    INTEGER, PARAMETER :: i = 1, j = 2, k = 3 ! Notation to match appendix
 
     ! Routine to demonstrate the calculation of forces from the
     ! Axilrod-Teller triple-dipole potential
     ! Written for ease of comparison with the text, rather than efficiency!
 
-    ! check dimensions to be sure
+    ! Check dimensions to be sure
     IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
        WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'r shape error', SHAPE(r), 3, n
        STOP 'Error in test_pot_at'
     END IF
 
+    ! Note that we define the separation vectors in a cyclic way
     rij = r(:,i) - r(:,j)
     rjk = r(:,j) - r(:,k)
     rki = r(:,k) - r(:,i)
@@ -44,9 +46,9 @@ CONTAINS
     rij2 = 1.0/rij_sq
     rjk2 = 1.0/rjk_sq
     rki2 = 1.0/rki_sq
-    rij_mag = SQRT ( rij_sq ) ! magnitude of separation vector
-    rjk_mag = SQRT ( rjk_sq ) ! magnitude of separation vector
-    rki_mag = SQRT ( rki_sq ) ! magnitude of separation vector
+    rij_mag = SQRT ( rij_sq )
+    rjk_mag = SQRT ( rjk_sq )
+    rki_mag = SQRT ( rki_sq )
     ci = DOT_PRODUCT ( rki, rij )
     cj = DOT_PRODUCT ( rij, rjk )
     ck = DOT_PRODUCT ( rjk, rki )
@@ -75,4 +77,4 @@ CONTAINS
   END SUBROUTINE force
 
 END MODULE test_pot_module
-  
+

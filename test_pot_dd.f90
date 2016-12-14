@@ -7,9 +7,11 @@ MODULE test_pot_module
   IMPLICIT NONE
   PRIVATE
 
-  PUBLIC :: n, force
+  ! Public routine
+  PUBLIC :: force
 
-  INTEGER, PARAMETER :: n = 2 ! Pair potential
+  ! Public data
+  INTEGER, PARAMETER, PUBLIC :: n = 2 ! Pair potential
 
 CONTAINS
 
@@ -30,7 +32,7 @@ CONTAINS
     ! dipole-dipole potential
     ! Written for ease of comparison with the text, rather than efficiency!
 
-    ! check dimensions to be sure
+    ! Check dimensions to be sure
     IF ( ANY ( SHAPE(r) /= [3,n] ) ) THEN
        WRITE ( unit=error_unit, fmt='(a,4i15)' ) 'r shape error', SHAPE(r), 3, n
        STOP 'Error in test_pot_dd'
@@ -48,8 +50,8 @@ CONTAINS
     END IF
 
     rij = r(:,i) - r(:,j)
-    rij_mag = SQRT ( SUM(rij**2) ) ! magnitude of separation vector
-    sij = rij / rij_mag ! unit vector
+    rij_mag = SQRT ( SUM(rij**2) ) ! Magnitude of separation vector
+    sij = rij / rij_mag            ! Unit vector
     ci  = DOT_PRODUCT ( e(:,i), sij )
     cj  = DOT_PRODUCT ( e(:,j), sij )
     cij = DOT_PRODUCT ( e(:,i), e(:,j) )
@@ -88,4 +90,4 @@ CONTAINS
   END SUBROUTINE force
 
 END MODULE test_pot_module
-  
+
