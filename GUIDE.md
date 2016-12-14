@@ -726,6 +726,15 @@ The efficiency of the direct method may be improved,
 by selecting origins less frequently,
 and in this case the results obtained by the two methods may differ a little.
 
+Sample results using default program parameters are shown here.
+The direct method is indicated in black, plotting only every fifth point for clarity.
+The FFT result is shown as a red line: it matches the direct method as expected.
+The exactly known function is a blue line.
+There are very small discrepancies with the results of the simulation,
+due to the finite length of the latter.
+
+![alt text](corfun.png "corfun test results")
+
 ##Diffusion program
 The program `diffusion` reads in a sequence of configurations and calculates
 the velocity auto correlation function (vacf),
