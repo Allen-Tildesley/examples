@@ -768,6 +768,18 @@ but the executable file is named `test_pot_atom` or `test_pot_linear`
 as appropriate.
 
 ## T-tensor program
+The program `t_tensor` compares the calculation of multipole energies by two methods:
+using explicit formulae based on trigonometric functions of the Euler angles,
+and via the Cartesian T-tensors.
+Two linear molecules are placed in random positions and orientations,
+within a specified range of separations,
+and some of the contributions to the electrostatic energies and forces are calculated.
+The program may be run using an empty namelist `&nml /`,
+so as to take the program defaults,
+or various parameters may be specified in the namelist.
+
+* How easy would it be to add quadrupole-quadrupole energy, quadrupole-dipole forces,
+quadrupole-quadrupole forces, and all the torques, calculated both ways??
 
 ## Cluster program
 The `cluster` program is self contained. It reads in a configuration of atomic positions
