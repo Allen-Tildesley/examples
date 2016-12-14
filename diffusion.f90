@@ -59,9 +59,9 @@ PROGRAM diffusion
   NAMELIST /nml/ nt, origin_interval, delta
 
   ! Example default values
-  nt              = 500 ! Max correlation time (as a multiple of interval between configurations)
-  origin_interval = 10  ! We only take time origins at these intervals, for efficiency
-  delta           = 1.0 ! This should be set to the actual time interval between configurations
+  nt              = 500  ! Max correlation time (as a multiple of interval between configurations)
+  origin_interval = 10   ! We only take time origins at these intervals, for efficiency
+  delta           = 0.05 ! This should be set to the actual time interval between configurations
 
   ! Namelist from standard input
   READ ( unit=input_unit, nml=nml, iostat=ioerr )

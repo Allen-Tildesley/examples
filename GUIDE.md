@@ -727,8 +727,9 @@ and in this case the results obtained by the two methods may differ a little.
 
 ##Diffusion program
 The program `diffusion` reads in a sequence of configurations and calculates
-the velocity auto correlation function, the mean square displacement, and
-the cross-correlation between velocity and displacement.
+the velocity auto correlation function (vacf),
+the mean square displacement (msd), and
+the cross-correlation between velocity and displacement (rvcf).
 Any of these may be used to estimate the diffusion coefficient,
 as described in the text.
 The output appears in `diffusion.out`
@@ -747,7 +748,7 @@ It is up to the user to provide the time interval between successive configurati
 This will typically be a small multiple of the timestep used in the original simulation.
 This value `delta` is only used to calculate the time, in the first column of
 the output file.
-A default value of 1 is provided as a place-holder, but
+A default value of 0.05 is provided as a place-holder, but
 the user really should specify a physically meaningful value;
 forgetting to do so could cause confusion when one attempts
 to quantify the results.
@@ -755,10 +756,15 @@ to quantify the results.
 To make it easier to test this program,
 we have also supplied a self-contained program `diffusion_test`,
 which generates an appropriate trajectory by numerically solving
-the simple Langevin equation for _N_ non-interacting atoms.
+the simple Langevin equation for _N_ non-interacting atoms (_N_=250 by default).
 For this model, one specifies the temperature and friction coefficient,
 which dictates the rate of exponential decay of the vacf,
 and hence the diffusion coefficient.
+The exact results for the vacf, rvcf and msd are written out to `diffusion_exact.out`
+for easy comparison with `diffusion.out`.
+Here are some typical results using default program parameters throughout.
+
+![alt text](diffusion.png "diffusion test results")
 
 ##DPD program
 For the `dpd` example, we recommend generating an initial configuration

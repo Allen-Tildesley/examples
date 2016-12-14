@@ -45,7 +45,7 @@ PROGRAM diffusion_test
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass m=1 throughout'
 
   ! Set sensible default run parameters for testing
-  n           = 100
+  n           = 250
   nblock      = 999
   nstep       = 25
   dt          = 0.002
@@ -104,6 +104,8 @@ PROGRAM diffusion_test
 
   DEALLOCATE ( r, v, zeta )
 
+  CALL exact ! Write out exact results for comparison
+  
 CONTAINS
 
   SUBROUTINE a_propagator ( t ) ! A propagator (drift)
@@ -134,4 +136,33 @@ CONTAINS
 
   END SUBROUTINE o_propagator
 
+  SUBROUTINE exact
+    IMPLICIT NONE
+
+    ! Writes out exact vacf, rvcf and msd for the Langevin equation
+    ! for comparison with results of diffusion program
+
+    INTEGER :: unit
+    REAL    :: t, vacf, rvcf, msd
+
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Exact results output to diffusion_exact.out'
+
+    OPEN ( newunit=unit, file='diffusion_exact.out', status='replace', iostat=ioerr )
+    IF ( ioerr /= 0 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening file', ioerr
+       STOP 'Error in diffusion'
+    END IF
+
+    DO blk = 0, nblock/2 ! Loop up to half the run length
+       t    = (blk*nstep)*dt                                                    ! Time advances block by block
+       vacf = 3.0*temperature * EXP(-gamma*t)                                   ! Velocity autocorrelation function
+       rvcf = 3.0*temperature * ( 1.0 - EXP(-gamma*t) ) / gamma                 ! Velocity-displacement correlation
+       msd  = 6.0*temperature * ( t - ( 1.0 - EXP(-gamma*t) ) / gamma ) / gamma ! Mean-square displacement
+       WRITE ( unit=unit, fmt='(f15.6,3f15.8)' ) t, vacf, rvcf, msd
+    END DO ! End loop up to half the run length
+
+    CLOSE(unit=unit)
+
+  END SUBROUTINE exact
+  
 END PROGRAM diffusion_test
