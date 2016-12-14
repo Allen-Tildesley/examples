@@ -683,12 +683,13 @@ is compared with the fit given by eqn (28) and the coefficients in Table III of 
 NB the volumes to insert into the equation are those of their Table I,
 which are specific to their system size.
 
-Id | &rho;   | _E_        | _P_     | _P_(ex) (MPa) | eqn (28)
-1  | 0.30533 | -12.737(7) | 0.35(2) | 12(2)         | 19.077
-2  | 0.31240 | -13.025(7) | 0.99(2) | 58(2)         | 60.143
-3  | 0.31918 | -13.293(8) | 1.66(2) | 107(2)        | 112.798
-4  | 0.32655 | -13.50(1)  | 2.60(2) | 176(1)        | 177.222
-5  | 0.33451 | -13.65(1)  | 3.95(2) | 274(1)        | 253.510
+Id    | &rho;   | _E_        | _P_     | _P_(ex) (MPa) | eqn (28)
+----- | -----   | -----      | -----   | -----         | -----
+1     | 0.30533 | -12.737(7) | 0.35(2) | 12(2)         | 19.077
+2     | 0.31240 | -13.025(7) | 0.99(2) | 58(2)         | 60.143
+3     | 0.31918 | -13.293(8) | 1.66(2) | 107(2)        | 112.798
+4     | 0.32655 | -13.50(1)  | 2.60(2) | 176(1)        | 177.222
+5     | 0.33451 | -13.65(1)  | 3.95(2) | 274(1)        | 253.510
 
 Although not perfect at the ends of the range, the agreement is not bad;
 once more, the difference in cutoff correction should be borne in mind.
@@ -763,6 +764,9 @@ and hence the diffusion coefficient.
 The exact results for the vacf, rvcf and msd are written out to `diffusion_exact.out`
 for easy comparison with `diffusion.out`.
 Here are some typical results using default program parameters throughout.
+The vacf is in red, rvcf in blue, and msd in green;
+every fifth point is shown for the results of `diffusion`,
+while the exact results are indicated as lines.
 
 ![alt text](diffusion.png "diffusion test results")
 
