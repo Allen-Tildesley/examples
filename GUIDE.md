@@ -203,9 +203,9 @@ Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    
 `mc_zvt_lj_ll`&Dagger; | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |          
 
 * &Dagger; indicates a larger system size, _N_=864 (or approximately so for `mc_zvt_lj_ll`)
-* The `mc_nvt_lj` program seems to give a low pressure, needs investigating.
+* The `mc_nvt_lj` program seems to give a low pressure, needs investigating? or longer run?
 * The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
-* The `mc_npt_lj` _measured_ pressure (c) is 0.666(2) which is a little low.
+* The `mc_npt_lj` _measured_ pressure (c) is 0.666(2) which is a little low. Needs checking?
 Measured _C<sub>p</sub>_ (full) is 5.28(7) compared with Thol et al (2016) EOS giving 5.22
 * The `mc_npt_lj_ll` program was run with `db_max`=0.015 to give a volume acceptance ratio around 9%.
 Measured pressure (c) is 0.660(3) which is again a little low. Is the delta correction wrong somehow???
@@ -257,7 +257,7 @@ which is below the critical point for the cut (but not shifted) LJ potential
 It was found convenient to start from a lower temperature,
 with configurations at gas and liquid densities, with roughly equal numbers of particles,
 and slowly work upwards in temperature, to equilibrate.
-Note that the program expects two starting configurations: cnf1.inp and cnf2.inp.
+Note that the program expects two starting configurations: `cnf1.inp` and `cnf2.inp`.
 Exchanges of box identity are expected as the critical temperature is approached,
 and so one should not place blind trust in the separate box averages reported by the program,
 but refer to histograms of density, energy etc.
@@ -271,7 +271,7 @@ Trokhymchuk et al MC | 0.6542   | 0.0439   | 0.0336   | 0.0336   |              
 Trokhymchuk et al MD | 0.6507   | 0.0500   | 0.0380   | 0.0380   | -2.713 &Dagger; | 1.047 &Dagger;
 `mc_gibbs_lj`        | 0.652(1) | 0.050(1) | 0.028(1) | 0.038(1) | -2.730(5)       | 1.054(8)
 
-* There is a small discrepancy between pressures in the two boxes.
+* There is a small discrepancy between pressures in the two boxes. Is this expected?
 * &Dagger; indicates values for given &rho; and _T_ from the Thol et al (2016) EOS (f) with cutoff correction.
 
 ### Replica exchange program
@@ -401,14 +401,16 @@ Equations of state from MC simulations are presented in two papers
 In making comparisons, care must be taken with the units.
 McGrother et al (1996) quote
 densities in the form of the packing fraction &eta;=&rho; _v_<sub>mol</sub>
-and pressures as _P_ _v_<sub>mol</sub>.
+and pressures as _P_ _v_<sub>mol</sub>,
+where _v_<sub>mol</sub> is the molecular volume.
 We translate selected values from their Table V
 (denoted (M) below)
 into our reduced units based on _D_=1 below;
 for _L/D_=5, _v_<sub>mol</sub>=4.4506.
 (Bolhuis and Frenkel (1997) define reduced densities relative to
 the density of closest packing of spherocylinders,
-while reporting pressures the same way as McGrother et al.)
+while reporting pressures the same way as McGrother et al.
+We do not use the Bolhuis-Frenkel results below.)
 
 _P_ _v_<sub>mol</sub> | &rho; _v_<sub>mol</sub> | _P_ | &rho; | _S_ | &rho; | _S_ | _P_ | _S_
 ----- | ----- | ----- | ----- | ----- | -----       | -----       | -----       | -----
@@ -442,7 +444,7 @@ which apply mainly to the middle three state points in the table,
 agreement between the two programs, and with the results of McGrother,
 is reasonable.
 
-* Perhaps we should increase the default number of steps in the programs and/or increase the system size
+* Perhaps we should increase the default number of steps in the programs? and/or increase the system size?
 
 ## Chain simulation programs
 The program `mc_chain_nvt_cbmc_lj` simulates a single Lennard-Jones chain,
@@ -560,14 +562,13 @@ _E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
  8.3488 | 5.00(1)   | 1.92(1)         | 1.97(1)
 
 When comparing results with the MC program, several points should be remembered.
-Firstly, constraining the bond lengths affects average potential energy, kinetic energy, and heat capacity.
-Secondly, while we use _k_<sub>spring</sub>=10000 to highlight the multiple timestep method,
+
+1. Constraining the bond lengths affects average potential energy, kinetic energy, and heat capacity.
+2. While we use _k_<sub>spring</sub>=10000 to highlight the multiple timestep method,
 it is quite likely that energy flow between bond vibrations and other degrees of freedom will be inefficient,
 due to the timescale separation.
-Thirdly,
-the constant-_NVE_ and constant-_NVT_ ensembles are expected to yield different behaviour around the collapse transition.
-Finally,
-molecular dynamics is not expected to thoroughly explore the energy landscape at low temperatures,
+3. The constant-_NVE_ and constant-_NVT_ ensembles are expected to yield different behaviour around the collapse transition.
+4. Molecular dynamics is not expected to thoroughly explore the energy landscape at low temperatures,
 giving instead (typically) quasi-harmonic vibrations in a single basin.
 The default run lengths are fairly modest here: 10 blocks,
 each consisting of 100000 steps of length &delta;t=0.002.
@@ -790,6 +791,8 @@ most likely identify almost all atoms as belonging to a single cluster, with at 
 a few atoms being isolated on their own. However, this is unlikely to be the type of system
 for which this analysis is useful.
 
+* Should we provide a more illuminating test case?
+
 ## Correlation function program
 The aim of the program `corfun` is to illustrate the direct method, and the FFT method,
 for calculating time correlation functions.
@@ -855,6 +858,7 @@ Here are some typical results using default program parameters throughout.
 The vacf is in red, rvcf in blue, and msd in green;
 every fifth point is shown for the results of `diffusion`,
 while the exact results are indicated as lines.
+For the default program parameters, the diffusion coefficient is _D_=1.
 
 ![alt text](diffusion.png "diffusion test results")
 
