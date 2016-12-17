@@ -42,6 +42,7 @@ variants['build_eos_lj']               = (['eos_lj.f90','eos_lj_module.f90','lrc
 variants['build_eos_hs']               = (['eos_hs.f90'],env_normal)
 variants['build_error_calc']           = (['error_calc.f90','maths_module.f90'],env_normal)
 variants['build_fft3dwrap']            = (['fft3dwrap.f90'],env_fftw)
+variants['build_grint']                = (['grint.f90','grint_module.f90','config_io_module.f90'],env_normal)
 variants['build_hit_and_miss']         = (['hit_and_miss.f90'],env_normal)
 variants['build_initialize']           = (['initialize.f90','initialize_module.f90','config_io_module.f90','maths_module.f90'],env_normal)
 variants['build_mc_chain_nvt_cbmc_lj'] = (['mc_chain_nvt_cbmc_lj.f90','mc_chain_lj_module.f90']+utilities,env_normal)

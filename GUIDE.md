@@ -858,6 +858,37 @@ while the exact results are indicated as lines.
 
 ![alt text](diffusion.png "diffusion test results")
 
+## Interface pair correlation function
+The program `grint.f90` reads in a set of configurations and calculates
+the pair correlation function for a system that is inhomogeneous in the
+z direction. It is assumed that the configurations consist of a liquid slab,
+surrounded by gas, with the interfaces lying in the _xy_-plane.
+The two interfaces are located by fitting the instantaneous density profile
+to a difference of two tanh functions. Then the single-particle density function,
+relative to the interface locations, is calculated.
+To make the process as robust as possible, an initial guess at the mid-point
+of the liquid slab should be provided, and this is updated automatically as
+successive configurations are read in, so as to shift the liquid slab into
+the middle of the periodic box, before fitting.
+Also, the results of one fit are passed on as the starting point of the next one.
+The program handles cubic boxes only;
+the modifications necessary to handle non-cubic boxes are fairly easy to make,
+but we will not do that here.
+
+* This program is incomplete. The essential parts, of reading in and
+fitting the profiles, and calculating the single-particle density in coordinates
+relative to the interface position, are done, and should not require any changes.
+A first attempt has been made to calculate the two-particle density: however
+this calculation, including the scaling and normalization factors, need to be
+checked. It was also promised, in the book, to convert this to a two-particle
+correlation function; however, this requires calculating the single-body density
+at a wider range of z than that of the two-body function (we need rho at z+r*c for
+all tabulated z, r and c). Over to you Dominic!
+* The program, as it stands, has been tested on a set of 101 configurations
+of 3200 atoms in a 20x20x20 box. It was produced by `mc_nvt_lj_ll`, at a temperature
+_T_=0.70: 100 blocks of 5000 steps each. These configurations are available if
+needed for further testing.
+
 ## Error calculation
 The program `error_calc` is a self-contained illustration of the effects of
 correlations on the estimation of errors for a time series.

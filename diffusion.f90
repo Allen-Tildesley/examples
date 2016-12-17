@@ -28,7 +28,7 @@ PROGRAM diffusion
   ! This assumes that the atoms never move more than box/2 during that interval
 
   ! Values of basic parameters are read from standard input using a namelist nml
-  ! Although a default value of delta=1 is supplied, it is really only a place-holder
+  ! Although a default value of delta=0.05 is supplied, it is really only a place-holder
   ! for the correct user-supplied value (time interval between configurations)
 
   INTEGER :: n               ! Number of atoms
@@ -98,7 +98,7 @@ PROGRAM diffusion
   mk      = 0 ! Storage location of time origin
   full    = .FALSE.
 
-  DO ! Single sweep through data until end
+  DO ! Loop reading and correlating data
 
      IF ( t > 999 ) EXIT ! Our naming scheme only goes up to cnf.999
 
@@ -157,7 +157,7 @@ PROGRAM diffusion
      r_old = r     ! Ready to unfold next step
      t     = t + 1 ! Number of next step
 
-  END DO  ! End main loop, reading and correlating data
+  END DO ! End loop reading and correlating data
 
   ! Normalize by N as well as time-origin normalizing factors
   msd(:)  = msd(:)  / norm(:) / REAL ( n ) ! 3D mean-squared displacement
