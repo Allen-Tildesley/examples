@@ -49,7 +49,7 @@ PROGRAM test_pot_atom
   WRITE ( unit=output_unit, fmt='(a,t40,es15.4)' ) 'Displacement delta',      delta
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)'  ) 'Min separation d_min',    d_min
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)'  ) 'Max separation d_max',    d_max
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)'  ) 'Min potential pot_max',   pot_max
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)'  ) 'Max potential pot_max',   pot_max
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'    ) 'Max placement tries',     ntry
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'    ) 'Max atom position tries', npos
 
