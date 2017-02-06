@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Routines for maths, random numbers, order parameters.
 """
+
+# Routines associated with random number generation
+
 def random_vector():
+    """Returns a random unit vector as a numpy array of 3 elements."""
+
     import numpy as np
 
     zeta = np.random.rand(2) # Two uniformly sampled random numbers in range (0,1)
@@ -14,3 +19,29 @@ def random_vector():
     phi = zeta[1] * 2.0*np.pi # Random angle uniformly sampled in range (0,2*pi)
 
     return np.array ( ( s*np.cos(phi), s*np.sin(phi), c ), dtype='f8' ) # Random unit vector
+
+# Low-level mathematical operations
+
+def rotate_vector ( angle, axis, old ):
+
+    """Returns a vector rotated from the old one by specified angle about specified axis."""
+
+    import numpy as np
+    from math import isclose
+    
+    # Note that the axis vector should be normalized and we test for this
+    # In general, the old vector need not be normalized, and the same goes for the result
+    # although quite often in our applications they will be
+
+    assert old.size == 3, 'Incorrect size of old'
+    assert axis.size == 3, 'Incorrect size of axis'
+    assert isclose(np.sum(axis**2),1.0), 'Non-unit vector {} {} {}'.format(*axis)
+
+    c    = np.cos ( angle )
+    s    = np.sin ( angle )
+    proj = np.dot ( axis, old ) # The two vectors need not be perpendicular
+
+    # Standard (Goldstein) rotation formula
+    e = c * old + ( 1.0 - c ) * proj * axis + s * np.cross ( axis, old )
+
+    return e

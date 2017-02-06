@@ -76,7 +76,7 @@ CONTAINS
        STOP 'Error in test_pot_qq'
     END IF
 
-    ! Forces and torques for dipole-quadrupole potential with mu_i = 1, Q_j = 1
+    ! Forces and torques for quadrupole-quadrupole potential with Q_i = 1, Q_j = 1
     dvdrij = -5.0 * vij / rij_mag
     dvdci  =  7.5 * (ci*(7.0*cj**2-1.0)-2.0*cj*cij) / rij_mag**5
     dvdcj  =  7.5 * (cj*(7.0*ci**2-1.0)-2.0*ci*cij) / rij_mag**5
