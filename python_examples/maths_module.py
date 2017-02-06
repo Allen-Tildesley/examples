@@ -18,7 +18,7 @@ def random_vector():
 
     phi = zeta[1] * 2.0*np.pi # Random angle uniformly sampled in range (0,2*pi)
 
-    return np.array ( ( s*np.cos(phi), s*np.sin(phi), c ), dtype='f8' ) # Random unit vector
+    return np.array ( ( s*np.cos(phi), s*np.sin(phi), c ), dtype=np.float_ ) # Random unit vector
 
 # Low-level mathematical operations
 

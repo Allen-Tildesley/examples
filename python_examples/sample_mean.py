@@ -10,7 +10,7 @@ import numpy as np
 print('sample_mean')
 np.random.seed()
 
-r_0 = np.array([1.0,2.0],dtype='f8')
+r_0 = np.array([1.0,2.0],dtype=np.float_)
 a_0 = np.prod ( r_0 )
 
 f = 0.0
