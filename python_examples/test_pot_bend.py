@@ -43,7 +43,7 @@ def force ( r ):
 
     # Here we include the derivative of the potential with respect to cos(theta) in the prefactor
     # For this simple case it is -1, so the forces are simply gradients of cos(theta) as in the text
-    f    = np.zeros_like(r) # Create force array
+    f    = np.empty_like(r) # Create force array
     fac1 = fac / cc[a,a]
     fac2 = fac / cc[a-1,a-1]
     f[a,:]   = -prefac * ( fac1*d[a,:] - d[a-1,:] )

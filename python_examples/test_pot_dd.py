@@ -35,7 +35,7 @@ def force ( r, e ):
     sij = rij / rij_mag                 # Unit vector
     ci  = np.dot( ei, sij )
     cj  = np.dot( ej, sij )
-    cij = np.dot( ei, ej )
+    cij = np.dot( ei, ej  )
 
     # The dipole-dipole potential with mu_i = mu_j = 1
     pot = (cij-3.0*ci*cj)/rij_mag**3
@@ -48,8 +48,8 @@ def force ( r, e ):
     gj = ( ei - 3.0*ci*sij ) / rij_mag**3
 
     # Final forces and torques
-    f = np.zeros_like(r)
-    t = np.zeros_like(r)
+    f = np.empty_like(r)
+    t = np.empty_like(r)
     f[i,:] = fij
     f[j,:] = -fij
     t[i,:] = -np.cross(ei,gi)

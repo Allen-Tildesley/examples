@@ -29,7 +29,7 @@ def random_orientations(n):
     """Returns n random 3-d vectors in a numpy array (n,3)."""
     import numpy as np
     from maths_module import random_vector
-    e = np.zeros((n,3),dtype=np.float_)
+    e = np.empty((n,3),dtype=np.float_)
     for i in range(e.shape[0]):
         e[i,:] = random_vector()
     return e
@@ -46,7 +46,7 @@ print('test_pot_linear')
 
 # Read parameters in JSON format
 allowed_nml_keys = ["model","delta","d_min","d_max","pot_max","ntry","npos"]
-allowed_models = ["dd","dq","qq","gb"]
+allowed_models   = ["dd","dq","qq","gb"]
 
 try:
     nml = json.load(sys.stdin)
@@ -83,12 +83,12 @@ ntry    = nml["ntry"]    if "ntry"    in nml else 1000  # Number of attempts to 
 npos    = nml["npos"]    if "npos"    in nml else 1000  # Number of attempts to position each molecule
 
 # Write out parameters
-print ( "{:40}{:15.4e}".format('Displacement delta',          delta)   )
-print ( "{:40}{:15.6f}".format('Min separation d_min',        d_min)   )
-print ( "{:40}{:15.6f}".format('Max separation d_max',        d_max)   )
-print ( "{:40}{:15.6f}".format('Max potential pot_max',       pot_max) )
-print ( "{:40}{:15d}  ".format('Max placement tries',         ntry)    )
-print ( "{:40}{:15d}  ".format('Max molecule position tries', npos)    )
+print( "{:40}{:15.4e}".format('Displacement delta',          delta)   )
+print( "{:40}{:15.6f}".format('Min separation d_min',        d_min)   )
+print( "{:40}{:15.6f}".format('Max separation d_max',        d_max)   )
+print( "{:40}{:15.6f}".format('Max potential pot_max',       pot_max) )
+print( "{:40}{:15d}  ".format('Max placement tries',         ntry)    )
+print( "{:40}{:15d}  ".format('Max molecule position tries', npos)    )
 
 np.random.seed()
 
@@ -103,32 +103,32 @@ else:
     print('Exceeded allowed number of tries')
     sys.exit()
 
-print ( "{:40}{:15.6f}".format('Potential energy', pot ) )
+print( "{:40}{:15.6f}".format('Potential energy', pot ) )
 tot = np.sum(f,axis=0)
-print ( "{:40}{:15.4e}{:15.4e}{:15.4e}".format('Total force', *tot ) )
+print( "{:40}{:15.4e}{:15.4e}{:15.4e}".format('Total force',*tot) )
 tot = np.sum(t+np.cross(r,f),axis=0)
-print ( "{:40}{:15.4e}{:15.4e}{:15.4e}".format('Total torque', *tot ) )
+print( "{:40}{:15.4e}{:15.4e}{:15.4e}".format('Total torque',*tot) )
 
-print ( "{:>15}{:>15}{:>15}{:>15}".format('Atom Component','Exact','Numerical','Difference') )
+print( "{:>15}{:>15}{:>15}{:>15}".format('Atom Component','Exact','Numerical','Difference') )
 
 cf = ['Fx','Fy','Fz']
-ct = ['Tx','Ty','Tz']
 
-for i_xyz, f_exact in np.ndenumerate(f):
-    i   = i_xyz[0]
-    xyz = i_xyz[1]
-    rsave = r[i_xyz] # Save position
-    r[i_xyz] = rsave + delta # Translate
+for (i,xyz), f_exact in np.ndenumerate(f):
+    rsave = r[i,xyz] # Save position
+    r[i,xyz] = rsave + delta # Translate
     potp, fdum, tdum = model.force ( r, e )
-    r[i_xyz] = rsave - delta # Translate
+    r[i,xyz] = rsave - delta # Translate
     potm, fdum, tdum = model.force ( r, e )
-    r[i_xyz] = rsave # Restore position
+    r[i,xyz] = rsave # Restore position
     fnum = -(potp-potm)/(2.0*delta)
-    print ( "{:5d}{:>10}{:15.6f}{:15.6f}{:15.4e}".format(i,cf[xyz],f_exact,fnum,f_exact-fnum) )
+    print( "{:5d}{:>10}{:15.6f}{:15.6f}{:15.4e}".format(i,cf[xyz],f_exact,fnum,f_exact-fnum) )
 
-    t_exact = t[i_xyz] # Exact torque
-    axis = np.zeros(3,dtype=np.float_)
-    esave = np.zeros(3,dtype=np.float_)
+ct = ['Tx','Ty','Tz']
+axis = np.empty(3,dtype=np.float_)
+esave = np.empty(3,dtype=np.float_)
+
+for (i,xyz), t_exact in np.ndenumerate(t):
+    axis[:]   = 0.0
     axis[xyz] = 1.0 # Pick axis
     esave[:] = e[i,:] # Save orientation vector (copy, not view)
     e[i,:] = rotate_vector ( delta, axis, esave ) # Rotate
@@ -137,5 +137,5 @@ for i_xyz, f_exact in np.ndenumerate(f):
     potm, fdum, tdum = model.force ( r, e )
     e[i,:] = esave # Restore orientation vector
     tnum = -(potp-potm)/(2.0*delta)
-    print ( "{:5d}{:>10}{:15.6f}{:15.6f}{:15.4e}".format(i,ct[xyz],t_exact,tnum,t_exact-tnum) )
+    print( "{:5d}{:>10}{:15.6f}{:15.6f}{:15.4e}".format(i,ct[xyz],t_exact,tnum,t_exact-tnum) )
 

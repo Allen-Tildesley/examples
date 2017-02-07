@@ -35,7 +35,7 @@ def force ( r, e ):
     sij = rij / rij_mag                 # Unit vector
     ci  = np.dot( ei, sij )
     cj  = np.dot( ej, sij )
-    cij = np.dot( ei, ej )
+    cij = np.dot( ei, ej  )
 
     # The quadrupole-quadrupole potential with Q_i = 1, Q_j = 1
     vij = 0.75 * (1.0 - 5.0*ci**2 - 5.0*cj**2 + 2.0*cij**2
@@ -52,8 +52,8 @@ def force ( r, e ):
 
     # Final potential, forces and torques
     pot    = vij
-    f      = np.zeros_like(r)
-    t      = np.zeros_like(r)
+    f      = np.empty_like(r)
+    t      = np.empty_like(r)
     f[i,:] = fij
     f[j,:] = -fij
     t[i,:] = -np.cross(ei,gi)

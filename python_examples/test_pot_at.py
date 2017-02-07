@@ -44,7 +44,7 @@ def force ( r ):
 
     pot = prefac * ( rij_sq*rjk_sq*rki_sq - 3.0*ci*cj*ck ) # The triple-dipole potential with strength=nu=1
 
-    f    = np.zeros_like(r) # Create force array
+    f   = np.empty_like(r) # Create force array
     fac = 5.0*(rij_sq*rjk_sq*rki_sq-3.0*ci*cj*ck)
     f[i,:] = prefac * ( fac*(rij2*rij-rki2*rki) 
              + 3.0*ci*(ck-cj)*rjk + 3.0*cj*ck*(rki-rij) 

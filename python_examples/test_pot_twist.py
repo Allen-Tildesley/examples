@@ -51,11 +51,11 @@ def force ( r ):
 
     # Here we include the derivative of the potential with respect to cos(phi) in the prefactor
     # For this simple case it is -1, so the forces are simply gradients of cos(phi) as in the text
-    f = np.zeros_like(r) # create force array
+    f = np.empty_like(r) # create force array
     fac1 = fac/dd[a,a-1]
     fac2 = fac/dd[a-1,a-2]
-    f[a,:] = -prefac * ( cc[a-1,a-2]*d[a-1,:] - cc[a-1,a-1]*d[a-2,:]
-             -fac1 * ( cc[a-1,a-1]*d[a,:] - cc[a,a-1]*d[a-1,:] ) )
+    f[a,:]   = -prefac * ( cc[a-1,a-2]*d[a-1,:] - cc[a-1,a-1]*d[a-2,:]
+               -fac1 * ( cc[a-1,a-1]*d[a,:] - cc[a,a-1]*d[a-1,:] ) )
     f[a-1,:] = -prefac * ( cc[a-1,a-2]*d[a,:] - cc[a-1,a-2]*d[a-1,:]
                + cc[a,a-1]*d[a-2,:] + cc[a-1,a-1]*d[a-2,:] - 2.0*cc[a,a-2]*d[a-1,:]
                -fac2 * ( cc[a-2,a-2]*d[a-1,:] - cc[a-1,a-2]*d[a-2,:] )
