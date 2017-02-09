@@ -58,25 +58,27 @@ print('Calculation of electrostatic interactions between linear molecules')
 print('using T-tensors and Euler angles')
 
 # Read parameters in JSON format
-allowed_nml_keys = ["d_min","d_max","mu1_mag","mu2_mag","quad1_mag","quad2_mag"]
-
 try:
     nml = json.load(sys.stdin)
 except json.JSONDecodeError:
     print('Exiting on Invalid JSON format')
     sys.exit()
 
-for key in nml:
-    if key not in allowed_nml_keys:
-        print('Warning', key, 'not in allowed_nml_keys',allowed_nml_keys)
+# Set default values, check keys and typecheck values
+defaults = {"d_min":0.5, "d_max":1.5, "mu1_mag":1.0, "mu2_mag":1.0, "quad1_mag":1.0, "quad2_mag":1.0}
+for key, val in nml.items():
+    if key in defaults:
+        assert type(val) == type(defaults[key]), key+" has the wrong type"
+    else:
+        print('Warning', key, 'not in ', list(defaults.keys()))
     
 # Set parameters to input values or defaults
-d_min     = nml["d_min"]     if "d_min"     in nml else 0.5 # Minimum separation
-d_max     = nml["d_max"]     if "d_max"     in nml else 1.5 # Maximum separation
-mu1_mag   = nml["mu1_mag"]   if "mu1_mag"   in nml else 1.0 # Dipole moment of molecule 1
-mu2_mag   = nml["mu2_mag"]   if "mu2_mag"   in nml else 1.0 # Dipole moment of molecule 2
-quad1_mag = nml["quad1_mag"] if "quad1_mag" in nml else 1.0 # Quadrupole moment of molecule 1
-quad2_mag = nml["quad2_mag"] if "quad2_mag" in nml else 1.0 # Quadrupole moment of molecule 2
+d_min     = nml["d_min"]     if "d_min"     in nml else defaults["d_min"]     # Minimum separation
+d_max     = nml["d_max"]     if "d_max"     in nml else defaults["d_max"]     # Maximum separation
+mu1_mag   = nml["mu1_mag"]   if "mu1_mag"   in nml else defaults["mu1_mag"]   # Dipole moment of molecule 1
+mu2_mag   = nml["mu2_mag"]   if "mu2_mag"   in nml else defaults["mu2_mag"]   # Dipole moment of molecule 2
+quad1_mag = nml["quad1_mag"] if "quad1_mag" in nml else defaults["quad1_mag"] # Quadrupole moment of molecule 1
+quad2_mag = nml["quad2_mag"] if "quad2_mag" in nml else defaults["quad2_mag"] # Quadrupole moment of molecule 2
 
 # Write out parameters
 print ( "{:40}{:15.6f}".format('Min separation d_min',            d_min)      )

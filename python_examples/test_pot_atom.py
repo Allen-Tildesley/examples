@@ -35,23 +35,22 @@ import numpy as np
 print('test_pot_atom')
 
 # Read parameters in JSON format
-allowed_nml_keys = ["model","delta","d_min","d_max","pot_max","ntry","npos"]
-allowed_models   = ["bend","twist","at"]
-
 try:
     nml = json.load(sys.stdin)
 except json.JSONDecodeError:
     print('Exiting on Invalid JSON format')
     sys.exit()
 
+# Set default values, check keys and typecheck values
+defaults = {"model":"null", "delta":1.e-5, "d_min":0.3, "d_max":1.5, "pot_max":10.0, "ntry":1000, "npos":1000}
+allowed_models = ["bend","twist","at"]
+
 if "model" not in nml:
     print('You must specify "model" as one of',allowed_models)
     sys.exit()
-
 if nml["model"] not in allowed_models:
     print(nml["model"],'not in allowed_models',allowed_models)
     sys.exit()
-
 pot_module = "test_pot_"+nml["model"]
 try:
     model = importlib.import_module(pot_module)
@@ -60,17 +59,19 @@ except ImportError:
     print('Exiting on ImportError')
     sys.exit()
 
-for key in nml:
-    if key not in allowed_nml_keys:
-        print('Warning', key, 'not in allowed_nml_keys',allowed_nml_keys)
+for key, val in nml.items():
+    if key in defaults:
+        assert type(val) == type(defaults[key]), key+" has the wrong type"
+    else:
+        print('Warning', key, 'not in ', list(defaults.keys()))
     
 # Set parameters to input values or defaults
-delta   = nml["delta"]   if "delta"   in nml else 1.e-5 # Small displacement
-d_min   = nml["d_min"]   if "d_min"   in nml else 0.3   # Minimum separation between atoms
-d_max   = nml["d_max"]   if "d_max"   in nml else 1.5   # Maximum separation between atoms
-pot_max = nml["pot_max"] if "pot_max" in nml else 10.0  # Maximum potential to allow in atom placement
-ntry    = nml["ntry"]    if "ntry"    in nml else 1000  # Number of attempts to make in order to place atoms
-npos    = nml["npos"]    if "npos"    in nml else 1000  # Number of attempts to position each atom
+delta   = nml["delta"]   if "delta"   in nml else defaults["delta"]   # Small displacement
+d_min   = nml["d_min"]   if "d_min"   in nml else defaults["d_min"]   # Minimum separation between atoms
+d_max   = nml["d_max"]   if "d_max"   in nml else defaults["d_max"]   # Maximum separation between atoms
+pot_max = nml["pot_max"] if "pot_max" in nml else defaults["pot_max"] # Maximum potential to allow in atom placement
+ntry    = nml["ntry"]    if "ntry"    in nml else defaults["ntry"]    # Number of attempts to make in order to place atoms
+npos    = nml["npos"]    if "npos"    in nml else defaults["npos"]    # Number of attempts to position each atom
 
 # Write out parameters
 print( "{:40}{:15.4e}".format('Displacement delta',      delta)   )

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 # fft3dwrap program
+"""Program to illustrate wrapping an FFT library routine.
+
+In this case we use the built-in NumPy FFT routine.
+"""
 
 import json
 import sys
@@ -9,21 +13,25 @@ import math
 print('fft3dwrap')
 
 # Read parameters in JSON format
-allowed_nml_keys = ["sc2","box"]
-
 try:
     nml = json.load(sys.stdin)
 except json.JSONDecodeError:
     print('Exiting on Invalid JSON format')
     sys.exit()
 
-for key in nml:
-    if key not in allowed_nml_keys:
-        print('Warning', key, 'not in allowed_nml_keys',allowed_nml_keys)
+# Set default values, check keys and typecheck values
+# It is not essential for sc2 to be a power of 2, but usually more efficient
+# box should be large enough to accommodate the chosen 3D Gaussian, for good comparison with analytical result
+defaults = {"sc2":2**4, "box":6.0}
+for key, val in nml.items():
+    if key in defaults:
+        assert type(val) == type(defaults[key]), key+" has the wrong type"
+    else:
+        print('Warning', key, 'not in ', list(defaults.keys()))
     
 # Set parameters to input values or defaults
-sc2 = nml["sc2"] if "sc2" in nml else 2**4 # Not essential to be a power of 2, but usually more efficient
-box = nml["box"] if "box" in nml else 6.0  # Large enough to accommodate the chosen 3D Gaussian, for good comparison with analytical result
+sc2 = nml["sc2"] if "sc2" in nml else defaults["sc2"] # Half the number of grid points
+box = nml["box"] if "box" in nml else defaults["box"] # Periodic repeat distance (box length)
 
 # Write out parameters
 sc = sc2 * 2
