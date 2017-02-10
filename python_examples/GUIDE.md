@@ -42,6 +42,13 @@ We indicate this by the string
 #!/usr/bin/env python3
 ```
 at the top of each source file.
+On many systems,
+this will allow the files to be run directly by typing their name;
+otherwise it will be necessary to type `python3 example.py`,
+or just `python example.py`,
+depending on your particular installation of Python.
+The examples _will not work_ with Python 2!
+They have been tested with Python 3.6.0.
 For an introduction to the differences between Python 2 and Python 3,
 see the [What's New in Python 3.0](https://docs.python.org/3/whatsnew/3.0.html "What's New in Python 3.0") page.
 The most obvious changes are
