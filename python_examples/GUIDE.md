@@ -186,6 +186,16 @@ and identical results to the slow direct method (with `origin_interval=1`)
 and FFT method,
 are obtained.
 
+## Error calculation
+The program `error_calc.py` is a self-contained illustration of the effects of
+correlations on the estimation of errors for a time series.
+We produce the series using a generalized Langevin equation,
+in the same manner as for the correlation function program (see above).
+Since the correlation time of the GLE is exactly known,
+we can predict the effects, and compare with the empirical estimates
+obtained by different methods.
+The program contains extensive comments to explain what is being calculated at each stage.
+
 ## FFT program
 The aim of `fft3dwrap.py` is to illustrate the way a standard Fast Fourier Transform
 library routine is wrapped in a user program.
