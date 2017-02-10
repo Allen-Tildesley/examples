@@ -44,8 +44,8 @@ We indicate this by the string
 at the top of each source file.
 On many systems,
 this will allow the files to be run directly by typing their name;
-otherwise it will be necessary to type `python3 example.py`,
-or just `python example.py`,
+otherwise it will be necessary to type, for example, `python3 t_tensor.py`,
+or just `python t_tensor.py`,
 depending on your particular installation of Python.
 The examples _will not work_ with Python 2!
 They have been tested with Python 3.6.0.
