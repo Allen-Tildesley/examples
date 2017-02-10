@@ -25,7 +25,7 @@ Nonetheless,
 any code which cannot be handled in vectorized form by NumPy will still run slowly.
 Several strategies are available to address these issues
 (for example, [Cython](http://cython.org/ "Cython home page"),
-[SWIG](http://www.swig.org/ "SWIG home page",
+[SWIG](http://www.swig.org/ "SWIG home page"),
 and F2PY which is part of NumPy),
 but we do not attempt to follow these here.
 As always,
