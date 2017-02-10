@@ -59,7 +59,8 @@ The most obvious changes are
 and various functions, such as `zip`, return iterators, instead of lists.
 
 Anyone coming from a Fortran background should note the use of indentation in Python
-to indicate the range of conditional constructs and loops.
+to indicate the range of conditional constructs and loops;
+there is no `end if` statement!
 Fortran experts
 should also be aware that indices for arrays
 (and other entities) follow the C-convention of numbering from 0 upwards.
