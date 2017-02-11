@@ -211,3 +211,30 @@ Monte Carlo methods to estimate the volume of a 3D object.
 They are both described in detail at the start of Chapter 4.
 No user input is required.
 For the built-in values defining the geometry, the exact result is 5/3.
+
+## Quantum simulation programs
+The program `qmc_walk_sho.py` solves the diffusion equation in imaginary time
+corresponding to the Schrodinger equation,
+for a single simple harmonic oscillator.
+Atomic units are chosen so that the effective diffusion coefficient is _D_=1/2.
+A few hundred independent systems, or walkers, are simulated using a simple random walk
+and a crude creation/destruction scheme based on the difference between the potential energy
+and the trial energy.
+The scheme is described in the text.
+The value of the trial energy `et` is updated regularly,
+and the hope is that, after convergence,
+it will be equal to the correct ground-state energy for the system which, in this case, is 1/2.
+The updating scheme, and several of the default parameters,
+are taken from the following paper
+
+* I Kostin, B Faber, K Schulten, _Amer J Phys,_ __64,__ 633 (1996).
+
+Reasonable results for the energy and the ground-state wavefunction,
+which is accumulated as a histogram of walker positions,
+should be obtained using the default input values,
+with an empty input record `{}`;
+these defaults include setting `et` initially to the exact ground state energy.
+Other values such as `{et:0.6}` may be supplied through standard input in the usual way.
+This type of simulation is sensitive to the initial value,
+and quite noisy:
+possible improvements are discussed in general terms in the text.
