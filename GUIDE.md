@@ -873,7 +873,7 @@ of _N_=256 Lennard-Jones atoms,
 cut (but not shifted) at _R_<sub>c</sub>=2.5&sigma;,
 at the usual state point &rho;=0.75, _T_=1.0.
 The interval between configurations was 100 MC sweeps.
-Using the default resolution of 0.2&sigma;, the results shown below were obtained
+Using the default resolution of 0.02&sigma;, the results shown below were obtained
 for _g(r)_.
 
 ![alt text](gr.png "g(r) test results")
