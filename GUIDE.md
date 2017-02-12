@@ -862,6 +862,22 @@ For the default program parameters, the diffusion coefficient is _D_=1.
 
 ![alt text](diffusion.png "diffusion test results")
 
+## Pair distribution function
+The program `pair_distribution` reads in a set of configurations and calculates
+the pair correlation function _g(r)_.
+We limit the number of configurations to 1000 (numbered from 000 to 999)
+simply so as to use a fixed naming scheme for the input configurations;
+in a practical application, a trajectory file would be used instead.
+We have tested it on a set of 500 configurations
+of _N_=256 Lennard-Jones atoms,
+cut (but not shifted) at _R_<sub>c</sub>=2.5&sigma;,
+at the usual state point &rho;=0.75, _T_=1.0.
+The interval between configurations was 100 MC sweeps.
+Using the default resolution of 0.2&sigma;, the results shown below were obtained
+for _g(r)_.
+
+![alt text](gr.png "g(r) test results")
+
 ## Interface pair correlation function
 The program `grint.f90` reads in a set of configurations and calculates
 the pair correlation function for a system that is inhomogeneous in the

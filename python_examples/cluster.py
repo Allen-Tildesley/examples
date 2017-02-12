@@ -26,8 +26,6 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-# It is not essential for sc2 to be a power of 2, but usually more efficient
-# box should be large enough to accommodate the chosen 3D Gaussian, for good comparison with analytical result
 defaults = {"r_cl":1.1}
 for key, val in nml.items():
     if key in defaults:
@@ -42,7 +40,7 @@ r_cl = nml["r_cl"] if "r_cl" in nml else defaults["r_cl"]
 print ( "{:40}{:15.6f}".format('Cluster separation distance', r_cl)  )
 
 # Read in configuration
-n, box, r, v = read_cnf_atoms('cnf.inp',with_v=True)
+n, box, r = read_cnf_atoms('cnf.inp')
 print("{:40}{:15d}  ".format('Number of particles', n))
 print("{:40}{:15.6f}".format('Box (in sigma units)',box))
 

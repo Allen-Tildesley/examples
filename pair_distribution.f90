@@ -18,6 +18,8 @@ PROGRAM pair_distribution
   ! r and box are assumed to be in the same units (e.g. LJ sigma)
   ! box is assumed to be unchanged throughout
   ! dr, the desired resolution of g(r), should be provided in the same units
+  ! The entire calculation is performed in box=1 units, but the grid points are
+  ! converted back to sigma=1 units before output.
 
   ! The value of dr is read from standard input using a namelist nml
   ! Leave namelist empty to accept supplied default
@@ -45,7 +47,7 @@ PROGRAM pair_distribution
   NAMELIST /nml/ dr
 
   ! Example default values
-  dr = 0.2
+  dr = 0.02
 
   ! Namelist from standard input
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
@@ -57,36 +59,36 @@ PROGRAM pair_distribution
   END IF
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'g(r) spacing dr = ', dr
 
-  WRITE ( sav_tag, fmt='(i3.3)' ) 0 ! use initial configuration to get n and box
-  INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! check the file exists
+  WRITE ( sav_tag, fmt='(i3.3)' ) 0 ! Use initial configuration to get n and box
+  INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! Check the file exists
   IF ( .NOT. exists ) THEN
      WRITE ( unit=error_unit, fmt='(a,a)') 'File does not exist: ', cnf_prefix//sav_tag
      STOP 'Error in pair_distribution'
   END IF
-  CALL read_cnf_atoms ( cnf_prefix//sav_tag, n, box ) ! read n and box
+  CALL read_cnf_atoms ( cnf_prefix//sav_tag, n, box ) ! Read n and box
 
-  dr = dr / box ! convert to box=1 units
-  nk = FLOOR ( 0.5/dr ) ! accumulate out to half box length
+  dr = dr / box         ! Convert to box=1 units
+  nk = FLOOR ( 0.5/dr ) ! Accumulate out to half box length
   WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'number of bins = ', nk
 
   ALLOCATE ( r(3,n), h(nk), g(nk) )
 
-  h(:) = 0 ! initialize to zero
+  h(:) = 0 ! Initialize to zero
   nstep = 0
 
   DO ! Single sweep through data until end
 
-     IF ( nstep >= 1000 ) EXIT ! our naming scheme only goes up to cnf.999
+     IF ( nstep >= 1000 ) EXIT ! Our naming scheme only goes up to cnf.999
 
-     WRITE ( sav_tag, fmt='(i3.3)' ) nstep                      ! number of configuration
-     INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! check the file exists
-     IF ( .NOT. exists ) EXIT                               ! we have come to the end of the data
+     WRITE ( sav_tag, fmt='(i3.3)' ) nstep                  ! Number of configuration
+     INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! Check the file exists
+     IF ( .NOT. exists ) EXIT                               ! We have come to the end of the data
 
-     CALL read_cnf_atoms ( cnf_prefix//sav_tag, n, box, r ) ! read configuration
+     CALL read_cnf_atoms ( cnf_prefix//sav_tag, n, box, r ) ! Read configuration
      WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Processing ', nstep
-     r = r / box ! convert to box=1 units
+     r = r / box ! Convert to box=1 units
 
-     ! the following is carried out for nstep configurations
+     ! The following is carried out for nstep configurations
 
      DO i = 1, n-1
         DO j = i+1, n
@@ -98,17 +100,17 @@ PROGRAM pair_distribution
         END DO
      END DO
 
-     nstep = nstep + 1 ! increment step counter ready for next time
+     nstep = nstep + 1 ! Increment step counter ready for next time
      
-  END DO ! end sweep through data
+  END DO ! End single sweep through data until end
 
-  rho = REAL(n) / box**3
+  rho = REAL(n) ! Our calculation is done in box=1 units
   const = 4.0 * pi * rho / 3.0
   DO k = 1, nk
-     g(k) = REAL ( h(k) ) / REAL ( n * nstep ) ! average number
+     g(k) = REAL ( h(k) ) / REAL ( n * nstep ) ! Average number
      r_lo = REAL ( k - 1 ) * dr
      r_hi = r_lo + dr
-     h_id = const * ( r_hi ** 3 - r_lo ** 3 ) ! ideal number
+     h_id = const * ( r_hi ** 3 - r_lo ** 3 ) ! Ideal number
      g(k) = g(k) / h_id
   END DO
   WRITE ( unit=output_unit, fmt='(a)' ) 'Output to pair_distribution.out'
@@ -119,6 +121,7 @@ PROGRAM pair_distribution
      STOP 'Error in pair_distribution'
   END IF
 
+  dr = dr*box ! Grid spacing in sigma=1 units; g(r) is dimensionless
   DO k = 1, nk
      WRITE ( unit=unit, fmt='(2f15.8)' ) (REAL(k)-0.5)*dr, g(k)
   END DO
