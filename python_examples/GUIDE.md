@@ -195,7 +195,7 @@ in a practical application, a trajectory file would be used instead.
 The sum over all pairs is performed using a vectorized approach,
 so as to take advantage of NumPy routines.
 The coordinate array `r` is compared with a cyclically-shifted copy,
-to give _N_ separation vectors `rij` which are processed all at once.
+to give `n` (that is, _N_) separation vectors `rij` which are processed all at once.
 Only `n//2` shifts are needed to cover every distinct `ij` pair.
 There is a slight subtlety on the last shift, if `n` is even:
 both `ij` and `ji` pairs appear,
