@@ -186,6 +186,33 @@ and identical results to the slow direct method (with `origin_interval=1`)
 and FFT method,
 are obtained.
 
+## Pair distribution function
+The program `pair_distribution.py` reads in a set of configurations and calculates
+the pair correlation function _g(r)_.
+We limit the number of configurations to a maximum of 1000 (numbered from 000 to 999)
+simply so as to use a fixed naming scheme for the input configurations;
+in a practical application, a trajectory file would be used instead.
+The sum over all pairs is performed using a vectorized approach,
+so as to take advantage of NumPy routines.
+The coordinate array `r` is compared with a cyclically-shifted copy,
+to give _N_ separation vectors `rij` which are processed all at once.
+Only `n//2` shifts are needed to cover every distinct `ij` pair.
+There is a slight subtlety on the last shift, if `n` is even:
+both `ij` and `ji` pairs appear,
+and so the usual incrementing factor 2 is replaced by a factor 1.
+The actual histogramming is conveniently performed
+by the built-in NumPy `histogram` routine.
+
+We have tested this on a set of 500 configurations
+of _N_=256 Lennard-Jones atoms,
+cut (but not shifted) at _R_<sub>c</sub>=2.5&sigma;,
+at the usual state point &rho;=0.75, _T_=1.0.
+The interval between configurations was 100 MC sweeps.
+Using the default resolution of 0.02&sigma;,
+identical results were obtained as for the Fortran example.
+
+![alt text](gr.png "g(r) test results")
+
 ## Error calculation
 The program `error_calc.py` is a self-contained illustration of the effects of
 correlations on the estimation of errors for a time series.

@@ -865,7 +865,7 @@ For the default program parameters, the diffusion coefficient is _D_=1.
 ## Pair distribution function
 The program `pair_distribution` reads in a set of configurations and calculates
 the pair correlation function _g(r)_.
-We limit the number of configurations to 1000 (numbered from 000 to 999)
+We limit the number of configurations to a maximum of 1000 (numbered from 000 to 999)
 simply so as to use a fixed naming scheme for the input configurations;
 in a practical application, a trajectory file would be used instead.
 We have tested it on a set of 500 configurations
