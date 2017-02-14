@@ -38,12 +38,18 @@ optimised for different machine architectures.
 The common tools for parallelizing scientific codes
 (OpenMP and MPI)
 are compatible with Fortran.
+The [User Guide](./GUIDE.md) contains some notes to assist in running the program,
+and some typical results.
 
 We hope that those who are used to other program languages
 will find little difficulty in converting these examples;
 also we point out the provisions,
 in current Fortran standards,
 for interoperability with C codes.
+
+The [python-examples subdirectory](./python_examples) contains Python versions
+of several of these same examples, also with an accompanying
+[User Guide](./python_examples/GUIDE.md).
 
 ## Building the codes
 The supplied SConstruct and SConscript files
@@ -54,3 +60,12 @@ The homepage for SCons is at http://www.scons.org/.
 Simply type `scons` to build each full example program in its own directory.
 A few examples consist of individual routines or modules,
 so there is no need to build them.
+
+The build process for the Fortran examples has been tested using SCons v2.5.1
+(older versions might not work properly).
+If you don't like using SCons, or can't get it to work,
+it is not difficult to compile the programs using other methods.
+Bear in mind that, with Fortran, it is usually essential to compile any
+modules that are used by the main program, before compiling the main program itself.
+
+The Python versions do not require building, they are simply run through the Python interpreter.
