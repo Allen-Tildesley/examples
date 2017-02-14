@@ -186,6 +186,52 @@ and identical results to the slow direct method (with `origin_interval=1`)
 and FFT method,
 are obtained.
 
+## Diffusion program
+The program `diffusion.py` reads in a sequence of configurations and calculates
+the velocity auto correlation function (vacf),
+the mean square displacement (msd), and
+the cross-correlation between velocity and displacement (rvcf).
+Any of these may be used to estimate the diffusion coefficient,
+as described in the text.
+The output appears in `diffusion.out`
+It is instructive to plot all three curves vs time.
+
+The input trajectory is handled in a crude way,
+by reading in successive snapshots with filenames `cnf.000`, `cnf.001`, etc.
+These might be produced by a molecular dynamics program,
+at the end of each block,
+choosing to make the blocks fairly small (perhaps 10 steps).
+As written, the program will only handle up to `cnf.999`.
+Obviously, in a practical application,
+a proper trajectory file would be used instead of these separate files.
+
+It is up to the user to provide the time interval between successive configurations.
+This will typically be a small multiple of the timestep used in the original simulation.
+This value `delta` is only used to calculate the time, in the first column of
+the output file.
+A default value of 0.05 is provided as a place-holder, but
+the user really should specify a physically meaningful value;
+forgetting to do so could cause confusion when one attempts
+to quantify the results.
+
+To make it easier to test this program,
+we have also supplied a self-contained program `diffusion_test.py`,
+which generates an appropriate trajectory by numerically solving
+the simple Langevin equation for _N_ non-interacting atoms (_N_=250 by default).
+For this model, one specifies the temperature and friction coefficient,
+which dictates the rate of exponential decay of the vacf,
+and hence the diffusion coefficient.
+The exact results for the vacf, rvcf and msd are written out to `diffusion_exact.out`
+for easy comparison with `diffusion.out`.
+Here are some typical results using default program parameters throughout.
+The vacf is in red, rvcf in blue, and msd in green;
+every fifth point is shown for the results of `diffusion`,
+while the exact results are indicated as lines.
+For the default program parameters, the diffusion coefficient is _D_=1.
+The results are very similar to those obtained from the analogous Fortran example.
+
+![alt text](diffusion.png "diffusion test results")
+
 ## Pair distribution function
 The program `pair_distribution.py` reads in a set of configurations and calculates
 the pair correlation function _g(r)_.

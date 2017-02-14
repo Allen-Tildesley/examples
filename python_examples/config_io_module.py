@@ -27,3 +27,26 @@ def read_cnf_atoms ( filename, with_v=False ):
     else:
         return n, box, r
 
+def write_cnf_atoms ( filename, n, box, *args ):
+    """Write out atomic configuration."""
+
+    import numpy as np
+    import sys
+
+    nargs=len(args)
+    assert nargs>0, "No array arguments supplied in write_cnf_atoms"
+    assert args[0].shape[0]==n, "r shape mismatch {:5d}{:5d}".format(n,args[0].shape[0])
+    assert args[0].shape[1]==3, "r shape mismatch {:5d}{:5d}".format(3,args[0].shape[1])
+    if nargs==1:
+        rv=args[0] # Just r
+    elif nargs==2:
+        assert args[1].shape[0]==n, "v shape mismatch {:5d}{:5d}".format(n,args[1].shape[0])
+        assert args[1].shape[1]==3, "v shape mismatch {:5d}{:5d}".format(3,args[1].shape[1])
+        rv=np.concatenate((args[0],args[1]),axis=1) # Both r and v
+    else:
+        print('Too many array arguments in write_cnf_atoms')
+        sys.exit()
+
+    my_header="{:15d}\n{:15.8f}".format(n,box)
+    np.savetxt(filename,rv,header=my_header,fmt='%15.10f',comments='')
+    
