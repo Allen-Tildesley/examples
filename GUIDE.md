@@ -961,3 +961,34 @@ Other values such as `&nml et=0.6 /` may be supplied through the namelist in the
 This type of simulation is sensitive to the initial value,
 and quite noisy:
 possible improvements are discussed in general terms in the text.
+
+The program `qmc_pi_sho` carries out a path integral Monte Carlo simulation
+for a single simple harmonic oscillator,
+at a specified temperature and ring-polymer size _P_.
+Larger values of _P_ give energies closer to the exact quantum mechanical canonical ensemble average.
+For this simple model,
+exact results can also be calculated for the finite values of _P_ used in the simulation
+
+* KS Schweizer, RM Stratt, D Chandler, PG Wolynes, _J Chem Phys,_ __75,__ 1347 (1981).
+* M Takahashi, M Imada, _J Phys Soc Japan,_ __53,__ 3765 (1984).
+
+and a routine to evaluate these is included in the example.
+No special techniques are used to accelerate the simulation;
+standard Metropolis moves are employed.
+Default parameters correspond to _P_=8, _T_=0.2.
+The table below is for test runs at various values of _P_,
+keeping the same temperature,
+which generates a range of average energies between
+the classical limit _E_=0.2
+and the quantum limit _E_=0.506784;
+in each case we compare with the exactly-known value for the same _P_.
+
+_P_  | _E_ (MC)  | _E_ (exact)
+---- | --------  | -----------
+ 2   | 0.3218(3) | 0.321951
+ 3   | 0.3933(4) | 0.392308
+ 4   | 0.4312(3) | 0.431618
+ 5   | 0.4543(4) | 0.454545
+ 6   | 0.4694(6) | 0.468708
+ 7   | 0.4778(6) | 0.477941
+ 8   | 0.4846(9) | 0.484244

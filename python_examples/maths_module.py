@@ -20,6 +20,21 @@ def random_vector():
 
     return np.array ( ( s*np.cos(phi), s*np.sin(phi), c ), dtype=np.float_ ) # Random unit vector
 
+def metropolis ( delta ):
+    """Conduct Metropolis test, with safeguards."""
+
+    import numpy as np
+    
+    exponent_guard = 75.0
+
+    if delta > exponent_guard: # Too high, reject without evaluating
+        return False
+    elif delta < 0.0: # Downhill, accept without evaluating
+        return True
+    else:
+        zeta = np.random.rand() # Uniform random number in range (0,1)
+        return np.exp(-delta) > zeta # Metropolis test
+
 # Low-level mathematical operations
 
 def rotate_vector ( angle, axis, old ):
