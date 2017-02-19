@@ -88,7 +88,7 @@ to provide a keyword based syntax,
 we input these values using the widespread [JSON](http://www.json.org/ "JSON home page") format.
 Typical input for a very simple example might be
 ```
-{ "nblock":20, "nstep":10000, "dt":0.002 }
+{ "nblock":10, "nstep":1000, "dt":0.005 }
 ```
 and the `"key":value` pairs may be set out on different lines if you wish.
 The appearance is very similar to a Python dictionary,
@@ -106,6 +106,35 @@ String values need to be enclosed, like the keys, in double quotes.
 The variables which may be set in this way are typically considered one by one in our programs:
 those whose names correspond to keys supplied in the input file are given the input values,
 while the others are given values taken from another `defaults` dictionary.
+
+## Lennard-Jones simulation programs
+State points for the Lennard-Jones potential,
+in its cut (but not shifted) form, denoted (c),
+cut-and-shifted form, denoted (cs),
+and full form (f),
+are discussed in the Fortran examples [GUIDE](../GUIDE.md).
+Except where otherwise stated,
+we use our default liquid state point (&rho;,_T_)=(0.75,1.0) for testing,
+with _N_=256 atoms,
+and compare with the same equations of state due to Thol et al.
+The Python codes run much more slowly than the Fortran ones,
+and so typically our default parameters carry out shorter runs
+(e.g. 10 blocks of 1000 steps rather than 20000 steps).
+
+### Lennard-Jones MD programs
+The module `md_lj_module.py` provides a force routine `force` built around the standard double loop,
+and a function `force_faster` which uses NumPy library routines to replace the inner loop.
+This is tantamount to _vectorizing_ the all-pairs calculation in a very simple way
+(and another approach to the same problem appears in `pair_distribution.py`).
+By default, the faster version is imported by the main programs tested below;
+the import statement is easily changed to use the slower version,
+but typically the difference in speed is an order of magnitude.
+
+Source                 | &rho;    | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
+------                 | -----    | -----     | --------   | -------- | --------- | -------    | -------  | --------
+Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |          
+Thol et al (2016) (f)  | 0.75     | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
+`md_nve_lj.py`         | 0.75     | 1.001(1)  | -2.9280    | 0.98(1)  |  2.30(4)  | -3.7277    | 0.38(1)  |          
 
 ## Test programs for potentials, forces and torques
 Two program files are provided: `test_pot_atom.py` and `test_pot_linear.py`,

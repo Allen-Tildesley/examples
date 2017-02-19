@@ -126,7 +126,6 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-# nstep can be made larger, but the default direct method of analysis is very slow (see below)
 defaults = {"p":8, "temperature":0.2, "nstep":50000, "nblock":20, "nequil":10, "dx_max":1.0}
 for key, val in nml.items():
     if key in defaults:
