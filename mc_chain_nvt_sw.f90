@@ -207,7 +207,7 @@ PROGRAM mc_chain_nvt_sw
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE averages_module, ONLY : write_variables, msd
+    USE averages_module, ONLY : write_variables, variable_type, msd
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 

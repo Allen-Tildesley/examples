@@ -149,7 +149,7 @@ PROGRAM mc_nvt_sc
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, variable_type
     USE maths_module,    ONLY : nematic_order
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string

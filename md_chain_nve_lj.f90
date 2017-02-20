@@ -157,7 +157,7 @@ PROGRAM md_chain_nve_lj
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE averages_module, ONLY : write_variables, msd, cke
+    USE averages_module, ONLY : write_variables, variable_type, msd, cke
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 

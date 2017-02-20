@@ -215,7 +215,7 @@ CONTAINS
   END SUBROUTINE b2_propagator
 
   SUBROUTINE calculate ( string ) 
-    USE averages_module, ONLY : write_variables, msd
+    USE averages_module, ONLY : write_variables, variable_type, msd
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 

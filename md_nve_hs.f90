@@ -192,6 +192,7 @@ CONTAINS
   END SUBROUTINE advance
 
   SUBROUTINE calculate
+    USE averages_module, ONLY : variable_type
     IMPLICIT NONE
 
     ! This routine calculates all variables of interest

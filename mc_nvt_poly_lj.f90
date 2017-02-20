@@ -180,7 +180,7 @@ PROGRAM mc_nvt_poly_lj
 CONTAINS
 
   SUBROUTINE calculate ( string )
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, variable_type
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 

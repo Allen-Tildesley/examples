@@ -131,7 +131,7 @@ CONTAINS
 
   SUBROUTINE calculate ( string )
     USE mc_module,       ONLY : potential, spring_pot, potential_type
-    USE averages_module, ONLY : write_variables, msd
+    USE averages_module, ONLY : write_variables, variable_type, msd
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 

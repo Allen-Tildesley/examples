@@ -189,7 +189,7 @@ CONTAINS
   END SUBROUTINE drift_propagator
 
   SUBROUTINE calculate ( string )
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, variable_type
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 

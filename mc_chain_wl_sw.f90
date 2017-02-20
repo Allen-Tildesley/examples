@@ -234,7 +234,7 @@ PROGRAM mc_chain_wl_sw
 CONTAINS
 
   SUBROUTINE calculate
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, variable_type
     IMPLICIT NONE
     ! This routine calculates all variables of interest (no writing out)
     ! They are collected together in the variables array, for use in the main program

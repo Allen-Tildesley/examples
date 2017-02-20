@@ -218,7 +218,7 @@ CONTAINS
 
   SUBROUTINE calculate ( string )
     USE lrc_module,      ONLY : potential_lrc
-    USE averages_module, ONLY : write_variables
+    USE averages_module, ONLY : write_variables, variable_type
     IMPLICIT NONE
     CHARACTER (len=*), INTENT(in), OPTIONAL :: string
 
