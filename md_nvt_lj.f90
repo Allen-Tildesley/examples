@@ -88,7 +88,8 @@ PROGRAM md_nvt_lj
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance', r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step',                 dt
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Specified temperature',     temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Nose-Hoover chain length ', m
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Thermostat timescale',      tau
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Nose-Hoover chain length',  m
 
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call is just to get n and box

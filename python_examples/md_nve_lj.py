@@ -12,7 +12,7 @@ def calculate ( string=None ):
     import numpy as np
     import math
 
-    # Preliminary calculations (n,r,f,total are taken from the calling program)
+    # Preliminary calculations (n,r,v,f,total are taken from the calling program)
     vol = box**3                  # Volume
     rho = n / vol                 # Density
     kin = 0.5*np.sum(v**2)        # Kinetic energy

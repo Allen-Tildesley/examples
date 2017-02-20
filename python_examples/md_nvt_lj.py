@@ -12,7 +12,7 @@ def calculate ( string=None ):
     import numpy as np
     import math
 
-    # Preliminary calculations (n,r,f,total are taken from the calling program)
+    # Preliminary calculations (n,r,v,f,total are taken from the calling program)
     vol = box**3                  # Volume
     rho = n / vol                 # Density
     kin = 0.5*np.sum(v**2)        # Kinetic energy
@@ -48,7 +48,7 @@ def calculate ( string=None ):
     t_k = VariableType ( nam = 'T kinetic', val = 2.0*kin/g )
 
     # Configurational temperature
-    # Total squared force divided by total Laplacian with small Hessian correction
+    # Total squared force divided by total Laplacian
     t_c = VariableType ( nam = 'T config', val = fsq/total.lap )
 
     # Conserved energy-like quantity per atom
