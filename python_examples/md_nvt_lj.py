@@ -120,7 +120,7 @@ def u4_propagator ( t, j_list ):
     v, p_eta, g, temperature, and q are accessed from the calling program.
     """
 
-    global v, p_eta
+    global p_eta
     import numpy as np
     
     for j in j_list:

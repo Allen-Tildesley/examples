@@ -104,6 +104,7 @@ PROGRAM md_nvt_lj
   v(:,:) = v(:,:) - SPREAD ( vcm(:), dim = 2, ncopies = n ) ! Set COM velocity to zero
 
   ! Initial values of thermal variables
+  CALL RANDOM_SEED()
   g    = REAL ( 3*(n-1) )
   q    = temperature * tau**2   
   q(1) = g * temperature * tau**2
