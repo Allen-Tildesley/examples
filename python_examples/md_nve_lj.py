@@ -2,6 +2,10 @@
 """Molecular dynamics, NVE ensemble."""
 
 def calculate ( string=None ):
+    """Calculates all variables of interest and (optionally) writes them out.
+    
+    They are collected and returned in the variables list, for use in the main program."""
+    
     from averages_module import write_variables, msd, cke, VariableType
     from md_lj_module import hessian_faster as hessian
     from lrc_module import potential_lrc, pressure_lrc
@@ -86,7 +90,7 @@ import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
-from md_lj_module import introduction, conclusion, force as force, PotentialType
+from md_lj_module import introduction, conclusion, force_faster as force, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
