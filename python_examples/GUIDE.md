@@ -137,8 +137,10 @@ Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286    | 0.9897   |  2.2787 
 Thol et al (2016) (f)  | 0.75     | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
 `md_nve_lj.py`         | 0.75     | 1.001(1)  | -2.9280    | 0.98(1)  |  2.30(4)  | -3.7277    | 0.38(1)  |          
 `md_nvt_lj.py`         | 0.75     | 1.00      | -2.95(3)   | 0.95(4)  |  0.6(1)   | -3.75(3)   | 0.35(4)  | 0.6(1)
+`bd_nvt_lj.py`         | 0.75     | 1.00      | -2.93(2)   | 0.97(2)  |  1.5(2)   | -3.73(2)   | 0.37(2)  | 1.5(2)
 
 * The `md_nvt_lj.py` program seems to give very low heat capacity, not clear why???
+* The `bd_nvt_lj.py` program also gives somewhat low heat capacity??
 
 ## Test programs for potentials, forces and torques
 Two program files are provided: `test_pot_atom.py` and `test_pot_linear.py`,

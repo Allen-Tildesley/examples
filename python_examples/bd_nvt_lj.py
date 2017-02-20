@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Molecular dynamics, NVT ensemble."""
+"""Brownian dynamics, NVT ensemble."""
 
 def calculate ( string=None ):
     """Calculates all variables of interest and (optionally) writes them out.
@@ -12,13 +12,11 @@ def calculate ( string=None ):
     import numpy as np
     import math
 
-    # Preliminary calculations (n,r,v,f,total are taken from the calling program)
+    # Preliminary calculations (n,v,f,total are taken from the calling program)
     vol = box**3                  # Volume
     rho = n / vol                 # Density
     kin = 0.5*np.sum(v**2)        # Kinetic energy
     fsq = np.sum ( f**2 )         # Total squared force
-    ext = np.sum(0.5*p_eta**2/q) + temperature * ( g*eta[0] + np.sum(eta[1:]) ) # Extra terms for conserved variable
-    eng = kin + total.pot         # Total energy for simulated system
 
     # Variables of interest, of class VariableType, containing three attributes:
     #   .val: the instantaneous value
@@ -30,7 +28,7 @@ def calculate ( string=None ):
 
     # Internal energy (cut-and-shifted) per atom
     # Total KE plus total cut-and-shifted PE divided by N
-    e_s = VariableType ( nam = 'E/N cut&shifted', val = eng/n )
+    e_s = VariableType ( nam = 'E/N cut&shifted', val = (kin+total.pot)/n )
 
     # Internal energy (full, including LRC) per atom
     # LRC plus total KE plus total cut (but not shifted) PE divided by N
@@ -45,15 +43,12 @@ def calculate ( string=None ):
     p_f = VariableType ( nam = 'P full', val = pressure_lrc(rho,r_cut) + rho*temperature + total.vir/vol )
 
     # Kinetic temperature
-    t_k = VariableType ( nam = 'T kinetic', val = 2.0*kin/g )
+    # Momentum is not conserved, hence 3N degrees of freedom
+    t_k = VariableType ( nam = 'T kinetic', val = 2.0*kin/(3*n) )
 
     # Configurational temperature
     # Total squared force divided by total Laplacian
     t_c = VariableType ( nam = 'T config', val = fsq/total.lap )
-
-    # Conserved energy-like quantity per atom
-    # Energy plus extra terms defined above
-    conserved = VariableType ( nam = 'Conserved/N', val = (eng+ext)/n )
 
     # Heat capacity (cut-and-shifted)
     # Total energy divided by temperature and sqrt(N) to make result intensive
@@ -63,23 +58,19 @@ def calculate ( string=None ):
     # Total energy divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
     c_f = VariableType ( nam = 'Cv/N full', val = (kin+total.cut)/(temperature*math.sqrt(n)), method = msd )
 
-    # Mean-squared deviation of conserved energy-like quantity
-    # Energy plus extra terms defined above
-    conserved_msd = VariableType ( nam = 'Conserved MSD', val = (eng+ext)/n, method = msd, e_format = True )
-
     # Collect together into a list for averaging
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, conserved, c_s, c_f, conserved_msd ]
+    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, c_s, c_f ]
 
     if string is not None:
         print(string)
-        write_variables ( variables[:7] ) # Don't write out MSD variables
+        write_variables ( variables[:6] ) # Don't write out MSD variables
 
     return variables
 
-def u1_propagator ( t ):
-    """U1: velocity Verlet drift step propagator.
+def a_propagator ( t ):
+    """A: drift step propagator.
 
-    t is the time over which to propagate (typically dt).
+    t is the time over which to propagate (typically dt/2).
     r, v, and box are accessed from the calling program.
     """
 
@@ -89,8 +80,8 @@ def u1_propagator ( t ):
     r = r + t * v / box   # Positions in box=1 units
     r = r - np.rint ( r ) # Periodic boundaries
 
-def u2_propagator ( t ):
-    """U2: velocity Verlet kick step propagator.
+def b_propagator ( t ):
+    """B: kick step propagator.
 
     t is the time over which to propagate (typically dt/2).
     v is accessed from the calling program.
@@ -99,49 +90,25 @@ def u2_propagator ( t ):
     global v
     v = v + t * f
 
-def u3_propagator ( t ):
-    """U3: thermostat propagator.
+def o_propagator ( t ):
+    """O: friction and random contributions propagator.
 
-    t is the time over which to propagate (typically dt/2).
-    v, eta, p_eta, and q are accessed from the calling program.
+    t is the time over which to propagate (typically dt).
+    v, n, temperature, and gamma are accessed from the calling program.
     """
 
-    global v, eta
+    global v
     import numpy as np
-    
-    v = v * np.exp ( -t * p_eta[0] / q[0] )
-    eta = eta + t * p_eta / q
 
-def u4_propagator ( t, j_list ):
-    """U4: thermostat propagator.
-
-    t is the time over which to propagate (typically dt/4).
-    j_list determines the order in which to tackle variables
-    v, p_eta, g, temperature, and q are accessed from the calling program.
-    """
-
-    global v, p_eta
-    import numpy as np
-    
-    for j in j_list:
-        if j==0:
-            gj = np.sum(v**2) - g*temperature # The driver Gj for p_eta[0] is different
-        else:
-            gj = ( p_eta[j-1]**2 / q[j-1] ) - temperature
-        if j==m-1:
-            p_eta[j]  = p_eta[j] + t * gj # The equation for p_eta[M-1] is different
-        else:
-            x = t * p_eta[j+1]/q[j+1]
-            c = (1.0-np.exp(-x))/x if x>0.001 else np.polyval([-1/24,1/6,-1/2,1.0],x) # Guard against small values
-            p_eta[j] = p_eta[j]*np.exp(-x) + t * gj * c
-  
+    x = gamma*t
+    c = 1-np.exp(-2*x) if x > 0.0001 else np.polyval([-2/3,4/3,-2.0,2.0,0.0],x)
+    c = np.sqrt(c)
+    v = v*np.exp(-x) + c*np.sqrt(temperature)*np.random.randn(n,3)
+ 
 # Takes in a configuration of atoms (positions, velocities)
 # Cubic periodic boundary conditions
-# Conducts molecular dynamics using a measure-preserving algorithm for the Nose-Hoover equations
-# Nose-Hoover chains are used, following Martyna et al, Molec Phys, 87, 1117 (1996)
-# and Tuckerman et al J Phys A, 39, 5629 (2006)
-# To keep this example reasonably simple, we do not subdivide the timesteps with a
-# Suzuki-Yoshida decomposition, as described in those papers
+# Conducts molecular dynamics using BAOAB algorithm of BJ Leimkuhler and C Matthews
+# Appl. Math. Res. eXpress 2013, 34–56 (2013); J. Chem. Phys. 138, 174102 (2013)
 # Uses no special neighbour lists
 
 # Reads several variables and options from standard input using JSON format
@@ -167,12 +134,13 @@ cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
 out_tag    = 'out'
 sav_tag    = 'sav'
-m = 3 # Number of Nose-Hoover chain variables
 
-print('md_nvt_lj')
-print('Molecular dynamics, constant-NVT ensemble')
+print('bd_nvt_lj')
+print('Brownian dynamics, constant-NVT ensemble')
 print('Particle mass=1 throughout')
 introduction()
+
+np.random.seed()
 
 # Read parameters in JSON format
 try:
@@ -182,7 +150,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "temperature":1.0, "tau":2.0}
+defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "temperature":1.0, "gamma":1.0}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -195,16 +163,16 @@ nstep       = nml["nstep"]       if "nstep"       in nml else defaults["nstep"]
 r_cut       = nml["r_cut"]       if "r_cut"       in nml else defaults["r_cut"]
 dt          = nml["dt"]          if "dt"          in nml else defaults["dt"]
 temperature = nml["temperature"] if "temperature" in nml else defaults["temperature"]
-tau         = nml["tau"]         if "tau"         in nml else defaults["tau"]
+gamma       = nml["gamma"]       if "gamma"       in nml else defaults["gamma"]
 
 # Write out parameters
-print( "{:40}{:15d}  ".format('Number of blocks',          nblock)      )
-print( "{:40}{:15d}  ".format('Number of steps per block', nstep)       )
-print( "{:40}{:15.6f}".format('Potential cutoff distance', r_cut)       )
-print( "{:40}{:15.6f}".format('Time step',                 dt)          )
-print( "{:40}{:15.6f}".format('Specified temperature',     temperature) )
-print( "{:40}{:15.6f}".format('Thermostat timescale',      tau)         )
-print( "{:40}{:15d}  ".format('Nose-Hoover chain length',  m)           )
+print( "{:40}{:15d}  ".format('Number of blocks',          nblock)            )
+print( "{:40}{:15d}  ".format('Number of steps per block', nstep)             )
+print( "{:40}{:15.6f}".format('Potential cutoff distance', r_cut)             )
+print( "{:40}{:15.6f}".format('Time step',                 dt)                )
+print( "{:40}{:15.6f}".format('Friction coefficient',      gamma)             )
+print( "{:40}{:15.6f}".format('Specified temperature',     temperature)       )
+print( "{:40}{:15.6f}".format('Ideal diffusion coefft',    temperature/gamma) )
 
 # Read in initial configuration
 n, box, r, v = read_cnf_atoms ( cnf_prefix+inp_tag, with_v=True)
@@ -213,20 +181,6 @@ print( "{:40}{:15.6f}".format('Box length', box)  )
 print( "{:40}{:15.6f}".format('Density', n/box**3)  )
 r = r / box                    # Convert positions to box units
 r = r - np.rint ( r )          # Periodic boundaries
-vcm = np.sum ( v, axis=0 ) / n # Centre-of mass velocity
-v = v - vcm                    # Set COM velocity to zero
-
-# Initial values of thermal variables
-np.random.seed()
-g    = 3*(n-1)
-q    = np.full(m,temperature * tau**2,dtype=np.float_) 
-q[0] = g * temperature * tau**2
-fmt_string = "{:15.6f}"*m
-fmt_string = "{:40}"+fmt_string
-print(fmt_string.format('Thermal inertias Q',*q))
-eta   = np.zeros(m,dtype=np.float_)
-p_eta = np.random.randn(m)*np.sqrt(temperature)
-p_eta = p_eta * np.sqrt(q)
 
 # Initial forces, potential, etc plus overlap check
 total, f = force ( box, r_cut, r )
@@ -242,21 +196,15 @@ for blk in range(1,nblock+1): # Loop over blocks
 
     for stp in range(nstep): # Loop over steps
 
-        u4_propagator ( dt/4, list(reversed(range(m))) ) # Inwards order
-        u3_propagator ( dt/2 )
-        u4_propagator ( dt/4, list(range(m)) ) # Outwards order
-
-        u2_propagator ( dt/2 )
-        u1_propagator ( dt )
+        b_propagator ( dt/2 ) # B kick half-step
+        a_propagator ( dt/2 ) # A drift half-step
+        o_propagator ( dt )   # O random velocities and friction step
+        a_propagator ( dt/2 ) # A drift half-step
 
         total, f = force ( box, r_cut, r ) # Force evaluation
         assert not total.ovr, 'Overlap in configuration'
 
-        u2_propagator ( dt/2 )
-
-        u4_propagator ( dt/4, list(reversed(range(m))) ) # Inwards order
-        u3_propagator ( dt/2 )
-        u4_propagator ( dt/4, list(range(m)) ) # Outwards order
+        b_propagator ( dt/2 ) # B kick half-step
 
         variables = calculate()
         blk_add(variables)
