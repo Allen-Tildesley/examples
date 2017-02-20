@@ -203,6 +203,7 @@ print( "{:40}{:15d}  ".format('Number of steps per block', nstep)       )
 print( "{:40}{:15.6f}".format('Potential cutoff distance', r_cut)       )
 print( "{:40}{:15.6f}".format('Time step',                 dt)          )
 print( "{:40}{:15.6f}".format('Specified temperature',     temperature) )
+print( "{:40}{:15.6f}".format('Thermostat timescale',      tau)         )
 print( "{:40}{:15d}  ".format('Nose-Hoover chain length',  m)           )
 
 # Read in initial configuration
