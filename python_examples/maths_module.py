@@ -20,6 +20,17 @@ def random_vector():
 
     return np.array ( ( s*np.cos(phi), s*np.sin(phi), c ), dtype=np.float_ ) # Random unit vector
 
+def random_translate_vector ( dr_max, old ):
+    """Returns a vector translated by a random amount."""
+
+    import numpy as np
+
+    # A randomly chosen vector is added to the old one
+
+    zeta = np.random.rand(3)   # Three uniform random numbers in range (0,1)
+    zeta = 2.0*zeta - 1.0      # Now in range (-1,+1)
+    return old + zeta * dr_max # Move to new position
+
 def metropolis ( delta ):
     """Conduct Metropolis test, with safeguards."""
 
