@@ -43,10 +43,11 @@ We indicate this by the string
 ```
 at the top of each source file.
 On many systems,
-this will allow the files to be run directly by typing their name;
-otherwise it will be necessary to type, for example, `python3 t_tensor.py`,
-or just `python t_tensor.py`,
+this will allow the files to be run directly by typing their name, for example `./sample_mean.py`;
+otherwise it will be necessary to type, for example, `python3 sample_mean.py`,
+or just `python sample_mean.py`,
 depending on your particular installation of Python.
+(Of course, in most cases, it will also be necessary to input data to the program.)
 The examples _will not work_ with Python 2!
 They have been tested with Python 3.6.0.
 For an introduction to the differences between Python 2 and Python 3,
@@ -103,6 +104,8 @@ so integer values must not have a decimal point,
 while floating-point values must have one
 (and at least one digit following the point, for example `1.0`, otherwise JSON raises an exception).
 String values need to be enclosed, like the keys, in double quotes.
+Boolean (logical) values are indicated by `true` or `false`
+(whereas in Python they are denoted `True` and `False` respectively).
 The variables which may be set in this way are typically considered one by one in our programs:
 those whose names correspond to keys supplied in the input file are given the input values,
 while the others are given values taken from another `defaults` dictionary.
@@ -120,16 +123,19 @@ and compare with the same equations of state due to Thol et al.
 The Python codes run much more slowly than the Fortran ones,
 and so typically our default parameters carry out shorter runs
 (e.g. 10 blocks of 1000 steps rather than 10 blocks of 20000 steps).
+For both MC and MD examples,
+we supply two versions of the main module:
+a _slow_ version built around the standard Python loops,
+which may be directly compared with the Fortran examples;
+and a _fast_ version which uses NumPy library routines to replace the inner loop.
+This is tantamount to _vectorizing_ the calculation in a very simple way
+(and another approach to the same problem appears in `pair_distribution.py`).
+The variable `fast` controls which version is imported, and by default is set to `True`.
+The user may override this by setting `"fast":false` in the input data,
+but the program will then run (yet another) order of magnitude more slowly,
+so it may be necessary to reduce the run length still further.
 
 ### Lennard-Jones MD programs
-The module `md_lj_module.py` provides a force routine `force` built around the standard double loop,
-and a function `force_faster` which uses NumPy library routines to replace the inner loop.
-This is tantamount to _vectorizing_ the all-pairs calculation in a very simple way
-(and another approach to the same problem appears in `pair_distribution.py`).
-Similarly, a faster version of the `hessian` function is also supplied.
-By default, the faster version is imported by the main programs tested below;
-the import statement is easily changed to use the slower version,
-but typically the difference in speed is an order of magnitude.
 
 Source                 | &rho;    | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
 ------                 | -----    | -----     | --------   | -------- | --------- | -------    | -------  | --------
@@ -183,7 +189,7 @@ and via the Cartesian T-tensors.
 Two linear molecules are placed in random positions and orientations,
 within a specified range of separations,
 and some of the contributions to the electrostatic energies and forces are calculated.
-The program may be run using an empty record `{}`,
+The program may be run using an empty input record `{}`,
 so as to take the program defaults,
 or various parameters may be specified.
 Several of the tensor manipulations are neatly expressed using NumPy library functions

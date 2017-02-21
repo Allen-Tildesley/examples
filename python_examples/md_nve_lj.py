@@ -7,10 +7,13 @@ def calculate ( string=None ):
     They are collected and returned in the variables list, for use in the main program."""
     
     from averages_module import write_variables, msd, cke, VariableType
-    from md_lj_module import hessian_faster as hessian
     from lrc_module import potential_lrc, pressure_lrc
     import numpy as np
     import math
+    if fast:
+        from md_lj_fast_module import hessian
+    else:
+        from md_lj_slow_module import hessian
 
     # Preliminary calculations (n,r,v,f,total are taken from the calling program)
     vol = box**3                  # Volume
@@ -82,7 +85,7 @@ def calculate ( string=None ):
 # For example, for Lennard-Jones, sigma = 1, epsilon = 1
 
 # Despite the program name, there is nothing here specific to Lennard-Jones
-# The model is defined in md_lj_module
+# The model is defined in md_lj_{fast|slow}_module
 
 import json
 import sys
@@ -90,7 +93,6 @@ import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
-from md_lj_module import introduction, conclusion, force_faster as force, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -100,7 +102,6 @@ sav_tag    = 'sav'
 print('md_nve_lj')
 print('Molecular dynamics, constant-NVE ensemble')
 print('Particle mass=1 throughout')
-introduction()
 
 # Read parameters in JSON format
 try:
@@ -110,7 +111,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005}
+defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "fast":True}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -122,6 +123,13 @@ nblock = nml["nblock"] if "nblock" in nml else defaults["nblock"]
 nstep  = nml["nstep"]  if "nstep"  in nml else defaults["nstep"]
 r_cut  = nml["r_cut"]  if "r_cut"  in nml else defaults["r_cut"]
 dt     = nml["dt"]     if "dt"     in nml else defaults["dt"]
+fast   = nml["fast"]   if "fast"   in nml else defaults["fast"]
+
+if fast:
+    from md_lj_fast_module import introduction, conclusion, force, PotentialType
+else:
+    from md_lj_slow_module import introduction, conclusion, force, PotentialType
+introduction()
 
 # Write out parameters
 print( "{:40}{:15d}  ".format('Number of blocks',          nblock) )

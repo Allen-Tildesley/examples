@@ -217,7 +217,7 @@ def u4_propagator ( t, j_list ):
 # For example, for Lennard-Jones, sigma = 1, epsilon = 1
 
 # Despite the program name, there is nothing here specific to Lennard-Jones
-# The model is defined in md_lj_module
+# The model is defined in md_lj_{fast|slow}_module
 
 import json
 import sys
@@ -225,7 +225,6 @@ import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
-from md_lj_module import introduction, conclusion, force_faster as force, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -236,7 +235,6 @@ m = 3 # Number of Nose-Hoover chain variables
 print('md_npt_lj')
 print('Molecular dynamics, constant-NPT ensemble')
 print('Particle mass=1 throughout')
-introduction()
 
 # Read parameters in JSON format
 try:
@@ -246,7 +244,8 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "temperature":1.0, "pressure":0.99, "tau":2.0, "tau_baro":2.0}
+defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "temperature":1.0,
+            "pressure":0.99, "tau":2.0, "tau_baro":2.0,"fast":True}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -262,6 +261,13 @@ temperature = nml["temperature"] if "temperature" in nml else defaults["temperat
 pressure    = nml["pressure"]    if "pressure"    in nml else defaults["pressure"]
 tau         = nml["tau"]         if "tau"         in nml else defaults["tau"]
 tau_baro    = nml["tau_baro"]    if "tau_baro"    in nml else defaults["tau_baro"]
+fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
+
+if fast:
+    from md_lj_fast_module import introduction, conclusion, force, PotentialType
+else:
+    from md_lj_slow_module import introduction, conclusion, force, PotentialType
+introduction()
 
 # Write out parameters
 print( "{:40}{:15d}  ".format('Number of blocks',          nblock)      )

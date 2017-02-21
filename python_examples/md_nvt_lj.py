@@ -172,7 +172,6 @@ m = 3 # Number of Nose-Hoover chain variables
 print('md_nvt_lj')
 print('Molecular dynamics, constant-NVT ensemble')
 print('Particle mass=1 throughout')
-introduction()
 
 # Read parameters in JSON format
 try:
@@ -182,7 +181,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "temperature":1.0, "tau":2.0}
+defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "temperature":1.0, "tau":2.0, "fast":True}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -196,6 +195,13 @@ r_cut       = nml["r_cut"]       if "r_cut"       in nml else defaults["r_cut"]
 dt          = nml["dt"]          if "dt"          in nml else defaults["dt"]
 temperature = nml["temperature"] if "temperature" in nml else defaults["temperature"]
 tau         = nml["tau"]         if "tau"         in nml else defaults["tau"]
+fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
+
+if fast:
+    from md_lj_fast_module import introduction, conclusion, force, PotentialType
+else:
+    from md_lj_slow_module import introduction, conclusion, force, PotentialType
+introduction()
 
 # Write out parameters
 print( "{:40}{:15d}  ".format('Number of blocks',          nblock)      )
