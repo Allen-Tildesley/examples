@@ -161,7 +161,6 @@ import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
-from md_lj_module import introduction, conclusion, force_faster as force, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'

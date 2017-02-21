@@ -47,7 +47,7 @@ def force ( box, r_cut, r ):
     # Forces are calculated in units where sigma = 1 and epsilon = 1
 
     n, d = r.shape
-    assert d==3, 'Dimension error in force_faster'
+    assert d==3, 'Dimension error in force'
     
     sr2_ovr      = 1.77 # Overlap threshold (pot > 100)
     r_cut_box    = r_cut / box
@@ -110,8 +110,8 @@ def hessian ( box, r_cut, r, f ):
     # It is assumed that forces have already been calculated in array f
 
     n, d = r.shape
-    assert d==3, 'Dimension error in hessian_faster'
-    assert np.all ( r.shape==f.shape ), 'Dimension mismatch in hessian_faster'
+    assert d==3, 'Dimension error in hessian'
+    assert np.all ( r.shape==f.shape ), 'Dimension mismatch in hessian'
 
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box ** 2
