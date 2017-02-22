@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Monte Carlo, NVT ensemble."""
+"""Monte Carlo, NPT ensemble."""
 
 def calculate ( string=None ):
     """Calculates all variables of interest and (optionally) writes them out.
@@ -8,7 +8,8 @@ def calculate ( string=None ):
     """
 
     # In this example we simulate using the cut (but not shifted) potential
-    # The values of < p_c >, < e_c > and density should be consistent (for this potential)
+    # Accordingly, < p_c > should match the input pressure and the values
+    # of < p_c >, < e_c > and density should be consistent (for this potential)
     # For comparison, long-range corrections are also applied to give
     # estimates of < e_f > and < p_f > for the full (uncut) potential
     # The value of the cut-and-shifted potential is not used, in this example
@@ -35,12 +36,17 @@ def calculate ( string=None ):
     # The .nam and some other attributes need only be defined once, at the start of the program,
     # but for clarity and readability we assign all the values together below
 
-    # Move acceptance ratio
+    # Move and volume acceptance ratios
 
     if string is None:
-        m_r = VariableType ( nam = 'Move ratio', val = m_ratio )
-    else:
-        m_r = VariableType ( nam = 'Move ratio', val = 0.0 ) # The ratio is meaningless in this case
+        m_r = VariableType ( nam = 'Move ratio',   val = m_ratio )
+        v_r = VariableType ( nam = 'Volume ratio', val = v_ratio )
+    else: # The ratios are meaningless in this case
+        m_r = VariableType ( nam = 'Move ratio',   val = 0.0 )
+        v_r = VariableType ( nam = 'Volume ratio', val = 0.0 )
+
+    # Density
+    density = VariableType ( nam = 'Density', val = rho )
 
     # Internal energy per atom for simulated, cut, potential
     # Ideal gas contribution plus cut (but not shifted) PE divided by N
@@ -62,23 +68,35 @@ def calculate ( string=None ):
     # Total squared force divided by total Laplacian
     t_c = VariableType ( nam = 'T config', val = fsq/total.lap )
 
+    # Heat capacity (cut but not shifted)
+    # MSD of excess "enthalpy" divided by temperature and sqrt(N) to make result intensive
+    # NB this is not really the excess Cp/NkB, it simply omits the kinetic energy fluctuations
+    # i.e. we add the ideal gas part of Cv/NkB, 1.5, to get total Cp/NkB
+    enp = total.pot+pressure*vol
+    c_c = VariableType ( nam = 'Cp/N cut', val = enp/(temperature*math.sqrt(n)), method = msd, add = 1.5 )
+
     # Heat capacity (full)
-    # MSD potential energy divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
-    # We add ideal gas contribution, 1.5, afterwards
-    c_f = VariableType ( nam = 'Cv/N full', val = total.pot/(temperature*math.sqrt(n)), method = msd, add = 1.5 )
+    # MSD of excess "enthalpy" divided by temperature and sqrt(N) to make result intensive
+    # NB this is not really the excess Cp/NkB, it simply omits the kinetic energy fluctuations
+    # i.e. we add the ideal gas part of Cv/NkB, 1.5, to get total Cp/NkB
+    enp = n*potential_lrc(rho,r_cut)+total.pot+pressure*vol
+    c_f = VariableType ( nam = 'Cp/N full', val = enp/(temperature*math.sqrt(n)), method = msd, add = 1.5 )
+
+    # Volume MSD
+    vol_msd = VariableType ( nam = 'Volume MSD', val = vol, method = msd )
 
     # Collect together into a list for averaging
-    variables = [ m_r, e_c, p_c, e_f, p_f, t_c, c_f ]
+    variables = [ m_r, v_r, density, e_c, p_c, e_f, p_f, t_c, c_c, c_f, vol_msd ]
 
     if string is not None:
         print(string)
-        write_variables ( variables[1:6] ) # Don't write out move ratio or MSD variables
+        write_variables ( variables[2:8] ) # Don't write out move ratio or MSD variables
 
     return variables
 
 # Takes in a configuration of atoms (positions)
 # Cubic periodic boundary conditions
-# Conducts Monte Carlo at the given temperature
+# Conducts isothermal-isobaric Monte Carlo at the given temperature and pressure
 # Uses no special neighbour lists
 
 # Reads several variables and options from standard input using JSON format
@@ -89,8 +107,16 @@ def calculate ( string=None ):
 # are given in simulation units defined by the model
 # For example, for Lennard-Jones, sigma = 1, epsilon = 1
 
+# For the LJ potential we could use the known scaling of the separate parts
+# with distances (i.e. with box scaling) to handle the volume move.
+# However, this would require us to scale the cutoff distance with the box
+# We do not do this here; instead we simply recalculate the potential energy,
+# keeping r_cut fixed (in simulation units)
+
 # Despite the program name, there is nothing here specific to Lennard-Jones
 # The model is defined in mc_lj_{fast|slow}_module
+
+# The logarithm of the box length is sampled uniformly
 
 import json
 import sys
@@ -105,8 +131,8 @@ inp_tag    = 'inp'
 out_tag    = 'out'
 sav_tag    = 'sav'
 
-print('mc_nvt_lj')
-print('Monte Carlo, constant-NVT ensemble')
+print('mc_npt_lj')
+print('Monte Carlo, constant-NPT ensemble')
 print('Simulation uses cut (but not shifted) potential')
 
 # Read parameters in JSON format
@@ -117,7 +143,8 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "temperature":1.0, "r_cut":2.5, "dr_max":0.15, "fast":True}
+defaults = {"nblock":10, "nstep":1000, "temperature":1.0, "pressure":0.69,
+            "r_cut":2.5, "dr_max":0.15, "db_max":0.025, "fast":True}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -128,8 +155,10 @@ for key, val in nml.items():
 nblock      = nml["nblock"]      if "nblock"      in nml else defaults["nblock"]
 nstep       = nml["nstep"]       if "nstep"       in nml else defaults["nstep"]
 temperature = nml["temperature"] if "temperature" in nml else defaults["temperature"]
+pressure    = nml["pressure"]    if "pressure"    in nml else defaults["pressure"]
 r_cut       = nml["r_cut"]       if "r_cut"       in nml else defaults["r_cut"]
 dr_max      = nml["dr_max"]      if "dr_max"      in nml else defaults["dr_max"]
+db_max      = nml["db_max"]      if "db_max"      in nml else defaults["db_max"]
 fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
 if fast:
@@ -143,8 +172,10 @@ np.random.seed()
 print( "{:40}{:15d}  ".format('Number of blocks',          nblock)      )
 print( "{:40}{:15d}  ".format('Number of steps per block', nstep)       )
 print( "{:40}{:15.6f}".format('Specified temperature',     temperature) )
+print( "{:40}{:15.6f}".format('Specified pressure',        pressure)    )
 print( "{:40}{:15.6f}".format('Potential cutoff distance', r_cut)       )
 print( "{:40}{:15.6f}".format('Maximum displacement',      dr_max)      )
+print( "{:40}{:15.6f}".format('Maximum box displacement',  db_max)      )
 
 # Read in initial configuration
 n, box, r = read_cnf_atoms ( cnf_prefix+inp_tag)
@@ -189,6 +220,26 @@ for blk in range(1,nblock+1): # Loop over blocks
                     moves = moves + 1                         # Increment move counter
 
         m_ratio = moves / n
+
+        v_ratio   = 0.0                 # Zero volume move counter
+        zeta      = np.random.rand()    # Uniform random number in range (0,1)
+        zeta      = 2.0*zeta-1.0        # Now in range (-1,+1)
+        box_scale = np.exp(zeta*db_max) # Sampling log(box) and log(vol) uniformly
+        box_new   = box*box_scale       # New box (in sigma units)
+        den_scale = 1.0 / box_scale**3  # Density scaling factor
+
+        total_new = potential ( box_new, r_cut, r ) # New total energy, virial etc
+
+        if not total_new.ovr: # Test for non-overlapping configuration
+            delta = total_new.pot - total.pot                  # Use cut (but not shifted) potential
+            delta = delta + pressure * ( box_new**3 - box**3 ) # Add PV term
+            delta = delta / temperature                        # Divide by temperature
+            delta = delta + (n+1) * np.log(den_scale)          # Factor (n+1) consistent with log(box) sampling
+
+            if metropolis(delta): # Accept Metropolis test
+                total   = total_new # Update total values
+                box     = box_new   # Update box
+                v_ratio = 1.0       # Set volume move counter
 
         variables = calculate()
         blk_add(variables)

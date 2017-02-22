@@ -156,9 +156,11 @@ and also gives a low value of _C<sub>p</sub>_ (cs)=1.0(3) while EOS gives 4.84??
 Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C_ (f)
 ------                 | -----     | ----- | -------    | -------  | -------    | -------  | --------
 Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630  
-`mc_nvt_lj`            | 0.75      | 1.00  | -3.330(2)  | 0.65(2)  | -3.732(2)  | 0.35(2)  |  2.30(2)
+`mc_nvt_lj.py`         | 0.75      | 1.00  | -3.330(2)  | 0.65(2)  | -3.732(2)  | 0.35(2)  |  2.30(2)
+`mc_npt_lj.py`         | 0.750(1)  | 1.00  | -3.328(8)  | 0.69     | -3.730(9)  | 0.355(5) |
 
 * The `mc_nvt_lj.py` program, like its Fortran counterpart, seems to give a low pressure, needs investigating?
+* The `mc_npt_lj.py` program measured _P_ (c) is also low at 0.656(5).
 
 ## Test programs for potentials, forces and torques
 Two program files are provided: `test_pot_atom.py` and `test_pot_linear.py`,
