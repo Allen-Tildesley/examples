@@ -170,8 +170,9 @@ Here we start to gather test simulation results for python versions of the hard-
 
 &rho; | _P_ (EOS) | _P_ `mc_nvt_hs`| _P_ `md_nve_hs` | &rho; `mc_npt_hs`
 ----- | -----     | -----    | ----- | -----
-0.50  | 1.6347    | 1.630(8) |  | 
+0.50  | 1.6347    | 1.630(8) |  | 0.493(4)
 
+For the _NPT_ simulation the pressure was set to the EOS value corresponding to the desired density.
 
 ## Test programs for potentials, forces and torques
 Two program files are provided: `test_pot_atom.py` and `test_pot_linear.py`,
