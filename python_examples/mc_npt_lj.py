@@ -202,13 +202,13 @@ for blk in range(1,nblock+1): # Loop over blocks
         moves = 0
 
         for i in range(n): # Loop over atoms
-            partial_old = potential_1 ( r[i,:], i, box, r_cut, r ) # Old atom potential, virial etc
+            rj = np.delete(r,i,0) # Array of all the other atoms
+            partial_old = potential_1 ( r[i,:], box, r_cut, rj ) # Old atom potential, virial etc
             assert not partial_old.ovr, 'Overlap in current configuration'
 
             ri = random_translate_vector ( dr_max/box, r[i,:] ) # Trial move to new position (in box=1 units)
             ri = ri - np.rint ( ri )                            # Periodic boundary correction
-
-            partial_new = potential_1 ( ri, i, box, r_cut, r ) # New atom potential, virial etc
+            partial_new = potential_1 ( ri, box, r_cut, rj )    # New atom potential, virial etc
 
             if not partial_new.ovr: # Test for non-overlapping configuration
                 delta = partial_new.pot - partial_old.pot # Use cut (but not shifted) potential

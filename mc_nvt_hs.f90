@@ -8,7 +8,7 @@ PROGRAM mc_nvt_hs
   USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE maths_module,     ONLY : random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       overlap_1, overlap, n_overlap, n, r
+       &                       overlap_1, overlap, n, r
 
   IMPLICIT NONE
 
@@ -145,6 +145,7 @@ CONTAINS
 
   SUBROUTINE calculate ( string )
     USE averages_module, ONLY : write_variables, variable_type
+    USE mc_module,       ONLY : n_overlap
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in), OPTIONAL :: string
 

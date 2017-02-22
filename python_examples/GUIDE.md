@@ -164,6 +164,15 @@ Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    
 * The `mc_npt_lj.py` program measured _P_ (c) is also low at 0.656(5), the specified value is 0.69.
 * The `mc_zvt_lj.py` program likewise gives a low pressure???
 
+## Hard-particle programs
+Equations of state are discussed in the main GUIDE.
+Here we start to gather test simulation results for python versions of the hard-sphere codes.
+
+&rho; | _P_ (EOS) | _P_ `mc_nvt_hs`| _P_ `md_nve_hs` | &rho; `mc_npt_hs`
+----- | -----     | -----    | ----- | -----
+0.50  | 1.6347    | 1.630(8) |  | 
+
+
 ## Test programs for potentials, forces and torques
 Two program files are provided: `test_pot_atom.py` and `test_pot_linear.py`,
 for pair potentials between, respectively, atoms and linear molecules.

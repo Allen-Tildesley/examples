@@ -8,7 +8,7 @@ PROGRAM mc_npt_hs
   USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE maths_module,     ONLY : metropolis, random_translate_vector
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                       overlap_1, overlap, n_overlap, n, r
+       &                       overlap_1, overlap, n, r
 
   IMPLICIT NONE
 

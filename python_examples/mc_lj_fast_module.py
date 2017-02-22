@@ -4,8 +4,6 @@
 Fast version, using NumPy.
 """
 
-lt, gt = -1, 1 # Options for j_range
-
 class PotentialType:
     """A composite variable for interactions."""
 
@@ -55,7 +53,7 @@ def potential ( box, r_cut, r ):
     total = PotentialType ( pot=0.0, vir=0.0, lap=0.0, ovr=False ) # Initialize
 
     for i in range(n-1):
-        partial = potential_1 ( r[i,:], i, box, r_cut, r, gt )
+        partial = potential_1 ( r[i,:], box, r_cut, r[i+1:,:] )
         if partial.ovr:
             total.ovr = True
             break
@@ -63,11 +61,10 @@ def potential ( box, r_cut, r ):
 
     return total
 
-def potential_1 ( ri, i, box, r_cut, r, j_range=None ):
+def potential_1 ( ri, box, r_cut, r ):
     """Takes in coordinates and index of an atom and calculates its interactions.
 
-    Values of box, cutoff range, and coordinate array are supplied,
-    as is the (optional) range of j-neighbours to be considered.
+    Values of box, cutoff range, and partner coordinate array are supplied.
     """
 
     import numpy as np
@@ -78,15 +75,13 @@ def potential_1 ( ri, i, box, r_cut, r, j_range=None ):
     # partial.lap is the corresponding Laplacian of atom ri
     # partial.ovr is a flag indicating overlap (potential too high) to avoid overflow
     # If this is True, the values of partial.pot etc should not be used
-    # The coordinates in ri are not necessarily identical with those in r[i,:]
-    # The argument j_range may restrict partner indices to j>i, or j<i
-    # Usually i takes a value in range(n) indicating the atom to be skipped
-    # but the routine should also handle the case j_range=None, i=n, when no atoms are skipped
+    # In general, r will be a subset of the complete set of simulation coordinates
+    # and none of its rows should be identical to ri
 
     # It is assumed that positions are in units where box = 1
     # Forces are calculated in units where sigma = 1 and epsilon = 1
 
-    n, d = r.shape
+    nj, d = r.shape
     assert d==3, 'Dimension error for r in potential_1'
     assert ri.size==3, 'Dimension error for ri in potential_1'
 
@@ -95,16 +90,7 @@ def potential_1 ( ri, i, box, r_cut, r, j_range=None ):
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
 
-    # Get all separation vectors from partners excluding i
-    if j_range is None:
-        if i in range(n):
-            rij = ri-np.delete(r,i,0)
-        else:
-            rij = ri-r
-    else:
-        assert j_range==gt or j_range==lt, 'j-range error in potential_1'
-        rij = ri-r[:i,:] if j_range==lt else ri-r[i+1:,:]
-
+    rij = ri - r                    # Get all separation vectors from partners
     rij = rij - np.rint(rij)        # Periodic boundary conditions in box=1 units
     rij_sq = np.sum(rij**2,axis=1)  # Squared separations
 

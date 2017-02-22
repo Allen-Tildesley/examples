@@ -200,14 +200,13 @@ for blk in range(1,nblock+1): # Loop over blocks
             if zeta < prob_move:
                 m_try = m_try + 1
                 i = np.random.randint(n) # Choose moving particle at random
-
-                partial_old = potential_1 ( r[i,:], i, box, r_cut, r ) # Old atom potential, virial etc
+                rj = np.delete(r,i,0)    # Array of all the other atoms
+                partial_old = potential_1 ( r[i,:], box, r_cut, rj ) # Old atom potential, virial etc
                 assert not partial_old.ovr, 'Overlap in current configuration'
 
                 ri = random_translate_vector ( dr_max/box, r[i,:] ) # Trial move to new position (in box=1 units)
                 ri = ri - np.rint ( ri )                            # Periodic boundary correction
-
-                partial_new = potential_1 ( ri, i, box, r_cut, r ) # New atom potential, virial etc
+                partial_new = potential_1 ( ri, box, r_cut, rj )    # New atom potential, virial etc
 
                 if not partial_new.ovr: # Test for non-overlapping configuration
                     delta = partial_new.pot - partial_old.pot # Use cut (but not shifted) potential
@@ -222,11 +221,11 @@ for blk in range(1,nblock+1): # Loop over blocks
                 c_try = c_try + 1
                 ri = np.random.rand(3) # Three uniform random numbers in range (0,1)
                 ri = ri - 0.5          # Now in range (-0.5,+0.5) for box=1 units
-                partial_new = potential_1 ( ri, n, box, r_cut, r ) # New atom potential, virial, etc
+                partial_new = potential_1 ( ri, box, r_cut, r ) # New atom potential, virial, etc
+
                 if not partial_new.ovr: # Test for non-overlapping configuration
                     delta = partial_new.pot / temperature                  # Use cut (not shifted) potential
                     delta = delta - np.log ( activity * box**3 / ( n+1 ) ) # Activity term for creation
-
                     if metropolis ( delta ): # Accept Metropolis test
                         r = np.append ( r, ri[np.newaxis,:], 0 ) # Add new particle to r array
                         n = r.shape[0]                           # New value of N
@@ -236,13 +235,14 @@ for blk in range(1,nblock+1): # Loop over blocks
             else: # Try destroy
                 d_try = d_try + 1
                 i = np.random.randint(n) # Choose particle at random
-                partial_old = potential_1 ( r[i,:], i, box, r_cut, r ) # Old atom potential, virial, etc
+                rj = np.delete(r,i,0)    # Array of all the other atoms
+                partial_old = potential_1 ( r[i,:], box, r_cut, rj ) # Old atom potential, virial, etc
                 assert not partial_old.ovr, 'Overlap found on particle removal'
+
                 delta = -partial_old.pot / temperature             # Use cut (not shifted) potential
                 delta = delta - np.log ( n / (activity * box**3) ) # Activity term for creation
-
                 if metropolis ( delta ): # Accept Metropolis test
-                    r = np.delete(r,i,0)        # Delete particle from r array
+                    r = rj                      # Delete particle from r array
                     n = r.shape[0]              # New value of N
                     total = total - partial_old # Update total values
                     d_acc = d_acc + 1           # Increment destruction move counter
