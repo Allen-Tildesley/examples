@@ -31,7 +31,7 @@ class PotentialType:
 
 def introduction():
     """Prints out introductory statements at start of run."""
-    
+
     print('Lennard-Jones potential')
     print('Cut (but not shifted)')
     print('Diameter, sigma = 1')
@@ -71,9 +71,9 @@ def potential ( box, r_cut, r ):
 
 def potential_1 ( ri, i, box, r_cut, r, j_range=None ):
     """Takes in coordinates and index of an atom and calculates its interactions.
-    
+
     Values of box, cutoff range, and coordinate array are supplied,
-    as is the (optional) range of j-neighbours to be considered. 
+    as is the (optional) range of j-neighbours to be considered.
     """
 
     import numpy as np
@@ -84,8 +84,10 @@ def potential_1 ( ri, i, box, r_cut, r, j_range=None ):
     # partial.ovr is a flag indicating overlap (potential too high) to avoid overflow
     # If this is True, the values of partial.pot etc should not be used
     # The coordinates in ri are not necessarily identical with those in r[i,:]
-    # The argument j_range may restrict partner indices to j>i, or j<i, or hold the complete set
- 
+    # The argument j_range may restrict partner indices to j>i, or j<i
+    # Usually i takes a value in range(n) indicating the atom to be skipped
+    # but the routine should also handle the case j_range=None, i=n, when no atoms are skipped
+
     # It is assumed that positions are in units where box = 1
     # Forces are calculated in units where sigma = 1 and epsilon = 1
 
@@ -121,7 +123,7 @@ def potential_1 ( ri, i, box, r_cut, r, j_range=None ):
             if ovr:
                 partial.ovr=True
                 return partial
-                
+
             sr6  = sr2 ** 3
             sr12 = sr6 ** 2
             pot  = sr12 - sr6                    # LJ pair potential (cut but not shifted)
@@ -134,7 +136,7 @@ def potential_1 ( ri, i, box, r_cut, r, j_range=None ):
     partial.pot = partial.pot * 4.0        # 4*epsilon
     partial.vir = partial.vir * 24.0 / 3.0 # 24*epsilon and divide virial by 3
     partial.lap = partial.lap * 24.0 * 2.0 # 24*epsilon and factor 2 for ij and ji
-    
+
     return partial
 
 def force_sq ( box, r_cut, r ):
@@ -143,7 +145,7 @@ def force_sq ( box, r_cut, r ):
     import numpy as np
 
     n, d = r.shape
-    
+
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
@@ -170,4 +172,3 @@ def force_sq ( box, r_cut, r ):
     f = f * 24 # Numerical factor 24*epsilon
 
     return np.sum(f**2)
-

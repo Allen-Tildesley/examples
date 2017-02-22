@@ -31,7 +31,7 @@ class PotentialType:
 
 def introduction():
     """Prints out introductory statements at start of run."""
-    
+
     print('Lennard-Jones potential')
     print('Cut (but not shifted)')
     print('Diameter, sigma = 1')
@@ -65,9 +65,9 @@ def potential ( box, r_cut, r ):
 
 def potential_1 ( ri, i, box, r_cut, r, j_range=None ):
     """Takes in coordinates and index of an atom and calculates its interactions.
-    
+
     Values of box, cutoff range, and coordinate array are supplied,
-    as is the (optional) range of j-neighbours to be considered. 
+    as is the (optional) range of j-neighbours to be considered.
     """
 
     import numpy as np
@@ -79,15 +79,17 @@ def potential_1 ( ri, i, box, r_cut, r, j_range=None ):
     # partial.ovr is a flag indicating overlap (potential too high) to avoid overflow
     # If this is True, the values of partial.pot etc should not be used
     # The coordinates in ri are not necessarily identical with those in r[i,:]
-    # The argument j_range may restrict partner indices to j>i, or j<i, or hold the complete set
- 
+    # The argument j_range may restrict partner indices to j>i, or j<i
+    # Usually i takes a value in range(n) indicating the atom to be skipped
+    # but the routine should also handle the case j_range=None, i=n, when no atoms are skipped
+
     # It is assumed that positions are in units where box = 1
     # Forces are calculated in units where sigma = 1 and epsilon = 1
 
     n, d = r.shape
     assert d==3, 'Dimension error for r in potential_1'
     assert ri.size==3, 'Dimension error for ri in potential_1'
-    
+
     sr2_ovr      = 1.77 # Overlap threshold (pot > 100)
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box ** 2
@@ -95,7 +97,10 @@ def potential_1 ( ri, i, box, r_cut, r, j_range=None ):
 
     # Get all separation vectors from partners excluding i
     if j_range is None:
-        rij = ri-np.concatenate((r[:i,:],r[i+1:,:]))
+        if i in range(n):
+            rij = ri-np.delete(r,i,0)
+        else:
+            rij = ri-r
     else:
         assert j_range==gt or j_range==lt, 'j-range error in potential_1'
         rij = ri-r[:i,:] if j_range==lt else ri-r[i+1:,:]
@@ -111,7 +116,7 @@ def potential_1 ( ri, i, box, r_cut, r, j_range=None ):
     if np.any(ovr):
         partial = PotentialType ( pot=0.0, vir=0.0, lap=0.0, ovr=True )
         return partial
-                
+
     sr6  = sr2 ** 3
     sr12 = sr6 ** 2
     pot  = sr12 - sr6                    # LJ pair potentials (cut but not shifted)
@@ -133,7 +138,7 @@ def force_sq ( box, r_cut, r ):
     import numpy as np
 
     n, d = r.shape
-    
+
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
