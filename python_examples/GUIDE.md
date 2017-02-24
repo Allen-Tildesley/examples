@@ -174,6 +174,41 @@ Here we start to gather test simulation results for python versions of the hard-
 
 For the _NPT_ simulation the pressure was set to the EOS value corresponding to the desired density.
 
+## Chain simulation programs
+The program `mc_chain_nvt_cbmc_lj.py` simulates a single Lennard-Jones chain,
+where the atoms are linked by harmonic springs.
+There are, therefore,
+both bonded and non-bonded interactions,
+the former being used to select atom positions,
+and the latter appearing in Rosenbluth weights,
+which govern the acceptance/rejection of moves.
+For comparison with the paper of Calvo, Doye and Wales, _J Chem Phys,_ __116,__ 2642 (2002),
+test runs were carried out using _N_=13 atoms, a bond length of 1.122462&sigma;
+(prepared using `initialize` with random non-overlapping atom positions)
+and a rather low spring potential _k_<sub>spring</sub>=20.
+We only use CBMC moves in this code: for a practical application it would be advisable
+to include other kinds of move, for example crankshaft, pivot, and bridging moves.
+Replica exchange (as used by Calvo et al) would also improve the sampling at low temperature.
+Below we report the excess, potential, energy per atom _PE_,
+and the excess heat capacity per atom _C<sub>v</sub>_(ex),
+as well as the radius of gyration _R_<sub>g</sub>.
+The program default run length is 10 blocks of 5000 steps.
+For lower temperatures (below 0.40), longer runs (10 blocks of 1000000
+steps) were used.
+For temperatures higher than 1.0,
+the bond length fluctuations become unphysically large for this value of _k_<sub>spring</sub>.
+
+_T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+----- | ------    | ------          | ------
+
+Here we give analogous results for the program default spring constant of _k_<sub>spring</sub>=400.
+
+_T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+----- | -------   | --------        | --------
+1.00  | -1.384(4) | 1.513(3)        | 1.23(2)
+
+* At first glance, the average _PE_ seems wrong???
+
 ## DPD program
 For testing we compare with an approximate DPD equation of state for _P_.
 
