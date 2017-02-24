@@ -242,7 +242,7 @@ for blk in range(1,nblock+1): # Loop over blocks
                 delta = -partial_old.pot / temperature             # Use cut (not shifted) potential
                 delta = delta - np.log ( n / (activity * box**3) ) # Activity term for creation
                 if metropolis ( delta ): # Accept Metropolis test
-                    r = rj                      # Delete particle from r array
+                    r = np.copy(rj)             # Delete particle from r array
                     n = r.shape[0]              # New value of N
                     total = total - partial_old # Update total values
                     d_acc = d_acc + 1           # Increment destruction move counter

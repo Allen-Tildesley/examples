@@ -174,6 +174,30 @@ Here we start to gather test simulation results for python versions of the hard-
 
 For the _NPT_ simulation the pressure was set to the EOS value corresponding to the desired density.
 
+## DPD program
+For testing we compare with an approximate DPD equation of state for _P_.
+
+* RD Groot, PB Warren, _J Chem Phys,_ __107,__ 4423 (1997)
+* TP Liyana-Arachchi, SN Jamadagni, D Eike, PH Koenig, JI Siepmann,
+_J Chem Phys,_ __142,__ 044902 (2015)
+
+The paper of Liyana-Arachchi et al (2015) is an improvement of the original
+EOS of Groot and Warren (1997), which is more accurate and
+applicable over a wider range of state points.
+The function is included in the `dpd` program,
+and the expected value of _P_ (labelled EOS below)
+is printed for comparison at the end.
+We give results obtained by both
+the Lowe thermostat (L) and the Shardlow algorithm (S).
+We take the default values of _a_ &rho;/T=75, and of other parameters not mentioned below.
+
+ _T_   | &rho; | _P_ (EOS) | _P_ (L)   | _P_ (S)
+ ----- | ----- | -----     | -----     | -----
+ 1.0   | 5.0   | 41.887    | 41.55(1)  | 41.533(7)
+
+* The configurational temperature seems to be wrong??
+* Not convinced slow version is working properly??
+
 ## Test programs for potentials, forces and torques
 Two program files are provided: `test_pot_atom.py` and `test_pot_linear.py`,
 for pair potentials between, respectively, atoms and linear molecules.
