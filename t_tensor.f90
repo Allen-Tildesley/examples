@@ -27,21 +27,23 @@ PROGRAM t_tensor
 
   ! The dipole moment of molecule 1 is aligned along the axial vector e1
   ! The quadrupole tensor, quad1, is diagonal and traceless with
-  ! quad1_xx = -0.5*quad1_mag, quad1_yy = -0.5*quad1_mag, and quad1_zz = quad1_mag in the molecule-fixed system.
-  ! Similarly for molecule 2
+  ! quad1_xx = -0.5*quad1_mag, quad1_yy = -0.5*quad1_mag, and quad1_zz = quad1_mag
+  ! in the molecule-fixed system. Similarly for molecule 2.
   ! The vector r12 = r1-r2 points from 2 to 1.
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               maths_module,    ONLY : init_random_seed, random_vector, outer_product
+
+  USE maths_module, ONLY : init_random_seed, random_vector, outer_product
 
   IMPLICIT NONE
 
-  REAL, DIMENSION(3)     :: r12, r12_hat, e1, e2, econ, mu1, mu2, f12t, f12e
-  REAL, DIMENSION(3,3)   :: tt2, quad1, quad2, emat
-  REAL, DIMENSION(3,3,3) :: tt3
+  REAL, DIMENSION(3)         :: r12, r12_hat, e1, e2, mu1, mu2, f12t, f12e, vec
+  REAL, DIMENSION(3,3)       :: tt2, quad1, quad2, mat
+  REAL, DIMENSION(3,3,3)     :: tt3
+  REAL, DIMENSION(3,3,3,3)   :: tt4, e4
+  REAL, DIMENSION(3,3,3,3,3) :: tt5
 
-  REAL    :: r12_mag, r12_sq, r12_cu, r12_fo
-  REAL    :: vddt, vdde, vdqt, vdqe, vqdt, vqde, c1, c2, c12
+  REAL    :: r12_mag, c1, c2, c12, v12t, v12e
   INTEGER :: i, ioerr
   REAL    :: d_min, d_max, mu1_mag, mu2_mag, quad1_mag, quad2_mag
 
@@ -62,15 +64,15 @@ PROGRAM t_tensor
   quad1_mag = 1.0 ! Quadrupole moment of molecule 1
   quad2_mag = 1.0 ! Quadrupole moment of molecule 2
 
-  ! Read parameters from namelist
+  !Read parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
-     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
-     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+    WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
+    IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+    IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in t_tensor'
-  END IF
+ END IF
 
   ! Write out parameters
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)'  ) 'Min separation d_min',            d_min
@@ -90,17 +92,13 @@ PROGRAM t_tensor
   r12_mag = d_min + (d_max-d_min)*r12_mag ! Magnitude of r12
   r12     = r12_hat * r12_mag             ! Within desired range of origin
 
-  r12_sq  = r12_mag**2       ! Squared distance
-  r12_cu  = r12_sq * r12_mag ! Cubed distance
-  r12_fo  = r12_sq * r12_sq  ! Fourth power of distance
-
   c1  = DOT_PRODUCT ( e1, r12_hat ) ! Cosine of angle between e1 and r12
   c2  = DOT_PRODUCT ( e2, r12_hat ) ! Cosine of angle between e2 and r12
   c12 = DOT_PRODUCT ( e1, e2   )    ! Cosine of angle between e1 and e2
 
-  WRITE ( unit=output_unit, fmt='(a,t40,3f10.6)' ) 'Displacement r12 = ', r12
-  WRITE ( unit=output_unit, fmt='(a,t40,3f10.6)' ) 'Orientation  e1  = ', e1
-  WRITE ( unit=output_unit, fmt='(a,t40,3f10.6)' ) 'Orientation  e2  = ', e2
+  WRITE ( unit=output_unit, fmt='(a,t40,3f12.6)' ) 'Displacement r12 = ', r12
+  WRITE ( unit=output_unit, fmt='(a,t40,3f12.6)' ) 'Orientation  e1  = ', e1
+  WRITE ( unit=output_unit, fmt='(a,t40,3f12.6)' ) 'Orientation  e2  = ', e2
 
   ! Dipole vectors in space-fixed frame
   mu1 = mu1_mag * e1                             
@@ -114,36 +112,69 @@ PROGRAM t_tensor
   FORALL (i=1:3) quad2(i,i) = quad2(i,i) - 0.5
   quad2 = quad2_mag * quad2
 
-  tt2 = t2_tensor ( r12_hat, r12_cu ) ! Calculate the second rank tensor, T2
-  tt3 = t3_tensor ( r12_hat, r12_fo ) ! Calculate the third rank tensor, T3
+  tt2 = t2_tensor ( r12_hat, r12_mag**3 ) ! Calculate the second rank tensor, T2
+  tt3 = t3_tensor ( r12_hat, r12_mag**4 ) ! Calculate the third  rank tensor, T3
+  tt4 = t4_tensor ( r12_hat, r12_mag**5 ) ! Calculate the fourth rank tensor, T4
+  tt5 = t5_tensor ( r12_hat, r12_mag**6 ) ! Calculate the fifth  rank tensor, T5
 
   ! Headings
-  WRITE ( unit=output_unit, fmt='(/,t30,a30,t70,a30)' ) '.....Result from T tensor', '.....Result from Euler angles' 
+  WRITE ( unit=output_unit, fmt='(/,t30,a36,t70,a36)' ) '.....Result from T tensor', '.....Result from Euler angles' 
 
   ! Calculate the dipole-dipole energy
-  vddt = -DOT_PRODUCT ( mu1, MATMUL ( tt2, mu2 ) ) ! Contract both dipoles with T2
-  vdde = mu1_mag * mu2_mag * ( c12 - 3.0 * c1 * c2 ) / r12_cu
-  WRITE ( unit=output_unit, fmt='(a,t30,f10.6,t70,f10.6)' ) 'Dipole-dipole energy =', vddt, vdde
-
-  ! Calculate the dipole-quadrupole energy
-  econ = contract_32 ( tt3, quad2 ) ! Contract T3 with the quadrupole tensor for molecule 2
-  vdqt = -(1.0/3.0) * DOT_PRODUCT ( mu1, econ ) ! and contract with dipole for molecule 1
-  vdqe = 1.5 * mu1_mag * quad2_mag * ( c1 * (1.0 - 5.0 * c2 * c2) + 2.0 * c2 * c12 ) / r12_fo
-  WRITE ( unit=output_unit, fmt='(a,t30,f10.6,t70,f10.6)' ) 'Dipole-quadrupole energy =', vdqe, vdqt
-
-  ! Calculate the quadrupole-dipole energy
-  econ = contract_32 ( tt3, quad1 )  ! Contract T3 with the quadrupole tensor for molecule 1
-  vqdt  =  (1.0/3.0) * DOT_PRODUCT ( econ, mu2 ) ! and contract with dipole for molecule 2
-  vqde  = - 1.5 * quad1_mag * mu2_mag * ( c2 * (1.0 - 5.0 * c1 * c1 ) + 2.0 * c1 * c12 ) / r12_fo
-  WRITE ( unit=output_unit, fmt='(a,t30,f10.6,t70,f10.6)' ) 'Quadrupole-dipole energy =', vqde, vqdt
+  vec = MATMUL ( tt2, mu2 ) ! Contract T2 with dipole for molecule 2
+  v12t = -DOT_PRODUCT ( mu1, vec ) ! and contract result with dipole for molecule 1
+  v12e = mu1_mag * mu2_mag * ( c12 - 3.0 * c1 * c2 ) / r12_mag**3
+  WRITE ( unit=output_unit, fmt='(a,t30,f12.6,t70,f12.6)' ) 'Dipole-dipole energy =', v12t, v12e
 
   ! Calculate the dipole-dipole force
-  emat = outer_product ( mu1, mu2 ) ! Dyadic of the dipole vectors
-  econ = contract_32 ( tt3, emat )  ! Contract with T3
-  f12t = - econ
-  f12e = (3.0 * mu1_mag * mu2_mag / r12_fo ) * ((c12 - 5.0 *c1 * c2) * r12_hat + c2 * e1 + c1 * e2 )
-  WRITE ( unit=output_unit, fmt='(a,t30,3f10.6,t70,3f10.6)' ) 'Dipole-dipole force  =', f12t, f12e
+  mat = outer_product ( mu1, mu2 ) ! Dyadic of the dipole vectors
+  vec = contract_32_1 ( tt3, mat )  ! Contract with T3
+  f12t = - vec
+  f12e = (3.0 * mu1_mag * mu2_mag / r12_mag**4 ) * ((c12 - 5.0 *c1 * c2) * r12_hat + c2 * e1 + c1 * e2 )
+  WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6)' ) 'Dipole-dipole force  =', f12t, f12e
 
+  ! Calculate the dipole-quadrupole energy
+  vec = contract_32_1 ( tt3, quad2 ) ! Contract T3 with the quadrupole tensor for molecule 2
+  v12t = -(1.0/3.0) * DOT_PRODUCT ( mu1, vec ) ! and contract with dipole for molecule 1
+  v12e = 1.5 * mu1_mag * quad2_mag * ( c1 * (1.0 - 5.0 * c2 * c2) + 2.0 * c2 * c12 ) / r12_mag**4
+  WRITE ( unit=output_unit, fmt='(a,t30,f12.6,t70,f12.6)' ) 'Dipole-quadrupole energy =', v12t, v12e
+  
+  ! Calculate the dipole-quadrupole force
+  mat  = contract_42_2 ( tt4, quad2 ) ! Contract T4 with the quadrupole tensor for molecule 2
+  f12t = - (1.0/3.0) * MATMUL ( mu1, mat ) ! and contract result with dipole for molecule 1
+  f12e = - (1.5 * mu1_mag * quad2_mag / r12_mag**5 ) * (( 35.0 * c1 * c2 * c2 - 10.0 * c2 * c12   &
+  - 5.0 * c1 ) * r12_hat + (1.0 - 5.0 * c2 * c2 ) * e1 + (2.0 * c12 - 10.0 * c1 * c2) * e2 )
+  WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6)' ) 'Dipole-quadrupole force  =', f12t, f12e
+
+  ! Calculate the quadrupole-dipole energy
+  vec = contract_32_1 ( tt3, quad1 )  ! Contract T3 with the quadrupole tensor for molecule 1
+  v12t  =  (1.0/3.0) * DOT_PRODUCT ( vec, mu2 ) ! and contract with dipole for molecule 2
+  v12e  = - 1.5 * quad1_mag * mu2_mag * ( c2 * (1.0 - 5.0 * c1 * c1 ) + 2.0 * c1 * c12 ) / r12_mag**4
+  WRITE ( unit=output_unit, fmt='(a,t30,f12.6,t70,f12.6)' ) 'Quadrupole-dipole energy =', v12t, v12e
+  
+  ! Calculate the quadrupole-dipole force
+  mat  = contract_42_2 ( tt4, quad1 ) ! Contract T4 with the quadrupole tensor for molecule 1 
+  f12t = (1.0/3.0) * MATMUL ( mat, mu2 ) ! and contract result with dipole for molecule 2
+  f12e = + (1.5 * mu2_mag * quad1_mag / r12_mag**5) * (( 35.0 * c1 * c1 * c2 - 10.0 * c1 * c12   &
+  - 5.0 * c2 ) * r12_hat + (1.0 - 5.0 * c1 * c1 ) * e2 + (2.0 * c12 - 10.0 * c1 * c2) * e1 )
+  WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6)' ) 'Quadrupole-dipole force  =', f12t, f12e
+ 
+  ! Calculate the quadrupole-quadrupole energy
+  mat  = contract_42_2 ( tt4, quad2 ) ! Contract T4 with the quadrupole tensor for molecule 2
+  v12t = (1.0/9.0) * contract_22(quad1, mat ) ! and double dot with the quadrupole tensor for molecule 1
+  v12e = 0.75 * quad1_mag * quad2_mag * ( 1.0 - 5.0 * c1 * c1 - 5.0 * c2 * c2 + 2.0 * c12 * c12 &
+         + 35.0 * c1 * c1 * c2 * c2 - 20.0 * c1 * c2 * c12 ) / r12_mag**5
+  WRITE ( unit=output_unit, fmt='(a,t30,f12.6,t70,f12.6)' ) 'Quadrupole-quadrupole energy =', v12t, v12e
+  
+  ! Calculate the quadrupole-quadrupole force
+  e4   = outer_22_4 ( quad1, quad2 ) ! Outer product of the quadrupole tensors
+  f12t = (1.0/9.0) * contract_54_1 ( tt5, e4 ) ! Contract with T5
+  f12e = (0.75 * quad1_mag * quad2_mag / r12_mag**6) * (( 5.0 - 35.0 * c1 * c1  - 35.0 * c2 * c2  &
+          + 10.0 * c12 * c12 + 315.0 * c1 * c1 * c2 * c2 - 140.0 * c1 * c2 * c12 ) * r12_hat  &
+          + ( 10.0 * c1 - 70.0 * c1 * c2 * c2 + 20.0 * c2 * c12 ) * e1                        &
+          + ( 10.0 * c2 - 70.0 * c2 * c1 * c1 + 20.0 * c1 * c12 ) * e2   )          
+  WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6)' ) 'Quadrupole-quadrupole force  =', f12t, f12e
+  
 CONTAINS
 
   FUNCTION t2_tensor ( r, r3 ) RESULT ( t2 )
@@ -188,19 +219,151 @@ CONTAINS
     t3 = t3 / r4 ! Scale by fourth power of distance
 
   END FUNCTION t3_tensor
-
-  FUNCTION contract_32 ( mat3, mat2 ) RESULT ( mat1 )
+  
+  FUNCTION t4_tensor ( r, r5 ) RESULT ( t4 )
     IMPLICIT NONE
-    REAL, DIMENSION(3)                  :: mat1 ! Returns rank-1 contraction of a rank-3 and a rank-2 tensor
-    REAL, DIMENSION(3,3,3), INTENT(in)  :: mat3 ! Third-rank  tensor
-    REAL, DIMENSION(3,3),   INTENT(in)  :: mat2 ! Second-rank tensor
+    REAL, DIMENSION(3,3,3,3)            :: t4 ! Returns fourth-rank 3x3x3x3 interaction tensor
+    REAL, DIMENSION(3),     INTENT(in)  :: r  ! Unit vector from 2 to 1
+    REAL,                   INTENT(in)  :: r5 ! Fifth power of the modulus of r12
+
+    INTEGER :: i, j, k, l
+
+    ! Define 3x3 unit matrix or Kronecker delta
+    REAL, DIMENSION(3,3), PARAMETER :: u = RESHAPE([ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0 ],[3,3])
+
+    t4 = 105.0 * outer_product ( r, r, r, r ) ! Starting point
+
+    DO i = 1, 3
+       DO j = 1, 3
+          DO k = 1, 3
+             DO l = 1, 3
+                t4(i,j,k,l) = t4(i,j,k,l) - 15.0 * ( &
+                     &   r(i) * r(j) * u(k,l) + r(i) * r(k) * u(j,l) &
+                     & + r(i) * r(l) * u(j,k) + r(j) * r(k) * u(i,l) &
+                     & + r(j) * r(l) * u(i,k) + r(k) * r(l) * u(i,j) ) &
+                     & + 3.0 * ( u(i,j) * u(k,l) + u(i,k) * u(j,l) + u(i,l) * u(j,k) )
+             END DO
+          END DO
+       END DO
+    END DO
+
+    t4 = t4 / r5 ! Scale by fifth power of distance
+
+  END FUNCTION t4_tensor
+  
+  FUNCTION t5_tensor ( r, r6 ) RESULT ( t5 )
+    IMPLICIT NONE
+    REAL, DIMENSION(3,3,3,3,3)          :: t5 ! Returns fifth-rank 3x3x3x3X3 interaction tensor
+    REAL, DIMENSION(3),     INTENT(in)  :: r  ! Unit vector from 2 to 1
+    REAL,                   INTENT(in)  :: r6 ! Sixth power of the modulus of r12
+
+    INTEGER :: i, j, k, l, m
+
+    ! Define 3x3 unit matrix or Kronecker delta
+    REAL, DIMENSION(3,3), PARAMETER :: u = RESHAPE([ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0 ],[3,3])
+
+    t5 = 945.0 * outer_product ( r, r, r, r, r ) ! Starting point
+
+    DO i = 1, 3
+       DO j = 1, 3
+          DO k = 1, 3
+             DO l = 1, 3
+                DO m = 1, 3
+                   t5(i,j,k,l,m) = t5(i,j,k,l,m) - 105.0 * ( &
+                        &   r(i) * r(j) * r(k) * u(l,m) + r(i) * r(j) * r(l) * u(k,m)     &
+                        & + r(i) * r(j) * r(m) * u(k,l) + r(i) * r(k) * r(l) * u(j,m)     &
+                        & + r(i) * r(k) * r(m) * u(j,l) + r(i) * r(l) * r(m) * u(j,k)     &
+                        & + r(j) * r(k) * r(l) * u(i,m) + r(j) * r(k) * r(m) * u(i,l)     &
+                        & + r(j) * r(l) * r(m) * u(i,k) + r(k) * r(l) * r(m) * u(i,j) )   &
+                        & + 15.0 * ( &
+                        &   r(i) * ( u(j,k) * u(l,m) + u(j,l) * u(k,m) + u(j,m) * u(k,l) ) &
+                        & + r(j) * ( u(i,k) * u(l,m) + u(i,l) * u(k,m) + u(i,m) * u(k,l) ) &
+                        & + r(k) * ( u(i,j) * u(l,m) + u(i,l) * u(j,m) + u(i,m) * u(j,l) ) &
+                        & + r(l) * ( u(i,j) * u(k,m) + u(i,k) * u(j,m) + u(i,m) * u(j,k) ) &
+                        & + r(m) * ( u(i,j) * u(k,l) + u(i,k) * u(j,l) + u(i,l) * u(j,k) ) )
+                END DO
+             END DO
+          END DO
+       END DO
+    END DO
+
+    t5 = t5 / r6 ! Scale by sixth power of distance
+
+  END FUNCTION t5_tensor
+  
+  FUNCTION contract_22 ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL                              :: c ! Returns a zero-rank contraction
+    REAL, DIMENSION(3,3), INTENT(in)  :: a ! of a second-rank tensor
+    REAL, DIMENSION(3,3), INTENT(in)  :: b ! with another second-rank tensor
+    
+    c = SUM ( a * b )
+    
+  END FUNCTION contract_22
+
+  FUNCTION contract_32_1 ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL, DIMENSION(3)                  :: c ! Returns a first-rank contraction of 
+    REAL, DIMENSION(3,3,3), INTENT(in)  :: a ! a third-rank tensor
+    REAL, DIMENSION(3,3),   INTENT(in)  :: b ! and a second-rank tensor
 
     INTEGER :: i
 
     DO i = 1, 3
-       mat1(i) = SUM ( mat3(i,:,:) * mat2(:,:) ) 
+       c(i) = SUM ( a(i,:,:) * b(:,:) ) 
     END DO
 
-  END FUNCTION contract_32
+  END FUNCTION contract_32_1
+  
+  FUNCTION contract_42_2 ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL, DIMENSION(3,3)                 :: c ! Returns a second-rank contraction of 
+    REAL, DIMENSION(3,3,3,3), INTENT(in) :: a ! a fourth-rank tensor
+    REAL, DIMENSION(3,3),     INTENT(in) :: b ! and a second-rank tensor
+
+    INTEGER :: i, j 
+
+    DO i = 1, 3
+       DO j = 1, 3
+          c(i,j) = SUM ( a(i,j,:,:) * b(:,:) ) 
+       END DO
+    END DO
+
+  END FUNCTION contract_42_2
+  
+  FUNCTION contract_54_1 ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL, DIMENSION(3)                     :: c ! Returns a first-rank contraction of 
+    REAL, DIMENSION(3,3,3,3,3), INTENT(in) :: a ! a fifth-rank tensor
+    REAL, DIMENSION(3,3,3,3),   INTENT(in) :: b ! and a fourth-rank tensor
+
+    INTEGER :: i
+
+    DO i = 1, 3    
+       c(i) = SUM ( a(i,:,:,:,:) * b(:,:,:,:) ) 
+    END DO
+    
+  END FUNCTION contract_54_1 
+   
+  FUNCTION outer_22_4 ( a, b ) RESULT( c )
+
+    IMPLICIT NONE
+    REAL, DIMENSION(3,3,3,3)             :: c ! Returns the fourth-rank outer product of 
+    REAL, DIMENSION(3,3),    INTENT(in)  :: a ! a second-rank tensor with
+    REAL, DIMENSION(3,3),    INTENT(in)  :: b ! another second-rank tensor
+
+    INTEGER :: i, j, k, l 
+
+    DO i = 1, 3
+       DO j = 1, 3
+          DO k = 1, 3
+             DO l = 1, 3
+                c(i,j,k,l) = a(i,j) * b(k,l)
+             END DO
+          END DO
+       END DO
+    END DO
+
+  END FUNCTION outer_22_4
 
 END PROGRAM t_tensor

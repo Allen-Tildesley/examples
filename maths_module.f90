@@ -56,6 +56,8 @@ MODULE maths_module
   INTERFACE outer_product
      MODULE PROCEDURE outer_product_2 ! for 2 vectors giving a rank-2 result
      MODULE PROCEDURE outer_product_3 ! for 3 vectors giving a rank-3 result
+     MODULE PROCEDURE outer_product_4 ! for 4 vectors giving a rank-4 result
+     MODULE PROCEDURE outer_product_5 ! for 5 vectors giving a rank-5 result
   END INTERFACE outer_product
 
   ! Generic interface for the random_normals functions
@@ -692,6 +694,46 @@ CONTAINS
     END DO
 
   END FUNCTION outer_product_3
+
+  FUNCTION outer_product_4 ( a, b, c, d ) RESULT (e)
+    IMPLICIT NONE
+    REAL, DIMENSION(:),                   INTENT(IN) :: a, b, c, d ! Given four supplied vectors,
+    REAL, DIMENSION(SIZE(a),SIZE(b),SIZE(c),SIZE(d)) :: e          ! returns their rank-4 outer product
+
+    INTEGER :: i, j, k, l
+
+    DO l = 1, SIZE(d)
+       DO k = 1, SIZE(c)
+          DO j = 1, SIZE(b)
+             DO i = 1, SIZE(a)
+                e(i,j,k,l) = a(i) * b(j) * c(k) * d(l)
+             END DO
+          END DO
+       END DO
+    END DO
+
+  END FUNCTION outer_product_4
+
+  FUNCTION outer_product_5 ( a, b, c, d, e ) RESULT (f)
+    IMPLICIT NONE
+    REAL, DIMENSION(:),                           INTENT(IN) :: a, b, c, d, e ! Given five  supplied vectors,
+    REAL, DIMENSION(SIZE(a),SIZE(b),SIZE(c),SIZE(d),SIZE(e)) :: f             ! returns their rank-5 outer product
+
+    INTEGER :: i, j, k, l, m
+
+    DO m = 1, SIZE(e) 
+       DO l = 1, SIZE(d)
+          DO k = 1, SIZE(c)
+             DO j = 1, SIZE(b)
+                DO i = 1, SIZE(a)                
+                   f(i,j,k,l,m) = a(i) * b(j) * c(k) * d(l) * e(m)
+                END DO
+             END DO
+          END DO
+       END DO
+    END DO
+
+  END FUNCTION outer_product_5
 
   FUNCTION lowercase ( oldstring ) RESULT ( newstring )
     IMPLICIT NONE
