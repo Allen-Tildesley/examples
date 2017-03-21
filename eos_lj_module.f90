@@ -2,6 +2,29 @@
 ! Routines for Lennard-Jones fitted equations of state
 MODULE eos_lj_module
 
+  !------------------------------------------------------------------------------------------------!
+  ! This software was written in 2016/17                                                           !
+  ! by Michael P. Allen <m.p.allen@warwick.ac.uk>/<m.p.allen@bristol.ac.uk>                        !
+  ! and Dominic J. Tildesley <dominic.tildesley@epfl.ch> ("the authors"),                          !
+  ! to accompany the book "Computer Simulation of Liquids", second edition, 2017 ("the text"),     !
+  ! published by Oxford University Press ("the publishers").                                       !
+  !                                                                                                !
+  ! LICENCE                                                                                        !
+  ! Creative Commons CC0 Public Domain Dedication.                                                 !
+  ! To the extent possible under law, the authors have dedicated all copyright and related         !
+  ! and neighboring rights to this software to the PUBLIC domain worldwide.                        !
+  ! This software is distributed without any warranty.                                             !
+  ! You should have received a copy of the CC0 Public Domain Dedication along with this software.  !
+  ! If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.                               !
+  !                                                                                                !
+  ! DISCLAIMER                                                                                     !
+  ! The authors and publishers make no warranties about the software, and disclaim liability       !
+  ! for all uses of the software, to the fullest extent permitted by applicable law.               !
+  ! The authors and publishers do not recommend use of this software for any purpose.              !
+  ! It is made freely available, solely to clarify points made in the text. When using or citing   !
+  ! the software, you should not imply endorsement by the authors or publishers.                   !
+  !------------------------------------------------------------------------------------------------!
+
   ! The routines in this module use the fitting function described and parametrized in
   ! M Thol, G Rutkai, R Span, J Vrabec, R Lustig, Int J Thermophys 36, 25 (2015)
   ! M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, J Phys Chem Ref Data 45, 023101 (2016)
@@ -48,6 +71,7 @@ MODULE eos_lj_module
 CONTAINS
 
   FUNCTION power ( tau, delta, c ) RESULT ( f )
+    IMPLICIT NONE
     REAL, DIMENSION(0:2,0:2)            :: f     ! Returns power function and scaled derivatives
     REAL,                    INTENT(in) :: tau   ! Reduced inverse temperature
     REAL,                    INTENT(in) :: delta ! Reduced density
@@ -66,6 +90,7 @@ CONTAINS
   END FUNCTION power
 
   FUNCTION expon ( tau, delta, c ) RESULT ( f )
+    IMPLICIT NONE
     REAL, DIMENSION(0:2,0:2)            :: f     ! Returns exponential function and scaled derivatives
     REAL,                    INTENT(in) :: tau   ! Reduced inverse temperature
     REAL,                    INTENT(in) :: delta ! Reduced density
@@ -84,6 +109,7 @@ CONTAINS
   END FUNCTION expon
 
   FUNCTION gauss ( tau, delta, c ) RESULT ( f )
+    IMPLICIT NONE
     REAL, DIMENSION(0:2,0:2)            :: f     ! Returns Gaussian function and scaled derivatives
     REAL,                    INTENT(in) :: tau   ! Reduced inverse temperature
     REAL,                    INTENT(in) :: delta ! Reduced density
@@ -102,6 +128,7 @@ CONTAINS
   END FUNCTION gauss
 
   FUNCTION a_res_full ( temp, rho ) RESULT ( a )
+    IMPLICIT NONE
     REAL, DIMENSION(0:2,0:2) :: a    ! Reduced residual free energy and scaled derivatives
     REAL, INTENT(in)         :: temp ! Temperature in LJ units
     REAL, INTENT(in)         :: rho  ! Density in LJ units
@@ -164,6 +191,7 @@ CONTAINS
   END FUNCTION a_res_full
 
   FUNCTION a_res_cutshift ( temp, rho ) RESULT ( a )
+    IMPLICIT NONE
     REAL, DIMENSION(0:2,0:2) :: a    ! Reduced residual free energy and scaled derivatives
     REAL, INTENT(in)         :: temp ! Temperature in LJ units
     REAL, INTENT(in)         :: rho  ! Density in LJ units

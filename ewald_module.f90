@@ -2,11 +2,28 @@
 ! r-space and k-space parts of Ewald sum for ions
 MODULE ewald_module
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
-
-  IMPLICIT NONE
-  PRIVATE
-  PUBLIC :: pot_r_ewald, pot_k_ewald
+  !------------------------------------------------------------------------------------------------!
+  ! This software was written in 2016/17                                                           !
+  ! by Michael P. Allen <m.p.allen@warwick.ac.uk>/<m.p.allen@bristol.ac.uk>                        !
+  ! and Dominic J. Tildesley <dominic.tildesley@epfl.ch> ("the authors"),                          !
+  ! to accompany the book "Computer Simulation of Liquids", second edition, 2017 ("the text"),     !
+  ! published by Oxford University Press ("the publishers").                                       !
+  !                                                                                                !
+  ! LICENCE                                                                                        !
+  ! Creative Commons CC0 Public Domain Dedication.                                                 !
+  ! To the extent possible under law, the authors have dedicated all copyright and related         !
+  ! and neighboring rights to this software to the PUBLIC domain worldwide.                        !
+  ! This software is distributed without any warranty.                                             !
+  ! You should have received a copy of the CC0 Public Domain Dedication along with this software.  !
+  ! If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.                               !
+  !                                                                                                !
+  ! DISCLAIMER                                                                                     !
+  ! The authors and publishers make no warranties about the software, and disclaim liability       !
+  ! for all uses of the software, to the fullest extent permitted by applicable law.               !
+  ! The authors and publishers do not recommend use of this software for any purpose.              !
+  ! It is made freely available, solely to clarify points made in the text. When using or citing   !
+  ! the software, you should not imply endorsement by the authors or publishers.                   !
+  !------------------------------------------------------------------------------------------------!
 
   ! References:
   ! Woodcock and Singer, Trans. Faraday Soc. 67, 12, 1971.
@@ -19,6 +36,14 @@ MODULE ewald_module
   ! A cubic box and unit box length are assumed throughout
   ! No special lists are used
 
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
+
+  IMPLICIT NONE
+  PRIVATE
+
+  ! Public routines
+  PUBLIC :: pot_r_ewald, pot_k_ewald
+
   ! Consider k-vectors within a sphere bounded by the cube (-nk,+nk) in each component
   REAL, DIMENSION(:), ALLOCATABLE, SAVE :: kfac     ! k-dept quantities (k_sq_max)
   INTEGER,                         SAVE :: k_sq_max ! =nk**2
@@ -26,6 +51,7 @@ MODULE ewald_module
 CONTAINS
 
   FUNCTION pot_r_ewald ( n, r, q, kappa ) RESULT ( pot )
+    IMPLICIT NONE
     REAL                              :: pot   ! Returns r-space part of potential energy
     INTEGER,              INTENT(in)  :: n     ! Number of atoms
     REAL, DIMENSION(3,n), INTENT(in)  :: r     ! Positions
@@ -54,6 +80,7 @@ CONTAINS
   END FUNCTION pot_r_ewald
 
   FUNCTION pot_k_ewald ( nk, n, r, q, kappa ) RESULT ( pot )
+    IMPLICIT NONE
     REAL                              :: pot   ! Returns k-space part of potential energy
     INTEGER,              INTENT(in)  :: nk    ! Determines number of wave-vectors
     INTEGER,              INTENT(in)  :: n     ! Number of atoms

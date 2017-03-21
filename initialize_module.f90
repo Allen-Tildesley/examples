@@ -2,6 +2,29 @@
 ! Routines to initialize configurations and velocities
 MODULE initialize_module
 
+  !------------------------------------------------------------------------------------------------!
+  ! This software was written in 2016/17                                                           !
+  ! by Michael P. Allen <m.p.allen@warwick.ac.uk>/<m.p.allen@bristol.ac.uk>                        !
+  ! and Dominic J. Tildesley <dominic.tildesley@epfl.ch> ("the authors"),                          !
+  ! to accompany the book "Computer Simulation of Liquids", second edition, 2017 ("the text"),     !
+  ! published by Oxford University Press ("the publishers").                                       !
+  !                                                                                                !
+  ! LICENCE                                                                                        !
+  ! Creative Commons CC0 Public Domain Dedication.                                                 !
+  ! To the extent possible under law, the authors have dedicated all copyright and related         !
+  ! and neighboring rights to this software to the PUBLIC domain worldwide.                        !
+  ! This software is distributed without any warranty.                                             !
+  ! You should have received a copy of the CC0 Public Domain Dedication along with this software.  !
+  ! If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.                               !
+  !                                                                                                !
+  ! DISCLAIMER                                                                                     !
+  ! The authors and publishers make no warranties about the software, and disclaim liability       !
+  ! for all uses of the software, to the fullest extent permitted by applicable law.               !
+  ! The authors and publishers do not recommend use of this software for any purpose.              !
+  ! It is made freely available, solely to clarify points made in the text. When using or citing   !
+  ! the software, you should not imply endorsement by the authors or publishers.                   !
+  !------------------------------------------------------------------------------------------------!
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
   IMPLICIT NONE
@@ -21,7 +44,7 @@ MODULE initialize_module
 
   ! Private data
   INTEGER, PARAMETER :: iter_max = 10000 ! Max random placement iterations
-  
+
 CONTAINS
 
   SUBROUTINE allocate_arrays ( quaternions )
@@ -111,7 +134,7 @@ CONTAINS
     ! End triple loop over unit cell indices
 
   END SUBROUTINE initialize_lattice
- 
+
   SUBROUTINE initialize_random ( box, length, soft )
     USE maths_module, ONLY : random_vector, random_quaternion
     IMPLICIT NONE
@@ -142,7 +165,7 @@ CONTAINS
 
           IF ( soft ) EXIT ! No overlap test
           IF ( .NOT. overlap ( i, 1, i-1, box, length ) ) EXIT
-          
+
           iter = iter + 1
           IF ( iter > iter_max ) THEN
              WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Too many iterations ', iter, iter_max
@@ -189,7 +212,7 @@ CONTAINS
     v       = factor * v
 
     ! Angular velocities
-    
+
     IF ( LBOUND(e,dim=1) == 0 ) THEN ! Nonlinear molecule, treat as spherical top
 
        w_std_dev = SQRT(temperature/inertia)
@@ -304,7 +327,7 @@ CONTAINS
        IF ( ABS(diff_sq) > tol ) WRITE ( unit=error_unit, fmt='(a,2i15,f15.8)' ) 'Bond length warning ', i, i+1, diff_sq
     END DO ! End loop to confirm bond lengths
 
-        r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL(n)               ! Compute centre of mass positions
+    r_cm(:) = SUM ( r(:,:), dim=2 ) / REAL(n)               ! Compute centre of mass positions
     r(:,:)  = r(:,:) - SPREAD ( r_cm(:), dim=2, ncopies=n ) ! Shift centre of mass to the origin
 
   END SUBROUTINE initialize_chain_lattice
@@ -401,7 +424,7 @@ CONTAINS
     ! Compute and remove total momentum
     v_cm(:) = SUM ( v(:,:), dim=2 ) / REAL ( n )            ! Compute centre of mass velocity
     v(:,:)  = v(:,:) - SPREAD ( v_cm(:), dim=2, ncopies=n ) ! Set net momentum to zero
-    
+
     ! Compute total angular momentum and moment of inertia tensor
     ang_mom = 0.0
     inertia = 0.0
@@ -410,7 +433,7 @@ CONTAINS
        inertia = inertia - outer_product ( r(:,i), r(:,i) )
        FORALL ( xyz=1:3 ) inertia(xyz,xyz) = inertia(xyz,xyz) + DOT_PRODUCT ( r(:,i), r(:,i) )
     END DO
-    
+
     ! Solve linear system to get angular velocity
     ang_vel = solve ( inertia, ang_mom )
 
@@ -459,10 +482,10 @@ CONTAINS
     INTEGER            :: i, j, iter
     REAL,    PARAMETER :: tol = 1.0e-9
     INTEGER, PARAMETER :: iter_max = 500
-  LOGICAL, DIMENSION(:), ALLOCATABLE :: move, moved
+    LOGICAL, DIMENSION(:), ALLOCATABLE :: move, moved
 
-  ALLOCATE ( move(n), moved(n) )
-  
+    ALLOCATE ( move(n), moved(n) )
+
     iter     = 0
     done     = .FALSE.
     moved(:) = .TRUE.
@@ -510,7 +533,7 @@ CONTAINS
     END DO ! End iterative loop until done
 
     DEALLOCATE ( move, moved )
-    
+
   END SUBROUTINE rattle_b
 
   FUNCTION overlap ( i, j1, j2, box, ell )
@@ -600,4 +623,4 @@ CONTAINS
 
   END FUNCTION overlap
 
-  END MODULE initialize_module
+END MODULE initialize_module

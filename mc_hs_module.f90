@@ -2,6 +2,29 @@
 ! Overlap routines for MC simulation, hard spheres
 MODULE mc_module
 
+  !------------------------------------------------------------------------------------------------!
+  ! This software was written in 2016/17                                                           !
+  ! by Michael P. Allen <m.p.allen@warwick.ac.uk>/<m.p.allen@bristol.ac.uk>                        !
+  ! and Dominic J. Tildesley <dominic.tildesley@epfl.ch> ("the authors"),                          !
+  ! to accompany the book "Computer Simulation of Liquids", second edition, 2017 ("the text"),     !
+  ! published by Oxford University Press ("the publishers").                                       !
+  !                                                                                                !
+  ! LICENCE                                                                                        !
+  ! Creative Commons CC0 Public Domain Dedication.                                                 !
+  ! To the extent possible under law, the authors have dedicated all copyright and related         !
+  ! and neighboring rights to this software to the PUBLIC domain worldwide.                        !
+  ! This software is distributed without any warranty.                                             !
+  ! You should have received a copy of the CC0 Public Domain Dedication along with this software.  !
+  ! If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.                               !
+  !                                                                                                !
+  ! DISCLAIMER                                                                                     !
+  ! The authors and publishers make no warranties about the software, and disclaim liability       !
+  ! for all uses of the software, to the fullest extent permitted by applicable law.               !
+  ! The authors and publishers do not recommend use of this software for any purpose.              !
+  ! It is made freely available, solely to clarify points made in the text. When using or citing   !
+  ! the software, you should not imply endorsement by the authors or publishers.                   !
+  !------------------------------------------------------------------------------------------------!
+
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
   IMPLICIT NONE
@@ -21,6 +44,7 @@ MODULE mc_module
 CONTAINS
 
   SUBROUTINE introduction
+    IMPLICIT NONE
 
     WRITE ( unit=output_unit, fmt='(a)' ) 'Hard sphere potential'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'   
@@ -29,20 +53,24 @@ CONTAINS
   END SUBROUTINE introduction
 
   SUBROUTINE conclusion
+    IMPLICIT NONE
 
     WRITE ( unit=output_unit, fmt='(a)') 'Program ends'
 
   END SUBROUTINE conclusion
 
   SUBROUTINE allocate_arrays
+    IMPLICIT NONE
     ALLOCATE ( r(3,n) )
   END SUBROUTINE allocate_arrays
 
   SUBROUTINE deallocate_arrays
+    IMPLICIT NONE
     DEALLOCATE ( r )
   END SUBROUTINE deallocate_arrays
 
   FUNCTION overlap ( box )
+    IMPLICIT NONE
     LOGICAL            :: overlap ! Shows if an overlap was detected
     REAL,   INTENT(in) :: box     ! Simulation box length
 
@@ -67,6 +95,7 @@ CONTAINS
   END FUNCTION overlap
 
   FUNCTION overlap_1 ( ri, i, box, j_range ) RESULT ( overlap )
+    IMPLICIT NONE
     LOGICAL                        :: overlap ! Shows if an overlap was detected
     REAL, DIMENSION(3), INTENT(in) :: ri      ! Coordinates of atom of interest
     INTEGER,            INTENT(in) :: i       ! Index of atom of interest
@@ -127,6 +156,7 @@ CONTAINS
   END FUNCTION overlap_1
 
   FUNCTION n_overlap ( box )
+    IMPLICIT NONE
     INTEGER             :: n_overlap ! Counts overlaps
     REAL,    INTENT(in) :: box       ! Simulation box length
 
@@ -149,6 +179,7 @@ CONTAINS
   END FUNCTION n_overlap
 
   FUNCTION n_overlap_1 ( ri, i, box, j_range ) RESULT ( n_overlap )
+    IMPLICIT NONE
     INTEGER                        :: n_overlap ! Counts overlaps
     REAL, DIMENSION(3), INTENT(in) :: ri        ! Coordinates of atom of interest
     INTEGER,            INTENT(in) :: i         ! Index of atom of interest
