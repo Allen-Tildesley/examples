@@ -56,7 +56,7 @@ The supplied SConstruct and SConscript files
 will build all the working examples,
 using SCons,
 an Open Source software construction tool based on Python.
-The homepage for SCons is at http://www.scons.org/.
+The homepage for SCons is at <http://www.scons.org/>.
 Simply type `scons` to build each full example program in its own directory.
 A few examples consist of individual routines or modules,
 so there is no need to build them.
