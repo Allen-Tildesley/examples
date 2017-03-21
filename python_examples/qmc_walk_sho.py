@@ -1,30 +1,53 @@
 #!/usr/bin/env python3
-# qmc_walk_sho program
-"""
-Quantum ground state wavefunction by random walk.
+# qmc_walk_sho.py
 
-Program to calculate the ground state wavefunction
-for a particle in a harmonic potential, V=(x**2)/2,
-by solving the corresponding diffusion equation in imaginary time.
+#------------------------------------------------------------------------------------------------#
+# This software was written in 2016/17                                                           #
+# by Michael P. Allen <m.p.allen@warwick.ac.uk>/<m.p.allen@bristol.ac.uk>                        #
+# and Dominic J. Tildesley <dominic.tildesley@epfl.ch> ("the authors"),                          #
+# to accompany the book "Computer Simulation of Liquids", second edition, 2017 ("the text"),     #
+# published by Oxford University Press ("the publishers").                                       #
+#                                                                                                #
+# LICENCE                                                                                        #
+# Creative Commons CC0 Public Domain Dedication.                                                 #
+# To the extent possible under law, the authors have dedicated all copyright and related         #
+# and neighboring rights to this software to the PUBLIC domain worldwide.                        #
+# This software is distributed without any warranty.                                             #
+# You should have received a copy of the CC0 Public Domain Dedication along with this software.  #
+# If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.                               #
+#                                                                                                #
+# DISCLAIMER                                                                                     #
+# The authors and publishers make no warranties about the software, and disclaim liability       #
+# for all uses of the software, to the fullest extent permitted by applicable law.               #
+# The authors and publishers do not recommend use of this software for any purpose.              #
+# It is made freely available, solely to clarify points made in the text. When using or citing   #
+# the software, you should not imply endorsement by the authors or publishers.                   #
+#------------------------------------------------------------------------------------------------#
 
-In atomic units, mass=1, hbar=1, diffusion coefficient D = hbar**2/(2*m) = 1/2,
-so root-mean-squared displacement in time step ds is sqrt(2*D*ds) = sqrt(ds)
-Walkers are created and destroyed, depending on the potential energy relative to the trial energy et
-The program adjusts et to attempt to converge on a target number of walkers
-hence obtaining the exact ground state value et = 0.5
-This type of simulation is very sensitive to the initial guess for et,
-and the resulting time evolution is quite noisy:
-results are output as averages over the production period.
-The simulated ground state wave function may be compared with the exact result for this simple problem.
+"""Quantum ground state wavefunction by random walk."""
 
-Reads several variables and options from standard input using a namelist nml
-Leave namelist empty to accept supplied defaults
-The default parameters run the simulation with et = 0.5, the exact groundstate energy for this potential.
-You can then try, say, et = 0.6 and et = 0.4, observing the behaviour of the number of walkers in each case.
+# Program to calculate the ground state wavefunction
+# for a particle in a harmonic potential, V=(x**2)/2,
+# by solving the corresponding diffusion equation in imaginary time.
+#
+# In atomic units, mass=1, hbar=1, diffusion coefficient D = hbar**2/(2*m) = 1/2,
+# so root-mean-squared displacement in time step ds is sqrt(2*D*ds) = sqrt(ds)
+# Walkers are created and destroyed, depending on the potential energy relative to the trial energy et
+# The program adjusts et to attempt to converge on a target number of walkers
+# hence obtaining the exact ground state value et = 0.5
+# This type of simulation is very sensitive to the initial guess for et,
+# and the resulting time evolution is quite noisy:
+# results are output as averages over the production period.
+# The simulated ground state wave function may be compared with the exact result for this simple problem.
+#
+# Reads several variables and options from standard input using a namelist nml
+# Leave namelist empty to accept supplied defaults
+# The default parameters run the simulation with et = 0.5, the exact groundstate energy for this potential.
+# You can then try, say, et = 0.6 and et = 0.4, observing the behaviour of the number of walkers in each case.
+#
+# Many of the parameters, and the updating scheme for et, are taken from the following paper:
+# I Kostin, B Faber and K Schulten, Amer J Phys, 64, 633 (1996).
 
-Many of the parameters, and the updating scheme for et, are taken from the following paper:
-I Kostin, B Faber and K Schulten, Amer J Phys, 64, 633 (1996).
-"""
 import json
 import sys
 import importlib
