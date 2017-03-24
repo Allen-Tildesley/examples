@@ -250,7 +250,7 @@ import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
-from md_lj_module     import introduction, conclusion, PotentialType
+from md_lj_module     import introduction, conclusion, force, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -289,13 +289,8 @@ tau         = nml["tau"]         if "tau"         in nml else defaults["tau"]
 tau_baro    = nml["tau_baro"]    if "tau_baro"    in nml else defaults["tau_baro"]
 fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
-if fast:
-    print('Fast force routine')
-    from md_lj_module import force_np as force
-else:
-    print('Slow force routine')
-    from md_lj_module import force_py as force
 introduction()
+np.random.seed()
 
 # Write out parameters
 print( "{:40}{:15d}  ".format('Number of blocks',          nblock)      )
@@ -307,6 +302,10 @@ print( "{:40}{:15.6f}".format('Specified pressure',        pressure)    )
 print( "{:40}{:15.6f}".format('Thermostat timescale',      tau)         )
 print( "{:40}{:15.6f}".format('Barostat timescale',        tau_baro)    )
 print( "{:40}{:15d}  ".format('Nose-Hoover chain length',  m)           )
+if fast:
+    print('Fast force routine')
+else:
+    print('Slow force routine')
 
 # Read in initial configuration
 n, box, r, v = read_cnf_atoms ( cnf_prefix+inp_tag, with_v=True)
@@ -319,7 +318,6 @@ vcm = np.sum ( v, axis=0 ) / n # Centre-of mass velocity
 v = v - vcm                    # Set COM velocity to zero
 
 # Initial values of thermal variables
-np.random.seed()
 g    = 3*(n-1)
 q    = np.full(m,temperature * tau**2,dtype=np.float_) 
 q[0] = g * temperature * tau**2
@@ -341,7 +339,7 @@ eps   = 0.0 # Initial strain; generally eps = log ( box/box0 )
 p_eps = np.random.randn() * np.sqrt(temperature*w_eps) # strain momentum
 
 # Initial forces, potential, etc plus overlap check
-total, f = force ( box, r_cut, r )
+total, f = force ( box, r_cut, r, fast )
 assert not total.ovr, 'Overlap in initial configuration'
 variables = calculate ( 'Initial values' )
 
@@ -363,7 +361,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
         u1_propagator ( dt )
 
-        total, f = force ( box, r_cut, r ) # Force evaluation
+        total, f = force ( box, r_cut, r, fast ) # Force evaluation
         assert not total.ovr, 'Overlap in configuration'
 
         u2_propagator  ( dt/2 )
@@ -382,7 +380,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end()
 
-total, f = force ( box, r_cut, r ) # Force evaluation
+total, f = force ( box, r_cut, r, fast ) # Force evaluation
 assert not total.ovr, 'Overlap in final configuration'
 
 variables = calculate('Final values')

@@ -35,13 +35,10 @@ def calculate ( string=None ):
     from averages_module import write_variables, VariableType
     import numpy as np
     import math
-    if fast:
-        from mc_hs_module import n_overlap_np as n_overlap
-    else:
-        from mc_hs_module import n_overlap_py as n_overlap
+    from mc_hs_module import n_overlap
 
     # Preliminary calculations (m_ratio, eps_box, box are taken from the calling program)
-    vir = n_overlap ( box/(1.0+eps_box), r ) / (3.0*eps_box) # Virial
+    vir = n_overlap ( box/(1.0+eps_box), r, fast ) / (3.0*eps_box) # Virial
     vol = box**3                     # Volume
     rho = n / vol                    # Density
 
@@ -94,7 +91,7 @@ import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
 from maths_module     import random_translate_vector
-from mc_hs_module     import introduction, conclusion
+from mc_hs_module     import introduction, conclusion, overlap, overlap_1
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -126,12 +123,6 @@ dr_max  = nml["dr_max"]  if "dr_max"  in nml else defaults["dr_max"]
 eps_box = nml["eps_box"] if "eps_box" in nml else defaults["eps_box"]
 fast    = nml["fast"]    if "fast"    in nml else defaults["fast"]
 
-if fast:
-    print('Fast overlap routines')
-    from mc_hs_fast_module import overlap_np as overlap, overlap_1_np as overlap_1
-else:
-    print('Slow overlap routines')
-    from mc_hs_slow_module import overlap_py as overlap, overlap_1_py as overlap_1
 introduction()
 np.random.seed()
 
@@ -140,6 +131,10 @@ print( "{:40}{:15d}  ".format('Number of blocks',           nblock)      )
 print( "{:40}{:15d}  ".format('Number of steps per block',  nstep)       )
 print( "{:40}{:15.6f}".format('Maximum displacement',       dr_max)      )
 print( "{:40}{:15.6f}".format('Pressure scaling parameter', eps_box)     )
+if fast:
+    print('Fast overlap routines')
+else:
+    print('Slow overlap routines')
 
 # Read in initial configuration
 n, box, r = read_cnf_atoms ( cnf_prefix+inp_tag)
@@ -150,7 +145,7 @@ r = r / box           # Convert positions to box units
 r = r - np.rint ( r ) # Periodic boundaries
 
 # Initial pressure and overlap check
-assert not overlap ( box, r ), 'Overlap in initial configuration'
+assert not overlap ( box, r, fast ), 'Overlap in initial configuration'
 variables = calculate ( 'Initial values' )
 
 # Initialize arrays for averaging and write column headings
@@ -169,9 +164,9 @@ for blk in range(1,nblock+1): # Loop over blocks
             ri = ri - np.rint ( ri )                            # Periodic boundary correction
             rj = np.delete(r,i,0)                               # Array of all the other atoms
 
-            if not overlap_1 ( ri, box, rj ): # Test for non-overlapping configuration
-                r[i,:] = ri                   # Update position
-                moves = moves + 1             # Increment move counter
+            if not overlap_1 ( ri, box, rj, fast ): # Test for non-overlapping configuration
+                r[i,:] = ri                         # Update position
+                moves = moves + 1                   # Increment move counter
 
         m_ratio = moves / n
 
@@ -185,7 +180,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 run_end()
 variables = calculate('Final values')
 
-assert not overlap ( box, r ), 'Overlap in final configuration'
+assert not overlap ( box, r, fast ), 'Overlap in final configuration'
 
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box ) # Save configuration
 conclusion()

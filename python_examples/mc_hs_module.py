@@ -24,7 +24,7 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Energy and move routines for MC simulation, LJ potential. Fast and slow versions."""
+"""Overlap and move routines for MC simulation, LJ potential. Fast and slow versions."""
 
 def introduction():
     """Prints out introductory statements at start of run."""
@@ -38,43 +38,25 @@ def conclusion():
 
     print('Program ends')
 
-def overlap_py ( box, r ):
-    """Takes in box and coordinate array, and signals any overlap.
+def overlap ( box, r, fast ):
+    """Takes in box and coordinate array, and signals any overlap."""
 
-    Slow version, calling a Python-based routine."""
-
-    # Actual calculation is performed by function overlap_1_py
+    # Actual calculation is performed by function overlap_1
 
     n, d = r.shape
-    assert d==3, 'Dimension error for r in overlap_py'
+    assert d==3, 'Dimension error for r in overlap'
 
     for i in range(n-1):
-        if overlap_1_py ( r[i,:], box, r[i+1:,:] ):
+        if overlap_1 ( r[i,:], box, r[i+1:,:], fast ):
             return True # Immediate return on detection of overlap
 
     return False
 
-def overlap_np ( box, r ):
-    """Takes in box and coordinate array, and signals any overlap.
-
-    Fast version, calling a NumPy-based routine."""
-
-    # Actual calculation is performed by function overlap_1_np
-
-    n, d = r.shape
-    assert d==3, 'Dimension error for r in overlap_np'
-
-    for i in range(n-1):
-        if overlap_1_np ( r[i,:], box, r[i+1:,:] ):
-            return True # Immediate return on detection of overlap
-
-    return False
-
-def overlap_1_py ( ri, box, r ):
+def overlap_1 ( ri, box, r, fast ):
     """Takes in coordinates of an atom and signals any overlap.
 
     Values of box and partner coordinate array are supplied.
-    Slow version, based on Python.
+    Fast or slow algorithm selected.
     """
 
     import numpy as np
@@ -85,88 +67,47 @@ def overlap_1_py ( ri, box, r ):
     # It is assumed that positions are in units where box = 1
 
     nj, d = r.shape
-    assert d==3, 'Dimension error for r in overlap_1_py'
-    assert ri.size==3, 'Dimension error for ri in overlap_1_py'
+    assert d==3, 'Dimension error for r in overlap_1'
+    assert ri.size==3, 'Dimension error for ri in overlap_1'
 
     inv_box_sq = 1.0 / box ** 2
 
-    for rj in r:
-        rij = ri - rj            # Separation vector
-        rij = rij - np.rint(rij) # Periodic boundary conditions in box=1 units
-        rij_sq = np.sum(rij**2)  # Squared separation
+    if fast:
+        rij = ri - r                    # Get all separation vectors from partners
+        rij = rij - np.rint(rij)        # Periodic boundary conditions in box=1 units
+        rij_sq = np.sum(rij**2,axis=1)  # Squared separations
+        return np.any(rij_sq<inv_box_sq)
+    
+    else:
+        for rj in r:
+            rij = ri - rj            # Separation vector
+            rij = rij - np.rint(rij) # Periodic boundary conditions in box=1 units
+            rij_sq = np.sum(rij**2)  # Squared separation
+            if rij_sq < inv_box_sq:  # Check within cutoff
+                return True # Immediate return on detection of overlap
 
-        if rij_sq < inv_box_sq: # Check within cutoff
-            return True # Immediate return on detection of overlap
+        return False
 
-    return False
-
-def overlap_1_np ( ri, box, r ):
-    """Takes in coordinates of an atom and signals any overlap.
-
-    Values of box and partner coordinate array are supplied.
-    Fast version based on NumPy.
-    """
-
-    import numpy as np
-
-    # In general, r will be a subset of the complete set of simulation coordinates
-    # and none of its rows should be identical to ri
-
-    # It is assumed that positions are in units where box = 1
-
-    nj, d = r.shape
-    assert d==3, 'Dimension error for r in overlap_1_np'
-    assert ri.size==3, 'Dimension error for ri in overlap_1_np'
-
-    inv_box_sq = 1.0 / box ** 2
-
-    rij = ri - r                    # Get all separation vectors from partners
-    rij = rij - np.rint(rij)        # Periodic boundary conditions in box=1 units
-    rij_sq = np.sum(rij**2,axis=1)  # Squared separations
-
-    return np.any(rij_sq<inv_box_sq)
-
-def n_overlap_py ( box, r ):
-    """Takes in box and coordinate array, and counts overlaps.
-
-    Slow version, calling Python-based routine."""
+def n_overlap ( box, r, fast ):
+    """Takes in box and coordinate array, and counts overlaps."""
 
     # This routine is used in the calculation of pressure
-    # Actual calculation is performed by function n_overlap_1_py
+    # Actual calculation is performed by function n_overlap_1
 
     n, d = r.shape
-    assert d==3, 'Dimension error for r in n_overlap_py'
+    assert d==3, 'Dimension error for r in n_overlap'
 
-    n_ovr = 0 # Initialize
-
+    n_ovr = 0
     for i in range(n-1):
-        n_ovr = n_ovr + n_overlap_1_py ( r[i,:], box, r[i+1:,:] )
+        n_ovr = n_ovr + n_overlap_1 ( r[i,:], box, r[i+1:,:], fast )
 
     return n_ovr
 
-def n_overlap_np ( box, r ):
-    """Takes in box and coordinate array, and counts overlaps.
-
-    Fast version, calling NumPy-based routine."""
-
-    # This routine is used in the calculation of pressure
-    # Actual calculation is performed by function n_overlap_1_np
-
-    n, d = r.shape
-    assert d==3, 'Dimension error for r in n_overlap_np'
-
-    n_ovr = 0 # Initialize
-
-    for i in range(n-1):
-        n_ovr = n_ovr + n_overlap_1_np ( r[i,:], box, r[i+1:,:] )
-
-    return n_ovr
-
-def n_overlap_1_py ( ri, box, r ):
+def n_overlap_1 ( ri, box, r, fast ):
     """Takes in coordinates of an atom and counts overlaps.
 
     Values of box and partner coordinate array are supplied.
-    Slow version based on Python.
+    Fast or slow algorithm selected.
     """
 
     import numpy as np
@@ -177,45 +118,24 @@ def n_overlap_1_py ( ri, box, r ):
     # It is assumed that positions are in units where box = 1
 
     nj, d = r.shape
-    assert d==3, 'Dimension error for r in n_overlap_1_py'
-    assert ri.size==3, 'Dimension error for ri in n_overlap_1_py'
+    assert d==3, 'Dimension error for r in n_overlap_1'
+    assert ri.size==3, 'Dimension error for ri in n_overlap_1'
 
     inv_box_sq = 1.0 / box ** 2
 
-    n_ovr = 0 # Initialize
+    if fast:
+        rij = ri - r                    # Get all separation vectors from partners
+        rij = rij - np.rint(rij)        # Periodic boundary conditions in box=1 units
+        rij_sq = np.sum(rij**2,axis=1)  # Squared separations
+        n_ovr = np.count_nonzero(rij_sq<inv_box_sq)
 
-    for rj in r:
-        rij = ri - rj            # Separation vector
-        rij = rij - np.rint(rij) # Periodic boundary conditions in box=1 units
-        rij_sq = np.sum(rij**2)  # Squared separation
-
-        if rij_sq < inv_box_sq: # Check within cutoff
-            n_ovr = n_ovr + 1
+    else:
+        n_ovr = 0
+        for rj in r:
+            rij = ri - rj            # Separation vector
+            rij = rij - np.rint(rij) # Periodic boundary conditions in box=1 units
+            rij_sq = np.sum(rij**2)  # Squared separation
+            if rij_sq < inv_box_sq:  # Check within cutoff
+                n_ovr = n_ovr + 1
 
     return n_ovr
-
-def n_overlap_1_np ( ri, box, r ):
-    """Takes in coordinates of an atom and counts overlaps.
-
-    Values of box and partner coordinate array are supplied.
-    Fast version based on NumPy.
-    """
-
-    import numpy as np
-
-    # In general, r will be a subset of the complete set of simulation coordinates
-    # and none of its rows should be identical to ri
-
-    # It is assumed that positions are in units where box = 1
-
-    nj, d = r.shape
-    assert d==3, 'Dimension error for r in n_overlap_1_np'
-    assert ri.size==3, 'Dimension error for ri in n_overlap_1_np'
-
-    inv_box_sq = 1.0 / box ** 2
-
-    rij = ri - r                    # Get all separation vectors from partners
-    rij = rij - np.rint(rij)        # Periodic boundary conditions in box=1 units
-    rij_sq = np.sum(rij**2,axis=1)  # Squared separations
-
-    return np.count_nonzero(rij_sq<inv_box_sq)

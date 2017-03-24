@@ -39,19 +39,16 @@ def calculate ( string=None ):
     # estimates of < e_f > and < p_f > for the full (uncut) potential
     # The value of the cut-and-shifted potential is not used, in this example
 
-    from averages_module import write_variables, msd, VariableType
-    from lrc_module import potential_lrc, pressure_lrc, pressure_delta
     import numpy as np
     import math
-    if fast:
-        from mc_lj_module import force_sq_np as force_sq
-    else:
-        from mc_lj_module import force_sq_py as force_sq
+    from averages_module import write_variables, msd, VariableType
+    from lrc_module      import potential_lrc, pressure_lrc, pressure_delta
+    from mc_lj_module    import force_sq
 
     # Preliminary calculations (n,r,total are taken from the calling program)
-    vol = box**3                     # Volume
-    rho = n / vol                    # Density
-    fsq = force_sq ( box, r_cut, r ) # Total squared force
+    vol = box**3                           # Volume
+    rho = n / vol                          # Density
+    fsq = force_sq ( box, r_cut, r, fast ) # Total squared force
 
     # Variables of interest, of class VariableType, containing three attributes:
     #   .val: the instantaneous value
@@ -150,7 +147,7 @@ import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
 from maths_module     import random_translate_vector, metropolis
-from mc_lj_module     import introduction, conclusion, PotentialType
+from mc_lj_module     import introduction, conclusion, potential, potential_1, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -187,12 +184,6 @@ dr_max      = nml["dr_max"]      if "dr_max"      in nml else defaults["dr_max"]
 db_max      = nml["db_max"]      if "db_max"      in nml else defaults["db_max"]
 fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
-if fast:
-    print('Fast potential routines')
-    from mc_lj_module import potential_np as potential, potential_1_np as potential_1
-else:
-    print('Slow potential routines')
-    from mc_lj_module import potential_py as potential, potential_1_py as potential_1
 introduction()
 np.random.seed()
 
@@ -204,6 +195,10 @@ print( "{:40}{:15.6f}".format('Specified pressure',        pressure)    )
 print( "{:40}{:15.6f}".format('Potential cutoff distance', r_cut)       )
 print( "{:40}{:15.6f}".format('Maximum displacement',      dr_max)      )
 print( "{:40}{:15.6f}".format('Maximum box displacement',  db_max)      )
+if fast:
+    print('Fast potential routines')
+else:
+    print('Slow potential routines')
 
 # Read in initial configuration
 n, box, r = read_cnf_atoms ( cnf_prefix+inp_tag)
@@ -214,7 +209,7 @@ r = r / box           # Convert positions to box units
 r = r - np.rint ( r ) # Periodic boundaries
 
 # Initial energy and overlap check
-total = potential ( box, r_cut, r )
+total = potential ( box, r_cut, r, fast )
 assert not total.ovr, 'Overlap in initial configuration'
 variables = calculate ( 'Initial values' )
 
@@ -231,12 +226,12 @@ for blk in range(1,nblock+1): # Loop over blocks
 
         for i in range(n): # Loop over atoms
             rj = np.delete(r,i,0) # Array of all the other atoms
-            partial_old = potential_1 ( r[i,:], box, r_cut, rj ) # Old atom potential, virial etc
+            partial_old = potential_1 ( r[i,:], box, r_cut, rj, fast ) # Old atom potential, virial etc
             assert not partial_old.ovr, 'Overlap in current configuration'
 
             ri = random_translate_vector ( dr_max/box, r[i,:] ) # Trial move to new position (in box=1 units)
             ri = ri - np.rint ( ri )                            # Periodic boundary correction
-            partial_new = potential_1 ( ri, box, r_cut, rj )    # New atom potential, virial etc
+            partial_new = potential_1 ( ri, box, r_cut, rj, fast )    # New atom potential, virial etc
 
             if not partial_new.ovr: # Test for non-overlapping configuration
                 delta = partial_new.pot - partial_old.pot # Use cut (but not shifted) potential
@@ -256,7 +251,7 @@ for blk in range(1,nblock+1): # Loop over blocks
         box_new   = box*box_scale       # New box (in sigma units)
         den_scale = 1.0 / box_scale**3  # Density scaling factor
 
-        total_new = potential ( box_new, r_cut, r ) # New total energy, virial etc
+        total_new = potential ( box_new, r_cut, r, fast ) # New total energy, virial etc
 
         if not total_new.ovr: # Test for non-overlapping configuration
             delta = total_new.pot - total.pot                  # Use cut (but not shifted) potential
@@ -279,7 +274,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 run_end()
 variables = calculate('Final values')
 
-total = potential ( box, r_cut, r ) # Double check book-keeping
+total = potential ( box, r_cut, r, fast ) # Double check book-keeping
 assert not total.ovr, 'Overlap in final configuration'
 
 variables = calculate('Final check')

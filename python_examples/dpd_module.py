@@ -52,58 +52,11 @@ def conclusion():
 
     print('Program ends')
 
-def force_np ( box, a, r ):
+def force ( box, a, r, fast ):
     """Takes in box, strength parameter, and coordinate array, and calculates forces and potentials etc.
 
     Also returns list of pairs in range for use by the thermalization algorithm.
-    Attempts to use NumPy functions.
-    """
-
-    import numpy as np
-
-    # It is assumed that positions are in units where box = 1
-
-    n,d = r.shape
-    assert d==3, 'Dimension error in force'
-
-    # Initialize
-    f = np.zeros_like(r)
-    total = PotentialType ( pot=0.0, vir=0.0, lap=0.0 )
-    pairs = [] # Initialize list of pair information
-
-    for i in range(n-1):
-        rij = r[i,:]-r[i+1:,:]           # Separation vectors for j>i
-        rij = rij - np.rint(rij)         # Periodic boundary conditions in box=1 units
-        rij = rij * box                  # Now in sigma=1 units
-        rij_sq   = np.sum(rij**2,axis=1) # Squared separations for j>1
-        rij_mag  = np.sqrt(rij_sq)       # Separations for j>i
-        rij_hat  = rij / rij_mag[:,np.newaxis]        # Unit separation vectors
-        in_range = rij_sq < 1.0                       # Set flags for within cutoff
-        wij      = np.where(in_range,1.0-rij_mag,0.0) # Weight functions
-        pot = 0.5 * wij**2                # Pair potentials
-        vir = wij * rij_mag               # Pair virials
-        lap = 3.0-2.0/rij_mag             # Pair Laplacians
-        fij = wij[:,np.newaxis] * rij_hat # Pair forces
-
-        total = total + PotentialType ( pot=sum(pot), vir=sum(vir), lap=sum(lap) )
-        f[i,:] = f[i,:] + np.sum(fij,axis=0)
-        f[i+1:,:] = f[i+1:,:] - fij
-        jvals = np.extract(in_range,np.arange(i+1,n))
-        pairs = pairs + [ (i,j,rij_mag[j-i-1],rij_hat[j-i-1,:]) for j in jvals ]
-
-    # Multiply results by numerical factors
-    total.pot = total.pot * a
-    total.vir = total.vir * a / 3.0
-    total.lap = total.lap * a * 2.0
-    f         = f * a
-
-    return total, f, pairs
-
-def force_py ( box, a, r ):
-    """Takes in box, strength parameter, and coordinate array, and calculates forces and potentials etc.
-
-    Also returns list of pairs in range for use by the thermalization algorithm.
-    Uses a simple Python loop, which will be slow.
+    Fast or slow version selected.
     """
 
     import numpy as np
@@ -119,25 +72,44 @@ def force_py ( box, a, r ):
     total = PotentialType ( pot=0.0, vir=0.0, lap=0.0 )
     pairs = [] # Initialize list of pair information
 
-    for i,j in combinations(range(n),2): # Double loop over pairs of atoms
-        rij = r[i,:]-r[j,:]      # Separation vector
-        rij = rij - np.rint(rij) # Periodic boundary conditions
-        rij = rij * box          # Now in r_cut=1 units
-        rij_sq = np.sum(rij**2)  # Squared distance
-        if rij_sq < 1.0:         # If in range ...
-            rij_mag = np.sqrt(rij_sq) # Distance
-            wij     = 1.0 - rij_mag   # Weight function
-            rij_hat = rij / rij_mag   # Unit separation vector
+    if fast:
+        for i in range(n-1):
+            rij = r[i,:]-r[i+1:,:]           # Separation vectors for j>i
+            rij = rij - np.rint(rij)         # Periodic boundary conditions in box=1 units
+            rij = rij * box                  # Now in sigma=1 units
+            rij_sq   = np.sum(rij**2,axis=1) # Squared separations for j>1
+            rij_mag  = np.sqrt(rij_sq)       # Separations for j>i
+            rij_hat  = rij / rij_mag[:,np.newaxis]        # Unit separation vectors
+            in_range = rij_sq < 1.0                       # Set flags for within cutoff
+            wij      = np.where(in_range,1.0-rij_mag,0.0) # Weight functions
+            pot = 0.5 * wij**2                # Pair potentials
+            vir = wij * rij_mag               # Pair virials
+            lap = 3.0-2.0/rij_mag             # Pair Laplacians
+            fij = wij[:,np.newaxis] * rij_hat # Pair forces
+            total = total + PotentialType ( pot=sum(pot), vir=sum(vir), lap=sum(lap) )
+            f[i,:] = f[i,:] + np.sum(fij,axis=0)
+            f[i+1:,:] = f[i+1:,:] - fij
+            jvals = np.extract(in_range,np.arange(i+1,n))
+            pairs = pairs + [ (i,j,rij_mag[j-i-1],rij_hat[j-i-1,:]) for j in jvals ]
 
-            pot = 0.5 * wij**2    # Pair potential
-            vir = wij * rij_mag   # Pair virial
-            lap = 3.0-2.0/rij_mag # Pair Laplacian
-            fij = wij * rij_hat   # Pair force
-
-            total  = total + PotentialType ( pot=pot, vir=vir, lap=lap )
-            f[i,:] = f[i,:] + fij
-            f[j,:] = f[j,:] - fij
-            pairs.append((i,j,rij_hat,rij_mag)) # add to list of pair information
+    else:
+        for i,j in combinations(range(n),2): # Double loop over pairs of atoms
+            rij = r[i,:]-r[j,:]      # Separation vector
+            rij = rij - np.rint(rij) # Periodic boundary conditions
+            rij = rij * box          # Now in r_cut=1 units
+            rij_sq = np.sum(rij**2)  # Squared distance
+            if rij_sq < 1.0:         # If in range ...
+                rij_mag = np.sqrt(rij_sq) # Distance
+                wij     = 1.0 - rij_mag   # Weight function
+                rij_hat = rij / rij_mag   # Unit separation vector
+                pot = 0.5 * wij**2    # Pair potential
+                vir = wij * rij_mag   # Pair virial
+                lap = 3.0-2.0/rij_mag # Pair Laplacian
+                fij = wij * rij_hat   # Pair force
+                total  = total + PotentialType ( pot=pot, vir=vir, lap=lap )
+                f[i,:] = f[i,:] + fij
+                f[j,:] = f[j,:] - fij
+                pairs.append((i,j,rij_hat,rij_mag)) # add to list of pair information
 
     # Multiply results by numerical factors
     total.pot = total.pot * a

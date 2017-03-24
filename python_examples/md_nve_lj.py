@@ -31,23 +31,20 @@ def calculate ( string=None ):
     
     They are collected and returned in the variables list, for use in the main program."""
     
-    from averages_module import write_variables, msd, cke, VariableType
-    from lrc_module import potential_lrc, pressure_lrc
     import numpy as np
     import math
-    if fast:
-        from md_lj_module import hessian_np as hessian
-    else:
-        from md_lj_module import hessian_py as hessian
-
+    from averages_module import write_variables, msd, cke, VariableType
+    from lrc_module import potential_lrc, pressure_lrc
+    from md_lj_module import hessian
+    
     # Preliminary calculations (n,r,v,f,total are taken from the calling program)
-    vol = box**3                  # Volume
-    rho = n / vol                 # Density
-    kin = 0.5*np.sum(v**2)        # Kinetic energy
-    tmp = 2.0 * kin / (3*n-3)     # Remove three degrees of freedom for momentum conservation
-    fsq = np.sum ( f**2 )         # Total squared force
-    hes = hessian(box,r_cut,r,f)  # Total Hessian
-    eng = kin + total.pot         # Total energy for simulated system
+    vol = box**3                       # Volume
+    rho = n / vol                      # Density
+    kin = 0.5*np.sum(v**2)             # Kinetic energy
+    tmp = 2.0 * kin / (3*n-3)          # Remove three degrees of freedom for momentum conservation
+    fsq = np.sum ( f**2 )              # Total squared force
+    hes = hessian(box,r_cut,r,f,fast)  # Total Hessian
+    eng = kin + total.pot              # Total energy for simulated system
 
     # Variables of interest, of class VariableType, containing three attributes:
     #   .val: the instantaneous value
@@ -118,7 +115,7 @@ import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
-from md_lj_module     import introduction, conclusion, PotentialType
+from md_lj_module     import introduction, conclusion, force, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -151,12 +148,6 @@ r_cut  = nml["r_cut"]  if "r_cut"  in nml else defaults["r_cut"]
 dt     = nml["dt"]     if "dt"     in nml else defaults["dt"]
 fast   = nml["fast"]   if "fast"   in nml else defaults["fast"]
 
-if fast:
-    print('Fast force routine')
-    from md_lj_module import force_np as force
-else:
-    print('Slow force routine')
-    from md_lj_module import force_py as force
 introduction()
 
 # Write out parameters
@@ -164,6 +155,10 @@ print( "{:40}{:15d}  ".format('Number of blocks',          nblock) )
 print( "{:40}{:15d}  ".format('Number of steps per block', nstep)  )
 print( "{:40}{:15.6f}".format('Potential cutoff distance', r_cut)  )
 print( "{:40}{:15.6f}".format('Time step',                 dt)     )
+if fast:
+    print('Fast force routine')
+else:
+    print('Slow force routine')
 
 # Read in initial configuration
 n, box, r, v = read_cnf_atoms ( cnf_prefix+inp_tag, with_v=True)
@@ -176,7 +171,7 @@ vcm = np.sum ( v, axis=0 ) / n # Centre-of mass velocity
 v = v - vcm                    # Set COM velocity to zero
 
 # Initial forces, potential, etc plus overlap check
-total, f = force ( box, r_cut, r )
+total, f = force ( box, r_cut, r, fast )
 assert not total.ovr, 'Overlap in initial configuration'
 variables = calculate ( 'Initial values' )
 
@@ -196,7 +191,7 @@ for blk in range(1,nblock+1): # Loop over blocks
         r = r + dt * v / box # Drift step (positions in box=1 units)
         r = r - np.rint ( r )  # Periodic boundaries
 
-        total, f = force ( box, r_cut, r ) # Force evaluation
+        total, f = force ( box, r_cut, r, fast ) # Force evaluation
         assert not total.ovr, 'Overlap in configuration'
 
         v = v + 0.5 * dt * f # Kick half-step
@@ -210,7 +205,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end()
 
-total, f = force ( box, r_cut, r ) # Force evaluation
+total, f = force ( box, r_cut, r, fast ) # Force evaluation
 assert not total.ovr, 'Overlap in final configuration'
 
 variables = calculate('Final values')

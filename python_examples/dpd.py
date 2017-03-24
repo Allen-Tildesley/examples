@@ -127,7 +127,7 @@ import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
-from dpd_module       import introduction, conclusion, lowe, shardlow, p_approx, PotentialType
+from dpd_module       import introduction, conclusion, force, lowe, shardlow, p_approx, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -164,13 +164,8 @@ gamma       = nml["gamma"]       if "gamma"       in nml else defaults["gamma"]
 method      = nml["method"]      if "method"      in nml else defaults["method"]
 fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
-if fast:
-    print('Fast force routine')
-    from dpd_module import force_np as force
-else:
-    print('Slow force routine')
-    from dpd_module import force_py as force
 introduction()
+np.random.seed()
 
 # Write out parameters
 print( "{:40}{:15d}  ".format('Number of blocks',              nblock)      )
@@ -179,6 +174,10 @@ print( "{:40}{:15.6f}".format('Time step',                     dt)          )
 print( "{:40}{:15.6f}".format('Specified temperature',         temperature) )
 print( "{:40}{:15.6f}".format('Force strength a*rho/kT',       a)           )
 print( "{:40}{:15.6f}".format('Friction / thermal rate gamma', gamma)       )
+if fast:
+    print('Fast force routine')
+else:
+    print('Slow force routine')
 
 method = method.lower()
 assert "lowe" in method or "shardlow" in method, 'Unrecognized thermalization method'
@@ -202,7 +201,7 @@ r = r / box                    # Convert positions to box units
 r = r - np.rint ( r )          # Periodic boundaries
 
 # Initial forces, potential, etc plus overlap check
-total, f, pairs = force ( box, a, r )
+total, f, pairs = force ( box, a, r, fast )
 variables = calculate ( 'Initial values' )
 
 # Initialize arrays for averaging and write column headings
@@ -218,7 +217,7 @@ for blk in range(1,nblock+1): # Loop over blocks
         kick_propagator ( dt/2 )
         drift_propagator ( dt )
 
-        total, f, pairs = force ( box, a, r ) # Force evaluation
+        total, f, pairs = force ( box, a, r, fast ) # Force evaluation
 
         kick_propagator ( dt/2 )
 
@@ -231,7 +230,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end()
 
-total, f, pairs = force ( box, a, r ) # Force evaluation
+total, f, pairs = force ( box, a, r, fast ) # Force evaluation
 
 variables = calculate('Final values')
 print( "{:40}{:15.6f}".format('Approx pressure', p_approx ( a, rho, temperature ) )  )
