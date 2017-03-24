@@ -89,9 +89,10 @@ import json
 import sys
 import numpy as np
 import math
-from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
-from maths_module import random_translate_vector, metropolis
+from config_io_module  import read_cnf_atoms, write_cnf_atoms
+from averages_module   import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from maths_module      import random_translate_vector, metropolis
+from mc_hs_module      import introduction, conclusion
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -125,9 +126,11 @@ pressure = nml["pressure"] if "pressure" in nml else defaults["pressure"]
 fast     = nml["fast"]     if "fast"     in nml else defaults["fast"]
 
 if fast:
-    from mc_hs_fast_module import introduction, conclusion, overlap, overlap_1
+    print('Fast overlap routines')
+    from mc_hs_module import overlap_np as overlap, overlap_1_np as overlap_1
 else:
-    from mc_hs_slow_module import introduction, conclusion, overlap, overlap_1
+    print('Slow overlap routines')
+    from mc_hs_module import overlap_py as overlap, overlap_1_py as overlap_1
 introduction()
 np.random.seed()
 

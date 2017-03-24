@@ -185,7 +185,8 @@ import sys
 import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from md_lj_module     import introduction, conclusion, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -222,9 +223,11 @@ tau         = nml["tau"]         if "tau"         in nml else defaults["tau"]
 fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
 if fast:
-    from md_lj_fast_module import introduction, conclusion, force, PotentialType
+    print('Fast force routine')
+    from md_lj_module import force_np as force
 else:
-    from md_lj_slow_module import introduction, conclusion, force, PotentialType
+    print('Slow force routine')
+    from md_lj_module import force_py as force
 introduction()
 
 # Write out parameters

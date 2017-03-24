@@ -126,7 +126,8 @@ import sys
 import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from dpd_module       import introduction, conclusion, lowe, shardlow, p_approx, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -164,9 +165,11 @@ method      = nml["method"]      if "method"      in nml else defaults["method"]
 fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
 if fast:
-    from dpd_fast_module import introduction, conclusion, force, lowe, shardlow, p_approx, PotentialType
+    print('Fast force routine')
+    from dpd_module import force_np as force
 else:
-    from dpd_slow_module import introduction, conclusion, force, lowe, shardlow, p_approx, PotentialType
+    print('Slow force routine')
+    from dpd_module import force_py as force
 introduction()
 
 # Write out parameters

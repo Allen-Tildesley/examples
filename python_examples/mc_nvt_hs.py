@@ -36,9 +36,9 @@ def calculate ( string=None ):
     import numpy as np
     import math
     if fast:
-        from mc_hs_fast_module import n_overlap
+        from mc_hs_module import n_overlap_np as n_overlap
     else:
-        from mc_hs_slow_module import n_overlap
+        from mc_hs_module import n_overlap_py as n_overlap
 
     # Preliminary calculations (m_ratio, eps_box, box are taken from the calling program)
     vir = n_overlap ( box/(1.0+eps_box), r ) / (3.0*eps_box) # Virial
@@ -92,8 +92,9 @@ import sys
 import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
-from maths_module import random_translate_vector
+from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from maths_module     import random_translate_vector
+from mc_hs_module     import introduction, conclusion
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -126,9 +127,11 @@ eps_box = nml["eps_box"] if "eps_box" in nml else defaults["eps_box"]
 fast    = nml["fast"]    if "fast"    in nml else defaults["fast"]
 
 if fast:
-    from mc_hs_fast_module import introduction, conclusion, overlap, overlap_1
+    print('Fast overlap routines')
+    from mc_hs_fast_module import overlap_np as overlap, overlap_1_np as overlap_1
 else:
-    from mc_hs_slow_module import introduction, conclusion, overlap, overlap_1
+    print('Slow overlap routines')
+    from mc_hs_slow_module import overlap_py as overlap, overlap_1_py as overlap_1
 introduction()
 np.random.seed()
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# dpd_slow_module.py
+# dpd_module.py
 
 #------------------------------------------------------------------------------------------------#
 # This software was written in 2016/17                                                           #
@@ -24,7 +24,7 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Dissipative particle dynamics module (slow version)."""
+"""Dissipative particle dynamics module (fast and slow versions)."""
 
 class PotentialType:
     """A composite variable for interactions."""
@@ -46,39 +46,60 @@ def introduction():
 
     print('DPD soft potential')
     print('Diameter, r_cut = 1')
-    print('Slow version built around python loops')
 
 def conclusion():
     """Prints out concluding statements at end of run."""
 
     print('Program ends')
 
-def make_ij ( box, r ):
-    """Compiles randomized list of pairs within range, and stores in the array ij.
+def force_np ( box, a, r ):
+    """Takes in box, strength parameter, and coordinate array, and calculates forces and potentials etc.
 
-    Uses a simple Python loop, which will be slow.
+    Also returns list of pairs in range for use by the thermalization algorithm.
+    Attempts to use NumPy functions.
     """
 
     import numpy as np
-    from itertools import combinations
+
+    # It is assumed that positions are in units where box = 1
 
     n,d = r.shape
-    assert d==3, 'Dimension error in make_ij'
+    assert d==3, 'Dimension error in force'
 
-    ij=[] # Initialize list of pairs
-    for i,j in combinations(range(n),2): # Double loop over pairs of atoms
-        rij = r[i,:]-r[j,:]      # Separation vector
-        rij = rij - np.rint(rij) # Periodic boundary conditions
-        rij = rij * box          # Now in r_cut=1 units
-        rij_sq = np.sum(rij**2)  # Squared distance
-        if rij_sq < 1.0:         # If in range ...
-            ij.append([i,j])     # add to list
+    # Initialize
+    f = np.zeros_like(r)
+    total = PotentialType ( pot=0.0, vir=0.0, lap=0.0 )
+    pairs = [] # Initialize list of pair information
 
-    ij = np.array(ij)              # Convert to array
-    ij = np.random.permutation(ij) # Permute (on first index only)
-    return ij
+    for i in range(n-1):
+        rij = r[i,:]-r[i+1:,:]           # Separation vectors for j>i
+        rij = rij - np.rint(rij)         # Periodic boundary conditions in box=1 units
+        rij = rij * box                  # Now in sigma=1 units
+        rij_sq   = np.sum(rij**2,axis=1) # Squared separations for j>1
+        rij_mag  = np.sqrt(rij_sq)       # Separations for j>i
+        rij_hat  = rij / rij_mag[:,np.newaxis]        # Unit separation vectors
+        in_range = rij_sq < 1.0                       # Set flags for within cutoff
+        wij      = np.where(in_range,1.0-rij_mag,0.0) # Weight functions
+        pot = 0.5 * wij**2                # Pair potentials
+        vir = wij * rij_mag               # Pair virials
+        lap = 3.0-2.0/rij_mag             # Pair Laplacians
+        fij = wij[:,np.newaxis] * rij_hat # Pair forces
 
-def force ( box, a, r ):
+        total = total + PotentialType ( pot=sum(pot), vir=sum(vir), lap=sum(lap) )
+        f[i,:] = f[i,:] + np.sum(fij,axis=0)
+        f[i+1:,:] = f[i+1:,:] - fij
+        jvals = np.extract(in_range,np.arange(i+1,n))
+        pairs = pairs + [ (i,j,rij_mag[j-i-1],rij_hat[j-i-1,:]) for j in jvals ]
+
+    # Multiply results by numerical factors
+    total.pot = total.pot * a
+    total.vir = total.vir * a / 3.0
+    total.lap = total.lap * a * 2.0
+    f         = f * a
+
+    return total, f, pairs
+
+def force_py ( box, a, r ):
     """Takes in box, strength parameter, and coordinate array, and calculates forces and potentials etc.
 
     Also returns list of pairs in range for use by the thermalization algorithm.
@@ -130,6 +151,7 @@ def lowe ( box, temperature, gamma_step, v, pairs ):
     """Updates velocities using pairwise Lowe-Andersen thermostat.
 
     Uses a simple Python loop, which will be slow.
+    (but necessary, since the operations are supposed to be sequential).
     """
 
     # It is assumed that the pairs list contains all pairs within range
@@ -154,7 +176,8 @@ def lowe ( box, temperature, gamma_step, v, pairs ):
 def shardlow ( box, temperature, gamma_step, v, pairs ):
     """Updates velocities using Shardlow integration algorithm.
 
-    Uses a simple Python loop, which will be slow.
+    Uses a simple Python loop, which will be slow
+    (but necessary, since the operations are supposed to be sequential).
     """
 
     # It is assumed that the pairs list contains all pairs within range

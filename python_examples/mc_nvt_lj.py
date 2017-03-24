@@ -43,9 +43,9 @@ def calculate ( string=None ):
     import numpy as np
     import math
     if fast:
-        from mc_lj_fast_module import force_sq
+        from mc_lj_module import force_sq_np as force_sq
     else:
-        from mc_lj_slow_module import force_sq
+        from mc_lj_module import force_sq_py as force_sq
 
     # Preliminary calculations (n,r,total are taken from the calling program)
     vol = box**3                     # Volume
@@ -115,15 +115,16 @@ def calculate ( string=None ):
 # For example, for Lennard-Jones, sigma = 1, epsilon = 1
 
 # Despite the program name, there is nothing here specific to Lennard-Jones
-# The model is defined in mc_lj_{fast|slow}_module
+# The model is defined in mc_lj_module
 
 import json
 import sys
 import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
-from maths_module import random_translate_vector, metropolis
+from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from maths_module     import random_translate_vector, metropolis
+from mc_lj_module     import introduction, conclusion, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -158,9 +159,11 @@ dr_max      = nml["dr_max"]      if "dr_max"      in nml else defaults["dr_max"]
 fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
 if fast:
-    from mc_lj_fast_module import introduction, conclusion, potential, potential_1, PotentialType
+    print('Fast potential routines')
+    from mc_lj_module import potential_np as potential, potential_1_np as potential_1
 else:
-    from mc_lj_slow_module import introduction, conclusion, potential, potential_1, PotentialType
+    print('Slow potential routines')
+    from mc_lj_module import potential_py as potential, potential_1_py as potential_1
 introduction()
 np.random.seed()
 
