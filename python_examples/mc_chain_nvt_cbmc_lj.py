@@ -38,16 +38,13 @@ def calculate ( string=None ):
     # estimates of < e_f > and < p_f > for the full (uncut) potential
     # The value of the cut-and-shifted potential is not used, in this example
 
-    from averages_module import write_variables, msd, VariableType
     import numpy as np
     import math
-    if fast:
-        from mc_chain_lj_fast_module import potential, spring_pot, PotentialType
-    else:
-        from mc_chain_lj_slow_module import potential, spring_pot, PotentialType
+    from averages_module    import write_variables, msd, VariableType
+    from mc_chain_lj_module import potential, spring_pot, PotentialType
 
     # Preliminary calculations
-    total = potential(r) # Nonbonded potential with overlap flag
+    total = potential(r,fast) # Nonbonded potential with overlap flag
     assert not total.ovr, 'Overlap in configuration'
     spr = spring_pot ( bond, k_spring, r ) # Total spring potential energy
     rcm = np.sum ( r, axis=0 ) / n         # Centre of mass
@@ -103,14 +100,15 @@ def calculate ( string=None ):
 # Configurational weights are calculated on the basis of the nonbonded interactions
 
 # Despite the program name, there is nothing here specific to Lennard-Jones
-# The model is defined in mc_chain_lj_{fast|slow}_module
+# The model is defined in mc_chain_lj_module
 
 import json
 import sys
 import numpy as np
 import math
-from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from config_io_module   import read_cnf_atoms, write_cnf_atoms
+from averages_module    import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from mc_chain_lj_module import introduction, conclusion, regrow
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
@@ -146,10 +144,6 @@ temperature = nml["temperature"] if "temperature" in nml else defaults["temperat
 k_spring    = nml["k_spring"]    if "k_spring"    in nml else defaults["k_spring"]
 fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
-if fast:
-    from mc_chain_lj_fast_module import introduction, conclusion, regrow
-else:
-    from mc_chain_lj_slow_module import introduction, conclusion, regrow
 introduction()
 np.random.seed()
 
@@ -160,6 +154,10 @@ print( "{:40}{:15d}  ".format('Max atoms in regrow',             m_max)       )
 print( "{:40}{:15d}  ".format('Random tries per atom in regrow', k_max)       )
 print( "{:40}{:15.6f}".format('Specified temperature',           temperature) )
 print( "{:40}{:15.6f}".format('Bond spring strength',            k_spring)    )
+if fast:
+    print('Fast potential routines')
+else:
+    print('Slow potential routines')
 
 # Read in initial configuration
 n, bond, r = read_cnf_atoms ( cnf_prefix+inp_tag)
@@ -178,7 +176,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
     for stp in range(nstep): # Loop over steps
 
-        r, accepted = regrow ( temperature, m_max, k_max, bond, k_spring, r )
+        r, accepted = regrow ( temperature, m_max, k_max, bond, k_spring, r, fast )
         m_ratio = 1.0 if accepted else 0.0
 
         variables = calculate()

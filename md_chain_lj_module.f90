@@ -396,34 +396,26 @@ CONTAINS
     ! See AG Bailey, CP Lowe, and AP Sutton, J Comput Phys, 227, 8949 (2008)
     ! and AG Bailey, CP Lowe, and AP Sutton, Comput Phys Commun, 180, 594 (2009)
 
-    INTEGER            :: i, iter
+    INTEGER            :: iter, k
     REAL               :: max_error
     LOGICAL            :: info
     REAL,    PARAMETER :: tol = 1.0e-9
     INTEGER, PARAMETER :: iter_max = 500
 
+    k = n - 1 ! Number of constraints
+
     v     = v + 0.5 * dt * f ! Kick half-step
     r_new = r + dt * v       ! Drift step
 
     ! Old and new (non-constrained) bond vectors
-    rij_old(:,1:n-1) = r(:,1:n-1) - r(:,2:n)
-    rij_new(:,1:n-1) = r_new(:,1:n-1) - r_new(:,2:n)
+    rij_old(:,1:k) = r    (:,1:k) - r    (:,2:n)
+    rij_new(:,1:k) = r_new(:,1:k) - r_new(:,2:n)
 
-    ! Elements of tridiagonal matrix
+    ! Elements of tridiagonal matrix (dot products of old and new vectors)
     ! In this example, all masses are equal to unity
-    dd(1) = DOT_PRODUCT ( rij_old(:,1), rij_new(:,1) ) / 0.5
-    du(1) = DOT_PRODUCT ( rij_old(:,2), rij_new(:,1) )
-    DO i = 2, n-2
-       dl(i-1) = DOT_PRODUCT ( rij_old(:,i-1), rij_new(:,i) )
-       dd(i)   = DOT_PRODUCT ( rij_old(:,i),   rij_new(:,i) ) / 0.5
-       du(i)   = DOT_PRODUCT ( rij_old(:,i+1), rij_new(:,i) )
-    ENDDO
-    dl(n-2) = DOT_PRODUCT ( rij_old(:,n-3), rij_new(:,n-2) ) 
-    dd(n-1) = DOT_PRODUCT ( rij_old(:,n-1), rij_new(:,n-1) ) / 0.5
-
-    dl(:) = -2.0*dl(:)
-    dd(:) =  2.0*dd(:)  
-    du(:) = -2.0*du(:)
+    dl(1:k-1) = -2.0*SUM ( rij_old(:,1:k-1)*rij_new(:,2:k),   dim=1 )       ! k-1 elements of lower-diagonal
+    dd(1:k)   =  2.0*SUM ( rij_old(:,1:k)  *rij_new(:,1:k),   dim=1 ) / 0.5 ! k elements of diagonal
+    du(1:k-1) = -2.0*SUM ( rij_old(:,2:k)  *rij_new(:,1:k-1), dim=1 )       ! k-1 elements of upper-diagonal
 
     ! Set up rhs of constraint equation
     rijsq(:)  = SUM ( rij_new(:,:)**2, dim=1 )
@@ -446,14 +438,12 @@ CONTAINS
        lambda(:) = rhs(:)
 
        ! Constraint effects on position from lambda multipliers
-       r(:,1) = r_new(:,1) + lambda(1)*rij_old(:,1)
-       DO i = 2, n-1
-          r(:,i) = r_new(:,i) + lambda(i)*rij_old(:,i) - lambda(i-1)*rij_old(:,i-1)
-       ENDDO
-       r(:,n) = r_new(:,n) - lambda(n-1)*rij_old(:,n-1)
+       r = r_new
+       r(:,1:k) = r(:,1:k) + SPREAD(lambda(1:k),dim=1,ncopies=3)*rij_old(:,1:k)
+       r(:,2:n) = r(:,2:n) - SPREAD(lambda(1:k),dim=1,ncopies=3)*rij_old(:,1:k)
 
        ! New bond vectors
-       rij(:,1:n-1) = r(:,1:n-1) - r(:,2:n)
+       rij(:,1:k) = r(:,1:k) - r(:,2:n)
 
        ! Prepare for next iteration
        rijsq(:)  = SUM ( rij(:,:)**2, dim=1 ) 
@@ -469,11 +459,8 @@ CONTAINS
     END DO ! End iterative loop until done
 
     ! Effect of constraints on velocities
-    v(:,1) = v(:,1) + lambda(1)*rij_old(:,1)/dt
-    DO i = 2, n-1
-       v(:,i) = v(:,i) + lambda(i)*rij_old(:,i)/dt - lambda(i-1)*rij_old(:,i-1)/dt
-    ENDDO
-    v(:,n) = v(:,n) - lambda(n-1)*rij_old(:,n-1)/dt
+    v(:,1:k) = v(:,1:k) + SPREAD(lambda(1:k),dim=1,ncopies=3)*rij_old(:,1:k)/dt
+    v(:,2:n) = v(:,2:n) - SPREAD(lambda(1:k),dim=1,ncopies=3)*rij_old(:,1:k)/dt
 
   END SUBROUTINE milcshake_a
 
@@ -490,34 +477,30 @@ CONTAINS
     ! and AG Bailey, CP Lowe, and AP Sutton, Comput Phys Commun, 180, 594 (2009)
     ! Also returns constraint contribution to virial
 
-    INTEGER :: i
+    INTEGER :: k
     LOGICAL :: info
+
+    k = n - 1 ! Number of constraints
 
     v = v + 0.5 * dt * f ! Kick half-step
 
     ! Relative velocities and bond vectors
-    vij(:,1:n-1) = v(:,1:n-1) - v(:,2:n)
-    rij(:,1:n-1) = r(:,1:n-1) - r(:,2:n)
+    vij(:,1:k) = v(:,1:k) - v(:,2:n)
+    rij(:,1:k) = r(:,1:k) - r(:,2:n)
     rhs(:) = - SUM ( vij*rij, dim=1 )
 
-    dd(1) =  DOT_PRODUCT ( rij(:,1), rij(:,1) ) / 0.5
-    du(1) = -DOT_PRODUCT ( rij(:,2), rij(:,1) )
-    DO i = 2, n-2
-       dl(i-1) = -DOT_PRODUCT ( rij(:,i-1), rij(:,i) )
-       dd(i)   =  DOT_PRODUCT ( rij(:,i),   rij(:,i) ) / 0.5
-       du(i)   = -DOT_PRODUCT ( rij(:,i+1), rij(:,i) )
-    ENDDO
-    dl(n-2) = -DOT_PRODUCT ( rij(:,n-2), rij(:,n-1) )
-    dd(n-1) =  DOT_PRODUCT ( rij(:,n-1), rij(:,n-1) ) / 0.5
+    ! Elements of tridiagonal matrix (dot products of old and new vectors)
+    ! In this example, all masses are equal to unity
+    dl(1:k-1) = -SUM ( rij(:,1:k-1)*rij(:,2:k),   dim=1 )       ! k-1 elements of lower-diagonal
+    dd(1:k)   =  SUM ( rij(:,1:k)  *rij(:,1:k),   dim=1 ) / 0.5 ! k elements of diagonal
+    du(1:k-1) = -SUM ( rij(:,2:k)  *rij(:,1:k-1), dim=1 )       ! k-1 elements of upper-diagonal
 
     CALL dgtsv ( n-1, 1, dl, dd, du, rhs, n-1, info ) 
     lambda(:) = rhs(:)
 
-    v(:,1) = v(:,1) + lambda(1)*rij(:,1)
-    DO i = 2, n-1
-       v(:,i) = v(:,i) + ( lambda(i)*rij(:,i) - lambda(i-1)*rij(:,i-1) )
-    ENDDO
-    v(:,n) = v(:,n) - lambda(n-1)*rij(:,n-1)
+    ! Effect of constraints on velocities
+    v(:,1:k) = v(:,1:k) + SPREAD(lambda(1:k),dim=1,ncopies=3)*rij(:,1:k)
+    v(:,2:n) = v(:,2:n) - SPREAD(lambda(1:k),dim=1,ncopies=3)*rij(:,1:k)
 
     wc = SUM(lambda) * bond**2
     wc = wc / (0.5*dt) / 3.0 ! scale factors for virial

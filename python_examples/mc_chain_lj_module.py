@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# mc_chain_lj_slow_module.py
+# mc_chain_lj_module.py
 
 #------------------------------------------------------------------------------------------------#
 # This software was written in 2016/17                                                           #
@@ -24,7 +24,7 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Monte Carlo, single chain, LJ atoms. Slow version using Python loop."""
+"""Monte Carlo, single chain, LJ atoms. Fast and slow versions."""
 
 class PotentialType:
     """A composite variable for interactions."""
@@ -57,14 +57,13 @@ def introduction():
     print('Diameter, sigma = 1')
     print('Well depth, epsilon = 1')
     print('Harmonic spring bond potential')
-    print('Slow version built around Python loops')
 
 def conclusion():
     """Prints out concluding statements at end of run."""
 
     print('Program ends')
 
-def regrow ( temperature, m_max, k_max, bond, k_spring, r ):
+def regrow ( temperature, m_max, k_max, bond, k_spring, r, fast ):
     """Carries out single regrowth move, returning new r and indicator of success."""
 
     # A short sequence of m atoms (m<=m_max) is deleted and regrown in the CBMC manner
@@ -116,9 +115,9 @@ def regrow ( temperature, m_max, k_max, bond, k_spring, r ):
     w_new = 1.0
     for i in range(n-m,n): # Loop to regrow last m atoms, computing new weight
         for k in range(k_max): # Loop over k_max tries
-            d          = random_bond ( bond, std, d_max )    # Generate random bond length around d=bond
-            r_try[k,:] = r[i-1,:] + d * random_vector()      # Trial position in random direction from i-1
-            partial    = potential_1 ( r_try[k,:], r[:i,:] ) # Nonbonded interactions with earlier atoms
+            d          = random_bond ( bond, std, d_max )          # Generate random bond length around d=bond
+            r_try[k,:] = r[i-1,:] + d * random_vector()            # Trial position in random direction from i-1
+            partial    = potential_1 ( r_try[k,:], r[:i,:], fast ) # Nonbonded interactions with earlier atoms
             w[k]       = 0.0 if partial.ovr else np.exp(-partial.pot/temperature) # Weight for this try
         w_sum = np.sum(w)
         if w_sum<w_tol: # Early exit if this happens at any stage
@@ -147,14 +146,14 @@ def regrow ( temperature, m_max, k_max, bond, k_spring, r ):
 
         # Old position and weight are stored as try 0
         r_try[0,:] = r[i,:]
-        partial    = potential_1 ( r_try[0,:], r[:i,:] ) # Nonbonded energy with earlier atoms
+        partial    = potential_1 ( r_try[0,:], r[:i,:], fast ) # Nonbonded energy with earlier atoms
         w[0]       = 0.0 if partial.ovr else np.exp(-partial.pot/temperature) # Weight for this try
 
         # Remaining tries only required to compute weight
         for k in range(1,k_max): # Loop over k_max-1 other tries
-            d          = random_bond ( bond, std, d_max )    # Generate random bond length around d=bond
-            r_try[k,:] = r[i-1,:] + d * random_vector()      # Trial position in random direction from i-1
-            partial    = potential_1 ( r_try[k,:], r[:i,:] ) # Nonbonded interactions with earlier atoms
+            d          = random_bond ( bond, std, d_max )          # Generate random bond length around d=bond
+            r_try[k,:] = r[i-1,:] + d * random_vector()            # Trial position in random direction from i-1
+            partial    = potential_1 ( r_try[k,:], r[:i,:], fast ) # Nonbonded interactions with earlier atoms
             w[k]       = 0.0 if partial.ovr else np.exp(-partial.pot/temperature) # Weight for this try
 
         w_sum = np.sum(w)
@@ -175,7 +174,7 @@ def regrow ( temperature, m_max, k_max, bond, k_spring, r ):
     else:
         return r_old, False
 
-def potential ( r ):
+def potential ( r, fast ):
     """Takes in coordinate array, and calculates total potential etc.
 
     The results are returned as total, a PotentialType variable."""
@@ -191,7 +190,7 @@ def potential ( r ):
     total = PotentialType ( pot=0.0, ovr=False ) # Initialize
 
     for i in range(n-1):
-        partial = potential_1 ( r[i,:], r[i+1:,:] )
+        partial = potential_1 ( r[i,:], r[i+1:,:], fast )
         if partial.ovr:
             total.ovr = True
             break
@@ -199,10 +198,11 @@ def potential ( r ):
 
     return total
 
-def potential_1 ( ri, r ):
+def potential_1 ( ri, r, fast ):
     """Takes in coordinates of an atom and calculates its interactions.
 
     Partner coordinate array is supplied.
+    Fast or slow version selected.
     """
 
     import numpy as np
@@ -225,21 +225,38 @@ def potential_1 ( ri, r ):
     # Initialize
     partial = PotentialType ( pot=0.0, ovr=False )
 
-    for rj in r:
-        rij    = ri - rj         # Separation vector
-        rij_sq = np.sum(rij**2)  # Squared separation
-        sr2    = 1.0 / rij_sq    # (sigma/rij)**2
-        ovr    = sr2 > sr2_ovr   # Overlap if too close
+    if fast:
+        rij    = ri - r                # Separation vectors
+        rij_sq = np.sum(rij**2,axis=1) # Squared separations
+        sr2    = 1.0 / rij_sq          # (sigma/rij)**2
+        ovr    = sr2 > sr2_ovr         # Overlap if too close
 
-        if ovr:
+        if any(ovr):
             partial.ovr=True
             return partial
-
+        
         sr6  = sr2 ** 3
         sr12 = sr6 ** 2
         pot  = sr12 - sr6
 
-        partial = partial + PotentialType ( pot=pot, ovr=ovr )
+        partial = PotentialType ( pot=np.sum(pot), ovr=False )
+
+    else:
+        for rj in r:
+            rij    = ri - rj         # Separation vector
+            rij_sq = np.sum(rij**2)  # Squared separation
+            sr2    = 1.0 / rij_sq    # (sigma/rij)**2
+            ovr    = sr2 > sr2_ovr   # Overlap if too close
+
+            if ovr:
+                partial.ovr=True
+                return partial
+
+            sr6  = sr2 ** 3
+            sr12 = sr6 ** 2
+            pot  = sr12 - sr6
+
+            partial = partial + PotentialType ( pot=pot, ovr=ovr )
 
     # Multiply results by numerical factors
     partial.pot = partial.pot * 4.0 # 4*epsilon
