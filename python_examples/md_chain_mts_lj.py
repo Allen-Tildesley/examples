@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# md_nve_lj.py
+# md_chain_mts_lj.py
 
 #------------------------------------------------------------------------------------------------#
 # This software was written in 2016/17                                                           #
@@ -24,27 +24,23 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Molecular dynamics, NVE ensemble."""
+"""Molecular dynamics, multiple timesteps, chain molecule."""
 
 def calculate ( string=None ):
     """Calculates all variables of interest and (optionally) writes them out.
-    
-    They are collected and returned in the variables list, for use in the main program."""
-    
+
+    They are collected and returned in the variables list, for use in the main program.
+    """
+
     import numpy as np
     import math
     from averages_module import write_variables, msd, cke, VariableType
-    from lrc_module import potential_lrc, pressure_lrc
-    from md_lj_module import hessian
-    
-    # Preliminary calculations (n,r,v,f,total are taken from the calling program)
-    vol = box**3                       # Volume
-    rho = n / vol                      # Density
-    kin = 0.5*np.sum(v**2)             # Kinetic energy
-    tmp = 2.0 * kin / (3*n-3)          # Remove three degrees of freedom for momentum conservation
-    fsq = np.sum ( f**2 )              # Total squared force
-    hes = hessian(box,r_cut,r,f,fast)  # Total Hessian
-    eng = kin + total.pot              # Total energy for simulated system
+
+    # Preliminary calculations
+    kin = 0.5*np.sum(v**2)
+    rcm = np.sum ( r, axis=0 ) / n  # Centre of mass
+    rsq = np.sum ( (r-rcm)**2 ) / n # Mean-squared distance from CM
+    eng = kin+total.pot+total_spr   # Total energy
 
     # Variables of interest, of class VariableType, containing three attributes:
     #   .val: the instantaneous value
@@ -54,77 +50,68 @@ def calculate ( string=None ):
     # The .nam and some other attributes need only be defined once, at the start of the program,
     # but for clarity and readability we assign all the values together below
 
-    # Internal energy (cut-and-shifted) per atom
-    # Total KE plus total cut-and-shifted PE divided by N
-    e_s = VariableType ( nam = 'E/N cut&shifted', val = eng/n )
-
-    # Internal energy (full, including LRC) per atom
-    # LRC plus total KE plus total cut (but not shifted) PE divided by N
-    e_f = VariableType ( nam = 'E/N full', val = potential_lrc(rho,r_cut) + (kin+total.cut)/n )
-
-    # Pressure (cut-and-shifted)
-    # Ideal gas contribution plus total virial divided by V
-    p_s = VariableType ( nam = 'P cut&shifted', val = rho*tmp + total.vir/vol )
-
-    # Pressure (full, including LRC)
-    # LRC plus ideal gas contribution plus total virial divided by V
-    p_f = VariableType ( nam = 'P full', val = pressure_lrc(rho,r_cut) + rho*tmp + total.vir/vol )
+    # Internal energy per atom
+    # Total KE plus total LJ nonbonded energy plus total spring energy divided by N
+    e_f = VariableType ( nam = 'E/N', val = eng/n )
 
     # Kinetic temperature
-    t_k = VariableType ( nam = 'T kinetic', val = tmp )
+    # Remove 6 degrees of freedom for conserved linear and angular momentum
+    t_k = VariableType ( nam = 'T kinetic', val = 2.0*kin/(3*n-6) )
 
-    # Configurational temperature
-    # Total squared force divided by total Laplacian with small Hessian correction
-    t_c = VariableType ( nam = 'T config', val = fsq/(total.lap-(2.0*hes/fsq)) )
+    # Radius of gyration
+    r_g = VariableType ( nam = 'Rg', val = math.sqrt(rsq) )
 
     # MSD of kinetic energy, intensive
     # Use special method to convert to Cv/N
-    c_s = VariableType ( nam = 'Cv/N cut&shifted', val = kin/math.sqrt(n), method = cke )
+    c_f = VariableType ( nam = 'Cv/N', val = kin/math.sqrt(n), method = cke )
 
     # Mean-squared deviation of conserved energy per atom
     conserved_msd = VariableType ( nam = 'Conserved MSD', val = eng/n, method = msd, e_format = True )
 
-    # Collect together into a list for averaging
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, c_s, conserved_msd ]
+    # Collect together for averaging
+    variables = [ e_f, t_k, r_g, c_f, conserved_msd ]
 
     if string is not None:
         print(string)
-        write_variables ( variables[:6] ) # Don't write out MSD variables
+        write_variables ( variables[:-2] ) # Not MSD variables
 
     return variables
 
-# Takes in a configuration of atoms (positions, velocities)
-# Cubic periodic boundary conditions
-# Conducts molecular dynamics using velocity Verlet algorithm
+# Takes in a configuration of atoms in a linear chain (positions, velocities)
+# NO periodic boundary conditions, no box
+# Conducts molecular dynamics with springs and multiple timesteps
 # Uses no special neighbour lists
 
 # Reads several variables and options from standard input using JSON format
 # Leave input empty "{}" to accept supplied defaults
 
-# Positions r are divided by box length after reading in and we assume mass=1 throughout
-# However, input configuration, output configuration, most calculations, and all results 
-# are given in simulation units defined by the model
+# Reads several variables and options from standard input using a namelist nml
+# Leave namelist empty to accept supplied defaults
+
+# Input configuration, output configuration, all calculations, and all results 
+# are given in mass = 1 units, and in simulation units defined by the model 
 # For example, for Lennard-Jones, sigma = 1, epsilon = 1
 
 # Despite the program name, there is nothing here specific to Lennard-Jones
-# The model is defined in md_lj_module
+# The model is defined in md_chain_lj_module.py
 
 import json
 import sys
 import numpy as np
 import math
-from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
-from md_lj_module     import introduction, conclusion, force, PotentialType
+from config_io_module   import read_cnf_atoms, write_cnf_atoms
+from averages_module    import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from md_chain_lj_module import introduction, conclusion, zero_cm, force, spring, worst_bond, PotentialType
 
 cnf_prefix = 'cnf.'
 inp_tag    = 'inp'
 out_tag    = 'out'
 sav_tag    = 'sav'
 
-print('md_nve_lj')
-print('Molecular dynamics, constant-NVE ensemble')
+print('md_chain_mts_lj')
+print('Molecular dynamics, constant-NVE ensemble, chain molecule, multiple time steps')
 print('Particle mass=1 throughout')
+print('No periodic boundaries')
 
 # Read parameters in JSON format
 try:
@@ -134,7 +121,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "fast":True}
+defaults = {"nblock":10, "nstep":10000, "dt":0.0002, "k_spring":10000.0, "n_mts":10, "fast":True}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -142,37 +129,38 @@ for key, val in nml.items():
         print('Warning', key, 'not in ',list(defaults.keys()))
 
 # Set parameters to input values or defaults
-nblock = nml["nblock"] if "nblock" in nml else defaults["nblock"]
-nstep  = nml["nstep"]  if "nstep"  in nml else defaults["nstep"]
-r_cut  = nml["r_cut"]  if "r_cut"  in nml else defaults["r_cut"]
-dt     = nml["dt"]     if "dt"     in nml else defaults["dt"]
-fast   = nml["fast"]   if "fast"   in nml else defaults["fast"]
+nblock   = nml["nblock"]   if "nblock"   in nml else defaults["nblock"]
+nstep    = nml["nstep"]    if "nstep"    in nml else defaults["nstep"]
+dt       = nml["dt"]       if "dt"       in nml else defaults["dt"]
+k_spring = nml["k_spring"] if "k_spring" in nml else defaults["k_spring"]
+n_mts    = nml["n_mts"]    if "n_mts"    in nml else defaults["n_mts"]
+fast     = nml["fast"]     if "fast"     in nml else defaults["fast"]
 
 introduction()
 
 # Write out parameters
-print( "{:40}{:15d}  ".format('Number of blocks',          nblock) )
-print( "{:40}{:15d}  ".format('Number of steps per block', nstep)  )
-print( "{:40}{:15.6f}".format('Potential cutoff distance', r_cut)  )
-print( "{:40}{:15.6f}".format('Time step',                 dt)     )
+print( "{:40}{:15d}  ".format('Number of blocks',          nblock)   )
+print( "{:40}{:15d}  ".format('Number of steps per block', nstep)    )
+print( "{:40}{:15.6f}".format('Time step',                 dt)       )
+print( "{:40}{:15.6f}".format('Bond spring constant',      k_spring) )
+print( "{:40}{:15d}  ".format('Multiple time step factor', n_mts)    )
+print( "{:40}{:15.6f}".format('Large time step',           dt*n_mts) )
 if fast:
     print('Fast force routine')
 else:
     print('Slow force routine')
 
 # Read in initial configuration
-n, box, r, v = read_cnf_atoms ( cnf_prefix+inp_tag, with_v=True)
+n, bond, r, v = read_cnf_atoms ( cnf_prefix+inp_tag, with_v=True)
 print( "{:40}{:15d}  ".format('Number of particles',          n) )
-print( "{:40}{:15.6f}".format('Box length', box)  )
-print( "{:40}{:15.6f}".format('Density', n/box**3)  )
-r = r / box                    # Convert positions to box units
-r = r - np.rint ( r )          # Periodic boundaries
-vcm = np.sum ( v, axis=0 ) / n # Centre-of mass velocity
-v = v - vcm                    # Set COM velocity to zero
+print( "{:40}{:15.6f}".format('Bond length (in sigma units)', bond)  )
+r, v = zero_cm ( r, v )
+print( "{:40}{:15.6f}".format('Worst bond length deviation', worst_bond(bond,r) )  )
 
 # Initial forces, potential, etc plus overlap check
-total, f = force ( box, r_cut, r, fast )
+total, f = force ( r, fast )
 assert not total.ovr, 'Overlap in initial configuration'
+total_spr, g = spring ( k_spring, bond, r, fast )
 variables = calculate ( 'Initial values' )
 
 # Initialize arrays for averaging and write column headings
@@ -184,30 +172,31 @@ for blk in range(1,nblock+1): # Loop over blocks
 
     for stp in range(nstep): # Loop over steps
 
-        # Velocity Verlet algorithm
+        # Single time step of length n_mts*dt
 
-        v = v + 0.5 * dt * f # Kick half-step
+        v = v + 0.5 * n_mts * dt * f  # Kick half-step (long) with nonbonded forces f
 
-        r = r + dt * v / box # Drift step (positions in box=1 units)
-        r = r - np.rint ( r )  # Periodic boundaries
+        for stp_mts in range(n_mts): # Loop over n_mts steps of length dt
+            v = v + 0.5 * dt * g                              # Kick half-step (short) with spring forces g
+            r = r + dt * v                                    # Drift step (short)
+            total_spr, g = spring ( k_spring, bond, r, fast ) # Evaluate spring forces g and potential
+            v = v + 0.5 * dt * g                              # Kick half-step (short) with spring forces g
 
-        total, f = force ( box, r_cut, r, fast ) # Force evaluation
+        total, f = force ( r, fast ) # Evaluate nonbonded forces f and potential
         assert not total.ovr, 'Overlap in configuration'
-
-        v = v + 0.5 * dt * f # Kick half-step
+        v = v + 0.5 * n_mts * dt * f # Kick half-step (long) with nonbonded forces f
 
         variables = calculate()
         blk_add(variables)
 
     blk_end(blk)                                             # Output block averages
     sav_tag = str(blk).zfill(3) if blk<1000 else 'sav'       # Number configuration by block
-    write_cnf_atoms ( cnf_prefix+sav_tag, n, box, r*box, v ) # Save configuration
+    write_cnf_atoms ( cnf_prefix+sav_tag, n, bond, r, v ) # Save configuration
 
 run_end()
 
-total, f = force ( box, r_cut, r, fast ) # Force evaluation
-assert not total.ovr, 'Overlap in final configuration'
-
 variables = calculate('Final values')
-write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box, v ) # Save configuration
+print( "{:40}{:15.6f}".format('Worst bond length deviation', worst_bond(bond,r) )  )
+write_cnf_atoms ( cnf_prefix+out_tag, n, bond, r, v ) # Save configuration
 conclusion()
+

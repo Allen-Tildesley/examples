@@ -45,7 +45,7 @@ PROGRAM md_chain_nve_lj
   USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
   USE               maths_module,     ONLY : lowercase
   USE               md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                                     zero_cm, force, worst_bond, r, v, n, potential_type, &
+       &                                     zero_cm, force, worst_bond, r, r_old, v, f, n, potential_type, &
        &                                     milcshake_a, milcshake_b, rattle_a, rattle_b
 
   IMPLICIT NONE
@@ -69,8 +69,8 @@ PROGRAM md_chain_nve_lj
   CHARACTER(len=30)           :: constraints
 
   ! Define procedure pointers with interfaces like those of rattle_a and rattle_b
-  PROCEDURE(rattle_a), POINTER :: move_a => NULL()
-  PROCEDURE(rattle_b), POINTER :: move_b => NULL()
+  PROCEDURE(rattle_a), POINTER :: constraints_a => NULL()
+  PROCEDURE(rattle_b), POINTER :: constraints_b => NULL()
 
   NAMELIST /nml/ nblock, nstep, dt, constraints
 
@@ -101,12 +101,12 @@ PROGRAM md_chain_nve_lj
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step',                 dt
   IF ( INDEX( lowercase(constraints), 'ratt' ) /= 0 ) THEN
-     move_a => rattle_a
-     move_b => rattle_b
+     constraints_a => rattle_a
+     constraints_b => rattle_b
      WRITE ( unit=output_unit, fmt='(a)' ) 'RATTLE constraint method'
   ELSE IF ( INDEX( lowercase(constraints), 'milc' ) /= 0 ) THEN
-     move_a => milcshake_a
-     move_b => milcshake_b
+     constraints_a => milcshake_a
+     constraints_b => milcshake_b
      WRITE ( unit=output_unit, fmt='(a)' ) 'MILCSHAKE constraint method'
   ELSE
      WRITE ( unit=error_unit, fmt='(a,a)' ) 'Unrecognized constraint method ', constraints
@@ -139,15 +139,21 @@ PROGRAM md_chain_nve_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        CALL move_a ( dt, bond )     ! RATTLE/MILCSHAKE part A
+        r_old = r            ! Save, since first constraints act along the old vectors
+        v = v + 0.5 * dt * f ! Kick half-step
+        r = r + dt * v       ! Drift step
 
-        CALL force ( total )         ! Force evaluation
+        CALL constraints_a ( dt, bond ) ! RATTLE/MILCSHAKE part A
+
+        CALL force ( total ) ! Force evaluation
         IF ( total%ovr ) THEN
            WRITE ( unit=error_unit, fmt='(a)') 'Overlap in configuration'
            STOP 'Error in md_chain_nve_lj'
         END IF
 
-        CALL move_b ( dt, bond, wc ) ! RATTLE/MILCSHAKE part B
+        v = v + 0.5 * dt * f ! Kick half-step
+
+        CALL constraints_b ( dt, bond, wc ) ! RATTLE/MILCSHAKE part B
 
         ! Calculate and accumulate variables for this step
         CALL calculate ( )

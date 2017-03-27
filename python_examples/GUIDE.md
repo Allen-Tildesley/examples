@@ -209,6 +209,41 @@ _T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 
 * At first glance, the average _PE_ seems wrong???
 
+Similar models were employed in `md_chain_nve_lj` and `md_chain_mts_lj`:
+_N_=13 atoms and equilibrium bond length of 1.122462&sigma;.
+Here we report results for constrained bond lengths, using the first program,
+and for _k_<sub>spring</sub>=400 and 10000 (the program default value), using the second program.
+In all cases, the primary indicator of a correctly-functioning program is energy conservation,
+and this was checked in all cases.
+
+
+constrained
+
+_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+-----   | -----     | -----           | -----
+
+_k_<sub>spring</sub>=10000
+
+_E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+-----    | -----     | -----           | -----
+
+_k_<sub>spring</sub>=400
+
+_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+-----   | -----     | -----           | -----
+
+When comparing results with the MC program, several points should be remembered.
+
+1. Constraining the bond lengths affects average potential energy, kinetic energy, and heat capacity.
+2. While we use _k_<sub>spring</sub>=10000 to highlight the multiple timestep method,
+it is quite likely that energy flow between bond vibrations and other degrees of freedom will be inefficient,
+due to the timescale separation.
+3. The constant-_NVE_ and constant-_NVT_ ensembles are expected to yield different behaviour around the collapse transition.
+4. Molecular dynamics is not expected to thoroughly explore the energy landscape at low temperatures,
+giving instead (typically) quasi-harmonic vibrations in a single basin.
+The default run lengths are very modest here: 10 blocks,
+each consisting of 10000 steps of length &delta;t=0.002.
+
 ## DPD program
 For testing we compare with an approximate DPD equation of state for _P_.
 

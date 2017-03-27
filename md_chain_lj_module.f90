@@ -36,14 +36,15 @@ MODULE md_module
   PUBLIC :: rattle_a, rattle_b, worst_bond, milcshake_a, milcshake_b 
 
   ! Public data
-  INTEGER,                              PUBLIC :: n ! Number of atoms
-  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r ! Positions (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v ! Velocities (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: f ! Non-bonded forces (3,n)
-  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: g ! Spring forces (3,n)
+  INTEGER,                              PUBLIC :: n     ! Number of atoms
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r     ! Positions (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: r_old ! Old positions (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: v     ! Velocities (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: f     ! Non-bonded forces (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE, PUBLIC :: g     ! Spring forces (3,n)
 
   ! Private data
-  REAL,    DIMENSION(:,:), ALLOCATABLE :: r_old, r_new               ! Old, new positions (3,n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: r_new                      ! New positions (3,n)
   LOGICAL, DIMENSION(:),   ALLOCATABLE :: move, moved                ! Iterative flags (n)
   REAL,    DIMENSION(:,:), ALLOCATABLE :: rij, rij_old, rij_new, vij ! Bond vectors etc (3,n-1)
   REAL,    DIMENSION(:),   ALLOCATABLE :: rijsq, lambda, rhs, rhsold ! Squared bond lengths, constraint equation terms (n-1)
@@ -122,6 +123,24 @@ CONTAINS
     v = v - SPREAD ( c, dim = 2, ncopies = n )
 
   END SUBROUTINE zero_cm
+
+  FUNCTION worst_bond ( bond ) RESULT ( diff_max )
+    IMPLICIT NONE
+    REAL             :: diff_max ! Returns max amount by which constraint is violated
+    REAL, INTENT(in) :: bond     ! Bond length (the same throughout the chain)
+
+    INTEGER            :: i
+    REAL               :: diff, rij_mag
+    REAL, DIMENSION(3) :: rij
+
+    diff_max = 0.0
+    DO i = 1, n-1
+       rij      = r(:,i) - r(:,i+1)      ! Current bond vector
+       rij_mag  = SQRT( SUM(rij**2) )    ! Current bond length
+       diff     = ABS ( rij_mag - bond ) ! Absolute amount by which constraint is violated
+       diff_max = MAX ( diff_max, diff ) ! Find maximum
+    END DO
+  END FUNCTION worst_bond
 
   SUBROUTINE force ( total )
     IMPLICIT NONE
@@ -215,13 +234,19 @@ CONTAINS
 
   END SUBROUTINE spring
 
-  SUBROUTINE rattle_a ( dt, bond ) ! First part of velocity Verlet algorithm with constraints
+  SUBROUTINE rattle_a ( dt, bond )
     IMPLICIT NONE
     REAL, INTENT(in) :: dt   ! Time step
     REAL, INTENT(in) :: bond ! Bond length (the same throughout the chain)
 
     ! This subroutine iteratively adjusts the positions stored in the array r
     ! and the velocities stored in the array v, to satisfy the bond constraints
+
+    ! On entry to this routine we assume:
+    ! r_old stores the positions at the start of the step
+    ! r stores the positions following the unconstrained drift and
+    ! v stores the velocities following the first unconstrained half-kick
+    ! On return from this routine, r and v will hold the constrained values
 
     REAL, DIMENSION(3) :: rij, rij_old, dr
     LOGICAL            :: done
@@ -230,11 +255,6 @@ CONTAINS
 
     REAL,    PARAMETER :: tol = 1.0e-9,  tol2 = 2.0 * tol, dot_tol = 1.0e-9
     INTEGER, PARAMETER :: iter_max = 500
-
-    r_old = r            ! Save, since constraints act along the old vectors
-
-    v = v + 0.5 * dt * f ! Kick half-step
-    r = r + dt * v       ! Drift step
 
     iter     = 0
     done     = .FALSE.
@@ -305,14 +325,17 @@ CONTAINS
     ! to satisfy the time derivatives of the bond constraints
     ! Also returns constraint contribution to virial
 
+    ! On entry to this routine we assume:
+    ! r stores the positions at the end of the step with constraints applied
+    ! v stores the velocities following the second unconstrained half-kick
+    ! On return from this routine, v will hold the constrained values
+
     REAL, DIMENSION(3) :: rij, vij, dv
     LOGICAL            :: done
     REAL               :: dot, g
     INTEGER            :: i, j, iter
     REAL,    PARAMETER :: tol = 1.0e-9,  tol2 = 2.0 * tol, dot_tol = 1.0e-9
     INTEGER, PARAMETER :: iter_max = 500
-
-    v = v + 0.5 * dt * f ! Kick half-step
 
     iter     = 0
     done     = .FALSE.
@@ -367,24 +390,6 @@ CONTAINS
 
   END SUBROUTINE rattle_b
 
-  FUNCTION worst_bond ( bond ) RESULT ( diff_max )
-    IMPLICIT NONE
-    REAL             :: diff_max ! Returns max amount by which constraint is violated
-    REAL, INTENT(in) :: bond     ! Bond length (the same throughout the chain)
-
-    INTEGER            :: i
-    REAL               :: diff, rij_mag
-    REAL, DIMENSION(3) :: rij
-
-    diff_max = 0.0
-    DO i = 1, n-1
-       rij      = r(:,i) - r(:,i+1)      ! Current bond vector
-       rij_mag  = SQRT( SUM(rij**2) )    ! Current bond length
-       diff     = ABS ( rij_mag - bond ) ! Absolute amount by which constraint is violated
-       diff_max = MAX ( diff_max, diff ) ! Find maximum
-    END DO
-  END FUNCTION worst_bond
-
   SUBROUTINE milcshake_a ( dt, bond ) ! First part of velocity Verlet algorithm with constraints
     IMPLICIT NONE
     REAL, INTENT(in) :: dt   ! Time step
@@ -396,6 +401,12 @@ CONTAINS
     ! See AG Bailey, CP Lowe, and AP Sutton, J Comput Phys, 227, 8949 (2008)
     ! and AG Bailey, CP Lowe, and AP Sutton, Comput Phys Commun, 180, 594 (2009)
 
+    ! On entry to this routine we assume:
+    ! r_old stores the positions at the start of the step
+    ! r stores the positions following the unconstrained drift and
+    ! v stores the velocities following the first unconstrained half-kick
+    ! On return from this routine, r and v will hold the constrained values
+
     INTEGER            :: iter, k
     REAL               :: max_error
     LOGICAL            :: info
@@ -404,11 +415,10 @@ CONTAINS
 
     k = n - 1 ! Number of constraints
 
-    v     = v + 0.5 * dt * f ! Kick half-step
-    r_new = r + dt * v       ! Drift step
+    r_new = r ! Saves unconstrained positions
 
-    ! Old and new (non-constrained) bond vectors
-    rij_old(:,1:k) = r    (:,1:k) - r    (:,2:n)
+    ! Old and new (unconstrained) bond vectors
+    rij_old(:,1:k) = r_old(:,1:k) - r_old(:,2:n)
     rij_new(:,1:k) = r_new(:,1:k) - r_new(:,2:n)
 
     ! Elements of tridiagonal matrix (dot products of old and new vectors)
@@ -430,12 +440,12 @@ CONTAINS
        max_error = MAXVAL ( ABS ( rijsq - bond**2 ) ) / ( 2.0*bond**2 )
        IF ( max_error <= tol ) EXIT 
 
-       ! Reset tridiagonal elements (may have been over-written by solver)
+       ! Copy tridiagonal elements (may be over-written by solver)
        dl_tmp(:) = dl(:)
        dd_tmp(:) = dd(:)
        du_tmp(:) = du(:)    
        CALL dgtsv( n-1, 1, dl_tmp, dd_tmp, du_tmp, rhs, n-1, info )              
-       lambda(:) = rhs(:)
+       lambda(:) = rhs(:) ! Store result
 
        ! Constraint effects on position from lambda multipliers
        r = r_new
@@ -477,12 +487,15 @@ CONTAINS
     ! and AG Bailey, CP Lowe, and AP Sutton, Comput Phys Commun, 180, 594 (2009)
     ! Also returns constraint contribution to virial
 
+    ! On entry to this routine we assume:
+    ! r stores the positions at the end of the step with constraints applied
+    ! v stores the velocities following the second unconstrained half-kick
+    ! On return from this routine, v will hold the constrained values
+
     INTEGER :: k
     LOGICAL :: info
 
     k = n - 1 ! Number of constraints
-
-    v = v + 0.5 * dt * f ! Kick half-step
 
     ! Relative velocities and bond vectors
     vij(:,1:k) = v(:,1:k) - v(:,2:n)
@@ -496,7 +509,7 @@ CONTAINS
     du(1:k-1) = -SUM ( rij(:,2:k)  *rij(:,1:k-1), dim=1 )       ! k-1 elements of upper-diagonal
 
     CALL dgtsv ( n-1, 1, dl, dd, du, rhs, n-1, info ) 
-    lambda(:) = rhs(:)
+    lambda(:) = rhs(:) ! Store result
 
     ! Effect of constraints on velocities
     v(:,1:k) = v(:,1:k) + SPREAD(lambda(1:k),dim=1,ncopies=3)*rij(:,1:k)
