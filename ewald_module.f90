@@ -153,8 +153,8 @@ CONTAINS
 
     ! Negative k values are complex conjugates of positive ones
     ! We do not need negative values of kx
-    eiky(:,-k:-1) = CONJG ( eiky(:,k:1:-1) )
-    eikz(:,-k:-1) = CONJG ( eikz(:,k:1:-1) )
+    eiky(:,-nk:-1) = CONJG ( eiky(:,nk:1:-1) )
+    eikz(:,-nk:-1) = CONJG ( eikz(:,nk:1:-1) )
 
     pot = 0.0
 
