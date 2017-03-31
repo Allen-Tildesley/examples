@@ -44,7 +44,7 @@ PROGRAM smc_nvt_lj
   ! For example, for Lennard-Jones, sigma = 1, epsilon = 1
 
   ! Despite the program name, there is nothing here specific to Lennard-Jones
-  ! The model is defined in md_module
+  ! The model is defined in smc_module
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
