@@ -33,16 +33,15 @@ PROGRAM t_tensor
 
   ! Forces are calculated by differentiating the T-tensor, giving the next higher rank T-tensor
   ! Torques are calculated from the angular dependence of dipole, quadrupole etc.
-  ! potential V = mu_a g_a => torque tau_a = -epsilon_abc mu_b g_c
-  ! potential V = Q_ab G_ab => torque tau_a = -2 epsilon_abc Q_bd G_cd
-  ! where abcd are Cartesian indices and epsilon is the Levi-Civita symbol
-  ! It is just necessary to identify the constants g_a, G_ab, in terms of the T tensor and the
+  ! potential V = mu_i g_i => torque tau_i = -epsilon_ijk mu_j g_k (=-cross_product)
+  ! potential V = Q_ij G_ij => torque tau_l = -2 epsilon_lij Q_ik G_jk
+  ! where ijkl are Cartesian indices and epsilon is the Levi-Civita symbol
+  ! It is just necessary to identify the constants g_i, G_ij, in terms of the T tensor and the
   ! multipole on the other molecule.
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
   USE maths_module,    ONLY : init_random_seed, random_vector, outer_product, cross_product
-  use t_tensor_module, only : t2_tensor, t3_tensor, t4_tensor, t5_tensor, contract, skew_contract
 
   IMPLICIT NONE
 
@@ -134,25 +133,25 @@ PROGRAM t_tensor
   WRITE ( unit=output_unit, fmt='(/,a)') 'Dipole-dipole'
 
   ! Calculate the dipole-dipole energy
-  g    =  contract ( tt2, mu2 ) ! Contract T2 with dipole 2
-  v12t = -contract ( mu1, g   ) ! Contract result with dipole 1
+  g    =  contract_ij_j ( tt2, mu2 ) ! Contract T2 with dipole 2
+  v12t = -contract_i_i  ( mu1, g   ) ! Contract result with dipole 1
   v12e = (mu1_mag*mu2_mag/r12_mag**3) * ( c12 - 3.0 * c1 * c2 ) ! Compare result from angles
   WRITE ( unit=output_unit, fmt='(a,t30,f12.6,t70,f12.6,t110,es10.2)' ) 'Energy =', v12t, v12e, v12t-v12e
 
   ! Calculate the dipole-dipole force
-  gg   =  contract ( tt3, mu2 ) ! Contract T3 with dipole 2
-  f12t = -contract ( gg,  mu1 ) ! Contract result with dipole 1
+  gg   =  contract_ijk_k ( tt3, mu2 ) ! Contract T3 with dipole 2
+  f12t = -contract_ij_j  ( gg,  mu1 ) ! Contract result with dipole 1
   f12e = (3.0*mu1_mag*mu2_mag/r12_mag**4) * ( (c12-5.0*c1*c2)*r12_hat + c2*e1 + c1*e2 ) ! Compare result from angles
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Force  =', f12t, f12e, f12t-f12e
 
   ! Calculate the dipole-dipole torques
-  g   = -contract ( tt2, mu2 )    ! Contract T2 with dipole 2
-  t1t = -cross_product ( mu1, g ) ! Cross-product result with dipole 1
+  g   = -contract_ij_j ( tt2, mu2 ) ! Contract T2 with dipole 2
+  t1t = -cross_product ( mu1, g   ) ! Cross-product result with dipole 1
   g   = e2 - 3.0*c2*r12_hat ! Compare result from angles
   t1e = -(mu1_mag*mu2_mag/r12_mag**3) * cross_product ( e1, g )
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Torque on 1  =', t1t, t1e, t1t-t1e
-  g   = -contract ( tt2, mu1 )    ! Contract T2 with dipole 1
-  t2t = -cross_product ( mu2, g ) ! Cross-product result with dipole 2
+  g   = -contract_ij_j ( tt2, mu1 ) ! Contract T2 with dipole 1
+  t2t = -cross_product ( mu2, g )   ! Cross-product result with dipole 2
   g   = e1 - 3.0*c1 * r12_hat ! Compare result from angles
   t2e = -(mu1_mag*mu2_mag/r12_mag**3) * cross_product ( e2, g )
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Torque on 2  =', t2t, t2e, t2t-t2e
@@ -160,14 +159,14 @@ PROGRAM t_tensor
   WRITE ( unit=output_unit, fmt='(/,a)') 'Dipole-quadrupole'
 
   ! Calculate the dipole-quadrupole energy
-  g    = contract ( tt3, quad2 )           ! Contract T3 with quadrupole 2
-  v12t = -(1.0/3.0) * contract ( mu1, g ) ! Contract result with dipole 1
+  g    = contract_ijk_jk ( tt3, quad2 )           ! Contract T3 with quadrupole 2
+  v12t = -(1.0/3.0) * contract_i_i ( mu1, g     ) ! Contract result with dipole 1
   v12e = (1.5*mu1_mag*quad2_mag/r12_mag**4) * ( c1*(1.0-5.0*c2*c2) + 2.0*c2*c12 )
   WRITE ( unit=output_unit, fmt='(a,t30,f12.6,t70,f12.6,t110,es10.2)' ) 'Energy =', v12t, v12e, v12t-v12e
 
   ! Calculate the dipole-quadrupole force
-  gg   = contract ( tt4, quad2 )           ! Contract T4 with quadrupole 2
-  f12t = -(1.0/3.0) * contract ( gg, mu1 ) ! Contract result with dipole 1
+  gg   = contract_ijkl_kl ( tt4, quad2 )        ! Contract T4 with quadrupole 2
+  f12t = -(1.0/3.0) * contract_ij_j ( gg, mu1 ) ! Contract result with dipole 1
   f12e = -(1.5*mu1_mag*quad2_mag/r12_mag**5) * ( & ! Compare result from angles
        &     ( 35.0*c1*c2**2 - 10.0*c2*c12 - 5.0*c1 ) * r12_hat  &
        &   + ( 1.0 - 5.0*c2**2 ) * e1 &
@@ -175,13 +174,14 @@ PROGRAM t_tensor
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Force  =', f12t, f12e, f12t-f12e
 
   ! Calculate the dipole-quadrupole torques
-  g   = -(1.0/3.0)*contract ( tt3, quad2 ) ! Contract T3 with quadrupole 2
-  t1t = -cross_product ( mu1, g )          ! Cross-product result with dipole 1
+  g   = -(1.0/3.0)*contract_ijk_jk ( tt3, quad2 ) ! Contract T3 with quadrupole 2
+  t1t = -cross_product ( mu1, g )                 ! Cross-product result with dipole 1
   g   =  (1.0-5.0*c2**2) * r12_hat + 2.0*c2 * e2 ! Compare result from angles
   t1e = -(1.5*mu1_mag*quad2_mag/r12_mag**4) * cross_product ( e1, g )
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Torque on 1  =', t1t, t1e, t1t-t1e
-  gg  = -(1.0/3.0)*contract ( tt3, mu1 ) ! Contract T3 with dipole 1
-  t2t = -2.0*skew_contract ( quad2, gg ) ! Skew-contract result with quadrupole 2
+  gg  = -(1.0/3.0)*contract_ijk_k ( tt3, mu1 ) ! Contract T3 with dipole 1
+  gg = contract_ik_jk ( quad2, gg )            ! Contract result with quadrupole 2
+  t2t = -2.0*skew ( gg )                       ! Contract with Levi-Civita symbol
   g   =  (c12-5.0*c1*c2) * r12_hat + c2 * e1 ! Compare result from angles
   t2e = -(3.0*mu1_mag*quad2_mag/r12_mag**4) * cross_product ( e2, g )
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Torque on 2  =', t2t, t2e, t2t-t2e
@@ -189,14 +189,14 @@ PROGRAM t_tensor
   WRITE ( unit=output_unit, fmt='(/,a)') 'Quadrupole-dipole'
 
   ! Calculate the quadrupole-dipole energy
-  g    = contract ( tt3, quad1 )           ! Contract T3 with quadrupole 1
-  v12t =  (1.0/3.0) * contract ( g, mu2 ) ! Contract result with dipole 2
+  g    = contract_ijk_jk ( tt3, quad1 )      ! Contract T3 with quadrupole 1
+  v12t = (1.0/3.0) * contract_i_i ( g, mu2 ) ! Contract result with dipole 2
   v12e = -(1.5*quad1_mag*mu2_mag/r12_mag**4) * ( c2*(1.0-5.0*c1**2) + 2.0*c1*c12 ) ! Compare result from angles
   WRITE ( unit=output_unit, fmt='(a,t30,f12.6,t70,f12.6,t110,es10.2)' ) 'Energy =', v12t, v12e, v12t-v12e
 
   ! Calculate the quadrupole-dipole force
-  gg   = contract ( tt4, quad1 )          ! Contract T4 with quadrupole 1 
-  f12t = (1.0/3.0) * contract ( gg, mu2 ) ! Contract result with dipole 2
+  gg   = contract_ijkl_kl ( tt4, quad1 )       ! Contract T4 with quadrupole 1 
+  f12t = (1.0/3.0) * contract_ij_j ( gg, mu2 ) ! Contract result with dipole 2
   f12e = (1.5*quad1_mag*mu2_mag/r12_mag**5) * ( & ! Compare result from angles
        &     ( 35.0*c2*c1**2 - 10.0*c1*c12 - 5.0*c2 ) * r12_hat  &
        &   + ( 1.0-5.0*c1**2 ) * e2 &
@@ -204,12 +204,13 @@ PROGRAM t_tensor
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Force  =', f12t, f12e, f12t-f12e
 
   ! Calculate the quadrupole-dipole torques
-  gg  = (1.0/3.0)*contract ( tt3, mu2 )  ! Contract T3 with dipole 2
-  t1t = -2.0*skew_contract ( quad1, gg ) ! Skew-contract result with quadrupole 1
+  gg  = (1.0/3.0)*contract_ijk_k ( tt3, mu2 ) ! Contract T3 with dipole 2
+  gg  = contract_ik_jk ( quad1, gg )          ! Contract result with quadrupole 1
+  t1t = -2.0*skew ( gg )                      ! Contract with Levi-Civita symbol
   g   = (c12-5.0*c1*c2) * r12_hat + c1 * e2 ! Compare result from angles
   t1e = (3.0*quad1_mag*mu2_mag/r12_mag**4) * cross_product ( e1, g )
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Torque on 1  =', t1t, t1e, t1t-t1e
-  g   = (1.0/3.0)*contract ( tt3, quad1 ) ! Contract T3 with quadrupole 1
+  g   = (1.0/3.0)*contract_ijk_jk ( tt3, quad1 ) ! Contract T3 with quadrupole 1
   t2t = -cross_product ( mu2, g )         ! Cross product result with dipole 2
   g   = (1.0-5.0*c1**2) * r12_hat + 2.0*c1 * e1 ! Compare result from angles
   t2e = (1.5*quad1_mag*mu2_mag/r12_mag**4) * cross_product ( e2, g )
@@ -218,15 +219,15 @@ PROGRAM t_tensor
   WRITE ( unit=output_unit, fmt='(/,a)') 'Quadrupole-quadrupole'
 
   ! Calculate the quadrupole-quadrupole energy
-  gg   = contract ( tt4, quad2 )            ! Contract T4 with quadrupole 2
-  v12t = (1.0/9.0) * contract ( quad1, gg ) ! Contract result with quadrupole 1
+  gg   = contract_ijkl_kl ( tt4, quad2 )          ! Contract T4 with quadrupole 2
+  v12t = (1.0/9.0) * contract_ij_ij ( quad1, gg ) ! Contract result with quadrupole 1
   v12e = (0.75*quad1_mag*quad2_mag/r12_mag**5) * ( & ! Compare result from angles
        &    1.0 - 5.0*c1**2 - 5.0*c2**2 + 2.0*c12**2 + 35.0*(c1*c2)**2 - 20.0*c1*c2*c12 )
   WRITE ( unit=output_unit, fmt='(a,t30,f12.6,t70,f12.6,t110,es10.2)' ) 'Energy =', v12t, v12e, v12t-v12e
 
   ! Calculate the quadrupole-quadrupole force
-  ggg  = contract ( tt5, quad2 )             ! Contract T5 with quadrupole 2
-  f12t = (1.0/9.0) * contract ( ggg, quad1 ) ! Contract result with quadrupole 1
+  ggg  = contract_ijklm_lm ( tt5, quad2 )           ! Contract T5 with quadrupole 2
+  f12t = (1.0/9.0) * contract_ijk_jk ( ggg, quad1 ) ! Contract result with quadrupole 1
   f12e = (0.75*quad1_mag*quad2_mag/r12_mag**6) * ( & ! Compare result from angles
        &    ( 5.0 - 35.0*c1**2 - 35.0*c2**2 + 10.0*c12**2 + 315.0*(c1*c2)**2 - 140.0*c1*c2*c12 ) * r12_hat  &
        &  + ( 10.0*c1 - 70.0*c1*c2**2 + 20.0*c2*c12 ) * e1 &
@@ -234,15 +235,261 @@ PROGRAM t_tensor
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Force  =', f12t, f12e, f12t-f12e
 
   ! Calculate the quadrupole-quadrupole torques
-  gg  = (1.0/9.0)*contract ( tt4, quad2 ) ! Contract T4 with quadrupole 2
-  t1t = -2.0*skew_contract(quad1, gg)     ! Skew-contract result with quadrupole 1
+  gg  = (1.0/9.0)*contract_ijkl_kl ( tt4, quad2 ) ! Contract T4 with quadrupole 2
+  gg  = contract_ik_jk(quad1, gg)                 ! Contract result with quadrupole 1
+  t1t = -2.0*skew ( gg )                          ! Contract with Levi-Civita symbol
   g   = 2.5*(c1*(7.0*c2**2-1.0)-2.0*c2*c12) * r12_hat - (5.0*c1*c2-c12) * e2 ! Compare result from angles
   t1e = -(3.0*quad1_mag*quad2_mag/r12_mag**5) * cross_product ( e1, g )
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Torque on 1  =', t1t, t1e, t1t-t1e
-  gg  = (1.0/9.0)*contract ( tt4, quad1 ) ! Contract T4 with quadrupole 1
-  t2t = -2.0*skew_contract(quad2, gg)     ! Skew-contract result with quadrupole 2
+  gg  = (1.0/9.0)*contract_ijkl_kl ( tt4, quad1 ) ! Contract T4 with quadrupole 1
+  gg  = contract_ik_jk(quad2, gg)                 ! Contract result with quadrupole 2
+  t2t = -2.0*skew ( gg )                          ! Contract with Levi-Civita symbol
   g   = 2.5*(c2*(7.0*c1**2-1.0)-2.0*c1*c12) * r12_hat -(5.0*c1*c2-c12) * e1 ! Compare result from angles
   t2e = -(3.0*quad1_mag*quad2_mag/r12_mag**5) * cross_product ( e2, g )
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Torque on 2  =', t2t, t2e, t2t-t2e
+CONTAINS
+
+  FUNCTION t2_tensor ( r, r3 ) RESULT ( t2 )
+    IMPLICIT NONE
+    REAL, DIMENSION(3,3)              :: t2 ! Returns second-rank 3x3 interaction tensor
+    REAL, DIMENSION(3),   INTENT(in)  :: r  ! Unit vector from 2 to 1
+    REAL,                 INTENT(in)  :: r3 ! Third power of the modulus of r12
+
+    INTEGER :: i
+
+    t2 = 3.0 * outer_product ( r, r ) ! Starting point
+
+    FORALL (i=1:3) t2(i,i) = t2(i,i) - 1.0 ! Make traceless
+
+    t2 = t2 / r3 ! Scale by third power of distance
+
+  END FUNCTION t2_tensor
+
+  FUNCTION t3_tensor ( r, r4 ) RESULT ( t3 )
+    IMPLICIT NONE
+    REAL, DIMENSION(3,3,3)              :: t3 ! Returns third-rank 3x3x3 interaction tensor (note positive sign)
+    REAL, DIMENSION(3),     INTENT(in)  :: r  ! Unit vector from 2 to 1
+    REAL,                   INTENT(in)  :: r4 ! Fourth power of the modulus of r12
+
+    INTEGER :: i, j
+
+    t3 = 15.0 * outer_product ( r, r, r ) ! Starting point
+
+    DO i = 1, 3
+
+       t3(i,i,i) = t3(i,i,i) - 9.0 * r(i) ! Correction for all indices the same
+
+       DO j = 1, 3
+          IF ( j == i ) CYCLE
+          t3(i,i,j) = t3(i,i,j) - 3.0 * r(j) ! Correction for two indices the same
+          t3(i,j,i) = t3(i,j,i) - 3.0 * r(j) ! Correction for two indices the same
+          t3(j,i,i) = t3(j,i,i) - 3.0 * r(j) ! Correction for two indices the same
+       END DO
+
+    END DO
+
+    t3 = t3 / r4 ! Scale by fourth power of distance
+
+  END FUNCTION t3_tensor
+
+  FUNCTION t4_tensor ( r, r5 ) RESULT ( t4 )
+    IMPLICIT NONE
+    REAL, DIMENSION(3,3,3,3)            :: t4 ! Returns fourth-rank 3x3x3x3 interaction tensor
+    REAL, DIMENSION(3),     INTENT(in)  :: r  ! Unit vector from 2 to 1
+    REAL,                   INTENT(in)  :: r5 ! Fifth power of the modulus of r12
+
+    INTEGER :: i, j, k, l
+
+    ! Define 3x3 unit matrix or Kronecker delta
+    REAL, DIMENSION(3,3), PARAMETER :: u = RESHAPE([ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0 ],[3,3])
+
+    t4 = 105.0 * outer_product ( r, r, r, r ) ! Starting point
+
+    DO i = 1, 3
+       DO j = 1, 3
+          DO k = 1, 3
+             DO l = 1, 3
+                t4(i,j,k,l) = t4(i,j,k,l) - 15.0 * ( &
+                     &   r(i) * r(j) * u(k,l) + r(i) * r(k) * u(j,l) &
+                     & + r(i) * r(l) * u(j,k) + r(j) * r(k) * u(i,l) &
+                     & + r(j) * r(l) * u(i,k) + r(k) * r(l) * u(i,j) ) &
+                     & + 3.0 * ( u(i,j) * u(k,l) + u(i,k) * u(j,l) + u(i,l) * u(j,k) )
+             END DO
+          END DO
+       END DO
+    END DO
+
+    t4 = t4 / r5 ! Scale by fifth power of distance
+
+  END FUNCTION t4_tensor
+
+  FUNCTION t5_tensor ( r, r6 ) RESULT ( t5 )
+    IMPLICIT NONE
+    REAL, DIMENSION(3,3,3,3,3)          :: t5 ! Returns fifth-rank 3x3x3x3X3 interaction tensor
+    REAL, DIMENSION(3),     INTENT(in)  :: r  ! Unit vector from 2 to 1
+    REAL,                   INTENT(in)  :: r6 ! Sixth power of the modulus of r12
+
+    INTEGER :: i, j, k, l, m
+
+    ! Define 3x3 unit matrix or Kronecker delta
+    REAL, DIMENSION(3,3), PARAMETER :: u = RESHAPE([ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0 ],[3,3])
+
+    t5 = 945.0 * outer_product ( r, r, r, r, r ) ! Starting point
+
+    DO i = 1, 3
+       DO j = 1, 3
+          DO k = 1, 3
+             DO l = 1, 3
+                DO m = 1, 3
+                   t5(i,j,k,l,m) = t5(i,j,k,l,m) - 105.0 * ( &
+                        &   r(i) * r(j) * r(k) * u(l,m) + r(i) * r(j) * r(l) * u(k,m)     &
+                        & + r(i) * r(j) * r(m) * u(k,l) + r(i) * r(k) * r(l) * u(j,m)     &
+                        & + r(i) * r(k) * r(m) * u(j,l) + r(i) * r(l) * r(m) * u(j,k)     &
+                        & + r(j) * r(k) * r(l) * u(i,m) + r(j) * r(k) * r(m) * u(i,l)     &
+                        & + r(j) * r(l) * r(m) * u(i,k) + r(k) * r(l) * r(m) * u(i,j) )   &
+                        & + 15.0 * ( &
+                        &   r(i) * ( u(j,k) * u(l,m) + u(j,l) * u(k,m) + u(j,m) * u(k,l) ) &
+                        & + r(j) * ( u(i,k) * u(l,m) + u(i,l) * u(k,m) + u(i,m) * u(k,l) ) &
+                        & + r(k) * ( u(i,j) * u(l,m) + u(i,l) * u(j,m) + u(i,m) * u(j,l) ) &
+                        & + r(l) * ( u(i,j) * u(k,m) + u(i,k) * u(j,m) + u(i,m) * u(j,k) ) &
+                        & + r(m) * ( u(i,j) * u(k,l) + u(i,k) * u(j,l) + u(i,l) * u(j,k) ) )
+                END DO
+             END DO
+          END DO
+       END DO
+    END DO
+
+    t5 = t5 / r6 ! Scale by sixth power of distance
+
+  END FUNCTION t5_tensor
+
+  FUNCTION contract_i_i ( a, b ) RESULT (c)
+    IMPLICIT NONE
+    REAL                           :: c ! Returns a zero-rank contraction
+    REAL, DIMENSION(3), INTENT(in) :: a ! of a first-rank tensor
+    REAL, DIMENSION(3), INTENT(in) :: b ! with a first-rank tensor
+
+    ! Sum over index i, equivalent to built-in dot_product
+    c = DOT_PRODUCT ( a, b )
+
+  END FUNCTION contract_i_i
+
+  FUNCTION contract_ij_j ( a, b ) RESULT (c)
+    IMPLICIT NONE
+    REAL, DIMENSION(3)                :: c ! Returns a first-rank contraction
+    REAL, DIMENSION(3,3), INTENT(in)  :: a ! of a second-rank tensor
+    REAL, DIMENSION(3),   INTENT(in)  :: b ! with a first-rank tensor
+
+    ! Free index i, sum over index j, equivalent to built-in mat_mul
+    c = MATMUL ( a, b )
+
+  END FUNCTION contract_ij_j
+
+  FUNCTION contract_ij_ij ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL                              :: c ! Returns a zero-rank contraction
+    REAL, DIMENSION(3,3), INTENT(in)  :: a ! of a second-rank tensor
+    REAL, DIMENSION(3,3), INTENT(in)  :: b ! with another second-rank tensor
+
+    ! Sum over indices i, j
+    c = SUM ( a * b )
+
+  END FUNCTION contract_ij_ij
+
+  FUNCTION contract_ik_jk ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL, DIMENSION(3,3)             :: c ! Returns a second-rank contraction
+    REAL, DIMENSION(3,3), INTENT(in) :: a ! of a second-rank tensor
+    REAL, DIMENSION(3,3), INTENT(in) :: b ! with another second-rank tensor
+    INTEGER :: i, j
+
+    ! Free indices i, j, sum over index k (if b symmetric, would be equivalent to built-in matmal)
+    DO i = 1, 3
+       DO j = 1, 3
+          c(i,j) = SUM ( a(i,:) * b(j,:) )
+       END DO
+    END DO
+
+  END FUNCTION contract_ik_jk
+
+  FUNCTION contract_ijk_k ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL, DIMENSION(3,3)                :: c ! Returns a second-rank contraction of 
+    REAL, DIMENSION(3,3,3), INTENT(in)  :: a ! a third-rank tensor
+    REAL, DIMENSION(3),     INTENT(in)  :: b ! and a first-rank tensor
+
+    INTEGER :: i, j
+
+    ! Free indices i, j, sum over index k.
+    DO i = 1, 3
+       DO j = 1, 3
+          c(i,j) = SUM ( a(i,j,:) * b(:) )
+       END DO
+    END DO
+
+  END FUNCTION contract_ijk_k
+
+  FUNCTION contract_ijk_jk ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL, DIMENSION(3)                  :: c ! Returns a first-rank contraction of 
+    REAL, DIMENSION(3,3,3), INTENT(in)  :: a ! a third-rank tensor
+    REAL, DIMENSION(3,3),   INTENT(in)  :: b ! and a second-rank tensor
+
+    INTEGER :: i
+
+    ! Free index i, sum over indices j, k.
+    DO i = 1, 3
+       c(i) = SUM ( a(i,:,:) * b(:,:) ) 
+    END DO
+
+  END FUNCTION contract_ijk_jk
+
+  FUNCTION contract_ijkl_kl ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL, DIMENSION(3,3)                 :: c ! Returns a second-rank contraction of 
+    REAL, DIMENSION(3,3,3,3), INTENT(in) :: a ! a fourth-rank tensor
+    REAL, DIMENSION(3,3),     INTENT(in) :: b ! and a second-rank tensor
+
+    INTEGER :: i, j 
+
+    ! Free indices i,j, sum over indices k, l
+    DO i = 1, 3
+       DO j = 1, 3
+          c(i,j) = SUM ( a(i,j,:,:) * b(:,:) ) 
+       END DO
+    END DO
+
+  END FUNCTION contract_ijkl_kl
+
+  FUNCTION contract_ijklm_lm ( a, b ) RESULT ( c )
+    IMPLICIT NONE
+    REAL, DIMENSION(3,3,3)                 :: c ! Returns a third-rank contraction of 
+    REAL, DIMENSION(3,3,3,3,3), INTENT(in) :: a ! a fifth-rank tensor
+    REAL, DIMENSION(3,3),   INTENT(in)     :: b ! and a second-rank tensor
+
+    INTEGER :: i, j, k
+
+    ! Free indices i,j,k, sum over indices l, m
+    DO i = 1, 3
+       DO j = 1, 3
+          DO k = 1, 3
+             c(i,j,k) = SUM ( a(i,j,k,:,:) * b(:,:) )
+          END DO
+       END DO
+    END DO
+
+  END FUNCTION contract_ijklm_lm
+
+  FUNCTION skew ( a ) RESULT ( b )
+
+    IMPLICIT NONE
+    REAL, DIMENSION(3)   :: b ! Returns a first-rank tensor by contracting the Levi-Civita symbol with
+    REAL, DIMENSION(3,3) :: a ! a second-rank tensor
+
+    b(1) = a(2,3) - a(3,2)
+    b(2) = a(3,1) - a(1,3)
+    b(3) = a(1,2) - a(2,1)
+
+  END FUNCTION skew
 
 END PROGRAM t_tensor
