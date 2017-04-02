@@ -208,7 +208,7 @@ for blk in range(1,nblock+1): # Loop over blocks
             n_move = 0
 
             for i in range(n): # Loop over atoms
-                r_old = r[i,:] # Store old position of this atom
+                r_old = r[i,:].copy() # Store old position of this atom
                 rj = np.delete(r,i,0) # Array of all the other atoms
                 partial_old, f_old = force_1 ( r[i,:], box, r_cut, rj, fast ) # Old forces, pot etc
                 assert not partial_old.ovr, 'Overlap in current configuration'
