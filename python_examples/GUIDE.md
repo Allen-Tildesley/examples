@@ -308,12 +308,23 @@ within a specified range of separations,
 and some of the contributions to the electrostatic energies and forces are calculated.
 The program may be run using an empty input record `{}`,
 so as to take the program defaults,
-or various parameters may be specified.
+or various parameters may be specified using JSON format.
+
 Several of the tensor manipulations are neatly expressed using NumPy library functions
 such as `outer` (outer product) and `einsum` (Einstein summation).
 
-* How easy would it be to add quadrupole-quadrupole energy, quadrupole-dipole forces,
-quadrupole-quadrupole forces, and all the torques, calculated both ways??
+The force between the molecules is calculated from the analytical derivative of the
+T-tensor with respect to the separation vector.
+This naturally leads to formulae where the original T-tensor of rank n
+is replaced by one of rank n+1.
+
+The torque on each molecule is calculated by formulae similar to those used for
+torques on multipoles in an external field, field gradient, etc., but in which the
+field terms are replaced by tensors based on T and the multipoles on the other molecule.
+This naturally leads to formulae involving the Levi-Civita (antisymmetric) symbol.
+
+In practical applications, the formulae would usually be incorporated in a scheme
+for handling long-range forces in periodic boundaries (e.g. Ewald sum).
 
 ## Correlation function program
 The aim of the program `corfun` is to illustrate the direct method, and the FFT method,

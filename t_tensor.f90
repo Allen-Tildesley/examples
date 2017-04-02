@@ -247,6 +247,7 @@ PROGRAM t_tensor
   g   = 2.5*(c2*(7.0*c1**2-1.0)-2.0*c1*c12) * r12_hat -(5.0*c1*c2-c12) * e1 ! Compare result from angles
   t2e = -(3.0*quad1_mag*quad2_mag/r12_mag**5) * cross_product ( e2, g )
   WRITE ( unit=output_unit, fmt='(a,t30,3f12.6,t70,3f12.6,t110,3es10.2)' ) 'Torque on 2  =', t2t, t2e, t2t-t2e
+
 CONTAINS
 
   FUNCTION t2_tensor ( r, r3 ) RESULT ( t2 )
