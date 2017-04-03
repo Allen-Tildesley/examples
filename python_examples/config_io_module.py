@@ -30,48 +30,98 @@ def read_cnf_atoms ( filename, with_v=False ):
     """Read in atomic configuration."""
     
     import numpy as np
-    import sys
+    
     with open(filename,"r") as f:
         n=int(f.readline()) # Number of atoms
         box=float(f.readline()) # Simulation box length (assumed cubic)
     rv=np.loadtxt(filename,skiprows=2) # The rest of the file should be uniformly formatted
     rows, cols = rv.shape
-    if rows != n:
-        print("{}{:5}{}{:5}".format('Number of rows',rows,' not equal to',n))
-        sys.exit()
-    if cols < 3:
-        print("{}{:5}{}".format('Number of cols',cols,' less than 3'))
-        sys.exit()
+    assert rows == n, "{:d}{}{:d}".format(rows,' rows not equal to ',n)
+    assert cols >= 3, "{:d}{}".format(cols,' cols less than 3')
     r = rv[:,0:3].astype(np.float_) # Coordinate array
     if with_v:
-        if cols < 6:
-            print("{}{:5}{}".format('Number of cols',cols,' less than 6'))
-            sys.exit()
+        assert cols >= 6, "{:d}{}".format(cols,' cols less than 6')
         v = rv[:,3:6].astype(np.float_) # Velocity array
         return n, box, r, v
     else:
         return n, box, r
 
-def write_cnf_atoms ( filename, n, box, *args ):
+def read_cnf_mols ( filename, with_v=False, quaternions=False ):
+    """Read in molecular configuration."""
+    
+    import numpy as np
+    
+    with open(filename,"r") as f:
+        n=int(f.readline()) # Number of atoms
+        box=float(f.readline()) # Simulation box length (assumed cubic)
+    revw=np.loadtxt(filename,skiprows=2) # The rest of the file should be uniformly formatted
+    rows, cols = revw.shape
+    assert rows == n, "{:d}{}{:d}".format(rows,' rows not equal to ',n)
+    cols_re = 7 if quaternions else 6
+    assert cols >= cols_re, "{:d}{}{:d}".format(cols,' cols less than ',cols_re)
+    r = revw[:,0:3].astype(np.float_) # Coordinate array
+    e = revw[:,3:cols_re].astype(np.float_) # Orientation array
+    if with_v:
+        assert cols >= cols_re+6, "{:d}{}{:d}".format(cols,' cols less than',cols_re+6)
+        v = revw[:,cols_re  :cols_re+3].astype(np.float_) # Velocity array
+        w = revw[:,cols_re+3:cols_re+6].astype(np.float_) # Angular velocity array
+        return n, box, r, e, v, w
+    else:
+        return n, box, r, e
+
+def write_cnf_atoms ( filename, nn, box, *args ):
     """Write out atomic configuration."""
 
     import numpy as np
-    import sys
 
     nargs=len(args)
-    assert nargs>0, "No array arguments supplied in write_cnf_atoms"
-    assert args[0].shape[0]==n, "r shape mismatch {:5d}{:5d}".format(n,args[0].shape[0])
-    assert args[0].shape[1]==3, "r shape mismatch {:5d}{:5d}".format(3,args[0].shape[1])
-    if nargs==1:
-        rv=args[0] # Just r
-    elif nargs==2:
-        assert args[1].shape[0]==n, "v shape mismatch {:5d}{:5d}".format(n,args[1].shape[0])
-        assert args[1].shape[1]==3, "v shape mismatch {:5d}{:5d}".format(3,args[1].shape[1])
-        rv=np.concatenate((args[0],args[1]),axis=1) # Both r and v
-    else:
-        print('Too many array arguments in write_cnf_atoms')
-        sys.exit()
+    assert nargs==1 or nargs==2, "{}{:d}".format('Wrong number of arguments ',nargs)
 
-    my_header="{:15d}\n{:15.8f}".format(n,box)
-    np.savetxt(filename,rv,header=my_header,fmt='%15.10f',comments='')
-    
+    my_header="{:15d}\n{:15.8f}".format(nn,box)
+
+    n, d = args[0].shape
+    assert n==nn, "r shape mismatch {:d}{:d}".format(n,nn)
+    assert d==3,  "r shape mismatch {:d}".format(d)
+
+    if nargs==1: # Positions only
+        r=args[0] # Just r
+        np.savetxt(filename,r,header=my_header,fmt='%15.10f',comments='')
+
+    else: # Positions and velocities
+        n, d = args[1].shape
+        assert n==nn, "v shape mismatch {:d}{:d}".format(n,nn)
+        assert d==3, "v shape mismatch {:d}".format(d)
+        rv=np.concatenate((args[0],args[1]),axis=1) # Both r and v
+        np.savetxt(filename,rv,header=my_header,fmt='%15.10f',comments='')
+
+def write_cnf_mols ( filename, nn, box, *args ):
+    """Write out molecular configuration."""
+
+    import numpy as np
+
+    nargs=len(args)
+    assert nargs==2 or nargs==4, "{}{:d}".format('Wrong number of arguments ',nargs)
+
+    my_header="{:15d}\n{:15.8f}".format(nn,box)
+
+    n, d = args[0].shape # Positions
+    assert n==nn, "r shape mismatch {:d}{:d}".format(n,nn)
+    assert d==3,  "r shape mismatch {:d}".format(d)
+
+    n, d = args[1].shape # Orientations: vectors or quaternions
+    assert n==nn, "e shape mismatch {:d}{:d}".format(n,nn)
+    assert d==3 or d==4, "e shape mismatch {:d}".format(d)
+
+    if nargs==2: # Positions and orientations
+        re=np.concatenate((args[0],args[1]),axis=1) # Just r and e
+        np.savetxt(filename,re,header=my_header,fmt='%15.10f',comments='')
+
+    else: # Positions, orientations, velocities and angular velocities
+        n, d = args[2].shape
+        assert n==nn, "v shape mismatch {:d}{:d}".format(n,nn)
+        assert d==3, "v shape mismatch {:d}".format(d)
+        n, d = args[3].shape
+        assert n==nn, "w shape mismatch {:d}{:d}".format(n,nn)
+        assert d==3, "w shape mismatch {:d}".format(d)
+        revw=np.concatenate((args[0],args[1],args[2],args[3]),axis=1) # All of r, e, v and w
+        np.savetxt(filename,revw,header=my_header,fmt='%15.10f',comments='')

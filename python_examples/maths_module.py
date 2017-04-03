@@ -44,6 +44,52 @@ def random_vector():
 
     return np.array ( ( s*np.cos(phi), s*np.sin(phi), c ), dtype=np.float_ ) # Random unit vector
 
+def random_perpendicular_vector ( old ):
+    """Returns a uniformly sampled unit vector perpendicular to the old vector.""" 
+
+    import numpy as np
+    
+    # Note that we do not require the reference vector to be of unit length
+    # However we do require its length to be greater than a small tolerance!
+
+    tol = 1.e-6
+
+    assert old.size==3, 'Error in old vector dimension'
+    norm = np.sum ( old**2 ) # Old squared length
+    assert norm>tol, "{}{:15.3e}{:15.3e}".format('old normalization error', norm, tol)
+    n = old / np.sqrt(norm) # Normalized old vector
+
+    while True: # Loop until generated vector is not too small
+       e    = random_vector () # Randomly oriented unit vector
+       proj = np.dot ( e, n )  # Projection along old
+       e    = e - proj * n     # Make e perpendicular to old
+       norm = np.sum ( e**2 )  # Squared length
+       if norm > tol:          # Accept, unless e is too small (which is unlikely)
+           break
+
+    e = e / np.sqrt ( norm ) # Normalize
+    return e
+
+def random_quaternion():
+    """Returns a random unit quaternion as a numpy array of 4 elements."""
+
+    import numpy as np
+    
+    while True: # Loop until within unit disk
+        zeta = 2.0*np.random.rand(2) - 1.0 # Two uniform random numbers between -1 and 1
+        norm1 = np.sum ( zeta**2 )         # Squared magnitude
+        if norm1 < 1.0:                    # Test for within unit disk
+            break
+
+    while True: # Loop until within unit disk
+        beta = 2.0*np.random.rand(2) - 1.0 # Two uniform random numbers between -1 and 1
+        norm2 = np.sum ( beta**2 )         # Squared magnitude
+        if norm2 < 1.0:                    # Test for within unit disk
+            break
+
+    f = np.sqrt ( ( 1.0 - norm1 ) / norm2 )
+    return np.array ( ( zeta[0], zeta[1], beta[0]*f, beta[1]*f ), dtype=np.float_ ) # Random quaternion
+
 def random_translate_vector ( dr_max, old ):
     """Returns a vector translated by a random amount."""
 
