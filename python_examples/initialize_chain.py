@@ -106,11 +106,11 @@ def initialize_velocities ( nn, temperature, r ):
     for i in range(n):
         inertia = inertia - np.outer ( r[i,:], r[i,:] )
         for xyz in range(3):
-            inertia[xyz,xyz] = inertia[xyz,xyz] - np.dot ( r[i,:], r[i,:] )
+            inertia[xyz,xyz] = inertia[xyz,xyz] + np.dot ( r[i,:], r[i,:] )
 
     # Solve linear system to get angular velocity
     ang_vel = la.solve(inertia,ang_mom)
-    
+
     # Remove angular momentum
     v = v - np.cross ( ang_vel, r )
 
