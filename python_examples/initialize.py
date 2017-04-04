@@ -76,7 +76,7 @@ def initialize_random ( n, box, length, soft, quaternions ):
     # Unlikely to be useful, unless the interaction potential is soft
     # or the density rather low
 
-    iter_max = 1000 # Max random placement iterations
+    iter_max = 10000 # Max random placement iterations
 
     print('Random positions')
 

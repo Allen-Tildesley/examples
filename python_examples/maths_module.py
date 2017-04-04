@@ -101,6 +101,27 @@ def random_translate_vector ( dr_max, old ):
     zeta = 2.0*zeta - 1.0      # Now in range (-1,+1)
     return old + zeta * dr_max # Move to new position
 
+def random_rotate_vector ( angle_max, old ):
+    """Returns a vector rotated by a small amount relative to the old one."""
+
+    import numpy as np
+    
+    # A small randomly chosen vector is added to the old one, and the result renormalized
+    # Provided angle_max is << 1, it is approximately the maximum rotation angle (in radians)
+    # The magnitude of the rotation is not uniformly sampled, but this should not matter
+
+    # Note that the old vector should be normalized and we test for this
+
+    tol = 1.e-6
+
+    norm = np.sum ( old**2 ) # Old squared length
+    assert np.fabs ( norm - 1.0 ) < tol, "{}{:20.8e}{:20.8e}".format('old normalization error', norm, tol)
+
+    # Choose new orientation by adding random small vector
+    e    = old + angle_max * random_vector ()
+    norm = np.sum ( e**2 )
+    return e / np.sqrt(norm) # Normalize
+
 def metropolis ( delta ):
     """Conduct Metropolis test, with safeguards."""
 
@@ -141,3 +162,28 @@ def rotate_vector ( angle, axis, old ):
     e = c * old + ( 1.0 - c ) * proj * axis + s * np.cross ( axis, old )
 
     return e
+
+def nematic_order ( e ):
+    """Returns a nematic orientational order parameter."""
+
+    import numpy as np
+    
+    # Calculate the nematic order parameter <P2(cos(theta))>
+    # where theta is the angle between a molecular axis and the director
+    # which is the direction that maximises the order parameter
+    # This is obtained by finding the largest eigenvalue of
+    # the 3x3 second-rank traceless order tensor
+
+    # Note that this is not the same as the order parameter characterizing a crystal
+
+    n, d = e.shape
+    assert d==3, 'Error in e dimension '
+
+    # Order tensor: outer product of each orientation vector, summed over n molecules
+    q = np.sum ( e[:,:,np.newaxis]*e[:,np.newaxis,:], axis=0)
+    q = 1.5 * q / n                # Normalize
+    for i in range(3):
+        q[i,i] = q[i,i] - 0.5 # Make traceless
+
+    evals = np.linalg.eigvalsh(q)
+    return evals[2]

@@ -24,7 +24,7 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Overlap and move routines for MC simulation, LJ potential. Fast and slow versions."""
+"""Overlap and move routines for MC simulation, hard spheres. Fast and slow versions."""
 
 def introduction():
     """Prints out introductory statements at start of run."""
