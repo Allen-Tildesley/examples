@@ -40,6 +40,9 @@
 # It is just necessary to identify the constants g_i, G_ij, in terms of the T tensor and the
 # multipole on the other molecule.
 
+# NB in the text, eqn (1.15), the signs of the odd-rank terms in the energy are wrong.
+# See https://github.com/Allen-Tildesley/corrections. The correct formulae are used here.
+
 def t2_tensor ( r, r3 ):
     """Returns second-rank 3x3 interaction tensor.
 
