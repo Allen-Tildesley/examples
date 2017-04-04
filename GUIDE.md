@@ -18,7 +18,7 @@ The program `md_nve_lj_vl` expects the input file to contain a second namelist,
 See the file `verlet_list_module.f90` for details.
 
 ## Initial Configuration
-Simulation runs require a starting configuration which can usually be prepared using
+Simulation runs for bulk liquids require a starting configuration which can usually be prepared using
 the `initialize` program (built, by the default SConstruct file, in `build_initialize/`).
 The default parameters produce an FCC configuration of 256 atoms at reduced density &rho;=0.75,
 writing out just the positions (for an MC program) to a file `cnf.inp`.
@@ -30,6 +30,9 @@ The `cnf.inp` file may then be copied to the directory in which the run is carri
 Typically, runs produce a final configuration `cnf.out`
 (which may be renamed to `cnf.inp` as a starting point for further runs)
 and intermediate configurations `cnf.001`, `cnf.002` etc during the run.
+
+Some of the programs simulate a single chain of atoms, without periodic boundary conditions.
+Initial configurations for these may be prepared using the `initialize_chain` program.
 
 A utility program,
 `adjust` takes in an MC or MD configuration and
@@ -376,7 +379,7 @@ of cylinder length _L_ and diameter _D_:
 In preparing configurations for these programs,
 one must not allow overlap between the hard particles.
 A simple approach is to
-run `initialize` with `molecules="linear", random_positions=.t.`,
+run `initialize` with `molecules="linear", lattice=.false.`,
 and to request a very low density.
 For the default `length=5` spherocylinders
 (_L_=5, _D_=1) a value of `density=0.05` is suitable.
@@ -456,7 +459,7 @@ and the latter appearing in Rosenbluth weights,
 which govern the acceptance/rejection of moves.
 For comparison with the paper of Calvo, Doye and Wales, _J Chem Phys,_ __116,__ 2642 (2002),
 test runs were carried out using _N_=13 atoms, a bond length of 1.122462&sigma;
-(prepared using `initialize` with random non-overlapping atom positions)
+(prepared using `initialize_chain` with random non-overlapping atom positions)
 and a rather low spring potential _k_<sub>spring</sub>=20.
 We only use CBMC moves in this code: for a practical application it would be advisable
 to include other kinds of move, for example crankshaft, pivot, and bridging moves.
@@ -579,7 +582,7 @@ In a practical application it would be advisable to include some bridging moves 
 Reasonably long chains have been studied by Taylor, Paul and Binder, _J Chem Phys,_ __131,__ 114907 (2009),
 who provide references to earlier simulation work, as well as exact results for very short chains.
 Here we choose _N_=13, bond length equal to &sigma;, and a nonbonded interaction range of 1.5&sigma;.
-The starting chain configuration can be prepared using `initialize` in the usual way.
+The starting chain configuration can be prepared using `initialize_chain` in the usual way.
 
 As a reference for comparison, we ran a set of canonical ensemble calculations with `mc_chain_nvt_sw`.
 The program default is to run for 10 blocks, each of 100000 steps;
@@ -707,7 +710,7 @@ but I cannot give this a high priority.
 For the `dpd` example, we recommend generating an initial configuration
 using the `initialize` program, with namelist input similar to the following
 ```
-&nml n = 100, density = 3.0, random_positions = .true.,
+&nml n = 100, density = 3.0, lattice = .false.,
 velocities = .true., soft=.true. /
 ```
 The above value of the density is typical when using this method to model water.
@@ -785,7 +788,7 @@ This naturally leads to formulae where the original T-tensor of rank n
 is replaced by one of rank n+1.
 
 The torque on each molecule is calculated by formulae similar to those used for
-torques on multipoles in an external field, field gradient, etc., but in which the 
+torques on multipoles in an external field, field gradient, etc., but in which the
 field terms are replaced by tensors based on T and the multipoles on the other molecule.
 This naturally leads to formulae involving the Levi-Civita (antisymmetric) symbol.
 

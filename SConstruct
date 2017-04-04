@@ -30,21 +30,23 @@ env_omp.Append(F90FLAGS=OMP_F90FLAGS,LINKFLAGS=OMP_LINKFLAGS,FORTRANMODDIRPREFIX
 
 utilities=['config_io_module.f90','averages_module.f90','maths_module.f90']
 utnomaths=['config_io_module.f90','averages_module.f90']
+utnoavrgs=['config_io_module.f90','maths_module.f90']
 variants={}
-variants['build_adjust']               = (['adjust.f90','config_io_module.f90','maths_module.f90'],env_normal)
+variants['build_adjust']               = (['adjust.f90']+utnoavrgs,env_normal)
 variants['build_bd_nvt_lj']            = (['bd_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
 variants['build_dpd']                  = (['dpd.f90','dpd_module.f90']+utilities,env_normal)
 variants['build_cluster']              = (['cluster.f90','config_io_module.f90'],env_normal)
 variants['build_corfun']               = (['corfun.f90','maths_module.f90'],env_fftw)
 variants['build_diffusion']            = (['diffusion.f90','config_io_module.f90'],env_normal)
-variants['build_diffusion_test']       = (['diffusion_test.f90','config_io_module.f90','maths_module.f90'],env_normal)
+variants['build_diffusion_test']       = (['diffusion_test.f90']+utnoavrgs,env_normal)
 variants['build_eos_lj']               = (['eos_lj.f90','eos_lj_module.f90','lrc_lj_module.f90'],env_normal)
 variants['build_eos_hs']               = (['eos_hs.f90'],env_normal)
 variants['build_error_calc']           = (['error_calc.f90','maths_module.f90'],env_normal)
 variants['build_fft3dwrap']            = (['fft3dwrap.f90'],env_fftw)
 variants['build_grint']                = (['grint.f90','grint_module.f90','config_io_module.f90'],env_normal)
 variants['build_hit_and_miss']         = (['hit_and_miss.f90'],env_normal)
-variants['build_initialize']           = (['initialize.f90','initialize_module.f90','config_io_module.f90','maths_module.f90'],env_normal)
+variants['build_initialize']           = (['initialize.f90','initialize_module.f90']+utnoavrgs,env_normal)
+variants['build_initialize_chain']     = (['initialize_chain.f90','initialize_chain_module.f90']+utnoavrgs,env_normal)
 variants['build_mc_chain_nvt_cbmc_lj'] = (['mc_chain_nvt_cbmc_lj.f90','mc_chain_lj_module.f90']+utilities,env_normal)
 variants['build_mc_chain_nvt_sw']      = (['mc_chain_nvt_sw.f90','mc_chain_sw_module.f90']+utilities,env_normal)
 variants['build_mc_chain_wl_sw']       = (['mc_chain_wl_sw.f90','mc_chain_sw_module.f90']+utilities,env_normal)

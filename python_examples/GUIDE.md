@@ -110,6 +110,23 @@ The variables which may be set in this way are typically considered one by one i
 those whose names correspond to keys supplied in the input file are given the input values,
 while the others are given values taken from another `defaults` dictionary.
 
+## Initial Configuration
+Simulation runs for bulk liquids require a starting configuration which can usually be prepared using
+the `initialize.py` program.
+The default parameters produce an FCC configuration of 256 atoms at reduced density &rho;=0.75,
+writing out just the positions (for an MC program) to a file `cnf.inp`.
+If the parameter `"velocities":true` is supplied, then positions and velocities are
+written to the file, corresponding to a reduced temperature _T_ = 1.0.
+These values of &rho; and _T_ (see below) lie in the liquid region of the Lennard-Jones phase diagram.
+Non-default values may, of course, be supplied for this or other models.
+The `cnf.inp` file may then be copied to the directory in which the run is carried out.
+Typically, runs produce a final configuration `cnf.out`
+(which may be renamed to `cnf.inp` as a starting point for further runs)
+and intermediate configurations `cnf.001`, `cnf.002` etc during the run.
+
+Some of the programs simulate a single chain of atoms, without periodic boundary conditions.
+Initial configurations for these may be prepared using the `initialize_chain.py` program.
+
 ## Lennard-Jones simulation programs
 State points for the Lennard-Jones potential,
 in its cut (but not shifted) form, denoted (c),
@@ -184,7 +201,7 @@ and the latter appearing in Rosenbluth weights,
 which govern the acceptance/rejection of moves.
 For comparison with the paper of Calvo, Doye and Wales, _J Chem Phys,_ __116,__ 2642 (2002),
 test runs were carried out using _N_=13 atoms, a bond length of 1.122462&sigma;
-(prepared using `initialize` with random non-overlapping atom positions)
+(prepared using `initialize_chain.py` with random non-overlapping atom positions)
 and a rather low spring potential _k_<sub>spring</sub>=20.
 We only use CBMC moves in this code: for a practical application it would be advisable
 to include other kinds of move, for example crankshaft, pivot, and bridging moves.
