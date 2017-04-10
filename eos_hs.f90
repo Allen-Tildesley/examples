@@ -57,15 +57,15 @@ PROGRAM eos_hs
   END IF
 
   eta = pi * density / 6.0 ! Packing fraction
-  WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'rho = ', density
-  WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'eta = ', eta
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density rho',          density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Packing fraction eta', eta
 
   ! Equation (6) of Hansen-Goos (2016)
   z = a * LOG ( 1.0-eta ) / eta
   z = z + polynomial ( b, eta ) / ( 1.0 - eta ) ** 3 ! Compressibility factor P/(rho*kT)
   p = z * density                                    ! Pressure P / kT
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'P', p
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Z = P/(rho*kT)', z
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Pressure P',                            p
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Compressibility factor Z = P/(rho*kT)', z
 
 CONTAINS
 
