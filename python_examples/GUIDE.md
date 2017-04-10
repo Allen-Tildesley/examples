@@ -191,6 +191,38 @@ Here we start to gather test simulation results for python versions of the hard-
 
 For the _NPT_ simulation the pressure was set to the EOS value corresponding to the desired density.
 
+We also provide two programs to simulate the hard spherocylinder model,
+of cylinder length _L_ and diameter _D_:
+`mc_npt_sc.py` and `mc_nvt_sc.py`.
+Configurations may be prepared as described in the Fortran example GUIDE,
+and since the simulations are quite expensive, we have simply used those
+configurations as the starting points for fairly short test runs of the
+Python codes. For _L_=5, _N_=256, with the default run length
+(10 blocks, 1000 steps each) we have compared with the results of
+McGrother et al (1996).
+
+* SC McGrother, DC Williamson, G Jackson, _J Chem Phys,_ __104,__ 6755 (1996)
+
+_P_ _v_<sub>mol</sub> | &rho; _v_<sub>mol</sub> | _P_ | &rho; | _S_ | &rho; | _S_ | _P_ | _S_
+----- | ----- | ----- | ----- | ----- | -----       | -----       | -----       | -----
+(M)   | (M)   | (M)   | (M)   | (M)   | `mc_npt_sc` | `mc_npt_sc` | `mc_nvt_sc` | `mc_nvt_sc`
+6.20  | 0.448 | 1.393 | 0.101 | 0.754 | 0.101(1)   | 0.83(1)    | 1.35(1)    | 0.85(1)
+
+The `mc_npt_sc` runs use pressures from column 3 above;
+the `mc_nvt_sc` runs are at densities taken from column 4.
+At the highest pressure, using default parameters,
+move acceptance ratio was around 30%,
+and volume acceptance ratio around 10%.
+These values rose to 50% and 15% respectively at the lowest pressure.
+No attempt was made to run the program
+near the isotropic-nematic transition,
+where very slow evolution of the nematic order parameter would be observed.
+Also the system size is about 25% that used by McGrother,
+which has a direct effect on the measured nematic order parameter.
+With these caveats in mind,
+agreement between the two programs, and with the results of McGrother,
+is reasonable.
+
 ## Chain simulation programs
 The program `mc_chain_nvt_cbmc_lj.py` simulates a single Lennard-Jones chain,
 where the atoms are linked by harmonic springs.
