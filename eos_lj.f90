@@ -62,19 +62,19 @@ PROGRAM eos_lj
      STOP 'Error in eos_lj'
   END IF
 
-  WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'T   = ', temperature
-  WRITE ( unit=output_unit, fmt='(a,f15.6)' ) 'rho = ', density
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature T', temperature
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density rho',   density
 
   ! Results for full potential from Thol et al (2016) fitting formula
   
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Full Lennard-Jones potential'
+  WRITE ( unit=output_unit, fmt='(/,a,/)' ) 'Full Lennard-Jones potential'
 
   a_res = a_res_full ( temperature, density )
 
   DO i = 0, 2
      DO j = 0, 2
         IF ( i+j > 2 ) CYCLE ! Only interested in some of the results
-        WRITE ( unit=output_unit, fmt='(a4,2i1,2x,f15.8)' ) 'Ares', i, j, a_res(i,j)
+        WRITE ( unit=output_unit, fmt='(a4,2i1,t40,f15.6)' ) 'Ares', i, j, a_res(i,j)
      END DO
   END DO
 
@@ -84,35 +84,35 @@ PROGRAM eos_lj
   cp = 2.5 - a_res(2,0)+(1.0+a_res(0,1)-a_res(1,1))*(1.0+a_res(0,1)-a_res(1,1))/(1.0+2.0*a_res(0,1)+a_res(0,2)) - 1.0
   mu = temperature * ( LOG(density) + a_res(0,0) + a_res(0,1) )
   z  = density * EXP ( a_res(0,0) + a_res(0,1) )
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'P', p
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'E/N', e
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cv/NkB', cv
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cp/NkB', cp
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'mu', mu
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'z (activity)', z
+  WRITE ( unit=output_unit, fmt='(/,a,t40,f15.6)' ) 'Pressure P',            p
+  WRITE ( unit=output_unit, fmt='(  a,t40,f15.6)' ) 'Energy E/N',            e
+  WRITE ( unit=output_unit, fmt='(  a,t40,f15.6)' ) 'Heat capacity Cv/NkB',  cv
+  WRITE ( unit=output_unit, fmt='(  a,t40,f15.6)' ) 'Heat capacity Cp/NkB',  cp
+  WRITE ( unit=output_unit, fmt='(  a,t40,f15.6)' ) 'Chemical potential mu', mu
+  WRITE ( unit=output_unit, fmt='(  a,t40,f15.6)' ) 'Activity z',            z
 
   ! Estimates for cut (but not shifted) potential by reverse-application of long-range & delta corrections
   
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential cut (but not shifted) at 2.5 sigma'
+  WRITE ( unit=output_unit, fmt='(/,a,/)' ) 'Lennard-Jones potential cut (but not shifted) at 2.5 sigma'
   p  = p - pressure_lrc ( density, r_cut ) + pressure_delta ( density, r_cut )
   e  = e - potential_lrc ( density, r_cut )
   mu = mu - 2.0 * potential_lrc ( density, r_cut )
   z  = z * EXP ( -2.0* potential_lrc ( density, r_cut ) / temperature )
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'P', p
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'E/N', e
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'mu', mu
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'z (activity)', z
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Pressure P',            p
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Energy E/N',            e
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Chemical potential mu', mu
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Activity z',            z
 
   ! Results for cut-and-shifted potential from Thol et al (2015) fitting formula
   
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential cut-and-shifted at 2.5 sigma'
+  WRITE ( unit=output_unit, fmt='(/,a,/)' ) 'Lennard-Jones potential cut-and-shifted at 2.5 sigma'
 
   a_res = a_res_cutshift ( temperature, density )
 
   DO i = 0, 2
      DO j = 0, 2
         IF ( i+j > 2 ) CYCLE ! Only interested in some of the results
-        WRITE ( unit=output_unit, fmt='(a4,2i1,2x,f15.8)' ) 'Ares', i, j, a_res(i,j)
+        WRITE ( unit=output_unit, fmt='(a4,2i1,t40,f15.6)' ) 'Ares', i, j, a_res(i,j)
      END DO
   END DO
 
@@ -122,11 +122,11 @@ PROGRAM eos_lj
   cp = 2.5 - a_res(2,0)+(1.0+a_res(0,1)-a_res(1,1))*(1.0+a_res(0,1)-a_res(1,1))/(1.0+2.0*a_res(0,1)+a_res(0,2)) - 1.0
   mu = temperature * ( LOG(density) + a_res(0,0) + a_res(0,1) )
   z  = density * EXP ( a_res(0,0) + a_res(0,1) )
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'P', p
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'E/N', e
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cv/NkB', cv
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'Cp/NkB', cp
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'mu', mu
-  WRITE ( unit=output_unit, fmt='(a,t20,f15.6)' ) 'z (activity)', z
+  WRITE ( unit=output_unit, fmt='(/,a,t40,f15.6)' ) 'Pressure P',            p
+  WRITE ( unit=output_unit, fmt='(  a,t40,f15.6)' ) 'Energy E/N',            e
+  WRITE ( unit=output_unit, fmt='(  a,t40,f15.6)' ) 'Heat capacity Cv/NkB',  cv
+  WRITE ( unit=output_unit, fmt='(  a,t40,f15.6)' ) 'Heat capacity Cp/NkB',  cp
+  WRITE ( unit=output_unit, fmt='(  a,t40,f15.6)' ) 'Chemical potential mu', mu
+  WRITE ( unit=output_unit, fmt='(  a,t40,f15.6)' ) 'Activity z',            z
 
 END PROGRAM eos_lj
