@@ -136,7 +136,17 @@ are discussed in the Fortran examples [GUIDE](../GUIDE.md).
 Except where otherwise stated,
 we use our default liquid state point (&rho;,_T_)=(0.75,1.0) for testing,
 with _N_=256 atoms,
-and compare with the same equations of state due to Thol et al.
+and compare with the same equations of state due to Thol et al
+
+* M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)
+* M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, _J Phys Chem Ref Data,_ __45,__ 023101 (2016)
+
+We provide a Python version of the equation-of-state program `eos_lj.py` based on
+the formulae in those papers.
+For completeness, note that Thol et al also supply C++ programs, and tables of data,
+in the Supplementary Information associated with their papers.
+They are not responsible for our (Python) program!
+
 The Python codes run much more slowly than the Fortran ones,
 and so typically our default parameters carry out shorter runs
 (e.g. 10 blocks of 1000 steps rather than 10 blocks of 20000 steps).
@@ -183,6 +193,14 @@ Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    
 
 ## Hard-particle programs
 Equations of state are discussed in the main GUIDE.
+Comparison may be made with equations of state and/or simulation results in the literature
+
+* H Hansen-Goos, _J Chem Phys,_ __144,__ 164506 (2016)
+* MN Bannerman, L Lue, LV Woodcock, _J Chem Phys,_ __132,__ 084507 (2010)
+* J Kolafa, S Labik, A Malijevsky, _Phys Chem Chem Phys,_ __6,__ 2335 (2004)
+
+and a program to evaluate the EOS from the Hansen-Goos (2016) paper may be found in `eos_hs.py`.
+
 Here we start to gather test simulation results for python versions of the hard-sphere codes.
 
 &rho; | _P_ (EOS) | _P_ `mc_nvt_hs`| _P_ `md_nve_hs` | &rho; `mc_npt_hs`
