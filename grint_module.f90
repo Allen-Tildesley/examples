@@ -33,37 +33,52 @@ MODULE grint_module
   ! Public routine
   PUBLIC :: fit
 
-  ! Public data
-  INTEGER, PARAMETER, PUBLIC :: nterms = 5 ! Number of coefficients in tanh fit
-
 CONTAINS
 
-  SUBROUTINE fit ( x, y, c, fail )
+  SUBROUTINE fit ( x, y, c, func, func_derivs, fail )
     IMPLICIT NONE
-    REAL,    DIMENSION(:),      INTENT(in)    :: x    ! Abscissae (npts)
-    REAL,    DIMENSION(:),      INTENT(in)    :: y    ! Ordinates (npts)
-    REAL,    DIMENSION(nterms), INTENT(inout) :: c    ! Coefficients in fit (inital values must be supplied)
-    LOGICAL,                    INTENT(out)   :: fail ! Indicates success or failure of fit
+    REAL,    DIMENSION(:), INTENT(in)    :: x    ! Abscissae (npts)
+    REAL,    DIMENSION(:), INTENT(in)    :: y    ! Ordinates (npts)
+    REAL,    DIMENSION(:), INTENT(inout) :: c    ! Coefficients in fit (nterms)
+    LOGICAL,               INTENT(out)   :: fail ! Indicates success or failure of fit
+
+    INTERFACE
+       FUNCTION func ( x, c ) RESULT ( f )
+         IMPLICIT NONE
+         REAL                           :: f ! Returns fitting function
+         REAL,               INTENT(in) :: x ! Abscissa
+         REAL, DIMENSION(:), INTENT(in) :: c ! Coefficients
+       END FUNCTION func
+       FUNCTION func_derivs ( x, c ) RESULT ( d )
+         IMPLICIT NONE
+         REAL,                    INTENT(in) :: x ! Abscissa
+         REAL, DIMENSION(:),      INTENT(in) :: c ! Coefficients
+         REAL, DIMENSION(SIZE(c))            :: d ! Returns fitting function derivatives
+       END FUNCTION func_derivs
+    END INTERFACE
 
     ! This fitting routine traces its origins back to an early edition of
     ! "Data reduction and error analysis for the physical sciences" by PR Bevington,
     ! since when both the program and the book have evolved significantly
-    
-    REAL, DIMENSION(nterms)        :: c_new, beta, dy, sigma
-    REAL, DIMENSION(nterms,nterms) :: alpha, array
-    REAL, DIMENSION(SIZE(x))       :: yfit
+    ! Initial values for the coefficient array c must be provided.
 
-    INTEGER :: npts, nfree, i, j, k, t, iter
+    REAL, DIMENSION(SIZE(c))         :: c_new, beta, dy, sigma
+    REAL, DIMENSION(SIZE(c),SIZE(c)) :: alpha, array
+    REAL, DIMENSION(SIZE(x))         :: yfit
+
+    INTEGER :: npts, nterms, nfree, i, j, k, t, iter
     REAL    :: lambda, chisq, chisq_red, chisq_old, change
 
     REAL,    PARAMETER :: tol = 1.e-6
-    LOGICAL, PARAMETER :: verbose = .false. ! Controls output
+    LOGICAL, PARAMETER :: verbose = .FALSE. ! Controls output
 
     npts = SIZE(x) ! Number of points
     IF ( SIZE(y) /= npts ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i5)') 'Array dimensioning error', npts, SIZE(y)
        STOP 'Error in fit'
     END IF
+
+    nterms = SIZE(c) ! Number of terms in fitting function
 
     nfree = npts - nterms
     IF (nfree <= 0) THEN
@@ -172,40 +187,6 @@ CONTAINS
     END DO ! End loop until change below tol or failure to converge
 
   END SUBROUTINE fit
-
-  FUNCTION func ( x, c ) RESULT ( f )
-    IMPLICIT NONE
-    REAL                                :: f ! Returns fitting function
-    REAL,                    INTENT(in) :: x ! Abscissa
-    REAL, DIMENSION(nterms), INTENT(in) :: c ! Coefficients
-
-    REAL :: t1, t2
-
-    t1 = TANH ( ( x - c(1) ) / c(3) )
-    t2 = TANH ( ( x - c(2) ) / c(3) )
-
-    f = c(4) + 0.5 * ( c(5) - c(4) ) * ( t1 - t2 )
-
-  END FUNCTION func
-
-  FUNCTION func_derivs ( x, c ) RESULT ( d )
-    IMPLICIT NONE
-    REAL, DIMENSION(nterms)             :: d ! Returns fitting function derivatives
-    REAL,                    INTENT(in) :: x ! Abscissa
-    REAL, DIMENSION(nterms), INTENT(in) :: c ! Coefficients
-
-    REAL :: t1, t2
-
-    t1 = TANH ( ( x - c(1) ) / c(3) )
-    t2 = TANH ( ( x - c(2) ) / c(3) )
-
-    d(1) = 0.5 * ( c(5) - c(4) ) * ( t1**2 - 1.0 ) / c(3)
-    d(2) = 0.5 * ( c(5) - c(4) ) * ( 1.0 - t2**2 ) / c(3)
-    d(3) = 0.5 * ( c(5) - c(4) ) * ( ( x - c(1) ) * ( t1**2 - 1.0 )  + ( x - c(2) ) * ( 1.0 - t2**2 ) ) / c(3)**2
-    d(4) = 1.0 - 0.5 * ( t1 - t2 )
-    d(5) = 0.5 * ( t1 - t2 )
-
-  END FUNCTION func_derivs
 
   SUBROUTINE matinv ( arr )
     IMPLICIT NONE

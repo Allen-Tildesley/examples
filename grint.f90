@@ -50,7 +50,7 @@ PROGRAM grint
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms
-  USE               grint_module,     ONLY : fit, nterms
+  USE               grint_module,     ONLY : fit
 
   IMPLICIT NONE
 
@@ -68,34 +68,41 @@ PROGRAM grint
   INTEGER :: nc     ! Number of cos(theta) points in pair density
   INTEGER :: nk     ! Number of z points in simulation box
 
-  REAL, DIMENSION(:,:),   ALLOCATABLE :: r    ! Positions (3,n)
-  REAL, DIMENSION(:),     ALLOCATABLE :: rz   ! Saved z-coordinates
-  REAL, DIMENSION(:),     ALLOCATABLE :: d    ! Single-particle density profile snapshot (nk)
-  REAL, DIMENSION(:),     ALLOCATABLE :: dens ! Single-particle density profile average (nk)
-  REAL, DIMENSION(:),     ALLOCATABLE :: z    ! Positions for density profile (nk)
-  REAL, DIMENSION(:),     ALLOCATABLE :: rho1 ! One-particle density relative to interface location (-nz:nz)
-  REAL, DIMENSION(:,:,:), ALLOCATABLE :: rho2 ! Two-particle density relative to interface location (-nz:nz,nc,nr)
-  REAL, DIMENSION(nterms)             :: cfit ! Coefficients for fit
+  REAL, DIMENSION(:,:),   ALLOCATABLE :: r     ! Positions (3,n)
+  REAL, DIMENSION(:),     ALLOCATABLE :: rz    ! Saved z-coordinates (n)
+  REAL, DIMENSION(:),     ALLOCATABLE :: d     ! Single-particle density profile snapshot (nk)
+  REAL, DIMENSION(:),     ALLOCATABLE :: dens  ! Single-particle density profile average (nk)
+  REAL, DIMENSION(:),     ALLOCATABLE :: z_box ! Positions for density profile (nk)
+  REAL, DIMENSION(:),     ALLOCATABLE :: rho1  ! One-particle density relative to interface location (-nz:nz)
+  REAL, DIMENSION(:,:,:), ALLOCATABLE :: rho2  ! Two-particle density relative to interface location (-nz:nz,nc,nr)
+  REAL, DIMENSION(:,:,:), ALLOCATABLE :: g2    ! Pair distribution relative to interface location (-nz:nz,nc,nr)
+  REAL, DIMENSION(:),     ALLOCATABLE :: z     ! Positions for rho1, rho2, g2 (-nz:nz)
+
+  REAL, DIMENSION(4) :: c1tanh ! Coefficients for 1-tanh fit
+  REAL, DIMENSION(5) :: c2tanh ! Coefficients for 2-tanh fit
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix  = 'cnf.'
   CHARACTER(len=4), PARAMETER :: den_prefix  = 'den.'
   CHARACTER(len=5), PARAMETER :: rho1_prefix = 'rho1.'
-  CHARACTER(len=5), PARAMETER :: rho2_prefix = 'rho2.'
-  CHARACTER(len=3)            :: sav_tag
-  INTEGER                     :: i, k, unit, ioerr
+  CHARACTER(len=4), PARAMETER :: rho2_prefix = 'rho2'
+  CHARACTER(len=4), PARAMETER :: out_tag = '.out'
+  CHARACTER(len=3)            :: sav_tag, z_tag
+  CHARACTER(len=2)            :: c_tag
+  INTEGER                     :: i, k, unit, ioerr, zskip, cskip, iz, ir, ic
   LOGICAL                     :: exists, fail
-  REAL                        :: norm, area
+  REAL                        :: norm, area, rij_mag, c, z1, z2, rho1_z1, rho1_z2
   REAL, PARAMETER             :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
 
-  NAMELIST /nml/ dz, dr, z_mid, nz, nc, nr
+  NAMELIST /nml/ dz, dr, z_mid, nz, nc, zskip, cskip
 
   ! Example default values
-  dz    = 0.1 ! Spacing in z-direction
-  nz    = 20  ! Number of z-points relative to interface location
-  nc    = 20  ! Number of cos(theta) points covering range (-1,1)
-  nr    = 20  ! Number of r points
+  dz    = 0.2 ! Spacing in z-direction
+  nz    = 10  ! Number of z-points relative to interface location
+  nc    = 13  ! Number of cos(theta) points covering range (-1,1)
   dr    = 0.1 ! r-spacing
   z_mid = 0.0 ! First estimate of location of liquid slab midpoint
+  zskip = 5   ! With nz=10 will give output files at iz=-10, -5, 0, 5, 10
+  cskip = 3   ! With nc=10 will give output files at ic=1, 4, 7, 10, 13
 
   ! Namelist from standard input
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
@@ -110,8 +117,9 @@ PROGRAM grint
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Spacing in cos(theta)',       dc
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Spacing in r',                dr
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of z points',          nz
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Output z skip',               zskip
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of cos(theta) points', nc
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of r points',          nr
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Output c skip',               cskip
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Liquid slab midpoint',        z_mid
 
   sav_tag = '000' ! Use initial configuration to get N
@@ -127,9 +135,16 @@ PROGRAM grint
   dz_box = box / REAL(nk)
   area   = box**2
 
-  ALLOCATE ( r(3,n), rz(n), d(nk), dens(nk), z(nk), rho1(-nz:nz), rho2(-nz:nz,nc,nr) )
+  ! We define nr to go out to (almost) a quarter of the box length
+  ! We must remember that artefacts are expected whenever z approaches the "other" interface
+  nr = FLOOR ( 0.25*box / dr )
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of r points', nr
 
-  z(:) = [ ( -0.5*box + (REAL(k)-0.5)*dz_box, k = 1, nk ) ]
+  ALLOCATE ( r(3,n), rz(n), d(nk), dens(nk), z_box(nk) )
+  ALLOCATE ( rho1(-nz:nz), rho2(-nz:nz,nc,nr), g2(-nz:nz,nc,nr), z(-nz:nz) )
+
+  z_box(:) = [ ( -0.5*box + (REAL(k)-0.5)*dz_box, k = 1, nk ) ] ! Coordinates in simulation box
+  z(:)     = [ ( REAL(k)*dz, k = -nz, nz ) ]                    ! Coordinates around interface
 
   dens = 0.0
   rho1 = 0.0
@@ -139,11 +154,11 @@ PROGRAM grint
 
   ! Initial guesses at slab fit parameters
   ! These will be passed on at each step, assuming that changes are small
-  cfit(1) = -0.25*box ! Gas-liquid interface position
-  cfit(2) =  0.25*box ! Liquid-gas interface position
-  cfit(3) = 1.0       ! Width of interface
-  cfit(4) = 0.0       ! Gas density
-  cfit(5) = 0.8       ! Liquid density
+  c2tanh(1) = -0.25*box ! Gas-liquid interface position
+  c2tanh(2) =  0.25*box ! Liquid-gas interface position
+  c2tanh(3) = 1.0       ! Width of interface
+  c2tanh(4) = 0.0       ! Gas density
+  c2tanh(5) = 0.8       ! Liquid density
 
   DO ! Loop through configuration files
 
@@ -169,62 +184,118 @@ PROGRAM grint
 
      d(:) = d(:) / ( area * dz_box )
 
-     ! Fit profile in order to obtain interface positions in cfit(1) and cfit(2)
-     CALL fit ( z, d, cfit, fail )
+     ! Fit profile in order to obtain interface positions in c2tanh(1) and c2tanh(2)
+     CALL fit ( z_box, d, c2tanh, f2tanh, d2tanh, fail )
      IF ( fail ) THEN
         WRITE ( unit=error_unit, fmt='(a)') 'Failed in fit routine'
         STOP 'Error in grint'
      END IF
-     
+
      rz(:) = r(3,:) ! Save z-coordinates of all atoms
 
      ! Process gas-liquid interface
-     r(3,:) = rz(:) - cfit(1)                       ! Shift gas-liquid interface to origin
+     r(3,:) = rz(:) - c2tanh(1)                       ! Shift gas-liquid interface to origin
      r(3,:) = r(3,:) - ANINT ( r(3,:) / box ) * box ! Apply PBC
      CALL calculate
 
      ! Process liquid-gas interface
-     r(3,:) = cfit(2) - rz(:)                       ! Shift liquid-gas interface to origin and reflect
+     r(3,:) = c2tanh(2) - rz(:)                       ! Shift liquid-gas interface to origin and reflect
      r(3,:) = r(3,:) - ANINT ( r(3,:) / box ) * box ! Apply PBC
      CALL calculate
-     
+
      norm  = norm + 1.0
      t     = t + 1 ! Ready for next file
-     z_mid = z_mid + 0.5*(cfit(1)+cfit(2)) ! Refine estimate of slab midpoint for next time
+     z_mid = z_mid + 0.5*(c2tanh(1)+c2tanh(2)) ! Refine estimate of slab midpoint for next time
 
   END DO ! End loop through configuration files
 
-  ! Normalize
+  ! Normalize (including factor for 2 interfaces)
   dens = dens / ( norm * area * dz_box )
   rho1 = rho1 / ( 2.0 * norm * area * dz )
-  rho2 = rho2 / ( twopi * norm * area * dr * dc * dz )
+  rho2 = rho2 / ( 2.0 * twopi * norm * area * dr * dc * dz )
+
+  ! Fit the averaged density profile
+  CALL fit ( z_box, dens, c2tanh, f2tanh, d2tanh, fail )
+
+  ! Fit the single particle density
+  c1tanh(1) = 0.0       ! Position of interface
+  c1tanh(2) = c2tanh(3) ! Width of interface
+  c1tanh(3) = c2tanh(4) ! Gas density
+  c1tanh(4) = c2tanh(5) ! Liquid density
+  CALL fit ( z, rho1, c1tanh, f1tanh, d1tanh, fail )
+
+  ! Convert rho2 to g2, normalizing by fitted single-particle densities at z1 and z2
+
+  DO iz = -nz, nz ! Loop over z coordinate
+
+     z1  = z(iz)
+     rho1_z1 = f1tanh ( z1, c1tanh ) ! Use fitted single-particle density 
+
+     DO  ic = 1, nc ! Loop over cos(theta)
+
+        c = -1.0 + ( REAL(ic) - 0.5 ) * dc
+
+        DO ir = 1, nr ! Loop over radial distance
+
+           rij_mag = ( REAL( ir ) - 0.5 ) * dr
+           z2      = z1 + c * rij_mag
+           rho1_z2 = f1tanh ( z2, c1tanh ) ! Use fitted single-particle density
+           g2(iz,ic,ir) = rho2(iz,ic,ir) / ( rho1_z1 * rho1_z2  )
+
+        END DO ! End loop over radial distance
+
+     END DO ! End loop over cos(theta)
+
+  END DO ! End loop over z coordinate
 
   ! Output results
-  
+
   OPEN ( newunit=unit, file=den_prefix//'out', status='replace', iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening file', ioerr
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening dens file', ioerr
      STOP 'Error in grint'
   END IF
   DO k = 1, nk
-     WRITE ( unit=unit, fmt='(2f15.6)' ) z(k), dens(k)
+     WRITE ( unit=unit, fmt='(3f15.6)' ) z_box(k), dens(k), f2tanh(z_box(k),c2tanh)
   END DO
   CLOSE(unit=unit)
 
   OPEN ( newunit=unit, file=rho1_prefix//'out', status='replace', iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening file', ioerr
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening rho1 file', ioerr
      STOP 'Error in grint'
   END IF
   DO k = -nz, nz
-     WRITE ( unit=unit, fmt='(2f15.6)' ) REAL(k)*dz, rho1(k)
+     WRITE ( unit=unit, fmt='(3f15.6)' ) z(k), rho1(k), f1tanh(z(k),c1tanh)
   END DO
   CLOSE(unit=unit)
 
-  DEALLOCATE ( r, rz, d, dens, rho1, rho2, z )
+  ! Slices for selected values of iz, ic
+
+  IF ( nz>99 ) STOP 'The output filename format will only cope with nz<100'
+  IF ( nc>99 ) STOP 'The output filename format will only cope with nc<100'
+
+  DO iz = -nz, nz, zskip
+     WRITE ( z_tag, fmt='(sp,i3.2)' ) iz ! encoded with +/- sign
+     DO ic = 1, nc, cskip
+        WRITE ( c_tag, fmt='(i2.2)' ) ic
+        OPEN ( newunit=unit, file=rho2_prefix//z_tag//c_tag//out_tag, status='replace', iostat=ioerr )
+        IF ( ioerr /= 0 ) THEN
+           WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening rho2 file', ioerr
+           STOP 'Error in grint'
+        END IF
+        DO ir = 1, nr ! Loop over radial distance
+           rij_mag = ( REAL( ir ) - 0.5 ) * dr
+           WRITE ( unit=unit, fmt='(3f15.6)' ) rij_mag, rho2(iz,ic,ir), g2(iz,ic,ir)
+        END DO
+        CLOSE(unit=unit)
+     END DO
+  END DO
+
+  DEALLOCATE ( r, rz, d, dens, rho1, rho2, g2, z_box, z )
 
 CONTAINS
-  
+
   SUBROUTINE calculate
 
     ! This routine carries out the histogramming for rho1 and rho2
@@ -271,5 +342,82 @@ CONTAINS
     END DO ! End loop over atoms
 
   END SUBROUTINE calculate
-  
+
+  FUNCTION f1tanh ( x, c ) RESULT ( f )
+    IMPLICIT NONE
+    REAL                           :: f ! Returns fitting function
+    REAL,               INTENT(in) :: x ! Abscissa
+    REAL, DIMENSION(:), INTENT(in) :: c ! Coefficients
+
+    REAL :: t
+
+    ! 1-tanh fit function (function value)
+    IF ( SIZE(c) /= 4 ) STOP 'Error in function f1tanh'
+
+    t = TANH ( ( x - c(1) ) / c(2) )
+
+    f = 0.5 * ( c(4) + c(3) ) + 0.5 * ( c(4) - c(3) ) * t
+
+  END FUNCTION f1tanh
+
+  FUNCTION d1tanh ( x, c ) RESULT ( d )
+    IMPLICIT NONE
+    REAL,                    INTENT(in) :: x ! Abscissa
+    REAL, DIMENSION(:),      INTENT(in) :: c ! Coefficients
+    REAL, DIMENSION(SIZE(c))            :: d ! Returns fitting function derivatives
+
+    REAL :: t
+
+    ! 1-tanh fit function (derivatives)
+    IF ( SIZE(c) /= 4 ) STOP 'Error in function d1tanh'
+
+    t = TANH ( ( x - c(1) ) / c(2) )
+
+    d(1) = 0.5 * ( c(4) - c(3) ) * ( t**2 - 1.0 ) / c(2)
+    d(2) = 0.5 * ( c(4) - c(3) ) * ( x - c(1) ) * ( t**2 - 1.0 ) / c(2)**2
+    d(3) = 0.5 - 0.5 * t
+    d(4) = 0.5 + 0.5 * t
+
+  END FUNCTION d1tanh
+
+  FUNCTION f2tanh ( x, c ) RESULT ( f )
+    IMPLICIT NONE
+    REAL                           :: f ! Returns fitting function
+    REAL,               INTENT(in) :: x ! Abscissa
+    REAL, DIMENSION(:), INTENT(in) :: c ! Coefficients
+
+    REAL :: t1, t2
+
+    ! 2-tanh fit function (function value)
+    IF ( SIZE(c) /= 5 ) STOP 'Error in function f2tanh'
+
+    t1 = TANH ( ( x - c(1) ) / c(3) )
+    t2 = TANH ( ( x - c(2) ) / c(3) )
+
+    f = c(4) + 0.5 * ( c(5) - c(4) ) * ( t1 - t2 )
+
+  END FUNCTION f2tanh
+
+  FUNCTION d2tanh ( x, c ) RESULT ( d )
+    IMPLICIT NONE
+    REAL,                    INTENT(in) :: x ! Abscissa
+    REAL, DIMENSION(:),      INTENT(in) :: c ! Coefficients
+    REAL, DIMENSION(SIZE(c))            :: d ! Returns fitting function derivatives
+
+    REAL :: t1, t2
+
+    ! 2-tanh fit function (derivatives)
+    IF ( SIZE(c) /= 5 ) STOP 'Error in function d2tanh'
+
+    t1 = TANH ( ( x - c(1) ) / c(3) )
+    t2 = TANH ( ( x - c(2) ) / c(3) )
+
+    d(1) = 0.5 * ( c(5) - c(4) ) * ( t1**2 - 1.0 ) / c(3)
+    d(2) = 0.5 * ( c(5) - c(4) ) * ( 1.0 - t2**2 ) / c(3)
+    d(3) = 0.5 * ( c(5) - c(4) ) * ( ( x - c(1) ) * ( t1**2 - 1.0 )  + ( x - c(2) ) * ( 1.0 - t2**2 ) ) / c(3)**2
+    d(4) = 1.0 - 0.5 * ( t1 - t2 )
+    d(5) = 0.5 * ( t1 - t2 )
+
+  END FUNCTION d2tanh
+
 END PROGRAM grint
