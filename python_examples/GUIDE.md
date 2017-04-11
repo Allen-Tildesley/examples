@@ -203,9 +203,9 @@ and a program to evaluate the EOS from the Hansen-Goos (2016) paper may be found
 
 Here we start to gather test simulation results for python versions of the hard-sphere codes.
 
-&rho; | _P_ (EOS) | _P_ `mc_nvt_hs`| _P_ `md_nve_hs` | &rho; `mc_npt_hs`
+&rho; | _P_ (EOS) | _P_ `mc_nvt_hs.py`| _P_ `md_nve_hs.py` | &rho; `mc_npt_hs.py`
 ----- | -----     | -----    | ----- | -----
-0.50  | 1.6347    | 1.630(8) |  | 0.493(4)
+0.50  | 1.6347    | 1.630(8) | 1.633(2) | 0.493(4)
 
 For the _NPT_ simulation the pressure was set to the EOS value corresponding to the desired density.
 
