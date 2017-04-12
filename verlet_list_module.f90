@@ -33,9 +33,8 @@ MODULE verlet_list_module
   ! Public routines
   PUBLIC :: initialize_list, finalize_list, make_list
 
-  ! The initialize_list routine reads the value of r_list_factor
-  ! from standard input using a NAMELIST nml_list
-  ! Leave namelist empty to accept supplied default
+  ! The initialize_list routine sets the value of r_list_factor. If you wish to read it
+  ! from standard input using a NAMELIST nml_list, just uncomment the indicated statements
   ! It is assumed that all positions and displacements are divided by box
   ! r_list_box is set to r_cut_box*r_list_factor
 
@@ -58,22 +57,27 @@ CONTAINS
     REAL,    INTENT(in) :: r_cut_box ! r_cut / box
 
     REAL    :: r_list_factor
-    INTEGER :: ioerr
 
     REAL, PARAMETER :: pi = 4.0*ATAN(1.0)
-    NAMELIST /nml_list/ r_list_factor
+
+    ! Uncomment the following statements if you wish to read in the value of r_list_factor
+!!$    INTEGER :: ioerr
+!!$    NAMELIST /nml_list/ r_list_factor
 
     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)') 'Verlet list based on r_cut/box =', r_cut_box
 
     ! Sensible default for r_list_factor
     r_list_factor = 1.2
-    READ ( unit=input_unit, nml=nml_list, iostat=ioerr ) ! namelist input
-    IF ( ioerr /= 0 ) THEN
-       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Error reading namelist nml_list from standard input', ioerr
-       IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
-       IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
-       STOP 'Error in initialize_list'
-    END IF
+
+    ! Uncomment the following statements if you wish to read in the value of r_list_factor
+!!$    READ ( unit=input_unit, nml=nml_list, iostat=ioerr ) ! namelist input
+!!$    IF ( ioerr /= 0 ) THEN
+!!$       WRITE ( unit=error_unit, fmt='(a,i15)' ) 'Error reading namelist nml_list from standard input', ioerr
+!!$       IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+!!$       IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+!!$       STOP 'Error in initialize_list'
+!!$    END IF
+
     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)') 'Verlet list factor = ', r_list_factor
     IF ( r_list_factor <= 1.0 ) THEN
        WRITE ( unit=error_unit, fmt='(a,f15.6)') 'r_list_factor must be > 1', r_list_factor

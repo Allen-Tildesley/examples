@@ -13,10 +13,6 @@ change the parameters, typical input might be
 ```
 and the `key=value` pairs may be set out on different lines if you wish.
 
-The program `md_nve_lj_vl` expects the input file to contain a second namelist,
-`&nml_list`, which should either be empty or contain the desired value of `r_list_factor`.
-See the file `verlet_list_module.f90` for details.
-
 ## Initial Configuration
 Simulation runs for bulk liquids require a starting configuration which can usually be prepared using
 the `initialize` program (built, by the default SConstruct file, in `build_initialize/`).
