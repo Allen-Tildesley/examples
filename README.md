@@ -34,7 +34,7 @@ It is also a compiled language,
 which means that it is quite efficient,
 and widely used,
 so it is easy to find compilers which are
-optimised for different machine architectures.
+optimized for different machine architectures.
 The common tools for parallelizing scientific codes
 (OpenMP and MPI)
 are compatible with Fortran.
@@ -52,12 +52,15 @@ of several of these same examples, also with an accompanying
 [User Guide](./python_examples/GUIDE.md).
 
 ## Building the codes
-The supplied SConstruct and SConscript files
-will build all the working examples,
+On some computing platforms,
+the supplied `SConstruct` and `SConscript` files will build all the working examples,
 using SCons,
 an Open Source software construction tool based on Python.
 The homepage for SCons is at <http://www.scons.org/>.
-Simply type `scons` to build each full example program in its own directory.
+The `SConstruct` file may need to be edited
+(for example, to point to the correct location of libraries
+such as `fftw3` and `lapack` on your system).
+Then, simply type `scons` to build each full example program in its own directory.
 A few examples consist of individual routines or modules,
 so there is no need to build them.
 
@@ -67,5 +70,22 @@ If you don't like using SCons, or can't get it to work,
 it is not difficult to compile the programs using other methods.
 Bear in mind that, with Fortran, it is usually essential to compile any
 modules that are used by the main program, before compiling the main program itself.
+Take a look at the `SConstruct` file in any case, as it shows the file dependencies
+for each example.
+
+We have used gfortran v6.3 for testing, but have attempted to stick to code which conforms
+to the Fortran 2008 standard. To our knowledge, the only GNU extensions appear in the function
+`init_random_seed()` in the file `maths_module.f90`, which is used in a few examples
+where the random number sequence must be different each time the program is run.
+From gfortran v7 onward, it seems likely that the intrinsic `random_seed()` function
+will behave this way, and so `init_random_seed()` will become redundant.
+You should check the behaviour of the random number generator on your own system.
+Note that, by default, we do not select any optimization options in compilation.
+If you are using a different compiler,
+then the compiler and linker options in the `SConstruct` file will most likely need changing.
+
+The above, general, advice should help you to build the codes on your system.
+Unfortunately, due to the enormous variety of computing platforms and compilers,
+we cannot offer more specific advice on the build process.
 
 The Python versions do not require building, they are simply run through the Python interpreter.

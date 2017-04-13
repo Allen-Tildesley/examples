@@ -85,12 +85,15 @@ CONTAINS
   ! Routines associated with random number generation
 
   ! This routine, and the next one, are taken from the online GNU documentation
-  ! https://gcc.gnu.org/onlinedocs/gfortran/RANDOM_005fSEED.html
-  ! and is specific to the gfortran compiler
+  ! https://gcc.gnu.org/onlinedocs/gcc-6.2.0/gfortran/RANDOM_005fSEED.html#RANDOM_005fSEED
+  ! They are specific to the gfortran compiler v6.
   ! At the time of writing, calling RANDOM_SEED() initializes the random number generator
   ! with the same random seed to a default state, which may result in the same sequence
   ! being generated every time. The routines below are intended to generate different
   ! sequences on different calls.
+  ! In gfortran v7 (development version at the time of writing), calling RANDOM_SEED()
+  ! initializes the random number generator with random data retrieved from the operating system
+  ! so the following two routines should become redundant.
   ! YOU SHOULD INVESTIGATE THE BEHAVIOUR FOR YOUR OWN COMPILER AND MACHINE IMPLEMENTATION 
 
   SUBROUTINE init_random_seed
@@ -122,7 +125,7 @@ CONTAINS
                + dt(6) * 60 * 1000 + dt(7) * 1000 &
                + dt(8)
        END IF
-       pid = getpid()
+       pid = getpid() ! apparently getpid is declared somewhere else in GCC
        t = IEOR(t, INT(pid, KIND(t)))
        DO i = 1, n
           seed(i) = lcg(t)
