@@ -43,7 +43,7 @@ PROGRAM md_nvt_lj_le
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                                     force, r, v, f, n, potential_type
 
@@ -55,9 +55,6 @@ PROGRAM md_nvt_lj_le
   REAL :: dt          ! Time step
   REAL :: strain_rate ! Strain_rate (velocity gradient) dv_x/dr_y
   REAL :: strain      ! Strain (integrated velocity gradient) dr_x/dr_y
-
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & vir & lap & ovr variables
   TYPE(potential_type) :: total
@@ -107,7 +104,7 @@ PROGRAM md_nvt_lj_le
      WRITE ( unit=error_unit, fmt='(a,es15.6)') 'Strain must be zero at end of block', strain
      STOP 'Error in md_nvt_lj_le'
   END IF
-  
+
   ! Read in initial configuration and allocate necessary arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box ) ! First call just to get n and box
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
@@ -129,10 +126,9 @@ PROGRAM md_nvt_lj_le
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in md_nvt_lj_le'
   END IF
-  CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  CALL run_begin ( calc_variables() )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -156,8 +152,7 @@ PROGRAM md_nvt_lj_le
         CALL a_propagator  ( dt/2.0 )
 
         ! Calculate and accumulate variables for this step
-        CALL calculate ( )
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
 
      END DO ! End loop over steps
 
@@ -167,14 +162,13 @@ PROGRAM md_nvt_lj_le
 
   END DO ! End loop over blocks
 
-  CALL run_end
+  CALL run_end ( calc_variables() )
 
   CALL force ( box, strain, total )
   IF ( total%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in md_nvt_lj_le'
   END IF
-  CALL calculate ( 'Final values' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v ) ! Write out final configuration
 
@@ -206,7 +200,7 @@ CONTAINS
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
 
     REAL :: x, c1, c2, g
-    
+
     x = t * strain_rate ! Change in strain (dimensionless)
 
     c1 = x * SUM ( v(1,:)*v(2,:) ) / SUM ( v(:,:)**2 )
@@ -223,7 +217,7 @@ CONTAINS
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt)
 
     REAL :: alpha, beta, h, e, dt_factor, prefactor
-    
+
     alpha = SUM ( f(:,:)*v(:,:) ) / SUM ( v(:,:)**2 )
     beta  = SQRT ( SUM ( f(:,:)**2 ) / SUM ( v(:,:)**2 ) )
     h     = ( alpha + beta ) / ( alpha - beta )
@@ -231,15 +225,15 @@ CONTAINS
 
     dt_factor = ( 1 + h - e - h / e ) / ( ( 1 - h ) * beta )
     prefactor = ( 1 - h ) / ( e - h / e )
-    
+
     v(:,:) = prefactor * ( v(:,:) + dt_factor * f(:,:) )
 
   END SUBROUTINE b2_propagator
 
-  SUBROUTINE calculate ( string ) 
-    USE averages_module, ONLY : write_variables, variable_type, msd
+  FUNCTION calc_variables ( ) RESULT ( variables )
+    USE averages_module, ONLY : variable_type, msd
     IMPLICIT NONE
-    CHARACTER (len=*), INTENT(in), OPTIONAL :: string
+    TYPE(variable_type), DIMENSION(6) :: variables ! The 6 variables listed below
 
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
@@ -292,18 +286,13 @@ CONTAINS
     END IF
 
     ! MSD of conserved kinetic energy
-    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin/REAL(n), method = msd, es_format = .TRUE. )
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = kin/REAL(n), &
+         &                          method = msd, e_format = .TRUE., instant = .FALSE. )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ e_s, p_s, t_k, t_c, eta, conserved_msd ]
 
-    IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables(1:5) ) ! Not MSD variable
-    END IF
-
-  END SUBROUTINE calculate
+  END FUNCTION calc_variables
 
 END PROGRAM md_nvt_lj_le
 

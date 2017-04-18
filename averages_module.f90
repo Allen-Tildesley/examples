@@ -31,7 +31,7 @@ MODULE averages_module
   PRIVATE
 
   ! Public routines
-  PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add, time_stamp, write_variables
+  PUBLIC :: run_begin, run_end, blk_begin, blk_end, blk_add, time_stamp
 
   ! Public data
   INTEGER, PARAMETER, PUBLIC :: avg = 0, msd = 1, cke = 2 ! Options for averaging methods
@@ -55,11 +55,12 @@ MODULE averages_module
 
   ! Public derived type for variables to average
   TYPE, PUBLIC :: variable_type
-     CHARACTER(len=nam_width) :: nam                 ! Name to be used in headings
-     REAL                     :: val                 ! Instantaneous value to be averaged
-     INTEGER                  :: method = avg        ! Selects method: avg (default), msd, or cke
-     REAL                     :: add = 0.0           ! Constant to use in msd method (default zero)
-     LOGICAL                  :: es_format = .FALSE. ! Flag to indicate scientific format (small numbers)
+     CHARACTER(len=nam_width) :: nam                ! Name to be used in headings
+     REAL                     :: val                ! Instantaneous value to be averaged
+     INTEGER                  :: method = avg       ! Selects method: avg (default), msd, or cke
+     REAL                     :: add = 0.0          ! Constant to use in msd method (default zero)
+     LOGICAL                  :: e_format = .FALSE. ! Flag to indicate scientific format (small numbers)
+     LOGICAL                  :: instant = .TRUE.   ! Flag to indicate whether to print instantaneous value
   END TYPE variable_type
 
 CONTAINS
@@ -114,7 +115,7 @@ CONTAINS
        headings(i) = ADJUSTR ( headings(i) )
        subheads(i) = ADJUSTR ( subheads(i) )
 
-       IF ( variables(i)%es_format ) THEN
+       IF ( variables(i)%e_format ) THEN
           line_fmt = line_fmt // '1x,' // cole_fmt // ','
        ELSE
           line_fmt = line_fmt // '1x,' // colf_fmt // ','
@@ -135,9 +136,17 @@ CONTAINS
     run_avg = 0.0
     run_err = 0.0
 
+    ! Write initial instantaneous values
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Initial values'
+    DO i = 1, n_avg
+       IF ( variables(i)%instant ) THEN
+          WRITE ( unit=output_unit, fmt=sngl_fmt ) variables(i)%nam, variables(i)%val
+       END IF
+    END DO
+
     ! Write headings
     WRITE ( unit=output_unit, fmt=* )
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Run begins'
+    WRITE ( unit=output_unit, fmt='(/,a)' ) 'Run begins'
     CALL time_stamp
     WRITE ( unit=output_unit, fmt=* )
     WRITE ( unit=output_unit, fmt='(a)'                   ) REPEAT ( '=', line_width ) 
@@ -204,13 +213,16 @@ CONTAINS
 
   END SUBROUTINE blk_end
 
-  SUBROUTINE run_end
+  SUBROUTINE run_end ( variables )
     IMPLICIT NONE
+    TYPE(variable_type), DIMENSION(:), INTENT(in) :: variables ! Instantaneous variables
 
     ! Write out averages and error estimates at end of run
     ! NB, these are the crudest possible error estimates, based on the wholly unjustified
     ! assumption that the blocks are statistically independent
     ! For a discussion of errors, see Chapter 8 and the error_calc.f90 example
+
+    INTEGER :: i
 
     IF ( run_nrm < 0.5 ) THEN ! Check for no accumulation; should never happen
        WRITE ( unit=error_unit, fmt='(a,f15.6)' ) 'Run accumulation error', run_nrm
@@ -236,23 +248,17 @@ CONTAINS
     CALL time_stamp
     WRITE ( unit=output_unit, fmt=* )
 
+    ! Write final instantaneous values
+    WRITE ( unit=output_unit, fmt='(/,a)' ) 'Final values'
+    DO i = 1, SIZE ( variables )
+       IF ( variables(i)%instant ) THEN
+          WRITE ( unit=output_unit, fmt=sngl_fmt ) variables(i)%nam, variables(i)%val
+       END IF
+    END DO
+
     DEALLOCATE ( headings, blk_avg, blk_msd, run_avg, run_err, method, add )
 
   END SUBROUTINE run_end
-
-  SUBROUTINE write_variables ( variables )
-    IMPLICIT NONE
-    TYPE(variable_type), DIMENSION(:), INTENT(in) :: variables ! Variables to be written
-
-    ! Writes out instantaneous values
-
-    INTEGER :: i
-
-    DO i = 1, SIZE(variables)
-       WRITE ( unit=output_unit, fmt=sngl_fmt ) variables(i)%nam, variables(i)%val
-    END DO
-
-  END SUBROUTINE write_variables
 
   SUBROUTINE cke_calc
     IMPLICIT NONE

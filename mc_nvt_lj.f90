@@ -43,7 +43,7 @@ PROGRAM mc_nvt_lj
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               maths_module,     ONLY : metropolis, random_translate_vector
   USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                                     potential_1, potential, move, n, r, potential_type
@@ -56,12 +56,9 @@ PROGRAM mc_nvt_lj
   REAL :: temperature ! Specified temperature
   REAL :: r_cut       ! Potential cutoff distance
 
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
-
   ! Composite interaction = pot & vir & ovr variables
   TYPE(potential_type) :: total, partial_old, partial_new
-  
+
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL               :: delta, m_ratio
   REAL, DIMENSION(3) :: ri
@@ -120,10 +117,10 @@ PROGRAM mc_nvt_lj
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_lj'
   END IF
-  CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  m_ratio = 0.0
+  CALL run_begin ( calc_variables() )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -165,8 +162,7 @@ PROGRAM mc_nvt_lj
         m_ratio = REAL(moves) / REAL(n)
 
         ! Calculate and accumulate variables for this step
-        CALL calculate ( )
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
 
      END DO ! End loop over steps
 
@@ -176,17 +172,7 @@ PROGRAM mc_nvt_lj
 
   END DO ! End loop over blocks
 
-  CALL run_end ! Output run averages
-
-  CALL calculate ( 'Final values' )
-
-  ! Double-check book-keeping for totals, and overlap
-  total = potential ( box, r_cut )
-  IF ( total%ovr ) THEN ! should never happen
-     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
-     STOP 'Error in mc_nvt_lj'
-  END IF
-  CALL calculate ( 'Final check' )
+  CALL run_end ( calc_variables() ) ! Output run averages
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box ) ! Write out final configuration
 
@@ -195,12 +181,12 @@ PROGRAM mc_nvt_lj
 
 CONTAINS
 
-  SUBROUTINE calculate ( string )
+  FUNCTION calc_variables () RESULT ( variables )
     USE lrc_module,      ONLY : potential_lrc, pressure_lrc, pressure_delta
     USE mc_module,       ONLY : force_sq
-    USE averages_module, ONLY : write_variables, variable_type, msd
+    USE averages_module, ONLY : variable_type, msd
     IMPLICIT NONE
-    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+    TYPE(variable_type), DIMENSION(7) :: variables ! The 7 variables listed below
 
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
@@ -228,13 +214,8 @@ CONTAINS
     ! but for clarity and readability we assign all the values together below
 
     ! Move acceptance ratio
+    m_r = variable_type ( nam = 'Move ratio', val = m_ratio, instant = .FALSE. )
 
-    IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
-    ELSE
-       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
-    END IF
-    
     ! Internal energy per atom for simulated, cut, potential
     ! Ideal gas contribution plus cut (but not shifted) PE divided by N
     e_c = variable_type ( nam = 'E/N cut', val = 1.5*temperature + total%pot/REAL(n) )
@@ -258,18 +239,13 @@ CONTAINS
     ! Heat capacity (full)
     ! MSD potential energy divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
     ! We add ideal gas contribution, 1.5, afterwards
-    c_f = variable_type ( nam = 'Cv/N full', val = total%pot/(temperature*SQRT(REAL(n))), method = msd, add = 1.5 )
+    c_f = variable_type ( nam = 'Cv/N full', val = total%pot/(temperature*SQRT(REAL(n))), &
+         &                method = msd, add = 1.5, instant = .FALSE. )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ m_r, e_c, p_c, e_f, p_f, t_c, c_f ]
 
-    IF ( PRESENT ( string ) ) THEN ! Output required
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables(2:6) ) ! Don't write out move ratio or MSD variable
-    END IF
-
-  END SUBROUTINE calculate
+  END FUNCTION calc_variables
 
 END PROGRAM mc_nvt_lj
 

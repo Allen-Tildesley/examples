@@ -47,7 +47,7 @@ PROGRAM mc_gibbs_lj
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               maths_module,     ONLY : metropolis, random_integer, random_translate_vector
   USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                                     potential_1, potential, move, swap, n, r, potential_type
@@ -60,9 +60,6 @@ PROGRAM mc_gibbs_lj
   REAL               :: dv_max      ! Maximum MC volume change
   REAL               :: temperature ! Specified temperature
   REAL               :: r_cut       ! Potential cutoff distance
-
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & vir & ovr variables
   TYPE(potential_type), DIMENSION(2) :: total, total_new
@@ -147,14 +144,18 @@ PROGRAM mc_gibbs_lj
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration 2'
      STOP 'Error in mc_gibbs_lj'
   END IF
-  CALL calculate ( 'Initial values' )
+
+  ! Initialize arrays for averaging and write column headings
+  m1_ratio  = 0.0
+  m2_ratio  = 0.0
+  x12_ratio = 0.0
+  x21_ratio = 0.0
+  v_ratio   = 0.0
+  CALL run_begin ( calc_variables() )
 
   ! Zero histograms
   rho_hist(:) = 0.0
   eng_hist(:) = 0.0
-
-  ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -329,8 +330,7 @@ PROGRAM mc_gibbs_lj
         END IF ! End test for non-overlapping configurations
 
         ! Calculate and accumulate variables for this step
-        CALL calculate ( )
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
         CALL add_hist
 
      END DO ! End loop over steps
@@ -342,22 +342,7 @@ PROGRAM mc_gibbs_lj
 
   END DO ! End loop over blocks
 
-  CALL run_end ! Output run averages
-
-  CALL calculate ( 'Final values' )
-
-  ! Double-check book-keeping of totals and overlap
-  total(1) = potential ( 1, n(1), box(1), r_cut )
-  IF ( total(1)%ovr ) THEN ! should never happen
-     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration 1'
-     STOP 'Error in mc_gibbs_lj'
-  END IF
-  total(2) = potential ( n(1)+1, n(1)+n(2), box(2), r_cut )
-  IF ( total(2)%ovr ) THEN ! should never happen
-     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration 2'
-     STOP 'Error in mc_gibbs_lj'
-  END IF
-  CALL calculate ( 'Final check' )
+  CALL run_end ( calc_variables() ) ! Output run averages
 
   CALL write_cnf_atoms ( cnf_prefix(1)//out_tag, n(1), box(1), box(1)*r(:,1:n(1))           ) ! Write out final configuration
   CALL write_cnf_atoms ( cnf_prefix(2)//out_tag, n(2), box(2), box(2)*r(:,n(1)+1:n(1)+n(2)) ) ! Write out final configuration
@@ -369,14 +354,13 @@ PROGRAM mc_gibbs_lj
 
 CONTAINS
 
-  SUBROUTINE calculate ( string )
+  FUNCTION calc_variables () RESULT ( variables )
     USE lrc_module,      ONLY : potential_lrc, pressure_lrc, pressure_delta
-    USE averages_module, ONLY : write_variables, variable_type
+    USE averages_module, ONLY : variable_type
     IMPLICIT NONE
-    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+    TYPE(variable_type), DIMENSION(13) :: variables ! The 13 variables listed below
 
-    ! This routine calculates all variables of interest and (optionally) writes them out
-    ! They are collected together in the variables array, for use in the main program
+    ! This function returns all variables of interest in an array, for use in the main program
 
     ! In this example we simulate using the cut (but not shifted) potential
     ! The values of < p_c >,  < e_c > and < density > should be consistent (for this potential)
@@ -401,20 +385,11 @@ CONTAINS
     ! but for clarity and readability we assign all the values together below
 
     ! Move, creation, and destruction acceptance ratios
-
-    IF ( PRESENT ( string ) ) THEN ! The ratios are meaningless in this case
-       m1_r  = variable_type ( nam = 'Move ratio (1)',    val = 0.0 )
-       m2_r  = variable_type ( nam = 'Move ratio (2)',    val = 0.0 )
-       x12_r = variable_type ( nam = 'Swap ratio (1->2)', val = 0.0 )
-       x21_r = variable_type ( nam = 'Swap ratio (2->1)', val = 0.0 )
-       v_r   = variable_type ( nam = 'Volume ratio',      val = 0.0 )
-    ELSE
-       m1_r  = variable_type ( nam = 'Move ratio (1)',    val = m1_ratio  )
-       m2_r  = variable_type ( nam = 'Move ratio (2)',    val = m2_ratio  )
-       x12_r = variable_type ( nam = 'Swap ratio (1->2)', val = x12_ratio )
-       x21_r = variable_type ( nam = 'Swap ratio (2->1)', val = x21_ratio )
-       v_r   = variable_type ( nam = 'Volume ratio',      val = v_ratio   )
-    END IF
+    m1_r  = variable_type ( nam = 'Move ratio (1)',    val = m1_ratio,  instant = .FALSE. )
+    m2_r  = variable_type ( nam = 'Move ratio (2)',    val = m2_ratio,  instant = .FALSE. )
+    x12_r = variable_type ( nam = 'Swap ratio (1->2)', val = x12_ratio, instant = .FALSE. )
+    x21_r = variable_type ( nam = 'Swap ratio (2->1)', val = x21_ratio, instant = .FALSE. )
+    v_r   = variable_type ( nam = 'Volume ratio',      val = v_ratio,   instant = .FALSE. )
 
     ! Number of particles
     n_1 = variable_type ( nam = 'Number (1)', val = REAL(n(1)) )
@@ -435,15 +410,9 @@ CONTAINS
     p2_c = variable_type ( nam = 'P cut (2)', val = pressure_delta(rho(2),r_cut) + rho(2)*temperature + total(2)%vir/vol(2) )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ m1_r, m2_r, x12_r, x21_r, v_r, n_1, n_2, density_1, density_2, e1_c, e2_c, p1_c, p2_c ]
 
-    IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables(6:) ) ! Don't write out move ratios
-    END IF
-
-  END SUBROUTINE calculate
+  END FUNCTION calc_variables
 
   SUBROUTINE add_hist
     REAL    :: rho, eng

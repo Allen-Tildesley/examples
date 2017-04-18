@@ -41,7 +41,7 @@ PROGRAM mc_nvt_hs
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               maths_module,     ONLY : random_translate_vector
   USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                                     overlap_1, overlap, n, r
@@ -52,9 +52,6 @@ PROGRAM mc_nvt_hs
   REAL :: box         ! Box length
   REAL :: dr_max      ! Maximum MC displacement
   REAL :: eps_box     ! Pressure scaling parameter
-
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   INTEGER            :: blk, stp, i, nstep, nblock, moves, ioerr
   REAL, DIMENSION(3) :: ri
@@ -110,10 +107,10 @@ PROGRAM mc_nvt_hs
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_hs'
   END IF
-  CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  m_ratio = 0.0
+  CALL run_begin ( calc_variables() )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -138,8 +135,7 @@ PROGRAM mc_nvt_hs
         m_ratio = REAL(moves) / REAL(n)
 
         ! Calculate and accumulate variables for this step
-        CALL calculate ( )
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
 
      END DO ! End loop over steps
 
@@ -149,14 +145,7 @@ PROGRAM mc_nvt_hs
 
   END DO ! End loop over blocks
 
-  CALL run_end ! Output run averages
-
-  ! Final overlap check and pressure calculation
-  IF ( overlap ( box ) ) THEN ! should never happen
-     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
-     STOP 'Error in mc_nvt_hs'
-  END IF
-  CALL calculate ( 'Final values' )
+  CALL run_end ( calc_variables() ) ! Output run averages
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box ) ! Write out final configuration
 
@@ -165,11 +154,11 @@ PROGRAM mc_nvt_hs
 
 CONTAINS
 
-  SUBROUTINE calculate ( string )
-    USE averages_module, ONLY : write_variables, variable_type
+  FUNCTION calc_variables () RESULT ( variables )
+    USE averages_module, ONLY : variable_type
     USE mc_module,       ONLY : n_overlap
     IMPLICIT NONE
-    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+    TYPE(variable_type), DIMENSION(2) :: variables ! The 2 variables listed below
 
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
@@ -191,26 +180,15 @@ CONTAINS
     ! but for clarity and readability we assign all the values together below
 
     ! Move acceptance ratio
-
-    IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
-    ELSE
-       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
-    END IF
+    m_r = variable_type ( nam = 'Move ratio', val = m_ratio, instant = .FALSE. )
 
     ! Pressure in units kT/sigma**3
     ! Ideal gas contribution plus total virial divided by V
     p_f = variable_type ( nam = 'P', val = rho + vir/vol )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ m_r, p_f ]
 
-    IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables(2:) ) ! Don't write out move ratio
-    END IF
-
-  END SUBROUTINE calculate
+  END FUNCTION calc_variables
 
 END PROGRAM mc_nvt_hs

@@ -51,7 +51,7 @@ PROGRAM mc_npt_lj
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               maths_module,     ONLY : metropolis, random_translate_vector
   USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                                     potential_1, potential, move, n, r, potential_type
@@ -65,9 +65,6 @@ PROGRAM mc_npt_lj
   REAL :: temperature ! Specified temperature
   REAL :: pressure    ! Specified pressure
   REAL :: r_cut       ! Potential cutoff distance
-
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & vir & ovr variables
   TYPE(potential_type) :: total, total_new, partial_old, partial_new
@@ -134,10 +131,11 @@ PROGRAM mc_npt_lj
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_npt_lj'
   END IF
-  CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  m_ratio = 0.0
+  v_ratio = 0.0
+  CALL run_begin ( calc_variables() )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -203,8 +201,7 @@ PROGRAM mc_npt_lj
         END IF ! End test for overlapping configuration
 
         ! Calculate and accumulate variables for this step
-        CALL calculate ( )
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
 
      END DO ! End loop over steps
 
@@ -214,18 +211,7 @@ PROGRAM mc_npt_lj
 
   END DO ! End loop over blocks
 
-  CALL run_end ! Output run averages
-
-  ! Output final values
-  CALL calculate ( 'Final values' )
-
-  ! Double-check book-keeping for totals, and overlap
-  total = potential ( box, r_cut )
-  IF ( total%ovr ) THEN ! should never happen
-     WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
-     STOP 'Error in mc_npt_lj'
-  END IF
-  CALL calculate ( 'Final check' )
+  CALL run_end ( calc_variables() ) ! Output run averages
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box ) ! Write out final configuration
 
@@ -234,12 +220,12 @@ PROGRAM mc_npt_lj
 
 CONTAINS
 
-  SUBROUTINE calculate ( string )
+  FUNCTION calc_variables () RESULT ( variables )
     USE lrc_module,      ONLY : potential_lrc, pressure_lrc, pressure_delta
     USE mc_module,       ONLY : force_sq
-    USE averages_module, ONLY : write_variables, variable_type, msd
+    USE averages_module, ONLY : variable_type, msd
     IMPLICIT NONE
-    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+    TYPE(variable_type), DIMENSION(11) :: variables ! The 11 variables listed below
 
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
@@ -270,14 +256,8 @@ CONTAINS
     ! but for clarity and readability we assign all the values together below
 
     ! Move and volume acceptance ratios
-
-    IF ( PRESENT ( string ) ) THEN ! The ratios are meaningless in this case
-       m_r = variable_type ( nam = 'Move ratio',   val = 0.0 )
-       v_r = variable_type ( nam = 'Volume ratio', val = 0.0 )
-    ELSE
-       m_r = variable_type ( nam = 'Move ratio',   val = m_ratio )
-       v_r = variable_type ( nam = 'Volume ratio', val = v_ratio )
-    END IF
+    m_r = variable_type ( nam = 'Move ratio',   val = m_ratio, instant = .FALSE. )
+    v_r = variable_type ( nam = 'Volume ratio', val = v_ratio, instant = .FALSE. )
 
     ! Density
     density = variable_type ( nam = 'Density', val = rho )
@@ -307,28 +287,24 @@ CONTAINS
     ! NB this is not really the excess Cp/NkB, it simply omits the kinetic energy fluctuations
     ! i.e. we add the ideal gas part of Cv/NkB, 1.5, to get total Cp/NkB
     enp = total%pot+pressure*vol
-    c_c = variable_type ( nam = 'Cp/N cut', val = enp/(temperature*SQRT(REAL(n))), method = msd, add = 1.5 )
+    c_c = variable_type ( nam = 'Cp/N cut', val = enp/(temperature*SQRT(REAL(n))), &
+         &                method = msd, add = 1.5, instant = .FALSE. )
 
     ! Heat capacity (full)
     ! MSD of excess "enthalpy" divided by temperature and sqrt(N) to make result intensive
     ! NB this is not really the excess Cp/NkB, it simply omits the kinetic energy fluctuations
     ! i.e. we add the ideal gas part of Cv/NkB, 1.5, to get total Cp/NkB
     enp = REAL(n)*potential_lrc(rho,r_cut)+total%pot+pressure*vol
-    c_f = variable_type ( nam = 'Cp/N full', val = enp/(temperature*SQRT(REAL(n))), method = msd, add = 1.5 )
+    c_f = variable_type ( nam = 'Cp/N full', val = enp/(temperature*SQRT(REAL(n))), &
+         &                method = msd, add = 1.5, instant = .FALSE. )
 
     ! Volume MSD
-    vol_msd = variable_type ( nam = 'Volume MSD', val = vol, method = msd )
+    vol_msd = variable_type ( nam = 'Volume MSD', val = vol, method = msd, instant = .FALSE. )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ m_r, v_r, density, e_c, p_c, e_f, p_f, t_c, c_c, c_f, vol_msd ]
 
-    IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables(3:8) ) ! Don't write out move ratios or MSD values
-    END IF
-
-  END SUBROUTINE calculate
+  END FUNCTION calc_variables
 
 END PROGRAM mc_npt_lj
 

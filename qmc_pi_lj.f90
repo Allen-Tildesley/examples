@@ -48,7 +48,7 @@ PROGRAM qmc_pi_lj
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               maths_module,     ONLY : metropolis, random_translate_vector
   USE               qmc_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                                     potential_1, spring_1, potential, spring, n, p, r, potential_type
@@ -61,9 +61,6 @@ PROGRAM qmc_pi_lj
   REAL :: dr_max      ! Maximum MC displacement
   REAL :: temperature ! Specified temperature
   REAL :: r_cut       ! Potential cutoff distance
-
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & ovr variables
   TYPE(potential_type) :: total, partial_old, partial_new
@@ -144,10 +141,10 @@ PROGRAM qmc_pi_lj
      STOP 'Error in qmc_pi_lj'
   END IF
   total_spr = spring ( box, k_spring )
-  CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  m_ratio = 0.0
+  CALL run_begin ( calc_variables() )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -199,8 +196,7 @@ PROGRAM qmc_pi_lj
         m_ratio = REAL(moves) / REAL(n)
 
         ! Calculate and accumulate variables for this step
-        CALL calculate ( )
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
 
      END DO ! End loop over steps
 
@@ -214,9 +210,7 @@ PROGRAM qmc_pi_lj
 
   END DO ! End loop over blocks
 
-  CALL run_end ! Output run averages
-
-  CALL calculate ( 'Final values' )
+  CALL run_end ( calc_variables() ) ! Output run averages
 
   ! Final double-check on book-keeping for totals, and overlap
   total = potential ( box, r_cut )
@@ -225,7 +219,6 @@ PROGRAM qmc_pi_lj
      STOP 'Error in qmc_pi_lj'
   END IF
   total_spr = spring ( box, k_spring )
-  CALL calculate ( 'Final check' )
 
   DO k = 1, p ! Loop over ring polymer indices
      WRITE(k_tag,fmt='(i2.2)') k                                        ! Convert into character form
@@ -238,11 +231,11 @@ PROGRAM qmc_pi_lj
 
 CONTAINS
 
-  SUBROUTINE calculate ( string )
+  FUNCTION calc_variables ( ) RESULT ( variables )
     USE lrc_module,      ONLY : potential_lrc
-    USE averages_module, ONLY : write_variables, variable_type
+    USE averages_module, ONLY : variable_type
     IMPLICIT NONE
-    CHARACTER (len=*), INTENT(in), OPTIONAL :: string
+    TYPE(variable_type), DIMENSION(3) :: variables ! The 3 variables listed below
 
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
@@ -270,12 +263,7 @@ CONTAINS
     ! but for clarity and readability we assign all the values together below
 
     ! Acceptance ratio of moves
-
-    IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move ratio', val = 0.0 )
-    ELSE
-       m_r = variable_type ( nam = 'Move ratio', val = m_ratio )
-    END IF
+    m_r = variable_type ( nam = 'Move ratio', val = m_ratio, instant = .FALSE. )
 
     ! Internal energy per atom for simulated, cut, potential
     ! Total (cut but not shifted) PE already divided by factor P
@@ -290,15 +278,9 @@ CONTAINS
     e_f = variable_type ( nam = 'E/N full', val = potential_lrc(rho,r_cut) + (kin+total%pot-total_spr)/REAL(n) )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ m_r, e_c, e_f ]
 
-    IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables(2:) ) ! Don't write out move ratio
-    END IF
-
-  END SUBROUTINE calculate
+  END FUNCTION calc_variables
 
 END PROGRAM qmc_pi_lj
 

@@ -52,7 +52,7 @@ PROGRAM mc_chain_wl_sw
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                                     regrow, crank, pivot, qcount, weight, n, r
 
@@ -78,9 +78,6 @@ PROGRAM mc_chain_wl_sw
   INTEGER :: nstage         ! Determines termination point for run
   REAL    :: ds             ! Entropy increment for Wang-Landau method
   INTEGER :: nq             ! Maximum anticipated energy
-
-  ! Quantities to be averaging
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Histograms and tables
   REAL, DIMENSION(:), ALLOCATABLE :: h ! Histogram of q values (0:nq)
@@ -169,11 +166,12 @@ PROGRAM mc_chain_wl_sw
   WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Initial energy', q
   q_max = q ! Max q seen so far
 
-  ! Allocate the variables array
-  CALL calculate
-  
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  r_ratio = 0.0
+  c_ratio = 0.0
+  p_ratio = 0.0
+  h(:) = 0.0
+  CALL run_begin ( calc_variables() )
 
   stage = 1
   blk   = 0
@@ -182,7 +180,7 @@ PROGRAM mc_chain_wl_sw
   s(:)  = 0.0
   h(:)  = 0.0
   g(:)  = 0.0
-  
+
   DO ! Begin loop over blocks
 
      IF ( stage > nstage ) EXIT ! Run is finished
@@ -226,8 +224,7 @@ PROGRAM mc_chain_wl_sw
         END IF
 
         ! Calculate and accumulate variables for this step
-        CALL calculate
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
 
      END DO ! End loop over steps
 
@@ -246,8 +243,9 @@ PROGRAM mc_chain_wl_sw
 
   END DO ! End loop over blocks
 
+  ! Conventional run averages are not appropriate, but we do generate specimen results
   CALL write_results
-  
+
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r ) ! Write out final configuration
 
   CALL deallocate_arrays
@@ -256,16 +254,15 @@ PROGRAM mc_chain_wl_sw
 
 CONTAINS
 
-  SUBROUTINE calculate
-    USE averages_module, ONLY : write_variables, variable_type
+  FUNCTION calc_variables () RESULT ( variables )
+    USE averages_module, ONLY : variable_type
     IMPLICIT NONE
-    ! This routine calculates all variables of interest (no writing out)
-    ! They are collected together in the variables array, for use in the main program
+    TYPE(variable_type), DIMENSION(6) :: variables ! The 6 variables listed below
+
+    ! This function returns all variables of interest in an array, for use in the main program
     ! The output during this simulation is essentially diagnostic, the averages don't mean much
 
     TYPE(variable_type) :: r_r, c_r, p_r, h_min, h_max, h_avg
-
-    LOGICAL, SAVE :: first_call = .TRUE.
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -275,39 +272,20 @@ CONTAINS
     ! The %nam and some other components need only be defined once, at the start of the program,
     ! but for clarity and readability we assign all the values together below
 
-    IF ( first_call ) THEN
+    ! Acceptance ratios for regrowth, crankshaft, and pivot moves
+    r_r = variable_type ( nam = 'Regrow ratio', val = r_ratio, instant = .FALSE. )
+    c_r = variable_type ( nam = 'Crank ratio',  val = c_ratio, instant = .FALSE. )
+    p_r = variable_type ( nam = 'Pivot ratio',  val = p_ratio, instant = .FALSE. )
 
-       ! Acceptance ratios for regrowth, crankshaft, and pivot moves
-       r_r = variable_type ( nam = 'Regrow ratio', val = 0.0 )
-       c_r = variable_type ( nam = 'Crank ratio',  val = 0.0 )
-       p_r = variable_type ( nam = 'Pivot ratio',  val = 0.0 )
-
-       ! Histogram diagnostics
-       h_min = variable_type ( nam = 'Histogram min', val = 0.0 )
-       h_max = variable_type ( nam = 'Histogram max', val = 0.0 )
-       h_avg = variable_type ( nam = 'Histogram avg', val = 0.0 )
-
-       first_call = .FALSE.
-
-    ELSE
-
-       ! Acceptance ratios for regrowth, crankshaft, and pivot moves
-       r_r = variable_type ( nam = 'Regrow ratio', val = r_ratio )
-       c_r = variable_type ( nam = 'Crank ratio',  val = c_ratio )
-       p_r = variable_type ( nam = 'Pivot ratio',  val = p_ratio )
-
-       ! Histogram diagnostics
-       h_min = variable_type ( nam = 'Histogram min', val = REAL(MINVAL(h(0:q_max))) )
-       h_max = variable_type ( nam = 'Histogram max', val = REAL(MAXVAL(h(0:q_max))) )
-       h_avg = variable_type ( nam = 'Histogram avg', val = REAL(SUM(h(0:q_max)))/REAL(q_max+1) )
-
-    END IF
+    ! Histogram diagnostics
+    h_min = variable_type ( nam = 'Histogram min', val = REAL(MINVAL(h(0:q_max))), instant = .FALSE. )
+    h_max = variable_type ( nam = 'Histogram max', val = REAL(MAXVAL(h(0:q_max))), instant = .FALSE. )
+    h_avg = variable_type ( nam = 'Histogram avg', val = REAL(SUM(h(0:q_max)))/REAL(q_max+1), instant = .FALSE. )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ r_r, c_r, p_r, h_min, h_max, h_avg ]
 
-  END SUBROUTINE calculate
+  END FUNCTION calc_variables
 
   SUBROUTINE update_histogram
     IMPLICIT NONE
@@ -318,7 +296,7 @@ CONTAINS
 
     REAL, DIMENSION(3) :: r_cm
     REAL               :: r_g
-    
+
     IF ( q > nq .OR. q < 0 ) THEN
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'q out of range ', q, nq
        STOP 'Error in update_histogram'
@@ -402,24 +380,24 @@ CONTAINS
   SUBROUTINE write_results
 
     IMPLICIT NONE
-    
+
     ! Calculates some specimen results after the simulation is finished
     ! The same calculation can be done afterwards using the data written out by write_histogram
     ! An example program wl_hist.f90 is provided to illustrate this
-    
+
     REAL, DIMENSION(:), ALLOCATABLE :: t_vals ! Array of temperatures
     REAL, DIMENSION(:), ALLOCATABLE :: boltz  ! Array of Boltzmann factors (including DOS)
-    
+
     INTEGER :: i, qs_max
     REAL    :: t, s_max, norm, g_avg, e_avg, e_msd
 
     ALLOCATE ( boltz(0:q_max) )
-    
-    t_vals = [ 0.15, 0.18, 0.2, 0.22, 0.25, 0.3, 0.5, 1.0, 2.0, 5.0 ] ! Fortran 2003 automatically allocates this
+    ALLOCATE ( t_vals(10) ) ! Ideally we could omit this as Fortran 2003 should automatically allocate
+    t_vals = [ 0.15, 0.18, 0.2, 0.22, 0.25, 0.3, 0.5, 1.0, 2.0, 5.0 ]
 
     WRITE ( unit=output_unit, fmt='(a)'   ) 'Specimen results'
     WRITE ( unit=output_unit, fmt='(4a15)') 'T', 'Rg', 'PE/N', 'Cv(ex)/N'
-    
+
     DO i = 1, SIZE(t_vals) ! Loop over selected temperatures
        t = t_vals(i)
 
@@ -431,7 +409,7 @@ CONTAINS
        ! Compute Boltzmann weights including density of states
        boltz = s(0:q_max) - s_max - e(0:q_max) / t
        boltz = EXP ( boltz )
-       
+
        ! Calculate averages
        norm  = SUM ( boltz )
        g_avg = SUM ( boltz * g(0:q_max) ) / norm
@@ -445,8 +423,8 @@ CONTAINS
     END DO ! End loop over selected temperatures
 
     DEALLOCATE ( boltz )
-    
+
   END SUBROUTINE write_results
-  
+
 END PROGRAM mc_chain_wl_sw
 

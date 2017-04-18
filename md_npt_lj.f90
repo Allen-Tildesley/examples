@@ -48,7 +48,7 @@ PROGRAM md_npt_lj
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE               maths_module,     ONLY : random_normal, random_normals
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                                     force, r, v, f, n, potential_type
 
@@ -75,9 +75,6 @@ PROGRAM md_npt_lj
   REAL,    DIMENSION(m) :: q_baro     ! Barostat thermal inertias
   REAL,    DIMENSION(m) :: eta_baro   ! Barostat thermal coordinates
   REAL,    DIMENSION(m) :: p_eta_baro ! Barostat thermal momenta
-
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & cut & vir & lap & ovr variables
   TYPE(potential_type) :: total
@@ -166,10 +163,9 @@ PROGRAM md_npt_lj
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in md_npt_lj'
   END IF
-  CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  CALL run_begin ( calc_variables() )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -200,8 +196,7 @@ PROGRAM md_npt_lj
         CALL u4_propagator ( dt/4.0, 1, m ) ! Outwards order
 
         ! Calculate and accumulate variables for this step
-        CALL calculate ( )
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
 
      END DO ! End loop over steps
 
@@ -211,14 +206,13 @@ PROGRAM md_npt_lj
 
   END DO ! End loop over blocks
 
-  CALL run_end
+  CALL run_end ( calc_variables() )
 
   CALL force ( box, r_cut, total )
   IF ( total%ovr ) THEN ! should never happen
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in md_npt_lj'
   END IF
-  CALL calculate ( 'Final values' )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v ) ! Write out final configuration
 
@@ -381,11 +375,11 @@ CONTAINS
 
   END SUBROUTINE u4_propagator
 
-  SUBROUTINE calculate ( string ) 
+  FUNCTION calc_variables ( ) RESULT ( variables )
     USE lrc_module,      ONLY : potential_lrc, pressure_lrc
-    USE averages_module, ONLY : write_variables, variable_type, msd
+    USE averages_module, ONLY : variable_type, msd
     IMPLICIT NONE
-    CHARACTER (len=*), INTENT(in), OPTIONAL :: string
+    TYPE(variable_type), DIMENSION(12) :: variables ! The 12 variables listed below
 
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
@@ -444,30 +438,25 @@ CONTAINS
     ! Heat capacity (cut-and-shifted)
     ! Total "enthalpy" divided by temperature and sqrt(N) to make result intensive
     enp = kin+total%pot+pressure*vol
-    c_s = variable_type ( nam = 'Cp/N cut&shifted', val = enp/(temperature*SQRT(REAL(n))), method = msd )
+    c_s = variable_type ( nam = 'Cp/N cut&shifted', val = enp/(temperature*SQRT(REAL(n))), method = msd, instant = .FALSE. )
 
     ! Heat capacity (full)
     ! Total "enthalpy" divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
     enp = kin+total%cut+pressure*vol
-    c_f = variable_type ( nam = 'Cp/N full', val = enp/(temperature*SQRT(REAL(n))), method = msd )
+    c_f = variable_type ( nam = 'Cp/N full', val = enp/(temperature*SQRT(REAL(n))), method = msd, instant = .FALSE. )
 
     ! Volume MSD
-    vol_msd = variable_type ( nam = 'Volume MSD', val = vol, method = msd )
+    vol_msd = variable_type ( nam = 'Volume MSD', val = vol, method = msd, instant = .FALSE. )
 
     ! Mean-squared deviation of conserved energy-like quantity
     ! Energy plus extra terms defined above
-    conserved_msd = variable_type ( nam = 'Conserved MSD', val = (eng+ext)/REAL(n), method = msd, es_format = .TRUE. )
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = (eng+ext)/REAL(n), &
+         &                          method = msd, e_format = .TRUE., instant = .FALSE. )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ e_s, p_s, e_f, p_f, t_k, t_c, density, conserved, c_s, c_f, vol_msd, conserved_msd ]
 
-    IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables(1:8) ) ! Don't write out MSD variables
-    END IF
-
-  END SUBROUTINE calculate
+  END FUNCTION calc_variables
 
 END PROGRAM md_npt_lj
 

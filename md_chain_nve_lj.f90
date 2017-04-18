@@ -42,7 +42,7 @@ PROGRAM md_chain_nve_lj
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               maths_module,     ONLY : lowercase
   USE               md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                                     zero_cm, force, worst_bond, r, r_old, v, f, n, potential_type, &
@@ -54,9 +54,6 @@ PROGRAM md_chain_nve_lj
   REAL :: dt   ! Time step
   REAL :: bond ! Bond length
   REAL :: wc   ! Constraint virial (not used in this example)
-
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & ovr variables
   TYPE(potential_type) :: total
@@ -128,10 +125,9 @@ PROGRAM md_chain_nve_lj
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in md_chain_nve_lj'
   END IF
-  CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  CALL run_begin ( calc_variables() )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -156,8 +152,7 @@ PROGRAM md_chain_nve_lj
         CALL constraints_b ( dt, bond, wc ) ! RATTLE/MILCSHAKE part B
 
         ! Calculate and accumulate variables for this step
-        CALL calculate ( )
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
 
      END DO ! End loop over steps
 
@@ -167,14 +162,13 @@ PROGRAM md_chain_nve_lj
 
   END DO ! End loop over blocks
 
-  CALL run_end ! Output run averages
+  CALL run_end ( calc_variables() ) ! Output run averages
 
   CALL force ( total )
   IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in final configuration'
      STOP 'Error in md_chain_nve_lj'
   END IF
-  CALL calculate ( 'Final values' )
   WRITE ( unit=output_unit, fmt='(a,t40,es15.5)' ) 'Worst bond length deviation = ', worst_bond ( bond )
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r, v ) ! Write out final configuration
@@ -184,10 +178,10 @@ PROGRAM md_chain_nve_lj
 
 CONTAINS
 
-  SUBROUTINE calculate ( string )
-    USE averages_module, ONLY : write_variables, variable_type, msd, cke
+  FUNCTION calc_variables ( ) RESULT ( variables )
+    USE averages_module, ONLY : variable_type, msd, cke
     IMPLICIT NONE
-    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+    TYPE(variable_type), DIMENSION(5) :: variables ! The 5 variables listed below
 
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
@@ -225,22 +219,16 @@ CONTAINS
 
     ! MSD of kinetic energy, intensive
     ! Use special method to convert to Cv/N
-    c_f = variable_type ( nam = 'Cv/N', val = kin/SQRT(REAL(n)), method = cke )
+    c_f = variable_type ( nam = 'Cv/N', val = kin/SQRT(REAL(n)), method = cke, instant = .FALSE. )
 
     ! Mean-squared deviation of conserved energy
-    conserved_msd = variable_type ( nam = 'Conserved MSD', val = eng/REAL(n), method = msd, es_format = .TRUE. )
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = eng/REAL(n), &
+         &                          method = msd, e_format = .TRUE., instant = .FALSE. )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ e_f, t_k, r_g, c_f, conserved_msd ]
 
-    IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables(1:3) ) ! Not MSD variables
-    END IF
-
-  END SUBROUTINE calculate
-
+  END FUNCTION calc_variables
 
 END PROGRAM md_chain_nve_lj
 

@@ -42,7 +42,7 @@ PROGRAM qmc_pi_sho
   ! Leave namelist empty to accept supplied defaults
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               averages_module, ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module, ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               maths_module,    ONLY : metropolis
 
   IMPLICIT NONE
@@ -55,9 +55,6 @@ PROGRAM qmc_pi_sho
   REAL    :: dx_max      ! Maximum Monte Carlo displacement
   REAL    :: pot_cl      ! Classical potential energy
   REAL    :: pot_qu      ! Quantum potential energy
-
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   REAL    :: xi, zeta, beta
   REAL    :: pot_cl_old, pot_cl_new, pot_qu_old, pot_qu_new
@@ -111,10 +108,10 @@ PROGRAM qmc_pi_sho
   ! Calculate initial values
   pot_cl = 0.5 * SUM ( x**2 ) / REAL (p )                ! Classical potential energy
   pot_qu = 0.5 * k_spring * SUM ( ( x-CSHIFT(x,1) )**2 ) ! Quantum potential energy
-  CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  m_ratio = 0.0
+  CALL run_begin ( calc_variables() )
 
   DO blk = 1-nequil, nblock ! Begin loop over blocks (including equilibration)
 
@@ -155,8 +152,7 @@ PROGRAM qmc_pi_sho
 
         IF ( blk > 0 ) THEN ! Test for production phase
            ! Calculate and accumulate variables for this step
-           CALL calculate ( )
-           CALL blk_add ( variables )
+           CALL blk_add ( calc_variables() )
         END IF ! End test for production phase
 
      END DO ! End loop over steps
@@ -165,24 +161,19 @@ PROGRAM qmc_pi_sho
 
   END DO ! End loop over blocks (including equilibration)
 
-  CALL run_end ! Output run averages
+  CALL run_end ( calc_variables() ) ! Output run averages
 
   e_qu = e_pi_sho ( p, beta )
   WRITE ( unit=output_unit, fmt='(a,i0.0,a,t40,f15.6)' ) 'Exact P=', p, ' energy', e_qu
   e_qu = 0.5 / TANH(0.5*beta)
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)'        ) 'Exact P=infinity energy', e_qu
 
-  CALL calculate ( 'Final values' )
-  pot_cl = 0.5 * SUM ( x**2 ) / REAL (p )                ! Classical potential energy
-  pot_qu = 0.5 * k_spring * SUM ( ( x-CSHIFT(x,1) )**2 ) ! Quantum potential energy
-  CALL calculate ( 'Final check' )
-
 CONTAINS
 
-  SUBROUTINE calculate ( string )
-    USE averages_module, ONLY : write_variables, variable_type
+  FUNCTION calc_variables ( ) RESULT ( variables )
+    USE averages_module, ONLY : variable_type
     IMPLICIT NONE
-    CHARACTER (len=*), INTENT(in), OPTIONAL :: string
+    TYPE(variable_type), DIMENSION(4) :: variables ! The 4 variables listed below
 
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
@@ -194,12 +185,7 @@ CONTAINS
     kin = 0.5 * p * temperature  ! Kinetic energy for P-bead system
 
     ! Move ratio
-
-    IF ( PRESENT ( string ) ) THEN ! The ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Move:ratio', val = 0.0 )
-    ELSE
-       m_r = variable_type ( nam = 'Move:ratio', val = m_ratio )
-    END IF
+    m_r = variable_type ( nam = 'Move:ratio', val = m_ratio, instant = .FALSE. )
 
     ! Classical potential energy
     pe_cl = variable_type ( nam = 'PE:classical', val = pot_cl )
@@ -211,15 +197,9 @@ CONTAINS
     energy = variable_type ( nam = 'Energy', val = kin+pot_cl-pot_qu )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ m_r, pe_cl, pe_qu, energy ]
 
-    IF ( PRESENT ( string ) ) THEN
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables(2:) ) ! Don't write out move ratio
-    END IF
-
-  END SUBROUTINE calculate
+  END FUNCTION calc_variables
 
   FUNCTION e_pi_sho ( p, beta ) RESULT ( e )
     IMPLICIT NONE

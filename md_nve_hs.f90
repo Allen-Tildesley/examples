@@ -43,7 +43,7 @@ PROGRAM md_nve_hs
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                                     update, overlap, collide, n, r, v, coltime, partner, gt, lt
 
@@ -55,9 +55,6 @@ PROGRAM md_nve_hs
   REAL :: kin        ! Kinetic energy
   REAL :: temp_kinet ! Temperature (conserved)
   REAL :: dt         ! Time step
-
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
@@ -111,14 +108,12 @@ PROGRAM md_nve_hs
   kin        = 0.5 * SUM ( v**2 )
   temp_kinet = 2.0 * kin / REAL ( 3*(n-1) )
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature', temp_kinet
-  
+
   ! Initial overlap check
   IF ( overlap ( box ) ) THEN
      WRITE ( unit=error_unit, fmt='(a)' ) 'Particle overlap in initial configuration'
      STOP 'Error in md_nve_hs'
   END IF
-
-  CALL calculate
 
   ! Initial search for collision partners >i
   coltime(:) = HUGE(1.0)
@@ -128,10 +123,12 @@ PROGRAM md_nve_hs
   END DO
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  col_sum = 0
+  vir_sum = 0.0
+  CALL run_begin ( calc_variables() )
 
   ncoll = 0
-  
+
   DO blk = 1, nblock ! Begin loop over blocks
 
      CALL blk_begin
@@ -160,7 +157,7 @@ PROGRAM md_nve_hs
 
            ! Update collision lists
            DO k = 1, n
-              IF ( k==i .or. k==j .or. partner(k) == i .OR.  partner(k) == j ) THEN
+              IF ( k==i .OR. k==j .OR. partner(k) == i .OR.  partner(k) == j ) THEN
                  CALL update ( k, box, gt ) ! Search for partners >k
               END IF
            END DO
@@ -172,8 +169,7 @@ PROGRAM md_nve_hs
         ncoll = ncoll + col_sum
 
         ! Calculate and accumulate variables for this step
-        CALL calculate
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
 
      END DO ! End loop over steps
 
@@ -183,10 +179,10 @@ PROGRAM md_nve_hs
 
   END DO ! End loop over blocks
 
-  CALL run_end ! Output run averages
+  CALL run_end ( calc_variables() ) ! Output run averages
 
   WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Total collisions', ncoll
-  
+
   IF ( overlap ( box ) ) STOP 'Particle overlap in final configuration'
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, box, r*box, v )
@@ -205,7 +201,7 @@ CONTAINS
        WRITE ( unit=error_unit, fmt='(a,f15.6)' ) 'Negative time step', t
        STOP 'Error in md_nve_hs/advance'
     END IF
-    
+
     t_now      = t_now + t                 ! Advance current time by t
     coltime(:) = coltime(:) - t            ! Reduce times to next collision by t
     r(:,:)     = r(:,:) + t * v(:,:) / box ! Advance all positions by t (box=1 units)
@@ -213,17 +209,16 @@ CONTAINS
 
   END SUBROUTINE advance
 
-  SUBROUTINE calculate
+  FUNCTION calc_variables ( ) RESULT ( variables )
     USE averages_module, ONLY : variable_type
     IMPLICIT NONE
+    TYPE(variable_type), DIMENSION(2) :: variables ! The 2 variables listed below
 
     ! This routine calculates all variables of interest
     ! They are collected together in the variables array, for use in the main program
 
     TYPE(variable_type) :: coll_rate, p_coll
     REAL                :: vol, rho
-
-    LOGICAL, SAVE :: first_call = .TRUE.
 
     ! Preliminary calculations
     vol = box**3        ! Volume
@@ -237,29 +232,17 @@ CONTAINS
     ! The %nam and some other components need only be defined once, at the start of the program,
     ! but for clarity and readability we assign all the values together below
 
-    IF ( first_call ) THEN
+    ! Collision rate per particle
+    ! We average over the time step
+    coll_rate = variable_type ( nam = 'Collision rate', val = 2.0*REAL(col_sum)/dt/REAL(n), instant = .FALSE. )
 
-       coll_rate  = variable_type ( nam = 'Collision rate', val = 0.0 )
-       p_coll     = variable_type ( nam = 'P', val = 0.0 )
-       first_call = .FALSE.
-
-    ELSE
-
-       ! Collision rate per particle
-       ! We average over the time step
-       coll_rate = variable_type ( nam = 'Collision rate', val = 2.0*REAL(col_sum)/dt/REAL(n) )
-
-       ! Collisional pressure
-       ! ideal + collisional virial / volume averaged over the time step
-       p_coll = variable_type ( nam = 'P', val = rho*temp_kinet + vir_sum/dt/vol )
-
-    END IF
+    ! Collisional pressure
+    ! ideal + collisional virial / volume averaged over the time step
+    p_coll = variable_type ( nam = 'P', val = rho*temp_kinet + vir_sum/dt/vol, instant = .FALSE. )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ coll_rate, p_coll ]
 
-  END SUBROUTINE calculate
+  END FUNCTION calc_variables
 
 END PROGRAM md_nve_hs
-

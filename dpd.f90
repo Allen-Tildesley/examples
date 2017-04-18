@@ -47,7 +47,7 @@ PROGRAM dpd
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               maths_module,     ONLY : lowercase
   USE               dpd_module,       ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                                     force, lowe, shardlow, p_approx, r, v, f, n, potential_type
@@ -61,9 +61,6 @@ PROGRAM dpd
   REAL :: dt          ! Time step
   REAL :: gamma       ! Thermalization rate (inverse time)
   REAL :: temperature ! Temperature (specified)
-
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   ! Composite interaction = pot & vir & lap variables
   TYPE(potential_type) :: total
@@ -146,10 +143,9 @@ PROGRAM dpd
 
   ! Initial energy etc
   CALL force ( box, a, total )
-  CALL calculate ( 'Initial values' )
 
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  CALL run_begin ( calc_variables() )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -167,8 +163,7 @@ PROGRAM dpd
         CALL kick_propagator ( dt/2.0 ) ! Kick half-step
 
         ! Calculate and accumulate quantities for this step
-        CALL calculate ( )
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
 
      END DO ! End loop over steps
 
@@ -178,11 +173,7 @@ PROGRAM dpd
 
   END DO ! End loop over blocks      
 
-  CALL run_end ! Output run averages
-
-  ! Final energy etc
-  CALL force ( box, a, total )
-  CALL calculate ( 'Final values' )
+  CALL run_end ( calc_variables() ) ! Output run averages
 
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Approx P = ', p_approx ( a, rho, temperature )
 
@@ -210,13 +201,12 @@ CONTAINS
 
   END SUBROUTINE drift_propagator
 
-  SUBROUTINE calculate ( string )
-    USE averages_module, ONLY : write_variables, variable_type
+  FUNCTION calc_variables ( ) RESULT ( variables )
+    USE averages_module, ONLY : variable_type
     IMPLICIT NONE
-    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+    TYPE(variable_type), DIMENSION(4) :: variables ! The 4 variables listed below
 
-    ! This routine calculates all variables of interest and (optionally) writes them out
-    ! They are collected together in the variables array, for use in the main program
+    ! This function returns all variables of interest in an array, for use in the main program
 
     ! The DPD potential is short ranged, zero at, and beyond, r_cut
     ! so issues of shifted potentials and long-range corrections do not arise
@@ -254,15 +244,9 @@ CONTAINS
     t_c = variable_type ( nam = 'T config', val = fsq/total%lap )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ e_f, t_k, t_c, p_f ]
 
-    IF ( PRESENT ( string ) ) THEN ! Output required
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables )
-    END IF
+  END FUNCTION calc_variables
 
-  END SUBROUTINE calculate
-
-END PROGRAM dpd
+END PROGRAM
 

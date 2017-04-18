@@ -43,7 +43,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add, variable_type
+  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, regrow, n, r
 
   IMPLICIT NONE
@@ -54,9 +54,6 @@ PROGRAM mc_chain_nvt_cbmc_lj
   REAL    :: k_spring    ! Strength of intramolecular bond springs
   INTEGER :: m_max       ! Maximum atoms in regrow
   INTEGER :: k_max       ! Number of random tries per atom in regrow
-
-  ! Quantities to be averaged
-  TYPE(variable_type), DIMENSION(:), ALLOCATABLE :: variables
 
   INTEGER :: blk, stp, nstep, nblock, ioerr
   LOGICAL :: accepted
@@ -109,11 +106,9 @@ PROGRAM mc_chain_nvt_cbmc_lj
   CALL allocate_arrays
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, bond, r ) ! Second call gets r
 
-  ! Initial potential and Rg calculation
-  CALL calculate ( 'Initial values' )
-
   ! Initialize arrays for averaging and write column headings
-  CALL run_begin ( variables )
+  m_ratio = 0.0
+  CALL run_begin ( calc_variables() )
 
   DO blk = 1, nblock ! Begin loop over blocks
 
@@ -129,8 +124,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
         END IF
 
         ! Calculate and accumulate quantities for this step
-        CALL calculate ( )
-        CALL blk_add ( variables )
+        CALL blk_add ( calc_variables() )
 
      END DO ! End loop over steps
 
@@ -140,10 +134,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
   END DO ! End loop over blocks
 
-  CALL run_end ! Output run averages
-
-  ! Final potential and Rg calculation
-  CALL calculate ( 'Final values' )
+  CALL run_end ( calc_variables() ) ! Output run averages
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r )
 
@@ -152,14 +143,13 @@ PROGRAM mc_chain_nvt_cbmc_lj
 
 CONTAINS
 
-  SUBROUTINE calculate ( string )
+  FUNCTION calc_variables ( ) RESULT ( variables )
     USE mc_module,       ONLY : potential, spring_pot, potential_type
-    USE averages_module, ONLY : write_variables, variable_type, msd
+    USE averages_module, ONLY : variable_type, msd
     IMPLICIT NONE
-    CHARACTER(len=*), INTENT(in), OPTIONAL :: string
+    TYPE(variable_type), DIMENSION(4) :: variables ! The 4 variables listed below
 
-    ! This routine calculates all variables of interest and (optionally) writes them out
-    ! They are collected together in the variables array, for use in the main program
+    ! This function returns all variables of interest in an array, for use in the main program
 
     TYPE(variable_type)  :: m_r, e_x, r_g, c_x
     TYPE(potential_type) :: total
@@ -185,12 +175,7 @@ CONTAINS
     ! but for clarity and readability we assign all the values together below
 
     ! Move acceptance ratio
-
-    IF ( PRESENT ( string ) ) THEN ! m_ratio is meaningless in this case
-       m_r = variable_type ( nam = 'Regrow ratio', val = 0.0 )
-    ELSE
-       m_r = variable_type ( nam = 'Regrow ratio', val = m_ratio )
-    END IF
+    m_r = variable_type ( nam = 'Regrow ratio', val = m_ratio, instant = .FALSE. )
 
     ! Total potential energy per atom (excess, without ideal gas contribution)
     ! Total PE of bond springs plus total LJ PE (not cut, nor shifted) divided by N
@@ -202,18 +187,12 @@ CONTAINS
     ! Heat Capacity per atom (excess, without ideal gas contribution)
     ! MSD of PE / (sqrt(N)*T)
     ! Total PE of bond springs plus total LJ PE (not cut, nor shifted), divided by T
-    c_x = variable_type ( nam = 'Cv(ex)/N', val = (spr+total%pot)/(SQRT(REAL(n))*temperature), method = msd )
+    c_x = variable_type ( nam = 'Cv(ex)/N', val = (spr+total%pot)/(SQRT(REAL(n))*temperature), &
+         &                method = msd, instant = .FALSE. )
 
     ! Collect together for averaging
-    ! Fortran 2003 should automatically allocate this first time
     variables = [ m_r, e_x, r_g, c_x ]
 
-    IF ( PRESENT ( string ) ) THEN ! Output required
-       WRITE ( unit=output_unit, fmt='(a)' ) string
-       CALL write_variables ( variables(2:3) ) ! Not acceptance ratio or heat capacity
-    END IF
-
-  END SUBROUTINE calculate
+  END FUNCTION calc_variables
 
 END PROGRAM mc_chain_nvt_cbmc_lj
-
