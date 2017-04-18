@@ -26,13 +26,13 @@
 
 """Brownian dynamics, NVT ensemble."""
 
-def calculate ( string=None ):
-    """Calculates all variables of interest and (optionally) writes them out.
+def calc_variables ( ):
+    """Calculates all variables of interest.
     
-    They are collected and returned in the variables list, for use in the main program.
+    They are collected and returned as a list, for use in the main program.
     """
 
-    from averages_module import write_variables, msd, VariableType
+    from averages_module import msd, VariableType
     from lrc_module import potential_lrc, pressure_lrc
     import numpy as np
     import math
@@ -77,20 +77,16 @@ def calculate ( string=None ):
 
     # Heat capacity (cut-and-shifted)
     # Total energy divided by temperature and sqrt(N) to make result intensive
-    c_s = VariableType ( nam = 'Cv/N cut&shifted', val = (kin+total.pot)/(temperature*math.sqrt(n)), method = msd )
+    c_s = VariableType ( nam = 'Cv/N cut&shifted', val = (kin+total.pot)/(temperature*math.sqrt(n)),
+                         method = msd, instant = False )
 
     # Heat capacity (full)
     # Total energy divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
-    c_f = VariableType ( nam = 'Cv/N full', val = (kin+total.cut)/(temperature*math.sqrt(n)), method = msd )
+    c_f = VariableType ( nam = 'Cv/N full', val = (kin+total.cut)/(temperature*math.sqrt(n)),
+                         method = msd, instant = False )
 
     # Collect together into a list for averaging
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, c_s, c_f ]
-
-    if string is not None:
-        print(string)
-        write_variables ( variables[:6] ) # Don't write out MSD variables
-
-    return variables
+    return [ e_s, p_s, e_f, p_f, t_k, t_c, c_s, c_f ]
 
 def a_propagator ( t ):
     """A: drift step propagator.
@@ -152,7 +148,7 @@ import sys
 import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add
 from md_lj_module import introduction, conclusion, force_faster as force, PotentialType
 
 cnf_prefix = 'cnf.'
@@ -210,10 +206,9 @@ r = r - np.rint ( r )          # Periodic boundaries
 # Initial forces, potential, etc plus overlap check
 total, f = force ( box, r_cut, r )
 assert not total.ovr, 'Overlap in initial configuration'
-variables = calculate ( 'Initial values' )
 
 # Initialize arrays for averaging and write column headings
-run_begin ( variables )
+run_begin ( calc_variables() )
 
 for blk in range(1,nblock+1): # Loop over blocks
 
@@ -231,18 +226,16 @@ for blk in range(1,nblock+1): # Loop over blocks
 
         b_propagator ( dt/2 ) # B kick half-step
 
-        variables = calculate()
-        blk_add(variables)
+        blk_add ( calc_variables() )
 
     blk_end(blk)                                             # Output block averages
     sav_tag = str(blk).zfill(3) if blk<1000 else 'sav'       # Number configuration by block
     write_cnf_atoms ( cnf_prefix+sav_tag, n, box, r*box, v ) # Save configuration
 
-run_end()
+run_end ( calc_variables() )
 
 total, f = force ( box, r_cut, r ) # Force evaluation
 assert not total.ovr, 'Overlap in final configuration'
 
-variables = calculate('Final values')
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box, v ) # Save configuration
 conclusion()

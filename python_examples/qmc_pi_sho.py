@@ -26,17 +26,19 @@
 
 """Quantum Monte Carlo, path-integral, harmonic oscillator."""
 
-def calculate ( string=None ):
-    from averages_module import write_variables, VariableType
+def calc_variables ( ):
+    """Calculates all variables of interest.
+
+    They are collected and returned as a list, for use in the main program.
+    """
+
+    from averages_module import VariableType
 
     # Preliminary calculations
     kin = 0.5 * p * temperature  # Kinetic energy for P-bead system
 
     # Move ratio
-    if string is None:
-        m_r = VariableType ( nam = 'Move ratio', val = m_ratio )
-    else: # The ratio is meaningless in this case
-        m_r = VariableType ( nam = 'Move ratio', val = 0.0 )
+    m_r = VariableType ( nam = 'Move ratio', val = m_ratio, instant = False )
 
     # Classical potential energy
     pe_cl = VariableType ( nam = 'PE classical', val = pot_cl )
@@ -48,13 +50,7 @@ def calculate ( string=None ):
     energy = VariableType ( nam = 'Energy', val = kin+pot_cl-pot_qu )
 
     # Collect together into a list for averaging
-    variables = [ m_r, pe_cl, pe_qu, energy ]
-
-    if string is not None:
-        print(string)
-        write_variables ( variables[1:] ) # Don't write out move ratio
-
-    return variables
+    return [ m_r, pe_cl, pe_qu, energy ]
 
 def e_pi_sho ( p, beta ):
     """Exact results for PI approximation of given order."""
@@ -136,7 +132,7 @@ import json
 import sys
 import numpy as np
 import math
-from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add
 from maths_module import metropolis
 
 print('qmc_pi_sho')
@@ -180,10 +176,10 @@ x = np.zeros(p,dtype=np.float_) # Set up initial positions at origin
 # Calculate initial values
 pot_cl = 0.5 * np.sum ( x**2 ) / p                         # Classical potential energy
 pot_qu = 0.5 * k_spring * np.sum ( ( x-np.roll(x,1) )**2 ) # Quantum potential energy
-variables = calculate ( 'Initial values' )
 
 # Initialize arrays for averaging and write column headings
-run_begin ( variables )
+m_ratio = 0.0
+run_begin ( calc_variables() )
 
 for blk in range(-nequil,nblock): # Loop over blocks (including equilibration)
 
@@ -217,20 +213,14 @@ for blk in range(-nequil,nblock): # Loop over blocks (including equilibration)
         m_ratio = moves / p
 
         if blk >= 0:
-            variables = calculate()
-            blk_add(variables)
+            blk_add ( calc_variables() )
 
     if blk >= 0:
         blk_end(blk)
 
-run_end()
+run_end ( calc_variables() )
 
 e_qu = e_pi_sho ( p, beta )
 print("{:8}{:8d}{:7}{:15.6f}".format('Exact P=',p,' energy',e_qu))
 e_qu = 0.5 / math.tanh(0.5*beta)
 print("{:23}{:15.6f}".format('Exact P=infinity energy',e_qu))
-
-variables = calculate('Final values')
-pot_cl = 0.5 * np.sum ( x**2 ) / p                         # Classical potential energy
-pot_qu = 0.5 * k_spring * np.sum ( ( x-np.roll(x,1) )**2 ) # Quantum potential energy
-variables = calculate ( 'Final check' )

@@ -26,10 +26,10 @@
 
 """Molecular dynamics, NVE ensemble, hard spheres."""
 
-def calculate ( string=None ):
+def calc_variables ( ):
     """Calculates all variables of interest.
     
-    They are collected and returned in the variables list, for use in the main program."""
+    They are collected and returned as a list, for use in the main program."""
     
     import numpy as np
     from averages_module import VariableType
@@ -46,19 +46,13 @@ def calculate ( string=None ):
     # The .nam and some other attributes need only be defined once, at the start of the program,
     # but for clarity and readability we assign all the values together below
 
-    if string is None:
-        # We average over the time step
-        coll_rate  = VariableType ( nam = 'Collision rate', val = 2.0*col_sum/dt/n )
-        # ideal + collisional virial / volume averaged over the time step
-        p_coll     = VariableType ( nam = 'P', val = rho*temp_kinet + vir_sum/dt/vol )
-    else:
-        coll_rate  = VariableType ( nam = 'Collision rate', val = 0.0 )
-        p_coll     = VariableType ( nam = 'P', val = 0.0 )
+    # We average over the time step
+    coll_rate  = VariableType ( nam = 'Collision rate', val = 2.0*col_sum/dt/n, instant = False )
+    # ideal + collisional virial / volume averaged over the time step
+    p_coll     = VariableType ( nam = 'P', val = rho*temp_kinet + vir_sum/dt/vol, instant = False )
 
     # Collect together into a list for averaging
-    variables = [ coll_rate, p_coll ]
-
-    return variables
+    return [ coll_rate, p_coll ]
 
 def advance ( t, box, t_now, coltime, r, v ):
     """Advances positions and reduces collision times."""
@@ -95,7 +89,7 @@ import sys
 import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add
 from md_nve_hs_module import introduction, conclusion, update, dndate, collide, overlap
 
 cnf_prefix = 'cnf.'
@@ -134,7 +128,6 @@ print( "{:40}{:15d}  ".format('Number of blocks',          nblock) )
 print( "{:40}{:15d}  ".format('Number of steps per block', nstep)  )
 print( "{:40}{:15.6f}".format('Time step',                 dt)     )
 
-
 # Read in initial configuration
 n, box, r, v = read_cnf_atoms ( cnf_prefix+inp_tag, with_v=True)
 print( "{:40}{:15d}  ".format('Number of particles',          n)         )
@@ -153,7 +146,6 @@ print( "{:40}{:15.6f}".format('Temperature', temp_kinet)  )
   
 # Initial overlap check
 assert not overlap ( box, r ), 'Particle overlap in initial configuration'
-variables = calculate ( 'Initial values' )
 
 # Initial search for collision partners >i
 coltime = np.full ( n, 1.0e9, dtype=np.float_ )
@@ -162,7 +154,9 @@ for i in range(n-1):
   coltime[i], partner[i] = update ( i, box, r[i:,:], v[i:,:] )
 
 # Initialize arrays for averaging and write column headings
-run_begin ( variables )
+col_sum = 0
+vir_sum = 0.0
+run_begin ( calc_variables() )
 
 ncoll = 0
 
@@ -206,14 +200,13 @@ for blk in range(1,nblock+1): # Loop over blocks
         ncoll = ncoll + col_sum
 
         # Calculate and accumulate variables for this step
-        variables = calculate()
-        blk_add ( variables )
+        blk_add ( calc_variables() )
 
     blk_end(blk)                                             # Output block averages
     sav_tag = str(blk).zfill(3) if blk<1000 else 'sav'       # Number configuration by block
     write_cnf_atoms ( cnf_prefix+sav_tag, n, box, r*box, v ) # Save configuration
 
-run_end()
+run_end ( calc_variables() )
 
 print( "{:40}{:15d}  ".format('Total collisions', ncoll)         )
 assert not overlap ( box, r ), 'Particle overlap in final configuration'

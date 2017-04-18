@@ -26,16 +26,16 @@
 
 """Dissipative particle dynamics."""
 
-def calculate ( string=None ):
-    """Calculates all variables of interest and (optionally) writes them out.
+def calc_variables ( ):
+    """Calculates all variables of interest.
 
-    They are collected and returned in the variables list, for use in the main program.
+    They are collected and returned as a list, for use in the main program.
     """
 
     # The DPD potential is short ranged, zero at, and beyond, r_cut
     # so issues of shifted potentials and long-range corrections do not arise
 
-    from averages_module import write_variables, VariableType
+    from averages_module import VariableType
     import numpy as np
     import math
 
@@ -70,13 +70,7 @@ def calculate ( string=None ):
     t_c = VariableType ( nam = 'T config', val = fsq/total.lap )
 
     # Collect together into a list for averaging
-    variables = [ e_f, t_k, t_c, p_f ]
-
-    if string is not None:
-        print(string)
-        write_variables ( variables )
-
-    return variables
+    return [ e_f, t_k, t_c, p_f ]
 
 def drift_propagator ( t ):
     """velocity Verlet drift step propagator.
@@ -126,7 +120,7 @@ import sys
 import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add
 from dpd_module       import introduction, conclusion, force, lowe, shardlow, p_approx, PotentialType
 
 cnf_prefix = 'cnf.'
@@ -202,10 +196,9 @@ r = r - np.rint ( r )          # Periodic boundaries
 
 # Initial forces, potential, etc plus overlap check
 total, f, pairs = force ( box, a, r, fast )
-variables = calculate ( 'Initial values' )
 
 # Initialize arrays for averaging and write column headings
-run_begin ( variables )
+run_begin ( calc_variables() )
 
 for blk in range(1,nblock+1): # Loop over blocks
 
@@ -221,18 +214,16 @@ for blk in range(1,nblock+1): # Loop over blocks
 
         kick_propagator ( dt/2 )
 
-        variables = calculate()
-        blk_add(variables)
+        blk_add ( calc_variables() )
 
     blk_end(blk)                                             # Output block averages
     sav_tag = str(blk).zfill(3) if blk<1000 else 'sav'       # Number configuration by block
     write_cnf_atoms ( cnf_prefix+sav_tag, n, box, r*box, v ) # Save configuration
 
-run_end()
+run_end ( calc_variables() )
 
 total, f, pairs = force ( box, a, r, fast ) # Force evaluation
 
-variables = calculate('Final values')
 print( "{:40}{:15.6f}".format('Approx pressure', p_approx ( a, rho, temperature ) )  )
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box, v ) # Save configuration
 conclusion()

@@ -26,10 +26,10 @@
 
 """Monte Carlo, single chain, NVT, CBMC."""
 
-def calculate ( string=None ):
-    """Calculates all variables of interest and (optionally) writes them out.
+def calc_variables ( ):
+    """Calculates all variables of interest.
 
-    They are collected and returned in the variables list, for use in the main program.
+    They are collected and returned as a list, for use in the main program.
     """
 
     # In this example we simulate using the cut (but not shifted) potential
@@ -40,7 +40,7 @@ def calculate ( string=None ):
 
     import numpy as np
     import math
-    from averages_module    import write_variables, msd, VariableType
+    from averages_module    import msd, VariableType
     from mc_chain_lj_module import potential, spring_pot, PotentialType
 
     # Preliminary calculations
@@ -59,11 +59,7 @@ def calculate ( string=None ):
     # but for clarity and readability we assign all the values together below
 
     # Move acceptance ratio
-
-    if string is None:
-        m_r = VariableType ( nam = 'Regrow ratio', val = m_ratio )
-    else:
-        m_r = VariableType ( nam = 'Regrow ratio', val = 0.0 ) # The ratio is meaningless in this case
+    m_r = VariableType ( nam = 'Regrow ratio', val = m_ratio, instant = False )
 
     # Total potential energy per atom (excess, without ideal gas contribution)
     # Total PE of bond springs plus total LJ PE (not cut, nor shifted) divided by N
@@ -75,16 +71,11 @@ def calculate ( string=None ):
     # Heat Capacity per atom (excess, without ideal gas contribution)
     # MSD of PE / (sqrt(N)*T)
     # Total PE of bond springs plus total LJ PE (not cut, nor shifted), divided by T
-    c_x = VariableType ( nam = 'Cv(ex)/N', val = (spr+total.pot)/(np.sqrt(n)*temperature), method = msd )
+    c_x = VariableType ( nam = 'Cv(ex)/N', val = (spr+total.pot)/(np.sqrt(n)*temperature),
+                         method = msd, instant = False )
 
     # Collect together into a list for averaging
-    variables = [ m_r, e_x, r_g, c_x ]
-
-    if string is not None:
-        print(string)
-        write_variables ( variables[1:3] ) # Not acceptance ratio or heat capacity
-
-    return variables
+    return [ m_r, e_x, r_g, c_x ]
 
 # Takes in a configuration of atom positions in a linear chain
 # NO periodic boundary conditions, no box
@@ -107,7 +98,7 @@ import sys
 import numpy as np
 import math
 from config_io_module   import read_cnf_atoms, write_cnf_atoms
-from averages_module    import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module    import run_begin, run_end, blk_begin, blk_end, blk_add
 from mc_chain_lj_module import introduction, conclusion, regrow
 
 cnf_prefix = 'cnf.'
@@ -164,11 +155,9 @@ n, bond, r = read_cnf_atoms ( cnf_prefix+inp_tag)
 print( "{:40}{:15d}  ".format('Number of particles',          n)     )
 print( "{:40}{:15.6f}".format('Bond length (in sigma units)', bond)  )
 
-# Initial energy and overlap check
-variables = calculate ( 'Initial values' )
-
 # Initialize arrays for averaging and write column headings
-run_begin ( variables )
+m_ratio = 0.0
+run_begin ( calc_variables() )
 
 for blk in range(1,nblock+1): # Loop over blocks
 
@@ -179,15 +168,13 @@ for blk in range(1,nblock+1): # Loop over blocks
         r, accepted = regrow ( temperature, m_max, k_max, bond, k_spring, r, fast )
         m_ratio = 1.0 if accepted else 0.0
 
-        variables = calculate()
-        blk_add(variables)
+        blk_add ( calc_variables() )
 
     blk_end(blk)                                       # Output block averages
     sav_tag = str(blk).zfill(3) if blk<1000 else 'sav' # Number configuration by block
     write_cnf_atoms ( cnf_prefix+sav_tag, n, bond, r ) # Save configuration
 
-run_end()
-variables = calculate('Final values')
+run_end ( calc_variables() )
 
 write_cnf_atoms ( cnf_prefix+out_tag, n, bond, r ) # Save configuration
 conclusion()

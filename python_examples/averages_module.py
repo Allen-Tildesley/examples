@@ -44,12 +44,13 @@ sngl_fmt  = '{:40}{:15.6f}' # Format for single line output
 class VariableType:
     """Class encapsulating the essential information for simulation averages."""
 
-    def __init__(self, nam, val, method=avg, add=0.0, e_format=False):
+    def __init__(self, nam, val, method=avg, add=0.0, e_format=False, instant=True):
         self.nam      = nam
         self.val      = val
         self.method   = method
         self.add      = add
         self.e_format = e_format
+        self.instant  = instant
 
 def time_stamp():
     """Function to print date, time, and cpu time information."""
@@ -65,6 +66,11 @@ def run_begin ( variables ):
     
     import numpy as np
     global n_avg, headings, subheads, line_fmt, line_width, method, add, run_nrm, run_avg, run_err
+
+    print('Initial values')
+    for variable in variables:
+        if variable.instant:
+            print(sngl_fmt.format(variable.nam,variable.val))
 
     n_avg = len(variables)
 
@@ -158,7 +164,7 @@ def blk_end ( blk ):
     # Write out block averages
     print((col1i_fmt+line_fmt).format(blk,*blk_avg))
 
-def run_end():
+def run_end ( variables ):
     """Write out averages and error estimates at end of run."""
     
     import numpy as np
@@ -186,13 +192,10 @@ def run_end():
     time_stamp()
     print()
 
-def write_variables ( variables ):
-    """Write out instantaneous variables."""
-    
-    import numpy as np
-
+    print('Final values')
     for variable in variables:
-        print(sngl_fmt.format(variable.nam,variable.val))
+        if variable.instant:
+            print(sngl_fmt.format(variable.nam,variable.val))
 
 def cke_calc():
     """Special fluctuation formula for microcanonical heat capacity."""

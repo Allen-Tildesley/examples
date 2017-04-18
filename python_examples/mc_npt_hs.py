@@ -26,13 +26,13 @@
 
 """Monte Carlo, NPT ensemble, hard spheres."""
 
-def calculate ( string=None ):
-    """Calculates all variables of interest and (optionally) writes them out.
+def calc_variables ( ):
+    """Calculates all variables of interest.
 
-    They are collected and returned in the variables list, for use in the main program.
+    They are collected and returned as a list, for use in the main program.
     """
 
-    from averages_module import write_variables, VariableType
+    from averages_module import VariableType
     import numpy as np
     import math
 
@@ -50,24 +50,14 @@ def calculate ( string=None ):
 
     # Move acceptance ratios
 
-    if string is None:
-        m_r = VariableType ( nam = 'Move ratio',   val = m_ratio )
-        v_r = VariableType ( nam = 'Volume ratio', val = v_ratio )
-    else: # The ratios are meaningless in this case
-        m_r = VariableType ( nam = 'Move ratio',   val = 0.0 )
-        v_r = VariableType ( nam = 'Volume ratio', val = 0.0 )
+    m_r = VariableType ( nam = 'Move ratio',   val = m_ratio, instant = False )
+    v_r = VariableType ( nam = 'Volume ratio', val = v_ratio, instant = False )
 
     # Density
     density = VariableType ( nam = 'Density', val = rho )
 
     # Collect together into a list for averaging
-    variables = [ m_r, v_r, density ]
-
-    if string is not None:
-        print(string)
-        write_variables ( variables[2:] ) # Don't write out move ratios
-
-    return variables
+    return [ m_r, v_r, density ]
 
 # Takes in a configuration of atoms (positions)
 # Cubic periodic boundary conditions
@@ -90,7 +80,7 @@ import sys
 import numpy as np
 import math
 from config_io_module  import read_cnf_atoms, write_cnf_atoms
-from averages_module   import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module   import run_begin, run_end, blk_begin, blk_end, blk_add
 from maths_module      import random_translate_vector, metropolis
 from mc_hs_module      import introduction, conclusion, overlap, overlap_1
 
@@ -148,10 +138,11 @@ r = r - np.rint ( r ) # Periodic boundaries
 
 # Initial pressure and overlap check
 assert not overlap ( box, r, fast ), 'Overlap in initial configuration'
-variables = calculate ( 'Initial values' )
 
 # Initialize arrays for averaging and write column headings
-run_begin ( variables )
+m_ratio = 0.0
+v_ratio = 0.0
+run_begin ( calc_variables() )
 
 for blk in range(1,nblock+1): # Loop over blocks
 
@@ -187,15 +178,13 @@ for blk in range(1,nblock+1): # Loop over blocks
                 box     = box_new   # Update box
                 v_ratio = 1.0       # Set volume move counter
 
-        variables = calculate()
-        blk_add(variables)
+        blk_add ( calc_variables() )
 
     blk_end(blk)                                          # Output block averages
     sav_tag = str(blk).zfill(3) if blk<1000 else 'sav'    # Number configuration by block
     write_cnf_atoms ( cnf_prefix+sav_tag, n, box, r*box ) # Save configuration
 
-run_end()
-variables = calculate('Final values')
+run_end ( calc_variables() )
 
 assert not overlap ( box, r, fast ), 'Overlap in final configuration'
 

@@ -26,10 +26,10 @@
 
 """Monte Carlo, zVT (grand) ensemble."""
 
-def calculate ( string=None ):
-    """Calculates all variables of interest and (optionally) writes them out.
+def calc_variables ( ):
+    """Calculates all variables of interest.
 
-    They are collected and returned in the variables list, for use in the main program.
+    They are collected and returned as a list, for use in the main program.
     """
 
     # In this example we simulate using the cut (but not shifted) potential
@@ -40,7 +40,7 @@ def calculate ( string=None ):
 
     import numpy as np
     import math
-    from averages_module import write_variables, msd, VariableType
+    from averages_module import msd, VariableType
     from lrc_module      import potential_lrc, pressure_lrc, pressure_delta
     from mc_lj_module    import force_sq
 
@@ -58,15 +58,9 @@ def calculate ( string=None ):
     # but for clarity and readability we assign all the values together below
 
     # Move, creation, and destruction acceptance ratios
-
-    if string is None:
-        m_r = VariableType ( nam = 'Move ratio',    val = m_ratio )
-        c_r = VariableType ( nam = 'Create ratio',  val = c_ratio )
-        d_r = VariableType ( nam = 'Destroy ratio', val = d_ratio )
-    else: # The ratios are meaningless in this case
-        m_r = VariableType ( nam = 'Move ratio',    val = 0.0 )
-        c_r = VariableType ( nam = 'Create ratio',  val = 0.0 )
-        d_r = VariableType ( nam = 'Destroy ratio', val = 0.0 )
+    m_r = VariableType ( nam = 'Move ratio',    val = m_ratio, instant = False )
+    c_r = VariableType ( nam = 'Create ratio',  val = c_ratio, instant = False )
+    d_r = VariableType ( nam = 'Destroy ratio', val = d_ratio, instant = False )
 
     # Number
     number = VariableType ( nam = 'N', val = float(n) )
@@ -95,16 +89,10 @@ def calculate ( string=None ):
     t_c = VariableType ( nam = 'T config', val = fsq/total.lap )
 
     # Number MSD
-    n_msd = VariableType ( nam = 'N MSD', val = float(n), method = msd )
+    n_msd = VariableType ( nam = 'N MSD', val = float(n), method = msd, instant = False )
 
     # Collect together into a list for averaging
-    variables = [ m_r, c_r, d_r, number, density, e_c, p_c, e_f, p_f, t_c, n_msd ]
-
-    if string is not None:
-        print(string)
-        write_variables ( variables[3:10] ) # Don't write out move ratio or MSD variables
-
-    return variables
+    return [ m_r, c_r, d_r, number, density, e_c, p_c, e_f, p_f, t_c, n_msd ]
 
 # Takes in a configuration of atoms (positions)
 # Cubic periodic boundary conditions
@@ -130,7 +118,7 @@ import sys
 import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add
 from maths_module     import random_translate_vector, metropolis
 from mc_lj_module     import introduction, conclusion, potential, potential_1, PotentialType
 
@@ -198,10 +186,12 @@ r = r - np.rint ( r ) # Periodic boundaries
 # Initial energy and overlap check
 total = potential ( box, r_cut, r, fast )
 assert not total.ovr, 'Overlap in initial configuration'
-variables = calculate ( 'Initial values' )
 
 # Initialize arrays for averaging and write column headings
-run_begin ( variables )
+m_ratio = 0.0
+c_ratio = 0.0
+d_ratio = 0.0
+run_begin ( calc_variables() )
 
 for blk in range(1,nblock+1): # Loop over blocks
 
@@ -273,19 +263,16 @@ for blk in range(1,nblock+1): # Loop over blocks
         c_ratio = c_acc/c_try if c_try>0 else 0.0
         d_ratio = d_acc/d_try if d_try>0 else 0.0
 
-        variables = calculate()
-        blk_add(variables)
+        blk_add ( calc_variables() )
 
     blk_end(blk)                                          # Output block averages
     sav_tag = str(blk).zfill(3) if blk<1000 else 'sav'    # Number configuration by block
     write_cnf_atoms ( cnf_prefix+sav_tag, n, box, r*box ) # Save configuration
 
-run_end()
-variables = calculate('Final values')
+run_end ( calc_variables() )
 
 total = potential ( box, r_cut, r, fast ) # Double check book-keeping
 assert not total.ovr, 'Overlap in final configuration'
 
-variables = calculate('Final check')
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box ) # Save configuration
 conclusion()

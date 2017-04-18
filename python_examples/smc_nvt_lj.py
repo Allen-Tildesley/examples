@@ -26,15 +26,15 @@
 
 """Smart Monte Carlo, NVT ensemble."""
 
-def calculate ( string=None ):
-    """Calculates all variables of interest and (optionally) writes them out.
+def calc_variables ( ):
+    """Calculates all variables of interest.
 
-    They are collected and returned in the variables list, for use in the main program.
+    They are collected and returned as a list, for use in the main program.
     """
     
     import numpy as np
     import math
-    from averages_module import write_variables, msd, VariableType
+    from averages_module import msd, VariableType
     from lrc_module      import potential_lrc, pressure_lrc
     
     # Preliminary calculations (n,r,total are taken from the calling program)
@@ -52,10 +52,7 @@ def calculate ( string=None ):
 
     # Move acceptance ratio
 
-    if string is None:
-        m_r = VariableType ( nam = 'Move ratio', val = m_ratio )
-    else:
-        m_r = VariableType ( nam = 'Move ratio', val = 0.0 ) # The ratio is meaningless in this case
+    m_r = VariableType ( nam = 'Move ratio', val = m_ratio, instant = False )
 
     # Internal energy per atom for simulated, cut-and-shifted, potential
     # Ideal gas contribution plus total cut-and-shifted PE divided by N
@@ -80,21 +77,17 @@ def calculate ( string=None ):
     # Heat capacity (excess, cut-and-shifted)
     # Total PE divided by temperature and sqrt(N) to make result intensive
     # We add ideal gas contribution, 1.5, afterwards
-    c_s = VariableType ( nam = 'Cv/N cut&shifted', val = total.pot/(temperature*math.sqrt(n)), method = msd, add = 1.5 )
+    c_s = VariableType ( nam = 'Cv/N cut&shifted', val = total.pot/(temperature*math.sqrt(n)),
+                         method = msd, add = 1.5, instant = False )
 
     # Heat capacity (excess, full)
     # Total PE divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
     # We add ideal gas contribution, 1.5, afterwards
-    c_f = VariableType ( nam = 'Cv/N full', val = total.cut/(temperature*math.sqrt(n)), method = msd, add = 1.5 )
+    c_f = VariableType ( nam = 'Cv/N full', val = total.cut/(temperature*math.sqrt(n)),
+                         method = msd, add = 1.5, instant = False )
 
     # Collect together into a list for averaging
-    variables = [ m_r, e_s, p_s, e_f, p_f, t_c, c_s, c_f ]
-
-    if string is not None:
-        print(string)
-        write_variables ( variables[1:-2] ) # Don't write out move ratio or MSD variables
-
-    return variables
+    return [ m_r, e_s, p_s, e_f, p_f, t_c, c_s, c_f ]
 
 # Takes in a configuration of atoms (positions)
 # Cubic periodic boundary conditions
@@ -122,7 +115,7 @@ import sys
 import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add
 from maths_module     import metropolis
 from smc_lj_module    import introduction, conclusion, force, force_1, PotentialType
 
@@ -192,10 +185,10 @@ r = r - np.rint ( r ) # Periodic boundaries
 # Initial energy and overlap check
 total, f = force ( box, r_cut, r, fast )
 assert not total.ovr, 'Overlap in initial configuration'
-variables = calculate ( 'Initial values' )
 
 # Initialize arrays for averaging and write column headings
-run_begin ( variables )
+m_ratio = 0.0
+run_begin ( calc_variables() )
 
 for blk in range(1,nblock+1): # Loop over blocks
 
@@ -275,20 +268,18 @@ for blk in range(1,nblock+1): # Loop over blocks
                     m_ratio = 0.0          # Set move counter
 
         # Calculate and accumulate variables for this step
-        variables = calculate ( )
-        blk_add ( variables )
+        blk_add ( calc_variables() )
 
     blk_end(blk)                                          # Output block averages
     sav_tag = str(blk).zfill(3) if blk<1000 else 'sav'    # Number configuration by block
     write_cnf_atoms ( cnf_prefix+sav_tag, n, box, r*box ) # Save configuration
 
-run_end() # Output run averages
-variables = calculate ( 'Final values' )
+run_end ( calc_variables() ) # Output run averages
 
-# Double check book-keeping for totals, and final overlap
+# Double check book-keeping for final overlap
 total, f = force ( box, r_cut, r, fast )
 assert not total.ovr, 'Overlap in final configuration'
-variables = calculate('Final check')
+
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box ) # Save configuration
 conclusion()
 

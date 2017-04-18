@@ -26,14 +26,14 @@
 
 """Molecular dynamics, NVE ensemble."""
 
-def calculate ( string=None ):
-    """Calculates all variables of interest and (optionally) writes them out.
+def calc_variables ( ):
+    """Calculates all variables of interest.
     
-    They are collected and returned in the variables list, for use in the main program."""
+    They are collected and returned as a list, for use in the main program."""
     
     import numpy as np
     import math
-    from averages_module import write_variables, msd, cke, VariableType
+    from averages_module import msd, cke, VariableType
     from lrc_module import potential_lrc, pressure_lrc
     from md_lj_module import hessian
     
@@ -79,19 +79,14 @@ def calculate ( string=None ):
 
     # MSD of kinetic energy, intensive
     # Use special method to convert to Cv/N
-    c_s = VariableType ( nam = 'Cv/N cut&shifted', val = kin/math.sqrt(n), method = cke )
+    c_s = VariableType ( nam = 'Cv/N cut&shifted', val = kin/math.sqrt(n), method = cke, instant = False )
 
     # Mean-squared deviation of conserved energy per atom
-    conserved_msd = VariableType ( nam = 'Conserved MSD', val = eng/n, method = msd, e_format = True )
+    conserved_msd = VariableType ( nam = 'Conserved MSD', val = eng/n,
+                                   method = msd, e_format = True, instant = False )
 
     # Collect together into a list for averaging
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, c_s, conserved_msd ]
-
-    if string is not None:
-        print(string)
-        write_variables ( variables[:6] ) # Don't write out MSD variables
-
-    return variables
+    return [ e_s, p_s, e_f, p_f, t_k, t_c, c_s, conserved_msd ]
 
 # Takes in a configuration of atoms (positions, velocities)
 # Cubic periodic boundary conditions
@@ -114,7 +109,7 @@ import sys
 import numpy as np
 import math
 from config_io_module import read_cnf_atoms, write_cnf_atoms
-from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add
 from md_lj_module     import introduction, conclusion, force, PotentialType
 
 cnf_prefix = 'cnf.'
@@ -173,10 +168,9 @@ v = v - vcm                    # Set COM velocity to zero
 # Initial forces, potential, etc plus overlap check
 total, f = force ( box, r_cut, r, fast )
 assert not total.ovr, 'Overlap in initial configuration'
-variables = calculate ( 'Initial values' )
 
 # Initialize arrays for averaging and write column headings
-run_begin ( variables )
+run_begin ( calc_variables() )
 
 for blk in range(1,nblock+1): # Loop over blocks
 
@@ -196,18 +190,16 @@ for blk in range(1,nblock+1): # Loop over blocks
 
         v = v + 0.5 * dt * f # Kick half-step
 
-        variables = calculate()
-        blk_add(variables)
+        blk_add ( calc_variables() )
 
     blk_end(blk)                                             # Output block averages
     sav_tag = str(blk).zfill(3) if blk<1000 else 'sav'       # Number configuration by block
     write_cnf_atoms ( cnf_prefix+sav_tag, n, box, r*box, v ) # Save configuration
 
-run_end()
+run_end ( calc_variables() )
 
 total, f = force ( box, r_cut, r, fast ) # Force evaluation
 assert not total.ovr, 'Overlap in final configuration'
 
-variables = calculate('Final values')
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box, v ) # Save configuration
 conclusion()

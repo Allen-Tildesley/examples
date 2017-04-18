@@ -26,15 +26,15 @@
 
 """Molecular dynamics, multiple timesteps, chain molecule."""
 
-def calculate ( string=None ):
-    """Calculates all variables of interest and (optionally) writes them out.
+def calc_variables ( ):
+    """Calculates all variables of interest.
 
-    They are collected and returned in the variables list, for use in the main program.
+    They are collected and returned as a list, for use in the main program.
     """
 
     import numpy as np
     import math
-    from averages_module import write_variables, msd, cke, VariableType
+    from averages_module import msd, cke, VariableType
 
     # Preliminary calculations
     kin = 0.5*np.sum(v**2)
@@ -63,19 +63,14 @@ def calculate ( string=None ):
 
     # MSD of kinetic energy, intensive
     # Use special method to convert to Cv/N
-    c_f = VariableType ( nam = 'Cv/N', val = kin/math.sqrt(n), method = cke )
+    c_f = VariableType ( nam = 'Cv/N', val = kin/math.sqrt(n), method = cke, instant = False )
 
     # Mean-squared deviation of conserved energy per atom
-    conserved_msd = VariableType ( nam = 'Conserved MSD', val = eng/n, method = msd, e_format = True )
+    conserved_msd = VariableType ( nam = 'Conserved MSD', val = eng/n,
+                                   method = msd, e_format = True, instant = False )
 
     # Collect together for averaging
-    variables = [ e_f, t_k, r_g, c_f, conserved_msd ]
-
-    if string is not None:
-        print(string)
-        write_variables ( variables[:-2] ) # Not MSD variables
-
-    return variables
+    return [ e_f, t_k, r_g, c_f, conserved_msd ]
 
 # Takes in a configuration of atoms in a linear chain (positions, velocities)
 # NO periodic boundary conditions, no box
@@ -100,7 +95,7 @@ import sys
 import numpy as np
 import math
 from config_io_module   import read_cnf_atoms, write_cnf_atoms
-from averages_module    import run_begin, run_end, blk_begin, blk_end, blk_add, VariableType
+from averages_module    import run_begin, run_end, blk_begin, blk_end, blk_add
 from md_chain_lj_module import introduction, conclusion, zero_cm, force, spring, worst_bond, PotentialType
 
 cnf_prefix = 'cnf.'
@@ -161,10 +156,9 @@ print( "{:40}{:15.6f}".format('Worst bond length deviation', worst_bond(bond,r) 
 total, f = force ( r, fast )
 assert not total.ovr, 'Overlap in initial configuration'
 total_spr, g = spring ( k_spring, bond, r, fast )
-variables = calculate ( 'Initial values' )
 
 # Initialize arrays for averaging and write column headings
-run_begin ( variables )
+run_begin ( calc_variables() )
 
 for blk in range(1,nblock+1): # Loop over blocks
 
@@ -186,16 +180,14 @@ for blk in range(1,nblock+1): # Loop over blocks
         assert not total.ovr, 'Overlap in configuration'
         v = v + 0.5 * n_mts * dt * f # Kick half-step (long) with nonbonded forces f
 
-        variables = calculate()
-        blk_add(variables)
+        blk_add ( calc_variables() )
 
     blk_end(blk)                                             # Output block averages
     sav_tag = str(blk).zfill(3) if blk<1000 else 'sav'       # Number configuration by block
     write_cnf_atoms ( cnf_prefix+sav_tag, n, bond, r, v ) # Save configuration
 
-run_end()
+run_end ( calc_variables() )
 
-variables = calculate('Final values')
 print( "{:40}{:15.6f}".format('Worst bond length deviation', worst_bond(bond,r) )  )
 write_cnf_atoms ( cnf_prefix+out_tag, n, bond, r, v ) # Save configuration
 conclusion()
