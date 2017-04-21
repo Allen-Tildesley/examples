@@ -109,10 +109,12 @@ for xbox, ybox, zbox in product ( range(-nbox,nbox+1), repeat=3 ): # Triple loop
 
 # Correct for double counting
 pot_shell = pot_shell / 2.0
-  
+
+# Convert to cumulative sum
+pot_shell = np.cumsum ( pot_shell )
+
 # Write out results for increasing spherical cutoff
 print('Shell      Potential')
 for rbox in range(nbox+1):
-    print ( "{:5d}{:15.6f}".format(rbox, np.sum(pot_shell[:1+rbox**2])) )
-
+    print ( "{:5d}{:15.6f}".format(rbox, pot_shell[rbox**2]) )
 

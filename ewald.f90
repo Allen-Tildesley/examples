@@ -125,11 +125,16 @@ PROGRAM ewald
 
   ! Correct for double counting
   pot_shell = pot_shell / 2.0
-  
+
+  ! Convert to cumulative sum
+  DO rbox_sq = 1, nbox_sq
+     pot_shell(rbox_sq) = pot_shell(rbox_sq) + pot_shell(rbox_sq-1)
+  END DO
+
   ! Write out results for increasing spherical cutoff
   WRITE ( unit=output_unit, fmt='(a)' ) 'Shell      Potential'
   DO rbox = 0, nbox
-     WRITE ( unit=output_unit, fmt='(i5,f15.6)' ) rbox, SUM(pot_shell(0:rbox**2))
+     WRITE ( unit=output_unit, fmt='(i5,f15.6)' ) rbox, pot_shell(rbox**2)
   END DO
 
   DEALLOCATE ( r, q, pot_shell )
