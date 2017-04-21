@@ -66,9 +66,8 @@ def pot_k_ewald ( nk, r, q, kappa ):
    
     import numpy as np
     from itertools import product
-    global first_call
+    global first_call, k_sq_max, kfac
 
-    
     n,d = r.shape
     assert d==3, 'r dimension error'
     assert n==q.size, 'q dimension error'
