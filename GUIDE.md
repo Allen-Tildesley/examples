@@ -791,6 +791,22 @@ This naturally leads to formulae involving the Levi-Civita (antisymmetric) symbo
 In practical applications, the formulae would usually be incorporated in a scheme
 for handling long-range forces in periodic boundaries (e.g. Ewald sum).
 
+## Ewald program
+The k-space and r-space contributions to the Ewald sum are illustrated in `ewald_module`
+and we provide a program `ewald` to test these.
+The program reads in a configuration file `cnf.inp` in the usual format:
+any of the Lennard-Jones or hard-sphere configurations would be suitable.
+Charges are assigned to the atoms in an arbitrary way.
+The program itself adds the surface term (the self term is included in the k-space routine).
+Then, a comparison is made with the brute force summation over all pairs
+in shells of periodic boxes surrounding the central box.
+For default parameters, and test configurations with _N_=256,
+reasonable convergence is obtained within 8-10 shells.
+One can adjust the screening parameter kappa within reason
+(and the number of k-vectors may need changing as well):
+the contributions of r-space and k-space terms will change, but their sum should
+remain approximately constant.
+
 ## Cluster program
 The `cluster` program is self contained. It reads in a configuration of atomic positions
 and produces a circular linked list for each cluster identified within it.

@@ -25,7 +25,7 @@ PROGRAM cluster
   ! the software, you should not imply endorsement by the authors or publishers.                   !
   !------------------------------------------------------------------------------------------------!
 
-  ! Reads an atomic configuration with periodic boundary conditions from inp.cnf
+  ! Reads an atomic configuration with periodic boundary conditions from cnf.inp
   ! Defines a cluster by a critical separation r_cl
   ! Value of r_cl read from standard input using a namelist nml
   ! Leave namelist empty to accept supplied default
