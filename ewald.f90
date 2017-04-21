@@ -44,7 +44,7 @@ PROGRAM ewald
   REAL,    DIMENSION(:),   ALLOCATABLE :: pot_shell ! Potential for each shell (0:nbox**2)
 
   CHARACTER(len=7), PARAMETER :: filename = 'cnf.inp'
-  REAL, DIMENSION(3)          :: rij, dipole
+  REAL, DIMENSION(3)          :: rij, dipole, rbox_vec
   REAL                        :: box, kappa, pot, pot_r, pot_k, pot_s
   INTEGER                     :: ioerr
   INTEGER                     :: i, j, xbox, ybox, zbox, rbox, rbox_sq, nbox, nbox_sq, nk
@@ -110,11 +110,12 @@ PROGRAM ewald
         DO zbox = -nbox, nbox
            rbox_sq = xbox**2 + ybox**2 + zbox**2
            IF ( rbox_sq > nbox_sq ) CYCLE ! Skip if outside maximum sphere of boxes
+           rbox_vec = REAL ( [xbox,ybox,zbox] )
            DO i = 1, n
               DO j = 1, n
                  IF ( i==j .AND. rbox_sq==0 ) CYCLE ! Skip only for i=j in central box
                  ! Bare Coulomb term, including box vector, no periodic box correction
-                 rij = r(:,i) - r(:,j) - REAL ( [xbox,ybox,zbox] )
+                 rij = r(:,i) - r(:,j) - rbox_vec
                  pot_shell(rbox_sq) = pot_shell(rbox_sq) + q(i)*q(j) / SQRT ( SUM ( rij**2 ) )
               END DO
            END DO

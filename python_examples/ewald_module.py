@@ -45,8 +45,8 @@ def pot_r_ewald ( r, q, kappa ):
     from scipy.special import erfc
     
     n,d = r.shape
-    assert d==3, 'r dimension error in pot_r_ewald'
-    assert n==q.size, 'q dimension error in pot_r_ewald'
+    assert d==3, 'r dimension error'
+    assert n==q.size, 'q dimension error'
 
     pot = 0.0
 
@@ -58,17 +58,25 @@ def pot_r_ewald ( r, q, kappa ):
         pot = pot + vij
 
     return pot
- 
+
+first_call = True
+
 def pot_k_ewald ( nk, r, q, kappa ):
     """Returns k-space part of potential energy."""
    
     import numpy as np
-    from itertools import combinations
+    from itertools import product
+    global first_call
 
+    
+    n,d = r.shape
+    assert d==3, 'r dimension error'
+    assert n==q.size, 'q dimension error'
+  
     twopi = 2.0*np.pi
     twopi_sq = twopi**2
     
-    if pot_k_ewald.first_call: # Precalculation of expressions at the start
+    if first_call: # Precalculation of expressions at the start
 
         b = 1.0 / 4.0 / kappa / kappa
         k_sq_max = nk**2            # Store this in module data
@@ -77,7 +85,7 @@ def pot_k_ewald ( nk, r, q, kappa ):
         # Lazy triple loop, which over-writes the same values of ksq several times
         # and leaves some locations empty (those which are not the sum of three squared integers)
         # We are only interested in the value of k**2, so skip all negative components
-        for kx,ky,kz in combinations(range(nk+1),3):  # Triple loop over k vector components
+        for kx,ky,kz in product(range(nk+1),repeat=3):  # Triple loop over k vector components
 
             k_sq = kx**2 + ky**2 + kz**2
 
@@ -85,23 +93,23 @@ def pot_k_ewald ( nk, r, q, kappa ):
                 kr_sq      = twopi_sq * k_sq           # k**2 in real units
                 kfac[k_sq] = twopi * np.exp ( -b * kr_sq ) / kr_sq # Stored expression for later use
 
-        pot_k_ewald.first_call = False
+        first_call = False
 
     # Double-check value on later calls
     assert k_sq_max == nk**2, 'nk error'
 
-    eikx = np.zeros((n,nk+1),dtype=np.complex_)   # omits negative k indices
+    eikx = np.zeros((n,nk+1),  dtype=np.complex_) # omits negative k indices
     eiky = np.zeros((n,2*nk+1),dtype=np.complex_) # includes negative k indices
-    eiky = np.zeros((n,2*nk+1),dtype=np.complex_) # includes negative k indices
+    eikz = np.zeros((n,2*nk+1),dtype=np.complex_) # includes negative k indices
 
     # Calculate kx, ky, kz = 0, 1 explicitly
     eikx[:,   0] = 1.0 + 0.0j
     eiky[:,nk+0] = 1.0 + 0.0j
     eikz[:,nk+0] = 1.0 + 0.0j
 
-    eikx[:,   1] = np.cos(twopi*r[:,1]) + np.sin(twopi*r[:,1])*1j
-    eiky[:,nk+1] = np.cos(twopi*r[:,2]) + np.sin(twopi*r[:,2])*1j
-    eikz[:,nk+1] = np.cos(twopi*r[:,3]) + np.sin(twopi*r[:,3])*1j
+    eikx[:,   1] = np.cos(twopi*r[:,0]) + np.sin(twopi*r[:,0])*1j
+    eiky[:,nk+1] = np.cos(twopi*r[:,1]) + np.sin(twopi*r[:,1])*1j
+    eikz[:,nk+1] = np.cos(twopi*r[:,2]) + np.sin(twopi*r[:,2])*1j
 
     # Calculate remaining positive kx, ky and kz by recurrence
     for k in range(2,nk+1):
@@ -120,18 +128,16 @@ def pot_k_ewald ( nk, r, q, kappa ):
 
         factor = 1.0 if kx==0 else 2.0 # Accounts for skipping negative kx
 
-        for ky,kz in combinations(range(2*nk+1),2):  # Double loop over ky, kz vector components
+        for ky,kz in product(range(-nk,nk+1),repeat=2):  # Double loop over ky, kz vector components
 
-            k_sq = kx**2 + (ky-nk)**2 + (kz-nk)**2
+            k_sq = kx**2 + ky**2 + kz**2
 
             if k_sq <= k_sq_max and k_sq > 0: # Test to ensure within range
 
-                term = np.sum ( q[:] * eikx[:,kx] * eiky[:,ky] * eikz[:,kz] ) # Sum over all ions
+                term = np.sum ( q[:] * eikx[:,kx] * eiky[:,nk+ky] * eikz[:,nk+kz] ) # Sum over all ions
                 pot  = pot + factor * kfac[k_sq] * np.real ( np.conj(term)*term )
 
     # Subtract self part of k-space sum
     pot = pot - kappa * np.sum ( q**2 ) / np.sqrt(np.pi)
 
     return pot
-
-pot_k_ewald.firstcall=True
