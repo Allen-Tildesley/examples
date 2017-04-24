@@ -121,7 +121,7 @@ CONTAINS
     IF ( ABS(x) < tol ) THEN
        u = 1 - 0.5*x**2 ! Taylor series
     ELSE
-       u = ( SIN(x)/x ) **3
+       u = ( SIN(x)/x )**3
     END IF
 
     f = 1.0 / u**2

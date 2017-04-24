@@ -109,6 +109,7 @@ PROGRAM ewald
   ! Big multiple loop over all pairs and surrounding periodic boxes
   ! For clarity we count all pairs twice, as ij and ji
   ! Potentials are stored according to squared distance of neighbouring box
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Brute force method'
 
   pot_shell = 0.0 ! Zero array of potentials (not all the elements of this array will be filled)
 
@@ -139,7 +140,6 @@ PROGRAM ewald
   END DO
 
   ! Write out results for increasing spherical cutoff
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Brute force method'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Shell      Potential'
   DO rbox = 0, nbox
      WRITE ( unit=output_unit, fmt='(i5,f15.6)' ) rbox, pot_shell(rbox**2)

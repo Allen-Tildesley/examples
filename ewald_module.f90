@@ -208,9 +208,11 @@ CONTAINS
     COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:,:,:), ALLOCATABLE :: fft_out ! Output data (0:sc-1,0:sc-1,0:sc-1)
     TYPE(C_PTR)                                              :: fft_plan! Plan needed for FFTW
 
-    INTEGER            :: ix, iy, iz
-    REAL, DIMENSION(3) :: k, f
-    REAL               :: g, k_sq, dr
+    INTEGER                             :: ix, iy, iz
+    REAL                                :: kx, ky, kz, fx, fxy, fxyz, g, k_sq, dr
+    real, DIMENSION(:,:,:), ALLOCATABLE :: rho_sq ! Square modulus of charge density (0:sc-1,0:sc-1,0:sc-1)
+    real, dimension(:),     allocatable :: kmesh  ! k-values in wraparound convention (0:sc-1)
+
     REAL, PARAMETER    :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi, fourpi = 4.0*pi, dk = twopi
 
     dr = 1.0 / REAL(2*nk) ! r-spacing
@@ -218,6 +220,7 @@ CONTAINS
     ! Use nk to determine mesh dimension
     sc = 2*nk
     ALLOCATE ( fft_inp(0:sc-1,0:sc-1,0:sc-1), fft_out(0:sc-1,0:sc-1,0:sc-1) )
+    allocate ( rho_sq(0:sc-1,0:sc-1,0:sc-1), kmesh(0:sc-1) )
 
     ! Assign charge density to complex array ready for FFT
     ! Assume r in unit box with range (-0.5,0.5)
@@ -227,27 +230,31 @@ CONTAINS
     CALL fftw_execute_dft  ( fft_plan, fft_inp, fft_out )                                    ! Execute FFT
     CALL fftw_destroy_plan ( fft_plan )                                                      ! Release plan
 
-    fft_out = fft_out / REAL(sc**3) ! Incorporate scaling by number of grid points
+    fft_out = fft_out / REAL(sc**3)           ! Incorporate scaling by number of grid points
+    rho_sq  = real ( fft_out*conjg(fft_out) ) ! Convert to square modulus of charge density
 
+    kmesh      = [ ( real(ix)*dk, ix = 0, sc-1 ) ] ! Set up k-components
+    kmesh(nk:) = kmesh(nk:) - real(sc)*dk          ! in wraparound convention
     pot = 0.0
 
     ! Triple loop over xyz grid points (uses wraparound indexing)
     DO ix = 0, sc-1
-       k(1) = REAL ( wraparound ( ix, nk ) ) * dk
-       f(1) = sharpen( 0.5*k(1)*dr )
+       kx = kmesh(ix)
+       fx = sharpen( 0.5*kx*dr )
        DO iy = 0, sc-1
-          k(2) = REAL ( wraparound ( iy, nk ) ) * dk
-          f(2) = sharpen( 0.5*k(2)*dr )
+          ky  = kmesh(iy)
+          fxy = fx * sharpen( 0.5*ky*dr )
           DO iz = 0, sc-1
-             k(3) = REAL ( wraparound ( iz, nk ) ) * dk
-             f(3) = sharpen( 0.5*k(3)*dr )
+             kz   = kmesh(iz)
+             fxyz = fxy * sharpen( 0.5*kz*dr )
 
              IF ( ix==0 .AND. iy==0 .AND. iz==0 ) CYCLE ! Skip zero wave vector
-             k_sq = SUM ( k**2 )                                   ! Squared magnitude of wave vector
-             g    = (fourpi/k_sq) * EXP ( -k_sq / (4.0*kappa**2) ) ! Uncorrected influence function
-             g    = g * PRODUCT(f)                                 ! Apply simple correction
 
-             pot = pot + g * REAL ( fft_out(ix,iy,iz)*CONJG(fft_out(ix,iy,iz)) )
+             k_sq = kx**2 + ky**2 + kz**2                          ! Squared magnitude of wave vector
+             g    = (fourpi/k_sq) * EXP ( -k_sq / (4.0*kappa**2) ) ! Uncorrected influence function
+             g    = g * fxyz                                       ! Apply simple correction
+             pot  = pot + g * rho_sq(ix,iy,iz)
+
           END DO
        END DO
     END DO
@@ -258,27 +265,8 @@ CONTAINS
     ! Subtract self part of k-space sum
     pot = pot - kappa * SUM ( q(:)**2 ) / SQRT(pi)
 
-    DEALLOCATE ( fft_inp, fft_out )
+    DEALLOCATE ( fft_inp, fft_out, rho_sq )
 
   END FUNCTION pot_k_pm_ewald
-
-  FUNCTION wraparound ( i, nk ) RESULT ( w )
-    IMPLICIT NONE
-    INTEGER             :: w  ! Returns wrapped index
-    INTEGER, INTENT(in) :: i  ! Index to be wrapped
-    INTEGER, INTENT(in) :: nk ! Half-range
-
-    IF ( i < 0 .OR. i >= nk*2 ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,i15)') 'Indexing error', i
-       STOP 'Error in wraparound'
-    END IF
-
-    IF ( i < nk ) THEN
-       w = i
-    ELSE
-       w = i - nk*2
-    END IF
-
-  END FUNCTION wraparound
   
 END MODULE ewald_module

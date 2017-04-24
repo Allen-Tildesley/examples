@@ -31,7 +31,7 @@ import sys
 import numpy as np
 from itertools        import product
 from config_io_module import read_cnf_atoms
-from ewald_module     import pot_r_ewald, pot_k_ewald
+from ewald_module     import pot_r_ewald, pot_k_ewald, pot_k_pm_ewald
 
 # Reads an atomic configuration with periodic boundary conditions from cnf.inp
 # Calculates r-space and k-space contributions to potential energy
@@ -48,7 +48,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"kappa":6.0, "nk":10, "nbox":8}
+defaults = {"kappa":6.0, "nk":8, "nbox":8}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -83,15 +83,23 @@ pot_r  = pot_r_ewald ( r, q, kappa )                # Real-space term involving 
 pot_k  = pot_k_ewald ( nk, r, q, kappa )            # Reciprocal space term
 dipole = np.sum ( q[:,np.newaxis]*r[:,:], axis=0 )  # Calculate overall box dipole
 pot_s  = ( 2.0*np.pi / 3.0 ) * np.sum ( dipole**2 ) # Surface term
-pot    = pot_r + pot_k + pot_s
+pot    = pot_r + pot_k + pot_s                      # Total potential
 print ( "{:40}{:15.6f}".format('r-space potential energy', pot_r) )
 print ( "{:40}{:15.6f}".format('k-space potential energy', pot_k) )
 print ( "{:40}{:15.6f}".format('surface potential energy', pot_s) )
 print ( "{:40}{:15.6f}".format('total   potential energy', pot)   )
 
+# Compare with an illustrative (simplified) particle-mesh method
+pot_k  = pot_k_pm_ewald ( nk, r, q, kappa ) # Reciprocal space term
+pot    = pot_r + pot_k + pot_s              # Total potential
+print ( "{:40}{:15.6f}".format('k-space potential energy (PME)', pot_k) )
+print ( "{:40}{:15.6f}".format('total   potential energy (PME)', pot)   )
+
+# Compare with brute force calculation
 # Big multiple loop over all pairs and surrounding periodic boxes
 # For clarity we count all pairs twice, as ij and ji
 # Potentials are stored according to squared distance of neighbouring box
+print('Brute force method')
 
 pot_shell = np.zeros(nbox_sq+1, dtype=np.float_) # Zero array of potentials (not all the elements of this array will be filled)
 

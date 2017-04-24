@@ -140,3 +140,60 @@ def pot_k_ewald ( nk, r, q, kappa ):
     pot = pot - kappa * np.sum ( q**2 ) / np.sqrt(np.pi)
 
     return pot
+
+def pot_k_pm_ewald ( nk, r, q, kappa ):
+    """Returns k-space part of potential energy (particle-mesh method)."""
+   
+    import numpy as np
+    from mesh_module import mesh_function, sharpen
+
+    n,d = r.shape
+    assert d==3, 'r dimension error'
+    assert n==q.size, 'q dimension error'
+  
+    twopi  = 2.0*np.pi
+    fourpi = 4.0*np.pi
+    dk     = twopi # k-spacing for box=1
+    dr     = 1.0 / (2*nk) # r-spacing
+    sc     = 2*nk # Use nk to determine mesh dimension
+    
+    # Set up indices in wraparound convention
+    imesh      = np.arange(sc)
+    imesh[nk:] = imesh[nk:] - sc
+    kmesh      = (dk*imesh).tolist()
+
+    # Assign charge density to complex array ready for FFT
+    # Assume r in unit box with range (-0.5,0.5)
+    # Mesh function expects coordinates in range 0..1 so we add 0.5
+    fft_inp = mesh_function ( r+0.5, q, 2*nk ).astype(np.complex_)
+
+    # Forward FFT incorporating scaling by number of grid points
+    fft_out = np.fft.fftn(fft_inp) / (sc**3)
+
+    # Square modulus of charge density
+    rho_sq = np.real ( fft_out*np.conjugate(fft_out) )
+
+    pot = 0.0
+
+    # Triple loop over xyz grid points in k-space
+    for ix, kx in enumerate(kmesh):
+        fx = sharpen( 0.5*kx*dr )
+        for iy, ky in enumerate(kmesh):
+            fxy = fx*sharpen( 0.5*ky*dr )
+            for iz, kz in enumerate(kmesh):
+                fxyz = fxy*sharpen( 0.5*kz*dr )
+
+                if ix==0 and iy==0 and iz==0: # Skip zero wave vector
+                    continue
+                k_sq = kx**2 + ky**2 + kz**2  # Squared magnitude of wave vector
+                g    = (fourpi/k_sq) * np.exp ( -k_sq / (4.0*kappa**2) ) # Uncorrected influence function
+                g    = g * fxyz # Apply simple correction
+                pot  = pot + g * rho_sq[ix,iy,iz]
+
+    # Divide by 2; box volume is 1
+    pot = pot / 2.0
+
+    # Subtract self part of k-space sum
+    pot = pot - kappa * np.sum ( q**2 ) / np.sqrt(np.pi)
+
+    return pot

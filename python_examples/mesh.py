@@ -30,14 +30,37 @@
 # triangular shape cloud distribution described by Hockney and Eastwood (1988)
 # The charges are positioned in a box of unit length.
 # The charge mesh is indexed from 0 to sc-1 in each coordinate direction.
-# There is no user input, some example parameters are set in the program.
 
+import json
+import sys
 import numpy as np
+from mesh_module import mesh_function
 
-# Example values for illustration
-n  = 4        # number of charges
-sc = 10       # dimension of mesh
+print('mesh')
+# Read parameters in JSON format
+try:
+    nml = json.load(sys.stdin)
+except json.JSONDecodeError:
+    print('Exiting on Invalid JSON format')
+    sys.exit()
+
+# Set default values, check keys and typecheck values
+defaults = {"n":4, "sc":10}
+for key, val in nml.items():
+    if key in defaults:
+        assert type(val) == type(defaults[key]), key+" has the wrong type"
+    else:
+        print('Warning', key, 'not in ', list(defaults.keys()))
+    
+# Set parameters to input values or defaults
+n = nml["n"]   if "n"  in nml else defaults["n"]
+sc = nml["sc"] if "sc" in nml else defaults["sc"]
 h  = 1.0 / sc # mesh spacing
+
+# Write out parameters
+print ( "{:40}{:15d}"  .format('Number of charges', n ) )
+print ( "{:40}{:15d}"  .format('Dimension of mesh', sc) )
+print ( "{:40}{:15.6f}".format('Mesh spacing',      h ) )
 
 # For illustration we choose random charge positions with coordinates in range (0,1)
 # In a real application, we would convert positions into this range
@@ -49,35 +72,7 @@ q = np.empty(n,dtype=np.float_)
 q[::2] = 1.0
 q[1::2] = -1.0
 
-rho = np.zeros( (sc,sc,sc), dtype=np.float_ ) # Zero mesh
-v = np.empty( (3,3), dtype=np.float_ ) # array of weights
-
-for i in range(n): # Loop over charges
-    nr = np.rint(r[i,:]*sc).astype(np.int_) # nearest mesh point indices
-    nr = np.mod(nr,sc)                      # with periodic boundaries
-    dr = r[i,:] - nr * h    # vector to charge from mesh cell centre
-    dr = dr - np.rint( dr ) # periodic boundaries
-    dr = dr / h             # normalise by mesh cell size
-
-    # weights for three point assignment scheme
-    # first index of v is 0,1,2 for neighbour -1,0,1
-    # second index of v is 0,1,2 for x,y,z
-    v[0,:] = 0.5 * ( 0.5 - dr ) ** 2
-    v[1,:] = 0.75 - dr**2
-    v[2,:] = 0.5 * ( 0.5 + dr ) ** 2
-
-    for i0 in range(3):            # Loop over x neighbours
-        q0 = q[i]*v[i0,0]          # charge times x-weight
-        n0 = np.mod(nr[0]+i0-1,sc) # x-neighbour index with periodic boundaries
-        for i1 in range(3):            # Loop over y neighbours
-            q1 = q0*v[i1,1]            # charge times xy-weight
-            n1 = np.mod(nr[1]+i1-1,sc) # y-neighbour index with periodic boundaries
-            for i2 in range(3):            # Loop over z neighbours
-                q2 = q1*v[i2,2]            # charge times xyz-weight
-                n2 = np.mod(nr[2]+i2-1,sc) # z-neighbour index with periodic boundaries
-                rho[n0,n1,n2] = rho[n0,n1,n2] + q2 # mesh cell share of charge
-
-rho = rho / h**3 # convert charges to charge densities
+rho = mesh_function ( r, q, sc )
 
 # Output charge density
 format_string="{:15.6f}"*sc

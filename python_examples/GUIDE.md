@@ -409,6 +409,33 @@ One can adjust the screening parameter kappa within reason
 the contributions of r-space and k-space terms will change, but their sum should
 remain approximately constant.
 
+There is also a comparison with a simplified particle-mesh Ewald method.
+As discussed in the text, the charge distribution is assigned to a cubic mesh,
+Fourier transformed by FFT, and used to calculate the total potential energy,
+using the solution of Poisson's equation in Fourier space.
+In doing so, accuracy is improved by optimizing the so-called influence function G.
+In this example, we use a simple sharpening function discussed by
+
+* V Ballenegger, JJ Cerda, C Holm, _J Chem Theo Comp,_ __8,__ 936 (2012)
+
+but more sophisticated optimized functions are possible. It is easy to comment out
+this sharpening function, to see the extent of the correction; it is reasonably
+significant for the default parameter values.
+
+See below for more discussion of the mesh function, provided in `mesh_module.py`,
+and of the FFT routine which is illustrated in `fft3dwrap.py`.
+
+## Mesh program
+The program `mesh.py` generates a random configuration of a small number of charges
+and illustrates the way this may be assigned to a regular cubic mesh using the
+triangular-shaped cloud distribution described in
+
+* RW Hockney, JW Eastwood, _Computer simulation using particles_ (Adam Hilger, Bristol, 1988)
+
+The function generating the charge density is provided in `mesh_module.py`. The mesh dimension
+is, by default, kept small enough to print out the whole array for inspection afterwards.
+The number of charges and mesh dimension may be adjusted by the user, via JSON parameters.
+
 ## Cluster program
 The `cluster.py` program is self contained. It reads in a configuration of atomic positions
 and produces a circular linked list for each cluster identified within it.
