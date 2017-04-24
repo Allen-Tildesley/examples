@@ -36,7 +36,7 @@ MODULE mesh_module
   PRIVATE
 
   ! Public routines
-  PUBLIC :: mesh_function
+  PUBLIC :: mesh_function, sharpen
 
 CONTAINS
 
@@ -100,5 +100,32 @@ CONTAINS
     rho = rho / (h**3) ! Convert charges to charge densities
 
   END FUNCTION mesh_function
+
+  FUNCTION sharpen ( x ) RESULT ( f )
+    REAL             :: f ! Returns sharpening factor for particle-mesh Ewald influence function
+    REAL, INTENT(in) :: x ! Argument
+
+    ! In the particle-mesh Ewald method, the accuracy may be improved by optimizing the influence function G
+    ! used to calculate energies and forces from the Fourier-transformed charge density.
+    ! To illustrate this, we use a simple sharpening function, eqn (2.22) of
+    ! V Ballenegger, JJ Cerda, C Holm, J Chem Theo Comp 8, 936 (2012)
+    ! We put this routine here because it assumes that we use the P=3 triangular-shaped cloud distribution
+    ! in assigning the charge distribution to a cubic mesh
+    ! The argument x is pi*i/sc, where i indexes the k-vector,
+    ! or equivalently 0.5*k*h where k is the k-value and h is the mesh spacing
+    ! This function is applied to x, y, and z components separately
+
+    REAL            :: u ! The U function (in one coordinate) of the text, and of Balleneger et al (2012)
+    REAL, PARAMETER :: tol = 1.0e-3
+
+    IF ( ABS(x) < tol ) THEN
+       u = 1 - 0.5*x**2 ! Taylor series
+    ELSE
+       u = ( SIN(x)/x ) **3
+    END IF
+
+    f = 1.0 / u**2
+
+  END FUNCTION sharpen
 
 END MODULE mesh_module

@@ -34,7 +34,7 @@ PROGRAM ewald
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_atoms
-  USE               ewald_module,     ONLY : pot_r_ewald, pot_k_ewald
+  USE               ewald_module,     ONLY : pot_r_ewald, pot_k_ewald, pot_k_pm_ewald
 
   IMPLICIT NONE
 
@@ -54,7 +54,7 @@ PROGRAM ewald
 
   ! Sensible default values
   kappa = 6.0
-  nk    = 10
+  nk    = 8
   nbox  = 8
 
   READ ( unit=input_unit, nml=nml, iostat=ioerr ) ! Namelist input
@@ -93,12 +93,19 @@ PROGRAM ewald
   pot_k  = pot_k_ewald ( nk, n, r, q, kappa )            ! Reciprocal space term
   dipole = SUM ( SPREAD(q(:),dim=1,ncopies=3)*r, dim=2 ) ! Calculate overall box dipole
   pot_s  = ( twopi / 3.0 ) * SUM ( dipole**2 )           ! Surface term
-  pot    = pot_r + pot_k + pot_s
+  pot    = pot_r + pot_k + pot_s                         ! Total potential
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'r-space potential energy', pot_r
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'k-space potential energy', pot_k
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'surface potential energy', pot_s
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'total   potential energy', pot
 
+  ! Compare with an illustrative (simplified) particle-mesh method
+  pot_k  = pot_k_pm_ewald ( nk, n, r, q, kappa ) ! Reciprocal space term
+  pot    = pot_r + pot_k + pot_s                 ! Total potential
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'k-space potential energy (PME)', pot_k
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'total   potential energy (PME)', pot
+
+  ! Compare with brute force calculation
   ! Big multiple loop over all pairs and surrounding periodic boxes
   ! For clarity we count all pairs twice, as ij and ji
   ! Potentials are stored according to squared distance of neighbouring box
@@ -132,6 +139,7 @@ PROGRAM ewald
   END DO
 
   ! Write out results for increasing spherical cutoff
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Brute force method'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Shell      Potential'
   DO rbox = 0, nbox
      WRITE ( unit=output_unit, fmt='(i5,f15.6)' ) rbox, pot_shell(rbox**2)

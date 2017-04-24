@@ -42,7 +42,7 @@ MODULE ewald_module
   PRIVATE
 
   ! Public routines
-  PUBLIC :: pot_r_ewald, pot_k_ewald
+  PUBLIC :: pot_r_ewald, pot_k_ewald, pot_k_pm_ewald
 
   ! Consider k-vectors within a sphere bounded by the cube (-nk,+nk) in each component
   REAL, DIMENSION(:), ALLOCATABLE, SAVE :: kfac     ! k-dept quantities (k_sq_max)
@@ -190,4 +190,95 @@ CONTAINS
 
   END FUNCTION pot_k_ewald
 
+  FUNCTION pot_k_pm_ewald ( nk, n, r, q, kappa ) RESULT ( pot )
+    USE, INTRINSIC :: iso_c_binding
+    USE mesh_module, ONLY : mesh_function, sharpen
+
+    IMPLICIT NONE
+    INCLUDE 'fftw3.f03'
+    REAL                              :: pot   ! Returns k-space part of potential energy
+    INTEGER,              INTENT(in)  :: nk    ! Determines number of wave-vectors
+    INTEGER,              INTENT(in)  :: n     ! Number of atoms
+    REAL, DIMENSION(3,n), INTENT(in)  :: r     ! Positions
+    REAL, DIMENSION(n),   INTENT(in)  :: q     ! Charges
+    REAL,                 INTENT(in)  :: kappa ! Ewald width parameter
+
+    INTEGER(C_INT)                                           :: sc      ! Number of points for FFT
+    COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:,:,:), ALLOCATABLE :: fft_inp ! Data to be transformed (0:sc-1,0:sc-1,0:sc-1)
+    COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:,:,:), ALLOCATABLE :: fft_out ! Output data (0:sc-1,0:sc-1,0:sc-1)
+    TYPE(C_PTR)                                              :: fft_plan! Plan needed for FFTW
+
+    INTEGER            :: ix, iy, iz
+    REAL, DIMENSION(3) :: k, f
+    REAL               :: g, k_sq, dr
+    REAL, PARAMETER    :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi, fourpi = 4.0*pi, dk = twopi
+
+    dr = 1.0 / REAL(2*nk) ! r-spacing
+
+    ! Use nk to determine mesh dimension
+    sc = 2*nk
+    ALLOCATE ( fft_inp(0:sc-1,0:sc-1,0:sc-1), fft_out(0:sc-1,0:sc-1,0:sc-1) )
+
+    ! Assign charge density to complex array ready for FFT
+    ! Assume r in unit box with range (-0.5,0.5)
+    ! Mesh function expects coordinates in range 0..1 so we add 0.5
+    fft_inp = CMPLX ( mesh_function ( r+0.5, q, 2*nk ), 0.0 )
+    fft_plan = fftw_plan_dft_3d ( sc, sc, sc, fft_inp, fft_out, FFTW_FORWARD, FFTW_ESTIMATE) ! Set up plan for the FFT
+    CALL fftw_execute_dft  ( fft_plan, fft_inp, fft_out )                                    ! Execute FFT
+    CALL fftw_destroy_plan ( fft_plan )                                                      ! Release plan
+
+    fft_out = fft_out / REAL(sc**3) ! Incorporate scaling by number of grid points
+
+    pot = 0.0
+
+    ! Triple loop over xyz grid points (uses wraparound indexing)
+    DO ix = 0, sc-1
+       k(1) = REAL ( wraparound ( ix, nk ) ) * dk
+       f(1) = sharpen( 0.5*k(1)*dr )
+       DO iy = 0, sc-1
+          k(2) = REAL ( wraparound ( iy, nk ) ) * dk
+          f(2) = sharpen( 0.5*k(2)*dr )
+          DO iz = 0, sc-1
+             k(3) = REAL ( wraparound ( iz, nk ) ) * dk
+             f(3) = sharpen( 0.5*k(3)*dr )
+
+             IF ( ix==0 .AND. iy==0 .AND. iz==0 ) CYCLE ! Skip zero wave vector
+             k_sq = SUM ( k**2 )                                   ! Squared magnitude of wave vector
+             g    = (fourpi/k_sq) * EXP ( -k_sq / (4.0*kappa**2) ) ! Uncorrected influence function
+             g    = g * PRODUCT(f)                                 ! Apply simple correction
+
+             pot = pot + g * REAL ( fft_out(ix,iy,iz)*CONJG(fft_out(ix,iy,iz)) )
+          END DO
+       END DO
+    END DO
+
+    ! Divide by 2; box volume is 1
+    pot = pot / 2.0
+
+    ! Subtract self part of k-space sum
+    pot = pot - kappa * SUM ( q(:)**2 ) / SQRT(pi)
+
+    DEALLOCATE ( fft_inp, fft_out )
+
+  END FUNCTION pot_k_pm_ewald
+
+  FUNCTION wraparound ( i, nk ) RESULT ( w )
+    IMPLICIT NONE
+    INTEGER             :: w  ! Returns wrapped index
+    INTEGER, INTENT(in) :: i  ! Index to be wrapped
+    INTEGER, INTENT(in) :: nk ! Half-range
+
+    IF ( i < 0 .OR. i >= nk*2 ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,i15)') 'Indexing error', i
+       STOP 'Error in wraparound'
+    END IF
+
+    IF ( i < nk ) THEN
+       w = i
+    ELSE
+       w = i - nk*2
+    END IF
+
+  END FUNCTION wraparound
+  
 END MODULE ewald_module
