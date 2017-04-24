@@ -26,36 +26,54 @@ PROGRAM mesh
   !------------------------------------------------------------------------------------------------!
 
   ! This program assigns a set of charges to a cubic mesh using the
-  ! triangular shape cloud distribution described by Hockney and Eastwood (1988)
+  ! triangular-shaped cloud distribution described by Hockney and Eastwood (1988)
   ! The charges are positioned in a box of unit length.
   ! The charge mesh is indexed from 0 to sc-1 in each coordinate direction
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+
+  USE mesh_module, ONLY : mesh_function
 
   IMPLICIT NONE
 
-  INTEGER                             :: n   ! number of charges
-  INTEGER                             :: sc  ! dimension of mesh
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: rho ! (0:sc-1,0:sc-1,0:sc-1) mesh cell charge density
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: r   ! (3,n) charge positions in range (0,1)
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: dr  ! (3,n) charge positions relative to mesh point
-  REAL, ALLOCATABLE, DIMENSION(:)     :: q   ! (n) charges
+  INTEGER                             :: n   ! Number of charges
+  INTEGER                             :: sc  ! Dimension of mesh
+  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: rho ! Mesh cell charge density (0:sc-1,0:sc-1,0:sc-1) 
+  REAL, ALLOCATABLE, DIMENSION(:,:)   :: r   ! Charge positions (3,n) 
+  REAL, ALLOCATABLE, DIMENSION(:)     :: q   ! Charges (n) 
 
-  REAL,    DIMENSION(3,-1:1) :: v  ! weights in each coordinate direction
-  INTEGER, DIMENSION(3)      :: nr ! mesh point index
+  INTEGER :: n2, n3, ioerr
+  REAL    :: h
 
-  INTEGER :: i, i1, i2, i3, n1, n2, n3
-  REAL    :: h, q1, q2, q3
+  NAMELIST /nml/ n, sc
+
+  WRITE ( unit=output_unit, fmt='(a)' ) 'mesh'
+  WRITE ( unit=output_unit, fmt='(a)' ) '3-D mesh assignment of charges'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Unit box length, coordinates in range (0,1)'
 
   ! Example values for illustration
-  n  = 4                ! number of charges
-  sc = 10               ! dimension of mesh
-  h  = 1.0 / REAL( sc ) ! mesh spacing
+  n  = 4  ! Number of charges
+  sc = 10 ! Dimension of mesh
+
+  ! Read parameters from namelist
+  ! Comment out, or replace, this section if you don't like namelists
+  READ ( unit=input_unit, nml=nml, iostat=ioerr )
+  IF ( ioerr /= 0 ) THEN
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error reading namelist nml from standard input', ioerr
+     IF ( ioerr == iostat_eor ) WRITE ( unit=error_unit, fmt='(a)') 'End of record'
+     IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
+     STOP 'Error in mesh'
+  END IF
+
+  h = 1.0 / REAL( sc ) ! Mesh spacing
+
+  ! Write out run parameters
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of charges', n
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Dimension of mesh', sc
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Mesh spacing',      h
 
   ALLOCATE ( rho(0:sc-1,0:sc-1,0:sc-1) ) ! C-style indexing is convenient here
-  ALLOCATE ( r(3,n), dr(3,n), q(n) )
-
-  WRITE ( unit=output_unit, fmt='(a)' ) '3-D mesh assignment for unit boxlength, coordinates in range (0,1)'
+  ALLOCATE ( r(3,n), q(n) )
 
   ! For illustration we choose random charge positions with coordinates in range (0,1)
   ! In a real application, we would convert positions into this range
@@ -66,42 +84,7 @@ PROGRAM mesh
   q(1::2) = 1.0
   q(2::2) = -1.0
 
-  rho = 0.0 ! zero mesh
-
-  DO i = 1, n ! Loop over charges
-
-     nr(:)   = NINT ( r(:,i) * sc )       ! nearest mesh point indices
-     nr(:)   = MODULO ( nr, sc)           ! with periodic boundaries
-     dr(:,i) = r(:,i) - REAL( nr(:) ) * h ! vector to charge from mesh cell centre
-     dr(:,i) = dr(:,i) - ANINT( dr(:,i) ) ! periodic boundaries
-     dr(:,i) = dr(:,i) / h                ! normalise by mesh cell size
-
-     ! weights for three point assignment scheme
-     v(:,-1) = 0.5 * ( 0.5 - dr(:,i) ) ** 2
-     v(:, 0) = 0.75 - dr(:,i)**2
-     v(:,+1) = 0.5 * ( 0.5 + dr(:,i) ) ** 2
-
-     DO i1 = -1, 1 ! Loop over x-neighbours
-        q1 = q(i) * v(1,i1)            ! charge times x-weight
-        n1 = MODULO ( nr(1) + i1, sc ) ! neighbour index with periodic boundaries
-
-        DO i2 = -1, 1 ! Loop over y-neighbours
-           q2 = q1 * v(2,i2)              ! charge times xy-weight
-           n2 = MODULO ( nr(2) + i2, sc ) ! neighbour index with periodic boundaries
-
-           DO i3 = -1, 1 ! Loop over z-neighbours
-              q3 = q2 * v(3,i3)                  ! charge times xyz-weight
-              n3 = MODULO ( nr(3) + i3, sc )     ! neighbour index with periodic boundaries
-              rho(n1,n2,n3) = rho(n1,n2,n3) + q3 ! mesh cell share of charge
-           END DO ! End loop over z-neighbours
-
-        END DO ! End loop over y-neighbours
-
-     END DO ! End loop over x-neighbours
-
-  END DO ! End loop over charges
-
-  rho = rho / (h**3) ! Convert charges to charge densities
+  rho = mesh_function ( r, q, sc )
 
   ! Output mesh charge density
   DO n3 = 0, sc-1
@@ -112,8 +95,8 @@ PROGRAM mesh
   END DO
 
   ! Finally check integrated charge density
-  WRITE( unit=output_unit, fmt='(a,2f10.6)') 'Total charge = ', SUM ( q ), SUM ( rho )*(h**3)
+  WRITE( unit=output_unit, fmt='(a,2f10.6)') 'Total charge = ', SUM ( q ), SUM ( rho ) * (h**3)
 
-  DEALLOCATE ( r, dr, q, rho )
+  DEALLOCATE ( r, q, rho )
   
 END PROGRAM mesh

@@ -807,6 +807,17 @@ One can adjust the screening parameter kappa within reason
 the contributions of r-space and k-space terms will change, but their sum should
 remain approximately constant.
 
+## Mesh program
+The program `mesh` generates a random configuration of a small number of charges
+and illustrates the way this may be assigned to a regular cubic mesh using the
+triangular-shaped cloud distribution described in
+
+* RW Hockney, JW Eastwood, _Computer simulation using particles_ (Adam Hilger, Bristol, 1988)
+
+The function generating the charge density is provided in `mesh_module`. The mesh dimension
+is, by default, kept small enough to print out the whole array for inspection afterwards.
+The number of charges and mesh dimension may be adjusted by the user, via namelist parameters.
+
 ## Cluster program
 The `cluster` program is self contained. It reads in a configuration of atomic positions
 and produces a circular linked list for each cluster identified within it.
