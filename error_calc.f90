@@ -47,21 +47,20 @@ PROGRAM error_calc
 
   REAL, DIMENSION(:), ALLOCATABLE :: a ! Stored data values (nstep)
 
-  INTEGER :: ioerr, tblock, i_repeat, nblock, blk, stp1, stp2, trun
+  INTEGER :: ioerr, tblock, i_repeat, nblock, blk, stp1, stp2, trun, n_repeat
   REAL    :: average, variance, stddev, err, si, tcor, x, e, b, d
   REAL    :: a_blk, a_run, a_avg, a_var, a_var_1, a_err
-
-  INTEGER, PARAMETER :: n_repeat = 50 ! Number of simulation repeats for brute force empirical calculation
 
   ! Taylor series coefficients
   REAL, PARAMETER :: b1 = 2.0, b2 = -2.0,     b3 = 4.0/3.0, b4 = -2.0/3.0  ! b = 1.0 - EXP(-2.0*x)
   REAL, PARAMETER :: d1 = 1.0, d2 = -1.0/2.0, d3 = 1.0/6.0, d4 = -1.0/24.0 ! d = 1.0 - EXP(-x)
 
-  NAMELIST /nml/ nstep, nequil, delta, variance, average
+  NAMELIST /nml/ nstep, nequil, n_repeat, delta, variance, average
 
   ! Example default values
   nstep    = 2**16 ! Number of steps, about 60,000 for example
   nequil   = 10000 ! Number of equilibration timesteps
+  n_repeat = 50    ! Number of simulation repeats for brute force empirical calculation
   delta    = 0.01  ! Timestep for simulation
   variance = 1.0   ! Desired variance of data (equivalent to temperature)
   average  = 1.0   ! Desired average value of data
@@ -75,11 +74,12 @@ PROGRAM error_calc
      STOP 'Error in error_calc'
   END IF
 
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps in run = ', nstep
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Equilibration steps = ',    nequil
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step delta = ',        delta
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Desired average value = ',  average
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Desired variance = ',       variance
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps in run',        nstep
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Equilibration steps',           nequil
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of brute-force repeats', n_repeat
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step delta',               delta
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Desired average value',         average
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Desired variance',              variance
 
   ALLOCATE ( a(nstep) )
 
