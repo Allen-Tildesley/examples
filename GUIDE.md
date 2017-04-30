@@ -114,26 +114,23 @@ The Smart Monte Carlo code `smc_nvt_lj` is included here since it uses the
 cut-and-shifted potential which corresponds to the force calculation
 (although it is not essential to do so).
 
-Source                 | &rho;    | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
-------                 | -----    | -----     | --------   | -------- | --------- | -------    | -------  | --------
-Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |          
-Thol et al (2016) (f)  | 0.75     | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
-`bd_nvt_lj`            | 0.75     | 1.00      | -2.934(4)  | 0.974(7) |  2.26(8)  | -3.733(4)  | 0.373(7) | 2.27(8)
-`md_nvt_lj`            | 0.75     | 1.00      | -2.940(4)  | 0.965(6) |  2.27(12) | -3.740(4)  | 0.363(6) | 2.27(12)
-`md_npt_lj`            | 0.749(1) | 1.00      | -2.920(8)  | 0.99     |           | -3.719(9)  | 0.395(1) |
-`md_nve_lj`            | 0.75     | 1.0022(3) | -2.9289    | 0.987(2) |  2.24(1)  | -3.7284    | 0.386(2) |          
-`md_nve_lj_omp`        | 0.75     | 1.0027(2) | -2.9278    | 0.986(2) |  2.28(1)  | -3.7273    | 0.385(2) |          
-`md_nve_lj_vl`         | 0.75     | 1.0023(3) | -2.9278    | 0.992(2) |  2.24(1)  | -3.7274    | 0.391(2) |          
-`md_nve_lj_ll`&Dagger; | 0.75     | 1.0010(1) | -2.9272    | 0.992(1) |  2.28(1)  | -3.7268    | 0.391(1) |          
-`smc_nvt_lj`           | 0.75     | 1.00      | -2.9300(5) | 0.971(2) |  2.263(5) | -3.7296(5) | 0.369(2) | 2.270(5)
-`smc_nvt_lj` (100%)    | 0.75     | 1.00      | -2.928(2)  | 0.99(1)  |  2.26(2)  | -3.728(2)  | 0.39(1)  | 2.27(2)
-`smc_nvt_lj` (30%)     | 0.75     | 1.00      | -2.930(3)  | 0.98(2)  |  2.26(3)  | -3.729(3)  | 0.38(2)  | 2.27(3)
+Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
+------                 | -----     | -----     | --------   | -------- | --------- | -------    | -------  | --------
+Thol et al (2015) (cs) | 0.75      | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |          
+Thol et al (2016) (f)  | 0.75      | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
+`bd_nvt_lj`            | 0.75      | 1.00      | -2.934(4)  | 0.974(7) |  2.26(8)  | -3.733(4)  | 0.373(7) | 2.27(8)
+`md_nvt_lj`            | 0.75      | 1.00      | -2.940(4)  | 0.965(6) |  2.27(12) | -3.740(4)  | 0.363(6) | 2.27(12)
+`md_npt_lj`            | 0.7514(6) | 1.00      | -2.947(6)  | 0.99     |           | -3.748(7)  | 0.391(1) |
+`md_nve_lj`            | 0.75      | 1.0022(3) | -2.9289    | 0.987(2) |  2.24(1)  | -3.7284    | 0.386(2) |          
+`md_nve_lj_omp`        | 0.75      | 1.0027(2) | -2.9278    | 0.986(2) |  2.28(1)  | -3.7273    | 0.385(2) |          
+`md_nve_lj_vl`         | 0.75      | 1.0023(3) | -2.9278    | 0.992(2) |  2.24(1)  | -3.7274    | 0.391(2) |          
+`md_nve_lj_ll`&Dagger; | 0.75      | 1.0010(1) | -2.9272    | 0.992(1) |  2.28(1)  | -3.7268    | 0.391(1) |          
+`smc_nvt_lj`           | 0.75      | 1.00      | -2.9300(5) | 0.971(2) |  2.263(5) | -3.7296(5) | 0.369(2) | 2.270(5)
+`smc_nvt_lj` (100%)    | 0.75      | 1.00      | -2.928(2)  | 0.99(1)  |  2.26(2)  | -3.728(2)  | 0.39(1)  | 2.27(2)
+`smc_nvt_lj` (30%)     | 0.75      | 1.00      | -2.930(3)  | 0.98(2)  |  2.26(3)  | -3.729(3)  | 0.38(2)  | 2.27(3)
 
 * &Dagger; indicates a larger system size, _N_=864, needed to make the link-list method viable.
 * The `md_nvt_lj` program seems to give a low energy and pressure, maybe needs looking at???
-* The `md_npt_lj` program does not conserve well,
-MSD of order 10<sup>-3</sup> rather than 10<sup>-8</sup> which is what we see for `md_nvt_lj`.
-Are the barostat parameters poorly chosen??? Calculated _C<sub>p</sub>_ (cs)=5.0(4) while EOS gives 4.84.
 * The `smc_nvt_lj` program was tested in default, single-particle-move, mode, with &delta;t=0.1,
 in multi-particle mode, moving 100% of particles, with &delta;t=0.02,
 and in multi-particle mode, moving 30% of particles, with &delta;t=0.03.

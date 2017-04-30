@@ -44,7 +44,7 @@ def calc_variables ( ):
     fsq = np.sum ( f**2 )         # Total squared force
     ext = np.sum(0.5*p_eta**2/q) + np.sum(0.5*p_eta_baro**2/q_baro) + 0.5*p_eps**2/w_eps + temperature * (
           g*eta[0] + np.sum(eta[1:])+ np.sum(eta_baro) )  # Extra terms for conserved variable
-    eng = kin + total.pot         # Total energy for simulated system (contributes to conserved variable)
+    eng = kin + total.pot         # Total energy (cut-and-shifted)
 
     # Variables of interest, of class VariableType, containing three attributes:
     #   .val: the instantaneous value
@@ -81,31 +81,21 @@ def calc_variables ( ):
     density = VariableType ( nam = 'Density', val = rho )
 
     # Conserved energy-like quantity per atom
-    # Energy plus extra terms defined above
-    conserved = VariableType ( nam = 'Conserved/N', val = (eng+ext)/n )
-
-    # Heat capacity (cut-and-shifted)
-    # Total "enthalpy" divided by temperature and sqrt(N) to make result intensive
-    enp = kin+total.pot+pressure*vol
-    c_s = VariableType ( nam = 'Cp/N cut&shifted', val = enp/(temperature*math.sqrt(n)),
-                         method = msd, instant = False )
-
-    # Heat capacity (full)
-    # Total "enthalpy" divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
-    enp = kin+total.cut+pressure*vol
-    c_f = VariableType ( nam = 'Cp/N full', val = enp/(temperature*math.sqrt(n)),
-                         method = msd, instant = False )
+    # Energy plus PV term plus extra terms defined above
+    enp = eng + pressure*vol
+    conserved = VariableType ( nam = 'Conserved/N', val = (enp+ext)/n )
 
     # Volume MSD
     vol_msd = VariableType ( nam = 'Volume MSD', val = vol, method = msd, instant = False )
 
     # Mean-squared deviation of conserved energy-like quantity
-    # Energy plus extra terms defined above
-    conserved_msd = VariableType ( nam = 'Conserved MSD', val = (eng+ext)/n,
+    # Energy plus PV term plus extra terms defined above
+    enp = eng + pressure*vol
+    conserved_msd = VariableType ( nam = 'Conserved MSD', val = (enp+ext)/n,
                                    method = msd, e_format = True, instant = False )
 
     # Collect together into a list for averaging
-    return [ e_s, p_s, e_f, p_f, t_k, t_c, density, conserved, c_s, c_f, vol_msd, conserved_msd ]
+    return [ e_s, p_s, e_f, p_f, t_k, t_c, density, conserved, vol_msd, conserved_msd ]
 
 def u1_propagator ( t ):
     """U1 and U1' combined: position and strain drift step propagator.
@@ -160,7 +150,7 @@ def u2p_propagator ( t ):
 
     alpha = 1.0 + 3 / g
     pv    = alpha * np.sum(v**2) / 3 + total.vir # total.vir is the total virial
-    p_eps = p_eps + ( pv - pressure*box**3 ) * t
+    p_eps = p_eps + 3.0 * ( pv - pressure*box**3 ) * t
 
 def u3_propagator ( t ):
     """U3 and U3' combined: thermostat propagator.

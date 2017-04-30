@@ -278,7 +278,7 @@ CONTAINS
 
     alpha = 1.0 + 3.0 / g
     pv    = alpha * SUM(v**2) / 3.0 + total%vir ! total%vir is the total virial
-    p_eps = p_eps + ( pv - pressure*box**3 ) * t
+    p_eps = p_eps + 3.0 * ( pv - pressure*box**3 ) * t
 
   END SUBROUTINE u2p_propagator
 
@@ -379,13 +379,13 @@ CONTAINS
     USE lrc_module,      ONLY : potential_lrc, pressure_lrc
     USE averages_module, ONLY : variable_type, msd
     IMPLICIT NONE
-    TYPE(variable_type), DIMENSION(12) :: variables ! The 12 variables listed below
+    TYPE(variable_type), DIMENSION(10) :: variables ! The 10 variables listed below
 
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
 
     TYPE(variable_type) :: e_s, p_s, e_f, p_f, t_k, t_c, density
-    TYPE(variable_type) :: c_s, c_f, vol_msd, conserved, conserved_msd
+    TYPE(variable_type) :: vol_msd, conserved, conserved_msd
     REAL                :: vol, rho, kin, fsq, ext, enp, eng
 
     ! Preliminary calculations
@@ -395,7 +395,7 @@ CONTAINS
     fsq = SUM(f**2)     ! Total squared force
     ext = SUM(0.5*p_eta**2/q) + SUM(0.5*p_eta_baro**2/q_baro) + 0.5*p_eps**2/w_eps &
          & + temperature * ( g*eta(1) + SUM(eta(2:m)) + SUM(eta_baro) ) ! Extra terms for conserved variable
-    eng = kin + total%pot ! Total energy (contributes to conserved variable)
+    eng = kin + total%pot ! Total energy (cut-and-shifted)
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -432,29 +432,21 @@ CONTAINS
     density = variable_type ( nam = 'Density', val = rho )
 
     ! Conserved energy-like quantity per atom
-    ! Energy plus extra terms defined above
-    conserved = variable_type ( nam = 'Conserved/N', val = (eng+ext)/REAL(n) )
-
-    ! Heat capacity (cut-and-shifted)
-    ! Total "enthalpy" divided by temperature and sqrt(N) to make result intensive
-    enp = kin+total%pot+pressure*vol
-    c_s = variable_type ( nam = 'Cp/N cut&shifted', val = enp/(temperature*SQRT(REAL(n))), method = msd, instant = .FALSE. )
-
-    ! Heat capacity (full)
-    ! Total "enthalpy" divided by temperature and sqrt(N) to make result intensive; LRC does not contribute
-    enp = kin+total%cut+pressure*vol
-    c_f = variable_type ( nam = 'Cp/N full', val = enp/(temperature*SQRT(REAL(n))), method = msd, instant = .FALSE. )
+    ! Energy plus PV term plus extra terms defined above
+    enp = eng + pressure*vol
+    conserved = variable_type ( nam = 'Conserved/N', val = (enp+ext)/REAL(n) )
 
     ! Volume MSD
     vol_msd = variable_type ( nam = 'Volume MSD', val = vol, method = msd, instant = .FALSE. )
 
     ! Mean-squared deviation of conserved energy-like quantity
-    ! Energy plus extra terms defined above
-    conserved_msd = variable_type ( nam = 'Conserved MSD', val = (eng+ext)/REAL(n), &
+    ! Energy plus PV term plus extra terms defined above
+    enp = eng + pressure*vol
+    conserved_msd = variable_type ( nam = 'Conserved MSD', val = (enp+ext)/REAL(n), &
          &                          method = msd, e_format = .TRUE., instant = .FALSE. )
 
     ! Collect together for averaging
-    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, density, conserved, c_s, c_f, vol_msd, conserved_msd ]
+    variables = [ e_s, p_s, e_f, p_f, t_k, t_c, density, conserved, vol_msd, conserved_msd ]
 
   END FUNCTION calc_variables
 

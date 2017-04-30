@@ -170,12 +170,10 @@ Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286    | 0.9897   |  2.2787 
 Thol et al (2016) (f)  | 0.75     | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
 `md_nve_lj.py`         | 0.75     | 1.001(1)  | -2.9280    | 0.98(1)  |  2.30(4)  | -3.7277    | 0.38(1)  |          
 `md_nvt_lj.py`         | 0.75     | 1.00      | -2.95(3)   | 0.95(4)  |  0.6(1)   | -3.75(3)   | 0.35(4)  | 0.6(1)
-`md_npt_lj.py`         | 0.749(3) | 1.00      | -2.93(4)   | 0.99     |           | -3.72(4)   | 0.397(6) |
+`md_npt_lj.py`         | 0.748(3) | 1.00      | -2.91(3)   | 0.99     |           | -3.71(3)   | 0.393(5) |
 `bd_nvt_lj.py`         | 0.75     | 1.00      | -2.93(2)   | 0.97(2)  |  1.5(2)   | -3.73(2)   | 0.37(2)  | 1.5(2)
 
 * The `md_nvt_lj.py` program seems to give very low heat capacity, not clear why???
-* The `md_npt_lj.py` program does not conserve well (like its Fortran counterpart)
-and also gives a low value of _C<sub>p</sub>_ (cs)=1.0(3) while EOS gives 4.84??
 * The `bd_nvt_lj.py` program also gives somewhat low heat capacity??
 
 ### Lennard-Jones MC programs
