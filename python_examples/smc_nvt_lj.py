@@ -135,7 +135,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "temperature":1.0, "r_cut":2.5, "dt":0.1, "single_atom":True, "fraction":1.0, "fast":True}
+defaults = {"nblock":10, "nstep":1000, "temperature":1.0, "r_cut":2.5, "dt":0.1, "single_atom":True, "fraction":1.0 }
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -150,7 +150,6 @@ r_cut       = nml["r_cut"]       if "r_cut"       in nml else defaults["r_cut"]
 dt          = nml["dt"]          if "dt"          in nml else defaults["dt"]
 single_atom = nml["single_atom"] if "single_atom" in nml else defaults["single_atom"]
 fraction    = nml["fraction"]    if "fraction"    in nml else defaults["fraction"]
-fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
 # Write out parameters
 print( "{:40}{:15d}  ".format('Number of blocks',          nblock)      )
@@ -163,10 +162,6 @@ if single_atom:
 else:
     print( "{:40}{:15.6f}".format('Multi-atom moves with fraction',fraction) )
     assert 0.0 <= fraction <= 1.0, "Error: fraction out of range"
-if fast:
-    print('Fast potential routines')
-else:
-    print('Slow potential routines')
 
 introduction()
 np.random.seed()
@@ -183,7 +178,7 @@ r = r / box           # Convert positions to box units
 r = r - np.rint ( r ) # Periodic boundaries
 
 # Initial energy and overlap check
-total, f = force ( box, r_cut, r, fast )
+total, f = force ( box, r_cut, r )
 assert not total.ovr, 'Overlap in initial configuration'
 
 # Initialize arrays for averaging and write column headings
@@ -203,14 +198,14 @@ for blk in range(1,nblock+1): # Loop over blocks
             for i in range(n): # Loop over atoms
                 r_old = r[i,:].copy() # Store old position of this atom
                 rj = np.delete(r,i,0) # Array of all the other atoms
-                partial_old, f_old = force_1 ( r[i,:], box, r_cut, rj, fast ) # Old forces, pot etc
+                partial_old, f_old = force_1 ( r[i,:], box, r_cut, rj ) # Old forces, pot etc
                 assert not partial_old.ovr, 'Overlap in current configuration'
-                v                  = np.random.randn(3)*v_rms                 # Choose 3 random momentum components
-                kin_old            = 0.5*np.sum(v**2)                         # Old kinetic energy of this atom
-                v                  = v + 0.5 * dt * np.sum(f_old,axis=0)      # Kick half-step for one atom with old force
-                r[i,:]             = r[i,:] + dt * v / box                    # Drift step (positions in box=1 units)
-                r[i,:]             = r[i,:] - np.rint ( r[i,:] )              # Periodic boundaries (box=1 units)
-                partial_new, f_new = force_1 ( r[i,:], box, r_cut, rj, fast ) # New forces and pot etc for this atom
+                v                  = np.random.randn(3)*v_rms             # Choose 3 random momentum components
+                kin_old            = 0.5*np.sum(v**2)                     # Old kinetic energy of this atom
+                v                  = v + 0.5 * dt * np.sum(f_old,axis=0)  # Kick half-step for one atom with old force
+                r[i,:]             = r[i,:] + dt * v / box                # Drift step (positions in box=1 units)
+                r[i,:]             = r[i,:] - np.rint ( r[i,:] )          # Periodic boundaries (box=1 units)
+                partial_new, f_new = force_1 ( r[i,:], box, r_cut, rj )   # New forces and pot etc for this atom
 
                 if partial_new.ovr: # Test for overlap
                     r[i,:] = r_old # Restore position: this move is rejected
@@ -223,11 +218,11 @@ for blk in range(1,nblock+1): # Loop over blocks
                     delta = delta / temperature               # Divide by temperature
 
                     if metropolis ( delta ): # Accept Metropolis test
-                        total = total + partial_new - partial_old # Update total values
-                        f[:i,:] = f[:i,:] - f_new[:i,:] + f_old[:i,:] # change in forces due to i on other atoms j<i
-                        f[i,:] = f[i,:] + np.sum(f_new,axis=0) - np.sum(f_old,axis=0)
+                        total = total + partial_new - partial_old         # Update total values
+                        f[:i,:]   = f[:i,:] - f_new[:i,:] + f_old[:i,:]   # change in forces due to i on other atoms j<i
+                        f[i,:]    = f[i,:] + np.sum(f_new,axis=0) - np.sum(f_old,axis=0)
                         f[i+1:,:] = f[i+1:,:] - f_new[i:,:] + f_old[i:,:] # change in forces due to i on other atoms j>i
-                        n_move = n_move + 1                       # Update move counter
+                        n_move    = n_move + 1                            # Update move counter
                     else:
                         r[i,:] = r_old # Restore position: this move is rejected
 
@@ -244,7 +239,7 @@ for blk in range(1,nblock+1): # Loop over blocks
             v[move,:] = v[move,:] + 0.5 * dt * f_old[move,:] # Kick half-step with old forces
             r[move,:] = r[move,:] + dt * v[move,:] / box     # Drift step (positions in box=1 units)
             r[move,:] = r[move,:] - np.rint ( r[move,:] )    # Periodic boundaries (box=1 units)
-            total, f  = force ( box, r_cut, r, fast )        # New force and potential etc
+            total, f  = force ( box, r_cut, r )              # New force and potential etc
 
             if total.ovr: # Test for overlap
               r       = r_old.copy() # Restore positions: this move is rejected
@@ -277,7 +272,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 run_end ( calc_variables() ) # Output run averages
 
 # Double check book-keeping for final overlap
-total, f = force ( box, r_cut, r, fast )
+total, f = force ( box, r_cut, r )
 assert not total.ovr, 'Overlap in final configuration'
 
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box ) # Save configuration

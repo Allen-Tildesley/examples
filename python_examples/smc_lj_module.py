@@ -26,6 +26,8 @@
 
 """Energy, force, and move routines for SMC, LJ potential."""
 
+fast = False # Change this to replace NumPy force evaluation with slower Python
+
 class PotentialType:
     """A composite variable for interactions."""
 
@@ -61,17 +63,18 @@ def introduction():
     print('Cut (but not shifted) version also calculated')
     print('Diameter, sigma = 1')
     print('Well depth, epsilon = 1')
+    if fast:
+        print('Fast NumPy force routine')
+    else:
+        print('Slow Python force routine')
 
 def conclusion():
     """Prints out concluding statements at end of run."""
 
     print('Program ends')
 
-def force ( box, r_cut, r, fast ):
-    """Takes in box, cutoff range, and coordinate array, and calculates forces and potentials etc.
-
-    Fast or slow algorithm selected.
-    """
+def force ( box, r_cut, r ):
+    """Takes in box, cutoff range, and coordinate array, and calculates forces and potentials etc."""
 
     import numpy as np
 
@@ -84,7 +87,7 @@ def force ( box, r_cut, r, fast ):
     f = np.zeros_like(r)
 
     for i in range(n-1):
-        partial, f_partial = force_1 ( r[i,:], box, r_cut, r[i+1:,:], fast )
+        partial, f_partial = force_1 ( r[i,:], box, r_cut, r[i+1:,:] )
         if partial.ovr:
             total.ovr = True
             break
@@ -94,12 +97,11 @@ def force ( box, r_cut, r, fast ):
 
     return total, f
   
-def force_1 ( ri, box, r_cut, r, fast ):
+def force_1 ( ri, box, r_cut, r ):
     """Takes in coordinates of an atom and calculates its interactions.
 
     Values of box, cutoff range, and partner coordinate array are supplied.
     The results are returned as partial, a PotentialType variable, and the forces f_partial.
-    Fast or slow version selected.
     """
 
     import numpy as np
@@ -146,11 +148,12 @@ def force_1 ( ri, box, r_cut, r, fast ):
             return partial, f_partial
         sr6  = sr2 ** 3
         sr12 = sr6 ** 2
-        cut  = sr12 - sr6                    # LJ pair potentials (cut but not shifted)
-        vir  = cut + sr12                    # LJ pair virials
-        pot  = np.where ( in_range, cut - pot_cut, 0.0 )   # LJ pair potential (cut-and-shifted)
-        lap  = ( 22.0*sr12 - 5.0*sr6 ) * sr2 # LJ pair Laplacians
-        f_partial = rij * vir[:,np.newaxis] * sr2[:,np.newaxis] # LJ pair forces on i due to each j
+        cut  = sr12 - sr6                                # LJ pair potentials (cut but not shifted)
+        vir  = cut + sr12                                # LJ pair virials
+        pot  = np.where ( in_range, cut - pot_cut, 0.0 ) # LJ pair potential (cut-and-shifted)
+        lap  = ( 22.0*sr12 - 5.0*sr6 ) * sr2             # LJ pair Laplacians
+        fij  = vir*sr2                                   # LJ scalar part of forces
+        f_partial = rij * fij[:,np.newaxis]              # LJ pair forces on i due to each j
         partial = PotentialType ( cut=np.sum(cut), pot=np.sum(pot), vir=np.sum(vir), lap=np.sum(lap), ovr=np.any(ovr) )
 
     else:
@@ -160,7 +163,7 @@ def force_1 ( ri, box, r_cut, r, fast ):
             rij = ri - rj            # Separation vector
             rij = rij - np.rint(rij) # Periodic boundary conditions in box=1 units
             rij_sq = np.sum(rij**2)  # Squared separation
-            if rij_sq < r_cut_box_sq: # Check within cutoff
+            if rij_sq < r_cut_box_sq:    # Check within cutoff
                 rij_sq = rij_sq * box_sq # Now in sigma=1 units
                 sr2    = 1.0 / rij_sq    # (sigma/rij)**2
                 ovr    = sr2 > sr2_ovr   # Overlap if too close

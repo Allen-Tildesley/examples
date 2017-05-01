@@ -229,7 +229,7 @@ def u4_propagator ( t, j_list ):
 # For example, for Lennard-Jones, sigma = 1, epsilon = 1
 
 # Despite the program name, there is nothing here specific to Lennard-Jones
-# The model is defined in md_lj_{fast|slow}_module
+# The model is defined in md_lj_module
 
 import json
 import sys
@@ -258,7 +258,7 @@ except json.JSONDecodeError:
 
 # Set default values, check keys and typecheck values
 defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "temperature":1.0,
-            "pressure":0.99, "tau":2.0, "tau_baro":2.0,"fast":True}
+            "pressure":0.99, "tau":2.0, "tau_baro":2.0}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -274,7 +274,6 @@ temperature = nml["temperature"] if "temperature" in nml else defaults["temperat
 pressure    = nml["pressure"]    if "pressure"    in nml else defaults["pressure"]
 tau         = nml["tau"]         if "tau"         in nml else defaults["tau"]
 tau_baro    = nml["tau_baro"]    if "tau_baro"    in nml else defaults["tau_baro"]
-fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
 introduction()
 np.random.seed()
@@ -289,10 +288,6 @@ print( "{:40}{:15.6f}".format('Specified pressure',        pressure)    )
 print( "{:40}{:15.6f}".format('Thermostat timescale',      tau)         )
 print( "{:40}{:15.6f}".format('Barostat timescale',        tau_baro)    )
 print( "{:40}{:15d}  ".format('Nose-Hoover chain length',  m)           )
-if fast:
-    print('Fast force routine')
-else:
-    print('Slow force routine')
 
 # Read in initial configuration
 n, box, r, v = read_cnf_atoms ( cnf_prefix+inp_tag, with_v=True)
@@ -326,7 +321,7 @@ eps   = 0.0 # Initial strain; generally eps = log ( box/box0 )
 p_eps = np.random.randn() * np.sqrt(temperature*w_eps) # strain momentum
 
 # Initial forces, potential, etc plus overlap check
-total, f = force ( box, r_cut, r, fast )
+total, f = force ( box, r_cut, r )
 assert not total.ovr, 'Overlap in initial configuration'
 
 # Initialize arrays for averaging and write column headings
@@ -347,7 +342,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
         u1_propagator ( dt )
 
-        total, f = force ( box, r_cut, r, fast ) # Force evaluation
+        total, f = force ( box, r_cut, r ) # Force evaluation
         assert not total.ovr, 'Overlap in configuration'
 
         u2_propagator  ( dt/2 )
@@ -365,7 +360,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end ( calc_variables() )
 
-total, f = force ( box, r_cut, r, fast ) # Force evaluation
+total, f = force ( box, r_cut, r ) # Force evaluation
 assert not total.ovr, 'Overlap in final configuration'
 
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box, v ) # Save configuration

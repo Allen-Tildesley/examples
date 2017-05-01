@@ -39,7 +39,7 @@ def calc_variables ( ):
     from maths_module    import nematic_order
 
     # Preliminary calculations (m_ratio, eps_box, box are taken from the calling program)
-    vir = n_overlap ( box/(1.0+eps_box), r, e, fast ) / (3.0*eps_box) # Virial
+    vir = n_overlap ( box/(1.0+eps_box), r, e ) / (3.0*eps_box) # Virial
     vol = box**3              # Volume
     rho = n / vol             # Density
     ord = nematic_order ( e ) # Order
@@ -106,7 +106,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "dr_max":0.05, "de_max":0.05, "eps_box":0.001, "fast":True}
+defaults = {"nblock":10, "nstep":1000, "dr_max":0.05, "de_max":0.05, "eps_box":0.001}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -119,7 +119,6 @@ nstep   = nml["nstep"]   if "nstep"   in nml else defaults["nstep"]
 dr_max  = nml["dr_max"]  if "dr_max"  in nml else defaults["dr_max"]
 de_max  = nml["de_max"]  if "de_max"  in nml else defaults["de_max"]
 eps_box = nml["eps_box"] if "eps_box" in nml else defaults["eps_box"]
-fast    = nml["fast"]    if "fast"    in nml else defaults["fast"]
 
 introduction()
 np.random.seed()
@@ -130,10 +129,6 @@ print( "{:40}{:15d}  ".format('Number of steps per block',  nstep)       )
 print( "{:40}{:15.6f}".format('Maximum displacement',       dr_max)      )
 print( "{:40}{:15.6f}".format('Maximum rotation',           de_max)      )
 print( "{:40}{:15.6f}".format('Pressure scaling parameter', eps_box)     )
-if fast:
-    print('Fast overlap routines')
-else:
-    print('Slow overlap routines')
 
 # Read in initial configuration
 n, box, r, e = read_cnf_mols ( cnf_prefix+inp_tag)
@@ -144,7 +139,7 @@ r = r / box           # Convert positions to box units
 r = r - np.rint ( r ) # Periodic boundaries
 
 # Initial pressure and overlap check
-assert not overlap ( box, r, e, fast ), 'Overlap in initial configuration'
+assert not overlap ( box, r, e ), 'Overlap in initial configuration'
 
 # Initialize arrays for averaging and write column headings
 m_ratio = 0.0
@@ -165,7 +160,7 @@ for blk in range(1,nblock+1): # Loop over blocks
             rj = np.delete(r,i,0)                               # Array of all the other atoms
             ej = np.delete(e,i,0)                               # Array of all the other atoms
 
-            if not overlap_1 ( ri, ei, box, rj, ej, fast ): # Test for non-overlapping configuration
+            if not overlap_1 ( ri, ei, box, rj, ej ): # Test for non-overlapping configuration
                 r[i,:] = ri                                 # Update position
                 e[i,:] = ei                                 # Update position
                 moves = moves + 1                           # Increment move counter
@@ -180,7 +175,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end ( calc_variables() )
 
-assert not overlap ( box, r, e, fast ), 'Overlap in final configuration'
+assert not overlap ( box, r, e ), 'Overlap in final configuration'
 
 write_cnf_mols ( cnf_prefix+out_tag, n, box, r*box, e ) # Save configuration
 conclusion()

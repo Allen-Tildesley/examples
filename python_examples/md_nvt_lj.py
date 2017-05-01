@@ -203,7 +203,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "temperature":1.0, "tau":2.0, "fast":True}
+defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "temperature":1.0, "tau":2.0}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -217,7 +217,6 @@ r_cut       = nml["r_cut"]       if "r_cut"       in nml else defaults["r_cut"]
 dt          = nml["dt"]          if "dt"          in nml else defaults["dt"]
 temperature = nml["temperature"] if "temperature" in nml else defaults["temperature"]
 tau         = nml["tau"]         if "tau"         in nml else defaults["tau"]
-fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
 introduction()
 np.random.seed()
@@ -230,10 +229,6 @@ print( "{:40}{:15.6f}".format('Time step',                 dt)          )
 print( "{:40}{:15.6f}".format('Specified temperature',     temperature) )
 print( "{:40}{:15.6f}".format('Thermostat timescale',      tau)         )
 print( "{:40}{:15d}  ".format('Nose-Hoover chain length',  m)           )
-if fast:
-    print('Fast force routine')
-else:
-    print('Slow force routine')
 
 # Read in initial configuration
 n, box, r, v = read_cnf_atoms ( cnf_prefix+inp_tag, with_v=True)
@@ -257,7 +252,7 @@ p_eta = np.random.randn(m)*np.sqrt(temperature)
 p_eta = p_eta * np.sqrt(q)
 
 # Initial forces, potential, etc plus overlap check
-total, f = force ( box, r_cut, r, fast )
+total, f = force ( box, r_cut, r )
 assert not total.ovr, 'Overlap in initial configuration'
 
 # Initialize arrays for averaging and write column headings
@@ -276,7 +271,7 @@ for blk in range(1,nblock+1): # Loop over blocks
         u2_propagator ( dt/2 )
         u1_propagator ( dt )
 
-        total, f = force ( box, r_cut, r, fast ) # Force evaluation
+        total, f = force ( box, r_cut, r ) # Force evaluation
         assert not total.ovr, 'Overlap in configuration'
 
         u2_propagator ( dt/2 )
@@ -293,7 +288,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end ( calc_variables() )
 
-total, f = force ( box, r_cut, r, fast ) # Force evaluation
+total, f = force ( box, r_cut, r ) # Force evaluation
 assert not total.ovr, 'Overlap in final configuration'
 
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box, v ) # Save configuration

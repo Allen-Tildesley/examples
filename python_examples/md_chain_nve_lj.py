@@ -114,7 +114,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":10000, "dt":0.002, "constraints":"rattle", "fast":True}
+defaults = {"nblock":10, "nstep":10000, "dt":0.002, "constraints":"rattle"}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -126,7 +126,6 @@ nblock      = nml["nblock"]      if "nblock"      in nml else defaults["nblock"]
 nstep       = nml["nstep"]       if "nstep"       in nml else defaults["nstep"]
 dt          = nml["dt"]          if "dt"          in nml else defaults["dt"]
 constraints = nml["constraints"] if "constraints" in nml else defaults["constraints"]
-fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
 introduction()
 
@@ -134,10 +133,6 @@ introduction()
 print( "{:40}{:15d}  ".format('Number of blocks',          nblock)   )
 print( "{:40}{:15d}  ".format('Number of steps per block', nstep)    )
 print( "{:40}{:15.6f}".format('Time step',                 dt)       )
-if fast:
-    print('Fast force routine')
-else:
-    print('Slow force routine')
 constraints = constraints.lower()
 assert "ratt" in constraints or "milc" in constraints, 'Unrecognized constraint method'
 if "ratt" in constraints:
@@ -155,7 +150,7 @@ r, v = zero_cm ( r, v )
 print( "{:40}{:15.6f}".format('Worst bond length deviation', worst_bond(bond,r) )  )
 
 # Initial forces, potential, etc plus overlap check
-total, f = force ( r, fast )
+total, f = force ( r )
 assert not total.ovr, 'Overlap in initial configuration'
 
 # Initialize arrays for averaging and write column headings
@@ -173,7 +168,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
         r, v = constraints_a ( dt, bond, r_old, r, v ) # RATTLE/MILCSHAKE part A
 
-        total, f = force ( r, fast ) # Force evaluation
+        total, f = force ( r ) # Force evaluation
         assert not total.ovr, 'Overlap in configuration'
 
         v = v + 0.5 * dt * f # Kick half-step
@@ -188,7 +183,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end ( calc_variables() )
 
-total, f = force ( r, fast )         # Force evaluation
+total, f = force ( r )         # Force evaluation
 assert not total.ovr, 'Overlap in final configuration'
 
 print( "{:40}{:15.6f}".format('Worst bond length deviation', worst_bond(bond,r) )  )

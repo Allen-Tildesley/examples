@@ -38,13 +38,13 @@ def calc_variables ( ):
     from md_lj_module import hessian
     
     # Preliminary calculations (n,r,v,f,total are taken from the calling program)
-    vol = box**3                       # Volume
-    rho = n / vol                      # Density
-    kin = 0.5*np.sum(v**2)             # Kinetic energy
-    tmp = 2.0 * kin / (3*n-3)          # Remove three degrees of freedom for momentum conservation
-    fsq = np.sum ( f**2 )              # Total squared force
-    hes = hessian(box,r_cut,r,f,fast)  # Total Hessian
-    eng = kin + total.pot              # Total energy for simulated system
+    vol = box**3                  # Volume
+    rho = n / vol                 # Density
+    kin = 0.5*np.sum(v**2)        # Kinetic energy
+    tmp = 2.0 * kin / (3*n-3)     # Remove three degrees of freedom for momentum conservation
+    fsq = np.sum ( f**2 )         # Total squared force
+    hes = hessian(box,r_cut,r,f)  # Total Hessian
+    eng = kin + total.pot         # Total energy for simulated system
 
     # Variables of interest, of class VariableType, containing three attributes:
     #   .val: the instantaneous value
@@ -129,7 +129,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005, "fast":True}
+defaults = {"nblock":10, "nstep":1000, "r_cut":2.5, "dt":0.005}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -141,7 +141,6 @@ nblock = nml["nblock"] if "nblock" in nml else defaults["nblock"]
 nstep  = nml["nstep"]  if "nstep"  in nml else defaults["nstep"]
 r_cut  = nml["r_cut"]  if "r_cut"  in nml else defaults["r_cut"]
 dt     = nml["dt"]     if "dt"     in nml else defaults["dt"]
-fast   = nml["fast"]   if "fast"   in nml else defaults["fast"]
 
 introduction()
 
@@ -150,10 +149,6 @@ print( "{:40}{:15d}  ".format('Number of blocks',          nblock) )
 print( "{:40}{:15d}  ".format('Number of steps per block', nstep)  )
 print( "{:40}{:15.6f}".format('Potential cutoff distance', r_cut)  )
 print( "{:40}{:15.6f}".format('Time step',                 dt)     )
-if fast:
-    print('Fast force routine')
-else:
-    print('Slow force routine')
 
 # Read in initial configuration
 n, box, r, v = read_cnf_atoms ( cnf_prefix+inp_tag, with_v=True)
@@ -166,7 +161,7 @@ vcm = np.sum ( v, axis=0 ) / n # Centre-of mass velocity
 v = v - vcm                    # Set COM velocity to zero
 
 # Initial forces, potential, etc plus overlap check
-total, f = force ( box, r_cut, r, fast )
+total, f = force ( box, r_cut, r )
 assert not total.ovr, 'Overlap in initial configuration'
 
 # Initialize arrays for averaging and write column headings
@@ -182,10 +177,10 @@ for blk in range(1,nblock+1): # Loop over blocks
 
         v = v + 0.5 * dt * f # Kick half-step
 
-        r = r + dt * v / box # Drift step (positions in box=1 units)
-        r = r - np.rint ( r )  # Periodic boundaries
+        r = r + dt * v / box  # Drift step (positions in box=1 units)
+        r = r - np.rint ( r ) # Periodic boundaries
 
-        total, f = force ( box, r_cut, r, fast ) # Force evaluation
+        total, f = force ( box, r_cut, r ) # Force evaluation
         assert not total.ovr, 'Overlap in configuration'
 
         v = v + 0.5 * dt * f # Kick half-step
@@ -198,7 +193,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end ( calc_variables() )
 
-total, f = force ( box, r_cut, r, fast ) # Force evaluation
+total, f = force ( box, r_cut, r ) # Force evaluation
 assert not total.ovr, 'Overlap in final configuration'
 
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box, v ) # Save configuration

@@ -24,8 +24,9 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Overlap and move routines for MC simulation, hard spherocylinders. Fast and slow versions."""
+"""Overlap and move routines for MC simulation, hard spherocylinders."""
 
+fast   = True # Change this to replace NumPy overlap evaluation with slower Python
 length = 5.0 # Cylinder length L (in units where D=1) used throughout the module
 
 def introduction():
@@ -40,13 +41,17 @@ def introduction():
     print("{:40}{:15.6f}".format('Spherocylinder volume/D**3', vmol))
     print('Diameter, D = 1')
     print('Energy, kT = 1')
+    if fast:
+        print('Fast NumPy overlap routine')
+    else:
+        print('Slow Python overlap routine')
 
 def conclusion():
     """Prints out concluding statements at end of run."""
 
     print('Program ends')
 
-def overlap ( box, r, e, fast ):
+def overlap ( box, r, e ):
     """Takes in box and coordinate & orientation arrays, and signals any overlap."""
 
     # Actual calculation is performed by function overlap_1
@@ -57,16 +62,15 @@ def overlap ( box, r, e, fast ):
     assert n==e.shape[0], "{}{:d}{:d}".format('Dimension error for e in overlap',n,e.shape[0])
 
     for i in range(n-1):
-        if overlap_1 ( r[i,:], e[i,:], box, r[i+1:,:], e[i+1:,:], fast ):
+        if overlap_1 ( r[i,:], e[i,:], box, r[i+1:,:], e[i+1:,:] ):
             return True # Immediate return on detection of overlap
 
     return False
 
-def overlap_1 ( ri, ei, box, r, e, fast ):
+def overlap_1 ( ri, ei, box, r, e ):
     """Takes in coordinates and orientations of a molecules and signals any overlap.
 
     Values of box and partner coordinate array are supplied.
-    Fast or slow algorithm selected.
     """
 
     import numpy as np
@@ -119,7 +123,7 @@ def overlap_1 ( ri, ei, box, r, e, fast ):
 
     return False
 
-def n_overlap ( box, r, e, fast ):
+def n_overlap ( box, r, e ):
     """Takes in box and coordinate and orientation arrays, and counts overlaps."""
 
     # This routine is used in the calculation of pressure
@@ -132,11 +136,11 @@ def n_overlap ( box, r, e, fast ):
 
     n_ovr = 0
     for i in range(n-1):
-        n_ovr = n_ovr + n_overlap_1 ( r[i,:], e[i,:], box, r[i+1:,:], e[i+1:,:], fast )
+        n_ovr = n_ovr + n_overlap_1 ( r[i,:], e[i,:], box, r[i+1:,:], e[i+1:,:] )
 
     return n_ovr
 
-def n_overlap_1 ( ri, ei, box, r, e, fast ):
+def n_overlap_1 ( ri, ei, box, r, e ):
     """Takes in coordinates and orientations of a molecule and counts overlaps.
 
     Values of box and partner coordinate array are supplied.

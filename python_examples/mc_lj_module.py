@@ -24,7 +24,9 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Energy and move routines for MC simulation, LJ potential. Fast and slow versions."""
+"""Energy and move routines for MC simulation, LJ potential."""
+
+fast = True # Change this to replace NumPy potential evaluation with slower Python
 
 class PotentialType:
     """A composite variable for interactions."""
@@ -56,13 +58,17 @@ def introduction():
     print('Cut (but not shifted)')
     print('Diameter, sigma = 1')
     print('Well depth, epsilon = 1')
+    if fast:
+        print('Fast NumPy potential routine')
+    else:
+        print('Slow Python potential routine')
 
 def conclusion():
     """Prints out concluding statements at end of run."""
 
     print('Program ends')
 
-def potential ( box, r_cut, r, fast ):
+def potential ( box, r_cut, r ):
     """Takes in box, cutoff range, and coordinate array, and calculates total potential etc.
 
     The results are returned as total, a PotentialType variable.
@@ -75,7 +81,7 @@ def potential ( box, r_cut, r, fast ):
     total = PotentialType ( pot=0.0, vir=0.0, lap=0.0, ovr=False )
 
     for i in range(n-1):
-        partial = potential_1 ( r[i,:], box, r_cut, r[i+1:,:], fast )
+        partial = potential_1 ( r[i,:], box, r_cut, r[i+1:,:] )
         if partial.ovr:
             total.ovr = True
             break
@@ -83,12 +89,11 @@ def potential ( box, r_cut, r, fast ):
 
     return total
 
-def potential_1 ( ri, box, r_cut, r, fast ):
+def potential_1 ( ri, box, r_cut, r ):
     """Takes in coordinates of an atom and calculates its interactions.
 
     Values of box, cutoff range, and partner coordinate array are supplied.
     The results are returned as partial, a PotentialType variable.
-    Fast or slow version selected.
     """
 
     import numpy as np
@@ -158,11 +163,8 @@ def potential_1 ( ri, box, r_cut, r, fast ):
 
     return partial
 
-def force_sq ( box, r_cut, r, fast ):
-    """Calculates total squared force.
-
-    Fast or slow version selected.
-    """
+def force_sq ( box, r_cut, r ):
+    """Calculates total squared force."""
 
     import numpy as np
 
@@ -176,17 +178,17 @@ def force_sq ( box, r_cut, r, fast ):
 
     if fast:
         for i in range(n-1):
-            rij = r[i,:]-r[i+1:,:]           # Separation vectors for j>i
-            rij = rij - np.rint(rij)         # Periodic boundary conditions in box=1 units
-            rij_sq = np.sum(rij**2,axis=1)   # Squared separations for j>1
-            in_range = rij_sq < r_cut_box_sq # Set flags for within cutoff
-            rij_sq = rij_sq * box_sq # Now in sigma=1 units
-            rij    = rij * box       # Now in sigma=1 units
-            sr2    = np.where ( in_range, 1.0 / rij_sq, 0.0 ) # (sigma/rij)**2, only if in range
-            sr6  = sr2 ** 3
-            sr12 = sr6 ** 2
-            fac  = (2*sr12 - sr6)*sr2
-            fij  = rij * fac[:,np.newaxis] # LJ pair forces
+            rij = r[i,:]-r[i+1:,:]            # Separation vectors for j>i
+            rij = rij - np.rint(rij)          # Periodic boundary conditions in box=1 units
+            rij_sq    = np.sum(rij**2,axis=1) # Squared separations for j>1
+            in_range  = rij_sq < r_cut_box_sq # Set flags for within cutoff
+            rij_sq    = rij_sq * box_sq       # Now in sigma=1 units
+            rij       = rij * box             # Now in sigma=1 units
+            sr2       = np.where ( in_range, 1.0 / rij_sq, 0.0 ) # (sigma/rij)**2, only if in range
+            sr6       = sr2 ** 3
+            sr12      = sr6 ** 2
+            fij       = (2*sr12 - sr6)*sr2
+            fij       = rij * fij[:,np.newaxis] # LJ pair forces
             f[i,:]    = f[i,:] + np.sum(fij,axis=0)
             f[i+1:,:] = f[i+1:,:] - fij
     else:

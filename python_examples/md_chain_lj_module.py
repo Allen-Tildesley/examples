@@ -26,6 +26,8 @@
 
 """Force & constraint routines for MD, LJ chain."""
 
+fast = True # Change this to replace NumPy force evaluation with slower Python
+
 class PotentialType:
     """A composite variable for interactions."""
 
@@ -46,6 +48,10 @@ def introduction():
     print('Well depth, epsilon = 1')
     print('All atomic masses the same m = 1')
     print('All bond lengths the same')
+    if fast:
+        print('Fast NumPy force routine')
+    else:
+        print('Slow Python force routine')
 
 def conclusion():
     """Prints out concluding statements at end of run."""
@@ -75,11 +81,8 @@ def worst_bond ( bond, r ):
     diff     = np.fabs(rij_mag-bond)          # Absolute amounts by which constraint is violated
     return np.max(diff)                       # Find maximum
 
-def force ( r, fast ):
-    """Takes in coordinate array, returns forces, potential etc.
-
-    Fast or slow algorithm selected.
-    """
+def force ( r ):
+    """Takes in coordinate array, returns forces, potential etc."""
 
     import numpy as np
 
@@ -105,9 +108,10 @@ def force ( r, fast ):
             ovr    = sr2 > sr2_ovr         # Overlap if too close
             sr6    = sr2 ** 3
             sr12   = sr6 ** 2
-            pot    = sr12 - sr6                                  # LJ pair potential
-            vir    = pot + sr12                                  # LJ pair virial
-            fij    = rij * vir[:,np.newaxis] * sr2[:,np.newaxis] # LJ pair forces
+            pot    = sr12 - sr6              # LJ pair potential
+            vir    = pot + sr12              # LJ pair virial
+            fij    = vir * sr2               # LJ scalar part of forces
+            fij    = rij * fij[:,np.newaxis] # LJ pair forces
             total     = total + PotentialType ( pot=np.sum(pot), ovr=np.any(ovr) )
             f[i,:]    = f[i,:] + np.sum(fij,axis=0)
             f[i+2:,:] = f[i+2:,:] - fij
@@ -134,11 +138,8 @@ def force ( r, fast ):
     
     return total, f
 
-def spring ( k_spring, bond, r, fast ):
-    """Calculates bond spring potential and forces for atomic chain.
-
-    Fast or slow algorithm selected.
-    """
+def spring ( k_spring, bond, r ):
+    """Calculates bond spring potential and forces for atomic chain."""
 
     import numpy as np
     
@@ -156,11 +157,11 @@ def spring ( k_spring, bond, r, fast ):
         rij_sq    = np.sum(rij**2,axis=1)        # Squared separations
         rij_mag   = np.sqrt(rij_sq)              # Separations
         pair_pot  = (rij_mag-bond)**2            # Spring pair potentials without numerical factor
-        gfac      = ( bond - rij_mag ) / rij_mag # Factor determining magnitude of forces
-        gij       = rij * gfac[:,np.newaxis]     # Spring pair forces without numerical factor
+        gij       = ( bond - rij_mag ) / rij_mag # Factor determining magnitude of forces
+        gij       = rij * gij[:,np.newaxis]      # Spring pair forces without numerical factor
         total_spr = total_spr + np.sum(pair_pot)
-        g[:-1,:] = g[:-1,:] + gij
-        g[1:,:]  = g[1:,:]  - gij
+        g[:-1,:]  = g[:-1,:] + gij
+        g[1:,:]   = g[1:,:]  - gij
     else:
         for i in range(n-1):                               # Loop over atoms
             j = i+1                                        # Nearest neighbour

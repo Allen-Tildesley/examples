@@ -141,7 +141,7 @@ except json.JSONDecodeError:
 
 # Set default values, check keys and typecheck values
 defaults = {"nblock":10, "nstep":1000, "dt":0.02, "temperature":1.0, "a":75.0,
-            "gamma":4.5, "method":"Lowe", "fast":True}
+            "gamma":4.5, "method":"Lowe"}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -156,7 +156,6 @@ temperature = nml["temperature"] if "temperature" in nml else defaults["temperat
 a           = nml["a"]           if "a"           in nml else defaults["a"]
 gamma       = nml["gamma"]       if "gamma"       in nml else defaults["gamma"]
 method      = nml["method"]      if "method"      in nml else defaults["method"]
-fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
 introduction()
 np.random.seed()
@@ -168,10 +167,6 @@ print( "{:40}{:15.6f}".format('Time step',                     dt)          )
 print( "{:40}{:15.6f}".format('Specified temperature',         temperature) )
 print( "{:40}{:15.6f}".format('Force strength a*rho/kT',       a)           )
 print( "{:40}{:15.6f}".format('Friction / thermal rate gamma', gamma)       )
-if fast:
-    print('Fast force routine')
-else:
-    print('Slow force routine')
 
 method = method.lower()
 assert "lowe" in method or "shardlow" in method, 'Unrecognized thermalization method'
@@ -195,7 +190,7 @@ r = r / box                    # Convert positions to box units
 r = r - np.rint ( r )          # Periodic boundaries
 
 # Initial forces, potential, etc plus overlap check
-total, f, pairs = force ( box, a, r, fast )
+total, f, pairs = force ( box, a, r )
 
 # Initialize arrays for averaging and write column headings
 run_begin ( calc_variables() )
@@ -210,7 +205,7 @@ for blk in range(1,nblock+1): # Loop over blocks
         kick_propagator ( dt/2 )
         drift_propagator ( dt )
 
-        total, f, pairs = force ( box, a, r, fast ) # Force evaluation
+        total, f, pairs = force ( box, a, r ) # Force evaluation
 
         kick_propagator ( dt/2 )
 
@@ -222,7 +217,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end ( calc_variables() )
 
-total, f, pairs = force ( box, a, r, fast ) # Force evaluation
+total, f, pairs = force ( box, a, r ) # Force evaluation
 
 print( "{:40}{:15.6f}".format('Approx pressure', p_approx ( a, rho, temperature ) )  )
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box, v ) # Save configuration

@@ -100,7 +100,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "dr_max":0.15, "db_max":0.005, "pressure":4.0, "fast":True}
+defaults = {"nblock":10, "nstep":1000, "dr_max":0.15, "db_max":0.005, "pressure":4.0}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -113,7 +113,6 @@ nstep    = nml["nstep"]    if "nstep"    in nml else defaults["nstep"]
 dr_max   = nml["dr_max"]   if "dr_max"   in nml else defaults["dr_max"]
 db_max   = nml["db_max"]   if "db_max"   in nml else defaults["db_max"]
 pressure = nml["pressure"] if "pressure" in nml else defaults["pressure"]
-fast     = nml["fast"]     if "fast"     in nml else defaults["fast"]
 
 introduction()
 np.random.seed()
@@ -124,10 +123,6 @@ print( "{:40}{:15d}  ".format('Number of steps per block', nstep)    )
 print( "{:40}{:15.6f}".format('Pressure',                  pressure) )
 print( "{:40}{:15.6f}".format('Maximum displacement',      dr_max)   )
 print( "{:40}{:15.6f}".format('Maximum box displacement',  db_max)   )
-if fast:
-    print('Fast overlap routines')
-else:
-    print('Slow overlap routines')
 
 # Read in initial configuration
 n, box, r = read_cnf_atoms ( cnf_prefix+inp_tag)
@@ -137,7 +132,7 @@ r = r / box           # Convert positions to box units
 r = r - np.rint ( r ) # Periodic boundaries
 
 # Initial pressure and overlap check
-assert not overlap ( box, r, fast ), 'Overlap in initial configuration'
+assert not overlap ( box, r ), 'Overlap in initial configuration'
 
 # Initialize arrays for averaging and write column headings
 m_ratio = 0.0
@@ -157,7 +152,7 @@ for blk in range(1,nblock+1): # Loop over blocks
             ri = ri - np.rint ( ri )                            # Periodic boundary correction
             rj = np.delete(r,i,0)                               # Array of all the other atoms
 
-            if not overlap_1 ( ri, box, rj, fast ): # Test for non-overlapping configuration
+            if not overlap_1 ( ri, box, rj ): # Test for non-overlapping configuration
                 r[i,:] = ri                         # Update position
                 moves = moves + 1                   # Increment move counter
 
@@ -170,7 +165,7 @@ for blk in range(1,nblock+1): # Loop over blocks
         box_new   = box*box_scale       # New box (in sigma units)
         den_scale = 1.0 / box_scale**3  # Density scaling factor
 
-        if not overlap ( box_new, r, fast ):           # Test for non-overlapping configuration
+        if not overlap ( box_new, r ):           # Test for non-overlapping configuration
             delta = pressure * ( box_new**3 - box**3 ) # PV term (temperature=1.0)
             delta = delta + (n+1) * np.log(den_scale)  # Factor (n+1) consistent with log(box) sampling
 
@@ -186,7 +181,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end ( calc_variables() )
 
-assert not overlap ( box, r, fast ), 'Overlap in final configuration'
+assert not overlap ( box, r ), 'Overlap in final configuration'
 
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box ) # Save configuration
 conclusion()

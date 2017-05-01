@@ -44,7 +44,7 @@ def calc_variables ( ):
     from mc_chain_lj_module import potential, spring_pot, PotentialType
 
     # Preliminary calculations
-    total = potential(r,fast) # Nonbonded potential with overlap flag
+    total = potential(r) # Nonbonded potential with overlap flag
     assert not total.ovr, 'Overlap in configuration'
     spr = spring_pot ( bond, k_spring, r ) # Total spring potential energy
     rcm = np.sum ( r, axis=0 ) / n         # Centre of mass
@@ -119,7 +119,7 @@ except json.JSONDecodeError:
 
 # Set default values, check keys and typecheck values
 defaults = {"nblock":10, "nstep":5000, "m_max":3, "k_max":32,
-            "temperature":1.0, "k_spring":400.0, "fast":True}
+            "temperature":1.0, "k_spring":400.0}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -133,7 +133,6 @@ m_max       = nml["m_max"]       if "m_max"       in nml else defaults["m_max"]
 k_max       = nml["k_max"]       if "k_max"       in nml else defaults["k_max"]
 temperature = nml["temperature"] if "temperature" in nml else defaults["temperature"]
 k_spring    = nml["k_spring"]    if "k_spring"    in nml else defaults["k_spring"]
-fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
 introduction()
 np.random.seed()
@@ -145,10 +144,6 @@ print( "{:40}{:15d}  ".format('Max atoms in regrow',             m_max)       )
 print( "{:40}{:15d}  ".format('Random tries per atom in regrow', k_max)       )
 print( "{:40}{:15.6f}".format('Specified temperature',           temperature) )
 print( "{:40}{:15.6f}".format('Bond spring strength',            k_spring)    )
-if fast:
-    print('Fast potential routines')
-else:
-    print('Slow potential routines')
 
 # Read in initial configuration
 n, bond, r = read_cnf_atoms ( cnf_prefix+inp_tag)
@@ -165,7 +160,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
     for stp in range(nstep): # Loop over steps
 
-        r, accepted = regrow ( temperature, m_max, k_max, bond, k_spring, r, fast )
+        r, accepted = regrow ( temperature, m_max, k_max, bond, k_spring, r )
         m_ratio = 1.0 if accepted else 0.0
 
         blk_add ( calc_variables() )

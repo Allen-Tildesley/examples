@@ -24,7 +24,9 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Force routine for MD simulation, Lennard-Jones atoms (fast and slow versions)."""
+"""Force routine for MD simulation, Lennard-Jones atoms."""
+
+fast = True # Change this to replace NumPy force evaluation with slower Python
 
 class PotentialType:
     """A composite variable for interactions."""
@@ -53,17 +55,18 @@ def introduction():
     print('Cut (but not shifted) version also calculated')
     print('Diameter, sigma = 1')
     print('Well depth, epsilon = 1')
+    if fast:
+        print('Fast NumPy force routine')
+    else:
+        print('Slow Python force routine')
 
 def conclusion():
     """Prints out concluding statements at end of run."""
 
     print('Program ends')
 
-def force ( box, r_cut, r, fast ):
-    """Takes in box, cutoff range, and coordinate array, and calculates forces and potentials etc.
-
-    Fast or slow algorithm selected.
-    """
+def force ( box, r_cut, r ):
+    """Takes in box, cutoff range, and coordinate array, and calculates forces and potentials etc."""
 
     import numpy as np
     
@@ -90,22 +93,24 @@ def force ( box, r_cut, r, fast ):
 
     if fast:
         for i in range(n-1):
-            rij = r[i,:]-r[i+1:,:]           # Separation vectors for j>i
-            rij = rij - np.rint(rij)         # Periodic boundary conditions in box=1 units
-            rij_sq = np.sum(rij**2,axis=1)   # Squared separations for j>1
-            in_range = rij_sq < r_cut_box_sq # Set flags for within cutoff
-            rij_sq = rij_sq * box_sq # Now in sigma=1 units
-            rij    = rij * box       # Now in sigma=1 units
-            sr2    = np.where ( in_range, 1.0 / rij_sq, 0.0 ) # (sigma/rij)**2, only if in range
-            ovr    = sr2 > sr2_ovr   # Overlap if too close
-            sr6  = sr2 ** 3
-            sr12 = sr6 ** 2
-            cut  = sr12 - sr6                                  # LJ pair potential (cut but not shifted)
-            vir  = cut + sr12                                  # LJ pair virial
-            pot  = np.where ( in_range, cut - pot_cut, 0.0 )   # LJ pair potential (cut-and-shifted)
-            lap  = ( 22.0*sr12 - 5.0*sr6 ) * sr2               # LJ pair Laplacian
-            fij  = rij * vir[:,np.newaxis] * sr2[:,np.newaxis] # LJ pair forces
-            total     = total + PotentialType ( cut=np.sum(cut), pot=np.sum(pot), vir=np.sum(vir), lap=np.sum(lap), ovr=np.any(ovr) )
+            rij       = r[i,:]-r[i+1:,:]                        # Separation vectors for j>i
+            rij       = rij - np.rint(rij)                      # Periodic boundary conditions in box=1 units
+            rij_sq    = np.sum(rij**2,axis=1)                   # Squared separations for j>1
+            in_range  = rij_sq < r_cut_box_sq                   # Set flags for within cutoff
+            rij_sq    = rij_sq * box_sq                         # Now in sigma=1 units
+            rij       = rij * box                               # Now in sigma=1 units
+            sr2       = np.where ( in_range, 1.0/rij_sq, 0.0 )  # (sigma/rij)**2, only if in range
+            ovr       = sr2 > sr2_ovr                           # Overlap if too close
+            sr6       = sr2 ** 3
+            sr12      = sr6 ** 2
+            cut       = sr12 - sr6                              # LJ pair potential (cut but not shifted)
+            vir       = cut + sr12                              # LJ pair virial
+            pot       = np.where ( in_range, cut-pot_cut, 0.0 ) # LJ pair potential (cut-and-shifted)
+            lap       = ( 22.0*sr12 - 5.0*sr6 ) * sr2           # LJ pair Laplacian
+            fij       = vir * sr2                               # LJ scalar part of forces
+            fij       = rij * fij[:,np.newaxis]                 # LJ pair forces
+            total     = total + PotentialType ( cut=np.sum(cut), pot=np.sum(pot),
+                                                vir=np.sum(vir), lap=np.sum(lap), ovr=np.any(ovr) )
             f[i,:]    = f[i,:] + np.sum(fij,axis=0)
             f[i+1:,:] = f[i+1:,:] - fij
 
@@ -143,11 +148,8 @@ def force ( box, r_cut, r, fast ):
     
     return total, f
 
-def hessian ( box, r_cut, r, f, fast ):
-    """Calculates Hessian function (for 1/N correction to config temp).
-
-    Fast or slow method selected.
-    """
+def hessian ( box, r_cut, r, f ):
+    """Calculates Hessian function (for 1/N correction to config temp)."""
 
     import numpy as np
 
@@ -194,8 +196,8 @@ def hessian ( box, r_cut, r, f, fast ):
 
                 if rij_sq < r_cut_box_sq:
                     rij_sq = rij_sq * box_sq # Now in sigma=1 units
-                    rij = rij * box    # Now in sigma=1 units
-                    fij = f[i,:] - f[j,:] # Difference in forces
+                    rij = rij * box          # Now in sigma=1 units
+                    fij = f[i,:] - f[j,:]    # Difference in forces
 
                     ff   = np.dot(fij,fij)
                     rf   = np.dot(rij,fij)

@@ -104,7 +104,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "dr_max":0.05, "de_max":0.05, "db_max":0.001, "pressure":1.4, "fast":True}
+defaults = {"nblock":10, "nstep":1000, "dr_max":0.05, "de_max":0.05, "db_max":0.001, "pressure":1.4}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -118,7 +118,6 @@ dr_max   = nml["dr_max"]   if "dr_max"   in nml else defaults["dr_max"]
 de_max   = nml["de_max"]   if "de_max"   in nml else defaults["de_max"]
 db_max   = nml["db_max"]   if "db_max"   in nml else defaults["db_max"]
 pressure = nml["pressure"] if "pressure" in nml else defaults["pressure"]
-fast     = nml["fast"]     if "fast"     in nml else defaults["fast"]
 
 introduction()
 np.random.seed()
@@ -130,10 +129,6 @@ print( "{:40}{:15.6f}".format('Pressure',                   pressure) )
 print( "{:40}{:15.6f}".format('Maximum displacement',       dr_max)   )
 print( "{:40}{:15.6f}".format('Maximum rotation',           de_max)   )
 print( "{:40}{:15.6f}".format('Maximum box displacement',   db_max)   )
-if fast:
-    print('Fast overlap routines')
-else:
-    print('Slow overlap routines')
 
 # Read in initial configuration
 n, box, r, e = read_cnf_mols ( cnf_prefix+inp_tag)
@@ -143,7 +138,7 @@ r = r / box           # Convert positions to box units
 r = r - np.rint ( r ) # Periodic boundaries
 
 # Initial pressure and overlap check
-assert not overlap ( box, r, e, fast ), 'Overlap in initial configuration'
+assert not overlap ( box, r, e ), 'Overlap in initial configuration'
 
 # Initialize arrays for averaging and write column headings
 m_ratio = 0.0
@@ -165,7 +160,7 @@ for blk in range(1,nblock+1): # Loop over blocks
             rj = np.delete(r,i,0)                               # Array of all the other atoms
             ej = np.delete(e,i,0)                               # Array of all the other atoms
 
-            if not overlap_1 ( ri, ei, box, rj, ej, fast ): # Test for non-overlapping configuration
+            if not overlap_1 ( ri, ei, box, rj, ej ): # Test for non-overlapping configuration
                 r[i,:] = ri                                 # Update position
                 e[i,:] = ei                                 # Update position
                 moves = moves + 1                           # Increment move counter
@@ -179,7 +174,7 @@ for blk in range(1,nblock+1): # Loop over blocks
         box_new   = box * box_scale     # New box (in sigma units)
         den_scale = 1.0 / box_scale**3  # Density scaling factor
 
-        if not overlap ( box_new, r, e, fast ): # Test for non-overlapping configuration
+        if not overlap ( box_new, r, e ): # Test for non-overlapping configuration
             delta = pressure * ( box_new**3 - box**3 ) # PV term (temperature = 1.0 )
             delta = delta + (n+1)*np.log(den_scale)    # Factor (n+1) consistent with log(box) sampling
             if metropolis ( delta ): # Accept Metropolis test
@@ -194,7 +189,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end ( calc_variables() )
 
-assert not overlap ( box, r, e, fast ), 'Overlap in final configuration'
+assert not overlap ( box, r, e ), 'Overlap in final configuration'
 
 write_cnf_mols ( cnf_prefix+out_tag, n, box, r*box, e ) # Save configuration
 conclusion()

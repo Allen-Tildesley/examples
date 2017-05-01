@@ -47,7 +47,7 @@ def calc_variables ( ):
     # Preliminary calculations (n,r,total are taken from the calling program)
     vol = box**3                           # Volume
     rho = n / vol                          # Density
-    fsq = force_sq ( box, r_cut, r, fast ) # Total squared force
+    fsq = force_sq ( box, r_cut, r ) # Total squared force
 
     # Variables of interest, of class VariableType, containing three attributes:
     #   .val: the instantaneous value
@@ -131,7 +131,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":1000, "temperature":1.0, "r_cut":2.5, "dr_max":0.15, "fast":True}
+defaults = {"nblock":10, "nstep":1000, "temperature":1.0, "r_cut":2.5, "dr_max":0.15}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -144,7 +144,6 @@ nstep       = nml["nstep"]       if "nstep"       in nml else defaults["nstep"]
 temperature = nml["temperature"] if "temperature" in nml else defaults["temperature"]
 r_cut       = nml["r_cut"]       if "r_cut"       in nml else defaults["r_cut"]
 dr_max      = nml["dr_max"]      if "dr_max"      in nml else defaults["dr_max"]
-fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 
 introduction()
 np.random.seed()
@@ -155,10 +154,6 @@ print( "{:40}{:15d}  ".format('Number of steps per block', nstep)       )
 print( "{:40}{:15.6f}".format('Specified temperature',     temperature) )
 print( "{:40}{:15.6f}".format('Potential cutoff distance', r_cut)       )
 print( "{:40}{:15.6f}".format('Maximum displacement',      dr_max)      )
-if fast:
-    print('Fast potential routines')
-else:
-    print('Slow potential routines')
 
 # Read in initial configuration
 n, box, r = read_cnf_atoms ( cnf_prefix+inp_tag)
@@ -169,7 +164,7 @@ r = r / box           # Convert positions to box units
 r = r - np.rint ( r ) # Periodic boundaries
 
 # Initial energy and overlap check
-total = potential ( box, r_cut, r, fast )
+total = potential ( box, r_cut, r )
 assert not total.ovr, 'Overlap in initial configuration'
 
 # Initialize arrays for averaging and write column headings
@@ -186,12 +181,12 @@ for blk in range(1,nblock+1): # Loop over blocks
 
         for i in range(n): # Loop over atoms
             rj = np.delete(r,i,0) # Array of all the other atoms
-            partial_old = potential_1 ( r[i,:], box, r_cut, rj, fast ) # Old atom potential, virial etc
+            partial_old = potential_1 ( r[i,:], box, r_cut, rj ) # Old atom potential, virial etc
             assert not partial_old.ovr, 'Overlap in current configuration'
 
             ri = random_translate_vector ( dr_max/box, r[i,:] ) # Trial move to new position (in box=1 units)
             ri = ri - np.rint ( ri )                            # Periodic boundary correction
-            partial_new = potential_1 ( ri, box, r_cut, rj, fast )    # New atom potential, virial etc
+            partial_new = potential_1 ( ri, box, r_cut, rj )    # New atom potential, virial etc
 
             if not partial_new.ovr: # Test for non-overlapping configuration
                 delta = partial_new.pot - partial_old.pot # Use cut (but not shifted) potential
@@ -211,7 +206,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end ( calc_variables() )
 
-total = potential ( box, r_cut, r, fast ) # Double check book-keeping
+total = potential ( box, r_cut, r ) # Double check book-keeping
 assert not total.ovr, 'Overlap in final configuration'
 
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box ) # Save configuration

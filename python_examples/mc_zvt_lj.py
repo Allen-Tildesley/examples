@@ -45,9 +45,9 @@ def calc_variables ( ):
     from mc_lj_module    import force_sq
 
     # Preliminary calculations (n,r,total are taken from the calling program)
-    vol = box**3                           # Volume
-    rho = n / vol                          # Density
-    fsq = force_sq ( box, r_cut, r, fast ) # Total squared force
+    vol = box**3                     # Volume
+    rho = n / vol                    # Density
+    fsq = force_sq ( box, r_cut, r ) # Total squared force
 
     # Variables of interest, of class VariableType, containing three attributes:
     #   .val: the instantaneous value
@@ -140,7 +140,7 @@ except json.JSONDecodeError:
 
 # Set default values, check keys and typecheck values
 defaults = {"nblock":10, "nstep":1000, "temperature":1.0, "activity":0.079,
-            "prob_move":0.34, "r_cut":2.5, "dr_max":0.15, "fast":True}
+            "prob_move":0.34, "r_cut":2.5, "dr_max":0.15}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -155,7 +155,6 @@ activity    = nml["activity"]    if "activity"    in nml else defaults["activity
 prob_move   = nml["prob_move"]   if "prob_move"   in nml else defaults["prob_move"]
 r_cut       = nml["r_cut"]       if "r_cut"       in nml else defaults["r_cut"]
 dr_max      = nml["dr_max"]      if "dr_max"      in nml else defaults["dr_max"]
-fast        = nml["fast"]        if "fast"        in nml else defaults["fast"]
 prob_create = (1-prob_move)/2 # So that create and destroy have equal probabilities
 
 introduction()
@@ -170,10 +169,6 @@ print( "{:40}{:15.6f}".format('Probability of move',           prob_move)   )
 print( "{:40}{:15.6f}".format('Probability of create/destroy', prob_create) )
 print( "{:40}{:15.6f}".format('Potential cutoff distance',     r_cut)       )
 print( "{:40}{:15.6f}".format('Maximum displacement',          dr_max)      )
-if fast:
-    print('Fast potential routines')
-else:
-    print('Slow potential routines')
 
 # Read in initial configuration
 n, box, r = read_cnf_atoms ( cnf_prefix+inp_tag )
@@ -184,7 +179,7 @@ r = r / box           # Convert positions to box units
 r = r - np.rint ( r ) # Periodic boundaries
 
 # Initial energy and overlap check
-total = potential ( box, r_cut, r, fast )
+total = potential ( box, r_cut, r )
 assert not total.ovr, 'Overlap in initial configuration'
 
 # Initialize arrays for averaging and write column headings
@@ -213,12 +208,12 @@ for blk in range(1,nblock+1): # Loop over blocks
                 m_try = m_try + 1
                 i = np.random.randint(n) # Choose moving particle at random
                 rj = np.delete(r,i,0)    # Array of all the other atoms
-                partial_old = potential_1 ( r[i,:], box, r_cut, rj, fast ) # Old atom potential, virial etc
+                partial_old = potential_1 ( r[i,:], box, r_cut, rj ) # Old atom potential, virial etc
                 assert not partial_old.ovr, 'Overlap in current configuration'
 
                 ri = random_translate_vector ( dr_max/box, r[i,:] ) # Trial move to new position (in box=1 units)
                 ri = ri - np.rint ( ri )                            # Periodic boundary correction
-                partial_new = potential_1 ( ri, box, r_cut, rj, fast )    # New atom potential, virial etc
+                partial_new = potential_1 ( ri, box, r_cut, rj )    # New atom potential, virial etc
 
                 if not partial_new.ovr: # Test for non-overlapping configuration
                     delta = partial_new.pot - partial_old.pot # Use cut (but not shifted) potential
@@ -233,7 +228,7 @@ for blk in range(1,nblock+1): # Loop over blocks
                 c_try = c_try + 1
                 ri = np.random.rand(3) # Three uniform random numbers in range (0,1)
                 ri = ri - 0.5          # Now in range (-0.5,+0.5) for box=1 units
-                partial_new = potential_1 ( ri, box, r_cut, r, fast ) # New atom potential, virial, etc
+                partial_new = potential_1 ( ri, box, r_cut, r ) # New atom potential, virial, etc
 
                 if not partial_new.ovr: # Test for non-overlapping configuration
                     delta = partial_new.pot / temperature                  # Use cut (not shifted) potential
@@ -248,7 +243,7 @@ for blk in range(1,nblock+1): # Loop over blocks
                 d_try = d_try + 1
                 i = np.random.randint(n) # Choose particle at random
                 rj = np.delete(r,i,0)    # Array of all the other atoms
-                partial_old = potential_1 ( r[i,:], box, r_cut, rj, fast ) # Old atom potential, virial, etc
+                partial_old = potential_1 ( r[i,:], box, r_cut, rj ) # Old atom potential, virial, etc
                 assert not partial_old.ovr, 'Overlap found on particle removal'
 
                 delta = -partial_old.pot / temperature             # Use cut (not shifted) potential
@@ -271,7 +266,7 @@ for blk in range(1,nblock+1): # Loop over blocks
 
 run_end ( calc_variables() )
 
-total = potential ( box, r_cut, r, fast ) # Double check book-keeping
+total = potential ( box, r_cut, r ) # Double check book-keeping
 assert not total.ovr, 'Overlap in final configuration'
 
 write_cnf_atoms ( cnf_prefix+out_tag, n, box, r*box ) # Save configuration

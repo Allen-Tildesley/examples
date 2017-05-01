@@ -116,7 +116,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"nblock":10, "nstep":10000, "dt":0.0002, "k_spring":10000.0, "n_mts":10, "fast":True}
+defaults = {"nblock":10, "nstep":10000, "dt":0.0002, "k_spring":10000.0, "n_mts":10}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -129,7 +129,6 @@ nstep    = nml["nstep"]    if "nstep"    in nml else defaults["nstep"]
 dt       = nml["dt"]       if "dt"       in nml else defaults["dt"]
 k_spring = nml["k_spring"] if "k_spring" in nml else defaults["k_spring"]
 n_mts    = nml["n_mts"]    if "n_mts"    in nml else defaults["n_mts"]
-fast     = nml["fast"]     if "fast"     in nml else defaults["fast"]
 
 introduction()
 
@@ -140,10 +139,6 @@ print( "{:40}{:15.6f}".format('Time step',                 dt)       )
 print( "{:40}{:15.6f}".format('Bond spring constant',      k_spring) )
 print( "{:40}{:15d}  ".format('Multiple time step factor', n_mts)    )
 print( "{:40}{:15.6f}".format('Large time step',           dt*n_mts) )
-if fast:
-    print('Fast force routine')
-else:
-    print('Slow force routine')
 
 # Read in initial configuration
 n, bond, r, v = read_cnf_atoms ( cnf_prefix+inp_tag, with_v=True)
@@ -153,9 +148,9 @@ r, v = zero_cm ( r, v )
 print( "{:40}{:15.6f}".format('Worst bond length deviation', worst_bond(bond,r) )  )
 
 # Initial forces, potential, etc plus overlap check
-total, f = force ( r, fast )
+total, f = force ( r )
 assert not total.ovr, 'Overlap in initial configuration'
-total_spr, g = spring ( k_spring, bond, r, fast )
+total_spr, g = spring ( k_spring, bond, r )
 
 # Initialize arrays for averaging and write column headings
 run_begin ( calc_variables() )
@@ -171,12 +166,12 @@ for blk in range(1,nblock+1): # Loop over blocks
         v = v + 0.5 * n_mts * dt * f  # Kick half-step (long) with nonbonded forces f
 
         for stp_mts in range(n_mts): # Loop over n_mts steps of length dt
-            v = v + 0.5 * dt * g                              # Kick half-step (short) with spring forces g
-            r = r + dt * v                                    # Drift step (short)
-            total_spr, g = spring ( k_spring, bond, r, fast ) # Evaluate spring forces g and potential
-            v = v + 0.5 * dt * g                              # Kick half-step (short) with spring forces g
+            v = v + 0.5 * dt * g                        # Kick half-step (short) with spring forces g
+            r = r + dt * v                              # Drift step (short)
+            total_spr, g = spring ( k_spring, bond, r ) # Evaluate spring forces g and potential
+            v = v + 0.5 * dt * g                        # Kick half-step (short) with spring forces g
 
-        total, f = force ( r, fast ) # Evaluate nonbonded forces f and potential
+        total, f = force ( r ) # Evaluate nonbonded forces f and potential
         assert not total.ovr, 'Overlap in configuration'
         v = v + 0.5 * n_mts * dt * f # Kick half-step (long) with nonbonded forces f
 

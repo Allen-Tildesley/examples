@@ -90,6 +90,7 @@ CONTAINS
     sr3 = 1.0 / r_cut**3
 
     pressure_delta = pi * (8.0/3.0) * ( sr3**3  - sr3 ) * density**2
+    print *, density, r_cut, pressure_delta
 
   END FUNCTION pressure_delta
 

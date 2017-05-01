@@ -24,7 +24,9 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Overlap and move routines for MC simulation, hard spheres. Fast and slow versions."""
+"""Overlap and move routines for MC simulation, hard spheres."""
+
+fast = True # Change this to replace NumPy overlap evaluation with slower Python
 
 def introduction():
     """Prints out introductory statements at start of run."""
@@ -32,13 +34,17 @@ def introduction():
     print('Hard sphere potential')
     print('Diameter, sigma = 1')
     print('Energy, kT = 1')
+    if fast:
+        print('Fast NumPy overlap routine')
+    else:
+        print('Slow Python overlap routine')
 
 def conclusion():
     """Prints out concluding statements at end of run."""
 
     print('Program ends')
 
-def overlap ( box, r, fast ):
+def overlap ( box, r ):
     """Takes in box and coordinate array, and signals any overlap."""
 
     # Actual calculation is performed by function overlap_1
@@ -47,16 +53,15 @@ def overlap ( box, r, fast ):
     assert d==3, 'Dimension error for r in overlap'
 
     for i in range(n-1):
-        if overlap_1 ( r[i,:], box, r[i+1:,:], fast ):
+        if overlap_1 ( r[i,:], box, r[i+1:,:] ):
             return True # Immediate return on detection of overlap
 
     return False
 
-def overlap_1 ( ri, box, r, fast ):
+def overlap_1 ( ri, box, r ):
     """Takes in coordinates of an atom and signals any overlap.
 
     Values of box and partner coordinate array are supplied.
-    Fast or slow algorithm selected.
     """
 
     import numpy as np
@@ -88,7 +93,7 @@ def overlap_1 ( ri, box, r, fast ):
 
         return False
 
-def n_overlap ( box, r, fast ):
+def n_overlap ( box, r ):
     """Takes in box and coordinate array, and counts overlaps."""
 
     # This routine is used in the calculation of pressure
@@ -99,15 +104,14 @@ def n_overlap ( box, r, fast ):
 
     n_ovr = 0
     for i in range(n-1):
-        n_ovr = n_ovr + n_overlap_1 ( r[i,:], box, r[i+1:,:], fast )
+        n_ovr = n_ovr + n_overlap_1 ( r[i,:], box, r[i+1:,:] )
 
     return n_ovr
 
-def n_overlap_1 ( ri, box, r, fast ):
+def n_overlap_1 ( ri, box, r ):
     """Takes in coordinates of an atom and counts overlaps.
 
     Values of box and partner coordinate array are supplied.
-    Fast or slow algorithm selected.
     """
 
     import numpy as np

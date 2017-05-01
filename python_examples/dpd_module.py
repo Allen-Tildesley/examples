@@ -24,7 +24,9 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Dissipative particle dynamics module (fast and slow versions)."""
+"""Dissipative particle dynamics module."""
+
+fast = True # Change this to replace NumPy force evaluation with slower Python
 
 class PotentialType:
     """A composite variable for interactions."""
@@ -46,17 +48,20 @@ def introduction():
 
     print('DPD soft potential')
     print('Diameter, r_cut = 1')
+    if fast:
+        print('Fast NumPy force routine')
+    else:
+        print('Slow Python force routine')
 
 def conclusion():
     """Prints out concluding statements at end of run."""
 
     print('Program ends')
 
-def force ( box, a, r, fast ):
+def force ( box, a, r ):
     """Takes in box, strength parameter, and coordinate array, and calculates forces and potentials etc.
 
     Also returns list of pairs in range for use by the thermalization algorithm.
-    Fast or slow version selected.
     """
 
     import numpy as np
@@ -186,7 +191,7 @@ def shardlow ( box, temperature, gamma_step, v, pairs ):
 def p_approx ( a, rho, temperature ):
     """Returns approximate pressure."""
 
-    # This expression is given by Groot and Warren, J Chem Phys 107, 4423 (1997), alpha = 0.101
+    # Original expression given by Groot and Warren, J Chem Phys 107, 4423 (1997), alpha = 0.101
     # This is the revised formula due to Liyana-Arachchi, Jamadagni, Elke, Koenig, Siepmann,
     # J Chem Phys 142, 044902 (2015)
 

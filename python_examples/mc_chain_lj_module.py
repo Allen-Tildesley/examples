@@ -24,7 +24,9 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Monte Carlo, single chain, LJ atoms. Fast and slow versions."""
+"""Monte Carlo, single chain, LJ atoms."""
+
+fast = True # Change this to replace NumPy potential evaluation with slower Python
 
 class PotentialType:
     """A composite variable for interactions."""
@@ -57,13 +59,17 @@ def introduction():
     print('Diameter, sigma = 1')
     print('Well depth, epsilon = 1')
     print('Harmonic spring bond potential')
+    if fast:
+        print('Fast NumPy potential routine')
+    else:
+        print('Slow Python potential routine')
 
 def conclusion():
     """Prints out concluding statements at end of run."""
 
     print('Program ends')
 
-def regrow ( temperature, m_max, k_max, bond, k_spring, r, fast ):
+def regrow ( temperature, m_max, k_max, bond, k_spring, r ):
     """Carries out single regrowth move, returning new r and indicator of success."""
 
     # A short sequence of m atoms (m<=m_max) is deleted and regrown in the CBMC manner
@@ -117,7 +123,7 @@ def regrow ( temperature, m_max, k_max, bond, k_spring, r, fast ):
         for k in range(k_max): # Loop over k_max tries
             d          = random_bond ( bond, std, d_max )          # Generate random bond length around d=bond
             r_try[k,:] = r[i-1,:] + d * random_vector()            # Trial position in random direction from i-1
-            partial    = potential_1 ( r_try[k,:], r[:i,:], fast ) # Nonbonded interactions with earlier atoms
+            partial    = potential_1 ( r_try[k,:], r[:i,:] ) # Nonbonded interactions with earlier atoms
             w[k]       = 0.0 if partial.ovr else np.exp(-partial.pot/temperature) # Weight for this try
         w_sum = np.sum(w)
         if w_sum<w_tol: # Early exit if this happens at any stage
@@ -146,14 +152,14 @@ def regrow ( temperature, m_max, k_max, bond, k_spring, r, fast ):
 
         # Old position and weight are stored as try 0
         r_try[0,:] = r[i,:]
-        partial    = potential_1 ( r_try[0,:], r[:i,:], fast ) # Nonbonded energy with earlier atoms
+        partial    = potential_1 ( r_try[0,:], r[:i,:] ) # Nonbonded energy with earlier atoms
         w[0]       = 0.0 if partial.ovr else np.exp(-partial.pot/temperature) # Weight for this try
 
         # Remaining tries only required to compute weight
         for k in range(1,k_max): # Loop over k_max-1 other tries
             d          = random_bond ( bond, std, d_max )          # Generate random bond length around d=bond
             r_try[k,:] = r[i-1,:] + d * random_vector()            # Trial position in random direction from i-1
-            partial    = potential_1 ( r_try[k,:], r[:i,:], fast ) # Nonbonded interactions with earlier atoms
+            partial    = potential_1 ( r_try[k,:], r[:i,:] ) # Nonbonded interactions with earlier atoms
             w[k]       = 0.0 if partial.ovr else np.exp(-partial.pot/temperature) # Weight for this try
 
         w_sum = np.sum(w)
@@ -174,7 +180,7 @@ def regrow ( temperature, m_max, k_max, bond, k_spring, r, fast ):
     else:
         return r_old, False
 
-def potential ( r, fast ):
+def potential ( r ):
     """Takes in coordinate array, and calculates total potential etc.
 
     The results are returned as total, a PotentialType variable."""
@@ -190,7 +196,7 @@ def potential ( r, fast ):
     total = PotentialType ( pot=0.0, ovr=False ) # Initialize
 
     for i in range(n-1):
-        partial = potential_1 ( r[i,:], r[i+1:,:], fast )
+        partial = potential_1 ( r[i,:], r[i+1:,:] )
         if partial.ovr:
             total.ovr = True
             break
@@ -198,11 +204,10 @@ def potential ( r, fast ):
 
     return total
 
-def potential_1 ( ri, r, fast ):
+def potential_1 ( ri, r ):
     """Takes in coordinates of an atom and calculates its interactions.
 
     Partner coordinate array is supplied.
-    Fast or slow version selected.
     """
 
     import numpy as np
