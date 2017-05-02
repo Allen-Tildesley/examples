@@ -214,7 +214,6 @@ Acceptance rate of creation/destruction moves is quite small, at about 0.3%.
 For other state points see below.
 We could look at including a reallocate_arrays routine to cope better with varying _N_.
 * The `mc_zvt_lj_ll` program has the same acceptance ratio of moves.
-It seems to run very slowly, which needs looking into???
 Again, it would be more satisfying to use list array reallocation to make the program resilient to _N_ increasing.
 * In principle, there should be a delta correction for the configurational temperature.
 Long-range corrections are discussed by A Baranyai _J Chem Phys,_ __112,__ 3964 (2000) and by
