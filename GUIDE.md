@@ -104,7 +104,7 @@ For completeness, note that Thol et al also supply C++ programs, and tables of d
 in the Supplementary Information associated with their papers.
 They are not responsible for our (Fortran) program!
 
-### Lennard-Jones MD programs
+### Lennard-Jones MD, BD and SMC programs
 First we look at the MD (and related) programs, which use the cut-and-shifted potential.
 Here we compare with typical test runs from our programs using default parameters, _N_=256, except where stated.
 Note that _E_ is the total internal energy per atom,
@@ -113,6 +113,7 @@ all including the ideal gas contributions.
 The Smart Monte Carlo code `smc_nvt_lj` is included here since it uses the
 cut-and-shifted potential which corresponds to the force calculation
 (although it is not essential to do so).
+Similarly, we include here the Brownian dynamics program `bd_nvt_lj`.
 
 Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
 ------                 | -----     | -----     | --------   | -------- | --------- | -------    | -------  | --------
@@ -187,39 +188,62 @@ at _R_<sub>c</sub>=2.5&sigma;, using the same LRC and delta corrections as in th
 Once again, all values in the table include the ideal gas contribution.
 Except where indicated, tests are performed for _N_=256.
 
-Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C_ (f)
-------                 | -----     | ----- | -------    | -------  | -------    | -------  | --------
-Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630  
-`mc_nvt_lj`            | 0.75      | 1.00  | -3.332(1)  | 0.651(3) | -3.734(1)  | 0.350(3) |  2.28(1)
-`mc_nvt_lj_re`         | 0.75      | 1.00  | -3.332(1)  | 0.648(2) | -3.734(1)  | 0.347(2) |  2.258(4)
-`mc_nvt_lj_ll`&Dagger; | 0.75      | 1.00  | -3.3230(3) | 0.669(1) | -3.7246(3) | 0.367(1) |  2.27(1)
-`mc_npt_lj`            | 0.7501(2) | 1.00  | -3.331(1)  | 0.69     | -3.733(1)  | 0.364(2) |          
-`mc_npt_lj_ll`&Dagger; | 0.7506(4) | 1.00  | -3.332(3)  | 0.69     | -3.734(3)  | 0.358(3) |          
-`mc_zvt_lj`            | 0.7504(4) | 1.00  | -3.333(3)  | 0.668(4) | -3.735(3)  | 0.366(4) |          
-`mc_zvt_lj_ll`&Dagger; | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |          
+Source                       | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C_ (f)
+------                       | -----     | ----- | -------    | -------  | -------    | -------  | --------
+Thol et al (2016) (f)        | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630  
+`mc_nvt_lj`                  | 0.75      | 1.00  | -3.332(1)  | 0.651(3) | -3.734(1)  | 0.350(3) |  2.28(1)
+`mc_nvt_lj_re`&sharp;        | 0.75      | 1.00  | -3.332(1)  | 0.648(2) | -3.734(1)  | 0.347(2) |  2.258(4)
+`mc_nvt_lj_ll`&Dagger;       | 0.75      | 1.00  | -3.3230(3) | 0.669(1) | -3.7246(3) | 0.367(1) |  2.27(1)
+`mc_npt_lj`&sect;            | 0.7501(2) | 1.00  | -3.331(1)  | 0.666(2) | -3.733(1)  | 0.364(2) |          
+`mc_npt_lj_ll`&Dagger;&sect; | 0.7506(4) | 1.00  | -3.332(3)  | 0.660(3) | -3.734(3)  | 0.358(3) |          
+`mc_zvt_lj`&para;            | 0.7504(4) | 1.00  | -3.333(3)  | 0.668(4) | -3.735(3)  | 0.366(4) |          
+`mc_zvt_lj_ll`&Dagger;&para; | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |          
 
-* &Dagger; indicates a larger system size, _N_=864 (or approximately so for `mc_zvt_lj_ll`)
-* The `mc_nvt_lj` program seems to give a low pressure, needs investigating? or longer run?
-* The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
-* The `mc_npt_lj` _measured_ pressure (c) is 0.666(2) which is a little low. Needs checking?
-Measured _C<sub>p</sub>_ (full) is 5.28(7) compared with Thol et al (2016) EOS giving 5.22
-* The `mc_npt_lj_ll` program was run with `db_max`=0.015 to give a volume acceptance ratio around 9%.
-Measured pressure (c) is 0.660(3) which is again a little low. Is the delta correction wrong somehow???
-Or the constant-pressure algorithm???
-Measured _C<sub>p</sub>_ (full) is 5.04(16) compared with Thol et al (2016) EOS value of 5.22.
-The program probably needs making more resilient against changes in box size (list array reallocation).
-* The `mc_zvt_lj` program was run at activity _z_=0.0795, the default value in the program, in a box of length 7&sigma;.
+&Dagger; indicates a larger system size, _N_=864 (or approximately so for `mc_zvt_lj_ll`).
+Note that the linked lists do not give an enormous speedup for this system size,
+which corresponds to 4x4x4 cells.
+
+&sect; the constant pressure simulations were run at _P_=0.69, the program default.
+The measured _C<sub>p</sub>_ (full) values were 5.28(7) for `mc_npt_lj` and 5.04(16) for `mc_npt_lj_ll`,
+compared with Thol et al (2016) EOS giving 5.22.
+The `mc_npt_lj_ll` program was run with non-default value `db_max`=0.015 to give a volume acceptance ratio around 9%.
+
+&para; the grand canonical programs were run at activity _z_=0.0795, the program default value.
 The Thol et al (2016) LRC-corrected value to give &rho;=0.75 would be _z_=0.080627.
+For `mc_zvt_lj` the box length was _L_=7&sigma;; for `mc_zvt_lj_ll` _L_=10.5&sigma;.
 Acceptance rate of creation/destruction moves is quite small, at about 0.3%.
 For other state points see below.
-We could look at including a reallocate_arrays routine to cope better with varying _N_.
-* The `mc_zvt_lj_ll` program has the same acceptance ratio of moves.
-Again, it would be more satisfying to use list array reallocation to make the program resilient to _N_ increasing.
-* In principle, there should be a delta correction for the configurational temperature.
-Long-range corrections are discussed by A Baranyai _J Chem Phys,_ __112,__ 3964 (2000) and by
-A Lervik, O Wilhelmsen, TT Trinh, HR Nagel, _J Chem Phys,_ __143,__ 114106 (2015),
-but they do not seem to discuss the truncation discontinuity.
-This needs looking into ???
+
+&sharp; The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
+
+Several of these programs could be improved to use array reallocation (available in Fortran)
+to make them more resilient against changes in box size or number of particles.
+For simplicity we have not included these features.
+
+The measured pressures _P_ (c) are systematically a little low;
+this is particularly noticeable for the constant-pressure programs,
+where they might be expected to agree with the user-defined value of _P_.
+This reflects the approximate nature of
+the delta correction applied to the virial pressure,
+to account for the discontinuous potential at _R<sub>c</sub>_.
+At the density &rho;=0.75, with _R<sub>c</sub>_=2.5,
+the pressure correction is &Delta; _P_&asymp;-0.3,
+which is substantial.
+However, this estimate is based on the assumption
+that the pair distribution function _g(R<sub>c</sub>)_=1.
+In fact, the choice _R<sub>c</sub>_=2.5 is a poor one in this regard,
+lying near a local minimum where _g(R<sub>c</sub>)_&asymp; 0.91
+(an illustration appears below).
+Consequently the applied correction is slightly too large,
+and the resulting estimated pressure is systematically too low by &asymp; 0.03.
+This serves as a reminder to always make clear what the cutoff is,
+and what corrections (for discontinuities or long-range interactions)
+have been applied.
+
+In principle, there should be a delta correction for the configurational temperature.
+Long-range corrections to _T_<sub>c</sub> are discussed by
+A Baranyai _J Chem Phys,_ __112,__ 3964 (2000) and by
+A Lervik, O Wilhelmsen, TT Trinh, HR Nagel, _J Chem Phys,_ __143,__ 114106 (2015).
 
 Tests for the grand canonical MC program were initially conducted at a slightly lower density,
 very close to the liquid-vapour coexistence line (see Gibbs simulations below).
@@ -233,16 +257,6 @@ Source                |  z     | &rho;     | _T_  | _E_ (c)   | _P_ (c)    | _E_
 -------               | ----   | -----     | ---- | --------- | -------    | -------   | -------  
 Thol et al (2016) (c) | 0.032  | 0.65325   | 1.0  | -2.7212   | 0.0457     | -3.0710   | -0.1828  
 `mc_zvt_lj`           | 0.032  | 0.6532(5) | 1.0  | -2.728(3) | 0.0325(25) | -3.078(4) | -0.196(2)
-
-### Brownian dynamics program
-The program `bd_nvt_lj` carries out a Brownian dynamics simulation for a set of atoms
-interacting through the cut-and-shifted Lennard-Jones potential.
-An initial configuration may be prepared, at a typical Lennard-Jones state point,
-using the `initialize` program in the usual way.
-As well as the usual run parameters, similar to a molecular dynamics code,
-the user specifies a friction coefficient.
-The calculated average thermodynamic quantities should be as expected for an
-equilibrium simulation of this model at the chosen state point (see e.g. the table above).
 
 ### Gibbs Monte Carlo program
 The program `mc_gibbs_lj` carries out Gibbs ensemble Monte Carlo,
@@ -266,8 +280,15 @@ Trokhymchuk et al MC | 0.6542   | 0.0439   | 0.0336   | 0.0336   |              
 Trokhymchuk et al MD | 0.6507   | 0.0500   | 0.0380   | 0.0380   | -2.713 &Dagger; | 1.047 &Dagger;
 `mc_gibbs_lj`        | 0.652(1) | 0.050(1) | 0.028(1) | 0.038(1) | -2.730(5)       | 1.054(8)
 
-* There is a small discrepancy between pressures in the two boxes. Is this expected?
-* &Dagger; indicates values for given &rho; and _T_ from the Thol et al (2016) EOS (f) with cutoff correction.
+&Dagger; indicates values for given &rho; and _T_ from the Thol et al (2016) EOS (f) with cutoff correction.
+
+The small discrepancy between measured pressures in the two phases reflects the approximate nature
+of the delta correction for potential discontinuity, particularly in the liquid phase (see above).
+For a density &rho;&asymp; 0.65 and _R<sub>c</sub>_=2.5
+the pressure correction is &Delta; _P_&asymp;-0.23.
+However, this assumes _g(R<sub>c</sub>)_=1,
+whereas actually _g(R<sub>c</sub>)_&asymp; 0.95 at this density.
+Hence the correction is too large by approximately 0.01.
 
 ### Replica exchange program
 The `mc_nvt_lj_re` program conducts runs at several temperatures: four were used in testing.
