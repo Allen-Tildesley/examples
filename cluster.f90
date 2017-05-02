@@ -25,7 +25,7 @@ PROGRAM cluster
   ! the software, you should not imply endorsement by the authors or publishers.                   !
   !------------------------------------------------------------------------------------------------!
 
-  ! Reads an atomic configuration with periodic boundary conditions from cnf.inp
+  ! Reads an atomic configuration with periodic boundary conditions from cluster.inp
   ! Defines a cluster by a critical separation r_cl
   ! Value of r_cl read from standard input using a namelist nml
   ! Leave namelist empty to accept supplied default
@@ -46,14 +46,14 @@ PROGRAM cluster
   INTEGER, DIMENSION(:),   ALLOCATABLE :: list ! Linked list array (n)
   INTEGER, DIMENSION(:),   ALLOCATABLE :: done ! Indicates assignment to cluster (n)
 
-  CHARACTER(len=7), PARAMETER :: filename = 'cnf.inp'
-  REAL                        :: r_cl, r_cl_sq, box
-  INTEGER                     :: ioerr, count, cluster_id
-  INTEGER                     :: i, j, k
+  CHARACTER(len=11), PARAMETER :: filename = 'cluster.inp'
+  REAL                         :: r_cl, r_cl_sq, box
+  INTEGER                      :: ioerr, count, cluster_id
+  INTEGER                      :: i, j, k
 
   NAMELIST /nml/ r_cl
 
-  r_cl = 1.1 ! default value
+  r_cl = 1.5 ! default value
   
   READ ( unit=input_unit, nml=nml, iostat=ioerr ) ! namelist input
   IF ( ioerr /= 0 ) THEN

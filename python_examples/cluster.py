@@ -24,7 +24,7 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Identify atoms clusters in a configuration."""
+"""Identify atom clusters in a configuration."""
 
 def in_range ( j, k ):
     """Returns True if pair, whose indices are supplied, is in range.
@@ -51,7 +51,7 @@ except json.JSONDecodeError:
     sys.exit()
 
 # Set default values, check keys and typecheck values
-defaults = {"r_cl":1.1}
+defaults = {"r_cl":1.5}
 for key, val in nml.items():
     if key in defaults:
         assert type(val) == type(defaults[key]), key+" has the wrong type"
@@ -65,7 +65,7 @@ r_cl = nml["r_cl"] if "r_cl" in nml else defaults["r_cl"]
 print ( "{:40}{:15.6f}".format('Cluster separation distance', r_cl)  )
 
 # Read in configuration
-n, box, r = read_cnf_atoms('cnf.inp')
+n, box, r = read_cnf_atoms('cluster.inp')
 print("{:40}{:15d}  ".format('Number of particles', n))
 print("{:40}{:15.6f}".format('Box (in sigma units)',box))
 
