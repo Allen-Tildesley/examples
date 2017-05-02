@@ -1,5 +1,8 @@
 # Brief Guide
 Here are some notes to assist in running the programs.
+Some details of tests carried out on the programs are also given.
+Do not expect to duplicate these results,
+they are simply a guide as to the kind of behaviour to expect.
 
 ## Data Input
 Most of the Fortran codes use a `namelist` to input a few parameters from standard input.
@@ -199,16 +202,16 @@ Thol et al (2016) (f)        | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.72
 `mc_zvt_lj`&para;            | 0.7504(4) | 1.00  | -3.333(3)  | 0.668(4) | -3.735(3)  | 0.366(4) |          
 `mc_zvt_lj_ll`&Dagger;&para; | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |          
 
-&Dagger; indicates a larger system size, _N_=864 (or approximately so for `mc_zvt_lj_ll`).
+&Dagger; Indicates a larger system size, _N_=864 (or approximately so for `mc_zvt_lj_ll`).
 Note that the linked lists do not give an enormous speedup for this system size,
 which corresponds to 4x4x4 cells.
 
-&sect; the constant pressure simulations were run at _P_=0.69, the program default.
+&sect; The constant pressure simulations were run at _P_=0.69, the program default.
 The measured _C<sub>p</sub>_ (full) values were 5.28(7) for `mc_npt_lj` and 5.04(16) for `mc_npt_lj_ll`,
 compared with Thol et al (2016) EOS giving 5.22.
 The `mc_npt_lj_ll` program was run with non-default value `db_max`=0.015 to give a volume acceptance ratio around 9%.
 
-&para; the grand canonical programs were run at activity _z_=0.0795, the program default value.
+&para; The grand canonical programs were run at activity _z_=0.0795, the program default value.
 The Thol et al (2016) LRC-corrected value to give &rho;=0.75 would be _z_=0.080627.
 For `mc_zvt_lj` the box length was _L_=7&sigma;; for `mc_zvt_lj_ll` _L_=10.5&sigma;.
 Acceptance rate of creation/destruction moves is quite small, at about 0.3%.
@@ -280,7 +283,7 @@ Trokhymchuk et al MC | 0.6542   | 0.0439   | 0.0336   | 0.0336   |              
 Trokhymchuk et al MD | 0.6507   | 0.0500   | 0.0380   | 0.0380   | -2.713 &Dagger; | 1.047 &Dagger;
 `mc_gibbs_lj`        | 0.652(1) | 0.050(1) | 0.028(1) | 0.038(1) | -2.730(5)       | 1.054(8)
 
-&Dagger; indicates values for given &rho; and _T_ from the Thol et al (2016) EOS (f) with cutoff correction.
+&Dagger; Indicates values for given &rho; and _T_ from the Thol et al (2016) EOS (f) with cutoff correction.
 
 The small discrepancy between measured pressures in the two phases reflects the approximate nature
 of the delta correction for potential discontinuity, particularly in the liquid phase (see above).
@@ -321,7 +324,9 @@ in order to compare results with the following papers:
 * KP Travis, DJ Searles, DJ Evans, _Mol Phys,_ __95,__ 195 (1998)
 
 Testing was performed at the state point used in those papers: &rho;=0.8442, _T_=0.722.
-A system size _N_=256 was used.
+A system size _N_=256 was used
+(for such a short-range potential, this system size was also suitable for the
+link-cell program).
 The given program defaults, including a time step of 0.005, were used throughout,
 except for the strain rate which was varied.
 
@@ -343,9 +348,6 @@ The results, particularly the increase in _E_ and _P_,
 and the decrease in shear viscosity &eta;,
 as the strain rate increases,
 are in good agreement with the above papers.
-
-* Although the link-list program seems to be working fine, it might be worth double-checking
-the logic in the force routine, as it is a bit fiddly.
 
 ## Hard-particle programs
 The programs `mc_nvt_hs` and `md_nve_hs` illustrate, respectively,
@@ -408,7 +410,7 @@ For testing we use `N=256`;
 such a small system is not recommended for serious work,
 but allows us to explore up to &rho;=0.148
 (box length 12 _D_, twice the interaction range of 6 _D_)
-which is more than sufficient for our purposes.
+which is sufficient for our purposes.
 Equations of state from MC simulations are presented in two papers
 
 * SC McGrother, DC Williamson, G Jackson, _J Chem Phys,_ __104,__ 6755 (1996)
@@ -459,8 +461,6 @@ With these caveats in mind,
 which apply mainly to the middle three state points in the table,
 agreement between the two programs, and with the results of McGrother,
 is reasonable.
-
-* Perhaps we should increase the default number of steps in the programs? and/or increase the system size?
 
 ## Chain simulation programs
 The program `mc_chain_nvt_cbmc_lj` simulates a single Lennard-Jones chain,
@@ -535,7 +535,7 @@ In all cases, the primary indicator of a correctly-functioning program is energy
 and this was checked in all cases.
 
 
-constrained
+Results for constrained system:
 
 _E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 -----   | -----     | -----           | -----
@@ -549,7 +549,7 @@ _E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
  1.0456 | 2.008(5)  | 1.754(9)        | 1.653(3)
  3.6459 | 4.996(4)  | 1.889(7)        | 1.534(1)
 
-_k_<sub>spring</sub>=10000
+Results for _k_<sub>spring</sub>=10000 system:
 
 _E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 -----    | -----     | -----           | -----
@@ -563,7 +563,7 @@ _E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
  2.8858  | 1.98(2)   | 1.752(14)       | 2.08(6)
  8.3859  | 5.04(4)   | 1.904(2)        | 1.94(2)
 
-_k_<sub>spring</sub>=400
+Results for _k_<sub>spring</sub>=400 system:
 
 _E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 -----   | -----     | -----           | -----
@@ -654,7 +654,10 @@ _Hint:_ it is not one of the highest-symmetry clusters such as the icosahedron;
 however, it is based on a fairly symmetric cluster,
 with small distortions due to the fixed bond length and the need to maximise interactions.)
 
-* We might consider adding a fixed-length production run at the end of `mc_chain_wl_sw`.
+In a practical application it would be advisable to add a
+production run at the end of the `mc_chain_wl_sw` program,
+during which the weights are no longer adjusted,
+allowing averages to be generated using a proper Markov chain.
 
 ## Polyatomic Lennard-Jones program
 The program `mc_nvt_poly_lj` conducts Monte Carlo simulations of a system of rigid molecules
@@ -710,14 +713,8 @@ Id    | &rho;   | _E_        | _P_     | _P_(ex) (MPa) | eqn (28)
 
 Although not perfect at the ends of the range, the agreement is not bad;
 once more, the difference in cutoff correction should be borne in mind.
-
-* The comparisons are perhaps not the best, since Mossa et al (2002) used a different value
+Note that Mossa et al (2002) used a different value
 &epsilon;=5.276 kJ/mol which, with their cutoff term, gives a well depth 4.985 kJ/mol.
-Maybe better to compare with another paper,
-or modify the potential to compare more precisely with this one??
-* Interestingly, in the book, it seems we never offer an example of a polyatomic molecular dynamics program,
-for either linear or nonlinear molecules. It is tempting to write examples of both,
-but I cannot give this a high priority.
 
 ## DPD program
 For the `dpd` example, we recommend generating an initial configuration
