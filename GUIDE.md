@@ -118,29 +118,29 @@ cut-and-shifted potential which corresponds to the force calculation
 (although it is not essential to do so).
 Similarly, we include here the Brownian dynamics program `bd_nvt_lj`.
 
-Source                    | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
-------                    | -----     | -----     | --------   | -------- | --------- | -------    | -------  | --------
-Thol et al (2015) (cs)    | 0.75      | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |          
-Thol et al (2016) (f)     | 0.75      | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
-`bd_nvt_lj`               | 0.75      | 1.00      | -2.934(4)  | 0.974(7) |  2.26(8)  | -3.733(4)  | 0.373(7) | 2.27(8)
-`md_nvt_lj`               | 0.75      | 1.00      | -2.940(4)  | 0.965(6) |  2.27(12) | -3.740(4)  | 0.363(6) | 2.27(12)
-`md_npt_lj`&sect;         | 0.7514(6) | 1.00      | -2.947(6)  | 0.995(1) |           | -3.748(7)  | 0.391(1) |
-`md_nve_lj`               | 0.75      | 1.0022(3) | -2.9289    | 0.987(2) |  2.24(1)  | -3.7284    | 0.386(2) |          
-`md_nve_lj_omp`           | 0.75      | 1.0027(2) | -2.9278    | 0.986(2) |  2.28(1)  | -3.7273    | 0.385(2) |          
-`md_nve_lj_vl`            | 0.75      | 1.0023(3) | -2.9278    | 0.992(2) |  2.24(1)  | -3.7274    | 0.391(2) |          
-`md_nve_lj_ll`&Dagger;    | 0.75      | 1.0010(1) | -2.9272    | 0.992(1) |  2.28(1)  | -3.7268    | 0.391(1) |          
-`smc_nvt_lj`&sharp;        | 0.75      | 1.00      | -2.9300(5) | 0.971(2) |  2.263(5) | -3.7296(5) | 0.369(2) | 2.270(5)
-`smc_nvt_lj` (100%)&sharp; | 0.75      | 1.00      | -2.928(2)  | 0.99(1)  |  2.26(2)  | -3.728(2)  | 0.39(1)  | 2.27(2)
-`smc_nvt_lj` (30%)&sharp;  | 0.75      | 1.00      | -2.930(3)  | 0.98(2)  |  2.26(3)  | -3.729(3)  | 0.38(2)  | 2.27(3)
+Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
+------                 | -----     | -----     | --------   | -------- | --------- | -------    | -------  | --------
+Thol et al (2015) (cs) | 0.75      | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |          
+Thol et al (2016) (f)  | 0.75      | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
+`bd_nvt_lj`            | 0.75      | 1.00      | -2.934(4)  | 0.974(7) |  2.26(8)  | -3.733(4)  | 0.373(7) | 2.27(8)
+`md_nvt_lj`            | 0.75      | 1.00      | -2.940(4)  | 0.965(6) |  2.27(12) | -3.740(4)  | 0.363(6) | 2.27(12)
+`md_npt_lj`&sect;      | 0.7514(6) | 1.00      | -2.947(6)  | 0.995(1) |           | -3.748(7)  | 0.391(1) |
+`md_nve_lj`            | 0.75      | 1.0022(3) | -2.9289    | 0.987(2) |  2.24(1)  | -3.7284    | 0.386(2) |          
+`md_nve_lj_omp`        | 0.75      | 1.0027(2) | -2.9278    | 0.986(2) |  2.28(1)  | -3.7273    | 0.385(2) |          
+`md_nve_lj_vl`         | 0.75      | 1.0023(3) | -2.9278    | 0.992(2) |  2.24(1)  | -3.7274    | 0.391(2) |          
+`md_nve_lj_ll`&Dagger; | 0.75      | 1.0010(1) | -2.9272    | 0.992(1) |  2.28(1)  | -3.7268    | 0.391(1) |          
+`smc_nvt_lj`&sharp;(a) | 0.75      | 1.00      | -2.9300(5) | 0.971(2) |  2.263(5) | -3.7296(5) | 0.369(2) | 2.270(5)
+`smc_nvt_lj`&sharp;(b) | 0.75      | 1.00      | -2.928(2)  | 0.99(1)  |  2.26(2)  | -3.728(2)  | 0.39(1)  | 2.27(2)
+`smc_nvt_lj`&sharp;(c) | 0.75      | 1.00      | -2.930(3)  | 0.98(2)  |  2.26(3)  | -3.729(3)  | 0.38(2)  | 2.27(3)
 
 &Dagger; Indicates a larger system size, _N_=864, needed to make the link-list method viable. Note that
 the speedup is not enormous for this system size, corresponding to 4x4x4 cells.
 
 &sect; The constant-pressure simulation was run at _P_=0.99, the program default.
 
-&sharp; The `smc_nvt_lj` program was tested in default, single-particle-move, mode, with &delta;t=0.1,
-in multi-particle mode, moving 100% of particles, with &delta;t=0.02,
-and in multi-particle mode, moving 30% of particles, with &delta;t=0.03.
+&sharp; The `smc_nvt_lj` program was tested (a) in default, single-particle-move, mode, with &delta;t=0.1;
+(b) in multi-particle mode, moving 100% of particles, with &delta;t=0.02;
+and (c) in multi-particle mode, moving 30% of particles, with &delta;t=0.03.
 These values give acceptance rates in the 45% &ndash; 55% range.
 
 Results for `md_lj_mts` are not directly comparable,
