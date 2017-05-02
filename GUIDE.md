@@ -118,24 +118,27 @@ cut-and-shifted potential which corresponds to the force calculation
 (although it is not essential to do so).
 Similarly, we include here the Brownian dynamics program `bd_nvt_lj`.
 
-Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
-------                 | -----     | -----     | --------   | -------- | --------- | -------    | -------  | --------
-Thol et al (2015) (cs) | 0.75      | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |          
-Thol et al (2016) (f)  | 0.75      | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
-`bd_nvt_lj`            | 0.75      | 1.00      | -2.934(4)  | 0.974(7) |  2.26(8)  | -3.733(4)  | 0.373(7) | 2.27(8)
-`md_nvt_lj`            | 0.75      | 1.00      | -2.940(4)  | 0.965(6) |  2.27(12) | -3.740(4)  | 0.363(6) | 2.27(12)
-`md_npt_lj`            | 0.7514(6) | 1.00      | -2.947(6)  | 0.99     |           | -3.748(7)  | 0.391(1) |
-`md_nve_lj`            | 0.75      | 1.0022(3) | -2.9289    | 0.987(2) |  2.24(1)  | -3.7284    | 0.386(2) |          
-`md_nve_lj_omp`        | 0.75      | 1.0027(2) | -2.9278    | 0.986(2) |  2.28(1)  | -3.7273    | 0.385(2) |          
-`md_nve_lj_vl`         | 0.75      | 1.0023(3) | -2.9278    | 0.992(2) |  2.24(1)  | -3.7274    | 0.391(2) |          
-`md_nve_lj_ll`&Dagger; | 0.75      | 1.0010(1) | -2.9272    | 0.992(1) |  2.28(1)  | -3.7268    | 0.391(1) |          
-`smc_nvt_lj`           | 0.75      | 1.00      | -2.9300(5) | 0.971(2) |  2.263(5) | -3.7296(5) | 0.369(2) | 2.270(5)
-`smc_nvt_lj` (100%)    | 0.75      | 1.00      | -2.928(2)  | 0.99(1)  |  2.26(2)  | -3.728(2)  | 0.39(1)  | 2.27(2)
-`smc_nvt_lj` (30%)     | 0.75      | 1.00      | -2.930(3)  | 0.98(2)  |  2.26(3)  | -3.729(3)  | 0.38(2)  | 2.27(3)
+Source                    | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
+------                    | -----     | -----     | --------   | -------- | --------- | -------    | -------  | --------
+Thol et al (2015) (cs)    | 0.75      | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |          
+Thol et al (2016) (f)     | 0.75      | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
+`bd_nvt_lj`               | 0.75      | 1.00      | -2.934(4)  | 0.974(7) |  2.26(8)  | -3.733(4)  | 0.373(7) | 2.27(8)
+`md_nvt_lj`               | 0.75      | 1.00      | -2.940(4)  | 0.965(6) |  2.27(12) | -3.740(4)  | 0.363(6) | 2.27(12)
+`md_npt_lj`&sect;         | 0.7514(6) | 1.00      | -2.947(6)  | 0.995(1) |           | -3.748(7)  | 0.391(1) |
+`md_nve_lj`               | 0.75      | 1.0022(3) | -2.9289    | 0.987(2) |  2.24(1)  | -3.7284    | 0.386(2) |          
+`md_nve_lj_omp`           | 0.75      | 1.0027(2) | -2.9278    | 0.986(2) |  2.28(1)  | -3.7273    | 0.385(2) |          
+`md_nve_lj_vl`            | 0.75      | 1.0023(3) | -2.9278    | 0.992(2) |  2.24(1)  | -3.7274    | 0.391(2) |          
+`md_nve_lj_ll`&Dagger;    | 0.75      | 1.0010(1) | -2.9272    | 0.992(1) |  2.28(1)  | -3.7268    | 0.391(1) |          
+`smc_nvt_lj`&sharp;        | 0.75      | 1.00      | -2.9300(5) | 0.971(2) |  2.263(5) | -3.7296(5) | 0.369(2) | 2.270(5)
+`smc_nvt_lj` (100%)&sharp; | 0.75      | 1.00      | -2.928(2)  | 0.99(1)  |  2.26(2)  | -3.728(2)  | 0.39(1)  | 2.27(2)
+`smc_nvt_lj` (30%)&sharp;  | 0.75      | 1.00      | -2.930(3)  | 0.98(2)  |  2.26(3)  | -3.729(3)  | 0.38(2)  | 2.27(3)
 
-* &Dagger; indicates a larger system size, _N_=864, needed to make the link-list method viable.
-* The `md_nvt_lj` program seems to give a low energy and pressure, maybe needs looking at???
-* The `smc_nvt_lj` program was tested in default, single-particle-move, mode, with &delta;t=0.1,
+&Dagger; Indicates a larger system size, _N_=864, needed to make the link-list method viable. Note that
+the speedup is not enormous for this system size, corresponding to 4x4x4 cells.
+
+&sect; The constant-pressure simulation was run at _P_=0.99, the program default.
+
+&sharp; The `smc_nvt_lj` program was tested in default, single-particle-move, mode, with &delta;t=0.1,
 in multi-particle mode, moving 100% of particles, with &delta;t=0.02,
 and in multi-particle mode, moving 30% of particles, with &delta;t=0.03.
 These values give acceptance rates in the 45% &ndash; 55% range.
@@ -156,28 +159,24 @@ We also tried 0.002 (142) meaning 10 blocks of 6250 steps of length 0.016,
 each subdivided into 2 steps of length 0.008,
 each subdivided again into 4 steps of length 0.002.
 The first line in the table below is from a run of `md_nve_lj` with the same system, for reference.
+This example is just to illustrate the idea:
+most of the test runs are actually slower, not faster, than `md_nve_lj`.
 
-Source          | &delta;t    | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | CPU (mins) | _E_ (MSD)
--------         | --------    | -------   | ---------  | -------- | --------- | -------    | -------  | ------     | ------
-`md_nve_lj`     | 0.005       | 1.0038(1) | -3.5199    | 0.557(2) | 2.26(1)   | -3.7157    | 0.410(2) | 30         | 1.7x10<sup>-8</sup>
-`md_lj_mts` (0) | 0.005 (111) | 1.002(3)  | -3.5199    | 0.58(1)  | 2.4(1)    | -3.7157    | 0.43(2)  | 75         | 1.6x10<sup>-8</sup>
-`md_lj_mts` (1) | 0.002 (142) | 1.0040(2) | -3.5196(2) | 0.559(1) | 2.26(1)   | -3.7153(2) | 0.412(1) | 50         | 1.1x10<sup>-7</sup>
-`md_lj_mts` (2) | 0.005 (142) | 1.017(2)  | -3.491(4)  | 0.610(7) | 2.26(1)   | -3.686(4)  | 0.463(7) | 20         | 6.8x10<sup>-6</sup>
-`md_lj_mts` (3) | 0.005 (142) | 1.0094(8) | -3.508(2)  | 0.576(3) | 2.26(1)   | -3.703(2)  | 0.429(3) | 30         | 7.8x10<sup>-7</sup>
+Source          | &delta;t    | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  |  _E_ (MSD)
+-------         | --------    | -------   | ---------  | -------- | --------- | -------    | -------  |  ------
+`md_nve_lj`     | 0.005       | 1.0038(1) | -3.5199    | 0.557(2) | 2.26(1)   | -3.7157    | 0.410(2) | 1.7x10<sup>-8</sup>
+`md_lj_mts`&dagger; | 0.005 (111) | 1.002(3)  | -3.5199    | 0.58(1)  | 2.4(1)  | -3.7157    | 0.43(2)  | 1.6x10<sup>-8</sup>
+`md_lj_mts`&Dagger; | 0.002 (142) | 1.0040(2) | -3.5196(2) | 0.559(1) | 2.26(1) | -3.7153(2) | 0.412(1) | 1.1x10<sup>-7</sup>
+`md_lj_mts`&sect; | 0.005 (142) | 1.017(2)  | -3.491(4)  | 0.610(7) | 2.26(1)   | -3.686(4)  | 0.463(7) | 6.8x10<sup>-6</sup>
+`md_lj_mts`&para; | 0.005 (142) | 1.0094(8) | -3.508(2)  | 0.576(3) | 2.26(1)   | -3.703(2)  | 0.429(3) | 7.8x10<sup>-7</sup>
 
-* Run (0) was run with all the timesteps the same length, as a check of the program book-keeping.
-The energy conservation is excellent, but the statistical errors on measured properties seem to be an order of magnitude
-larger than for `md_nve_lj` and the pressure seems a bit off. Why is this so bad??
-* Run (1), program default parameters, has quite good energy conservation, and statistical errors,
-but this is partly a result of the smaller timestep.
-* Run (2) uses the 0.005 timestep,
-has worse energy MSD, and the average energies and pressure are deviating significantly from the expected values.
-That's rather disappointing.
-* Run (3) is identical to run (2) except that the switching length lambda is increased from 0.1 to 0.15.
-This improves the energy conservation, but the pressure still looks a bit off.
+&dagger; All the timesteps the same length, as a check of the program book-keeping.
 
-Perhaps this program needs looking at???
-Be aware that there have been some cosmetic changes to the introductory output since these first few test runs.
+&Dagger; Program default parameters; note the smaller timestep.
+
+&sect; Program defaults, except for the timestep.
+
+&para; Identical to &sect; except that the switching length lambda is increased from 0.1 to 0.15.
 
 ### Lennard-Jones MC programs
 Our MC programs use the cut (but not shifted) potential
@@ -330,18 +329,15 @@ link-cell program).
 The given program defaults, including a time step of 0.005, were used throughout,
 except for the strain rate which was varied.
 
-Strain rate | _E_       | _P_       | &eta;
------       | -----     | -----     | -----
-0.04        | 1.8043(1) | 6.3907(7) | 2.30(4)
-0.04        | 1.8039(3) | 6.389(2)  | 2.31(4)
-0.16        | 1.8103(2) | 6.431(1)  | 2.254(8)
-0.16        | 1.8098(2) | 6.427(1)  | 2.23(1)
-0.64        | 1.8649(2) | 6.778(1)  | 1.939(2)
-0.64        | 1.8646(2) | 6.776(1)  | 1.935(2)
+Strain rate | _E_       | _P_       | &eta;    | _E_       | _P_       | &eta;
+-----       | -----     | -----     | -----    | -----     | -----     | -----
+0.04        | 1.8043(1) | 6.3907(7) | 2.30(4)  | 1.8039(3) | 6.389(2)  | 2.31(4)
+0.16        | 1.8103(2) | 6.431(1)  | 2.254(8) | 1.8098(2) | 6.427(1)  | 2.23(1)
+0.64        | 1.8649(2) | 6.778(1)  | 1.939(2) | 1.8646(2) | 6.776(1)  | 1.935(2)
 
 In the table above, for each strain rate,
-the first line comes from `md_nvt_lj_le`
-and the second from `md_nvt_lj_llle`
+the results in columns 2-4 come from `md_nvt_lj_le`
+and those in columns 5-7 from `md_nvt_lj_llle`
 (essentially identical, but roughly twice as fast for _N_=256).
 In all cases the kinetic energy was conserved very accurately by the algorithm.
 The results, particularly the increase in _E_ and _P_,
@@ -654,7 +650,7 @@ _Hint:_ it is not one of the highest-symmetry clusters such as the icosahedron;
 however, it is based on a fairly symmetric cluster,
 with small distortions due to the fixed bond length and the need to maximise interactions.)
 
-In a practical application it would be advisable to add a
+To obtain more reliable results it would be advisable to add a
 production run at the end of the `mc_chain_wl_sw` program,
 during which the weights are no longer adjusted,
 allowing averages to be generated using a proper Markov chain.
