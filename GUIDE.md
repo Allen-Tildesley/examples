@@ -959,19 +959,21 @@ The program handles cubic boxes only;
 the modifications necessary to handle non-cubic boxes are fairly easy to make,
 but we will not do that here.
 
-* This program is incomplete. The essential parts, of reading in and
-fitting the profiles, and calculating the single-particle density in coordinates
-relative to the interface position, are done, and should not require any changes.
-A first attempt has been made to calculate the two-particle density: however
-this calculation, including the scaling and normalization factors, need to be
-checked. It was also promised, in the book, to convert this to a two-particle
-correlation function; however, this requires calculating the single-body density
-at a wider range of z than that of the two-body function (we need rho at z+r*c for
-all tabulated z, r and c). Over to you Dominic!
-* The program, as it stands, has been tested on a set of 101 configurations
-of 3200 atoms in a 20x20x20 box. It was produced by `mc_nvt_lj_ll`, at a temperature
-_T_=0.70: 100 blocks of 5000 steps each. These configurations are available if
-needed for further testing.
+Having located, and combined, the two interfaces, the histograms for calculating
+the one-body and two-body densities are accumulated, in a coordinate system
+which has its origin at the interface. The one-body density is then fitted by
+a single tanh curve: this could easily be changed by the user if desired.
+For simplicity, in the normalization of the two-body density to give the
+pair correlation function, we use the _fitted_ tanh form of the single particle
+density. This is obviously an approximation, and could be replaced by a better fit,
+or an interpolation scheme, to evaluate the function at arbitrary z.
+Finally, the program writes out the average, overall, density profile, the
+single-particle density (with fit) and slices at selected values of z and c
+through the two-body density and pair correlation function.
+
+In testing this program, it is important to use a large enough system so that
+all values of z<sub>1</sub> and z<sub>2</sub> of interest (measured relative to
+the interface position) lie far from the _other_ interface position.
 
 ## Error calculation
 The program `error_calc` is a self-contained illustration of the effects of

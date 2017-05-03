@@ -238,7 +238,7 @@ PROGRAM grint
         DO ir = 1, nr ! Loop over radial distance
 
            rij_mag = ( REAL( ir ) - 0.5 ) * dr
-           z2      = z1 + c * rij_mag
+           z2      = z1 - c * rij_mag
            rho1_z2 = f1tanh ( z2, c1tanh ) ! Use fitted single-particle density
            g2(iz,ic,ir) = rho2(iz,ic,ir) / ( rho1_z1 * rho1_z2  )
 
