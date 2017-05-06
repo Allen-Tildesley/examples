@@ -1,8 +1,6 @@
 ! grint.f90
-! ! g(z,c,r) in a planar interface
+! g(z,c,r) in a planar interface
 PROGRAM grint
-  !
-  ! TODO DJT to complete the code
 
   !------------------------------------------------------------------------------------------------!
   ! This software was written in 2016/17                                                           !
@@ -32,9 +30,12 @@ PROGRAM grint
   ! including dependence on z and symmetry breaking with respect to z direction
 
   ! Single-particle density profile in box coordinates is written to a file 'den.out'
-  ! The combined profile for both interfaces, relative to interface position, is written to rho1.out
-  ! More work is needed to check the two-particle density calculation, its conversion to the appropriate
-  ! distribution function, and output to a file rho2.out. DJT to complete this!
+  ! The combined profile for both interfaces, relative to interface position, is written to rho.out
+  ! Slices through the pair distribution function g2(z,c,r) where z=z1 is the z-coordinate of atom 1
+  ! and c=cos(theta) is the angle of the r12 vector, are written out to files as a function of r.
+  ! Assuming that the liquid phase is more-or-less central in the box, the interfaces are combined
+  ! in the analysis and oriented so that z<0 is towards the gas and z>0 is towards the liquid.
+  ! The cosine is defined so that c<0 corresponds to z1<z2 and c>0 to z1>z2.
 
   ! For illustration and simplicity, we adopt a scheme of formatted files of the same kind
   ! as those that are saved at the end of each block of our MD simulation examples
@@ -74,35 +75,36 @@ PROGRAM grint
   REAL, DIMENSION(:),     ALLOCATABLE :: dens  ! Single-particle density profile average (nk)
   REAL, DIMENSION(:),     ALLOCATABLE :: z_box ! Positions for density profile (nk)
   REAL, DIMENSION(:),     ALLOCATABLE :: rho1  ! One-particle density relative to interface location (-nz:nz)
-  REAL, DIMENSION(:,:,:), ALLOCATABLE :: rho2  ! Two-particle density relative to interface location (-nz:nz,nc,nr)
-  REAL, DIMENSION(:,:,:), ALLOCATABLE :: g2    ! Pair distribution relative to interface location (-nz:nz,nc,nr)
+  REAL, DIMENSION(:,:,:), ALLOCATABLE :: rho2  ! Two-particle density relative to interface location (-nz:nz,-nc:nc,nr)
+  REAL, DIMENSION(:,:,:), ALLOCATABLE :: g2    ! Pair distribution relative to interface location (-nz:nz,-nc:nc,nr)
   REAL, DIMENSION(:),     ALLOCATABLE :: z     ! Positions for rho1, rho2, g2 (-nz:nz)
 
   REAL, DIMENSION(4) :: c1tanh ! Coefficients for 1-tanh fit
   REAL, DIMENSION(5) :: c2tanh ! Coefficients for 2-tanh fit
 
-  CHARACTER(len=4), PARAMETER :: cnf_prefix  = 'cnf.'
-  CHARACTER(len=4), PARAMETER :: den_prefix  = 'den.'
-  CHARACTER(len=5), PARAMETER :: rho1_prefix = 'rho1.'
-  CHARACTER(len=4), PARAMETER :: rho2_prefix = 'rho2'
-  CHARACTER(len=4), PARAMETER :: out_tag = '.out'
-  CHARACTER(len=3)            :: sav_tag, z_tag
-  CHARACTER(len=2)            :: c_tag
-  INTEGER                     :: i, k, unit, ioerr, zskip, cskip, iz, ir, ic
+  CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
+  CHARACTER(len=3), PARAMETER :: den_prefix = 'den'
+  CHARACTER(len=3), PARAMETER :: rho_prefix = 'rho'
+  CHARACTER(len=3), PARAMETER :: g2_prefix  = 'g2_'
+  CHARACTER(len=4), PARAMETER :: out_tag = '.out' ! NB with dot
+  CHARACTER(len=3)            :: sav_tag, z_tag, c_tag
+  INTEGER                     :: i, k, unit, ioerr, zskip, cskip, iz, ir, ic, ic_max, iz_max
   LOGICAL                     :: exists, fail
   REAL                        :: norm, area, rij_mag, c, z1, z2, rho1_z1, rho1_z2
   REAL, PARAMETER             :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
 
-  NAMELIST /nml/ dz, dr, z_mid, nz, nc, zskip, cskip
+  NAMELIST /nml/ dz, dr, z_mid, nz, nc, nr, zskip, cskip, iz_max
 
   ! Example default values
-  dz    = 0.2 ! Spacing in z-direction
-  nz    = 10  ! Number of z-points relative to interface location
-  nc    = 13  ! Number of cos(theta) points covering range (-1,1)
-  dr    = 0.1 ! r-spacing
-  z_mid = 0.0 ! First estimate of location of liquid slab midpoint
-  zskip = 5   ! With nz=10 will give output files at iz=-10, -5, 0, 5, 10
-  cskip = 3   ! With nc=10 will give output files at ic=1, 4, 7, 10, 13
+  dz    = 0.2  ! Spacing in z-direction
+  nz    = 15   ! Number of z-points relative to interface location (-nz:+nz)
+  nc    = 6    ! Number of cos(theta) points covering range (-1,1) (-nc:+nc)
+  dr    = 0.02 ! r-spacing
+  z_mid = 0.0  ! First estimate of location of liquid slab midpoint
+  iz_max = 10  ! Limit on z values for g2 output
+  zskip = 5    ! With iz_max=10 will give output files at iz = -10, -5, 0, +5, +10
+  cskip = 3    ! With nc=6  will give output files at ic = -6,  -3, 0, +3, +6
+  nr    = 200  ! Number of r-points
 
   ! Namelist from standard input
   READ ( unit=input_unit, nml=nml, iostat=ioerr )
@@ -112,15 +114,19 @@ PROGRAM grint
      IF ( ioerr == iostat_end ) WRITE ( unit=error_unit, fmt='(a)') 'End of file'
      STOP 'Error in grint'
   END IF
-  dc = 2.0 / REAL(nc) ! Cosine spacing to cover the range (-1,1)
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Spacing in z-direction',      dz
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Spacing in cos(theta)',       dc
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Spacing in r',                dr
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of z points',          nz
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Output z skip',               zskip
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of cos(theta) points', nc
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Output c skip',               cskip
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Liquid slab midpoint',        z_mid
+  dc = 2.0 / REAL(2*nc+1) ! Cosine spacing to cover the range (-1,1)
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Spacing in z-direction',       dz
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of z points',           nz
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) '+/- zmax',                     nz*dz
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Spacing in cos(theta)',        dc
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of cos(theta) points',  nc
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Spacing in r',                 dr
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of r points',           nr
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'rmax',                         nr*dr
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Output z skip',                zskip
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Output z max',                 iz_max
+  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Output c skip',                cskip
+  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Liquid slab midpoint (guess)', z_mid
 
   sav_tag = '000' ! Use initial configuration to get N
   INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! Check the file exists
@@ -130,18 +136,20 @@ PROGRAM grint
   END IF
   CALL read_cnf_atoms ( cnf_prefix//sav_tag, n, box ) ! Read n and box
 
+  ! We must remember that artefacts are expected whenever z approaches the "other" interface
+  ! This depends on widths of the two phases, on nz*dz, and on nr*dr
+  ! It's up to you if you ignore this warning
+  IF ( ( nz*dz + nr*dr ) > 0.25*box ) THEN
+     WRITE ( unit=output_unit, fmt='(a,t40,2f15.6)' ) 'Warning: max z > box/4 = ', (nz*dz+nr*dr), 0.25*box
+  END IF
+
   ! We define dz_box to fit the box exactly
   nk     = NINT(box/dz)
   dz_box = box / REAL(nk)
   area   = box**2
 
-  ! We define nr to go out to (almost) a quarter of the box length
-  ! We must remember that artefacts are expected whenever z approaches the "other" interface
-  nr = FLOOR ( 0.25*box / dr )
-  WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of r points', nr
-
   ALLOCATE ( r(3,n), rz(n), d(nk), dens(nk), z_box(nk) )
-  ALLOCATE ( rho1(-nz:nz), rho2(-nz:nz,nc,nr), g2(-nz:nz,nc,nr), z(-nz:nz) )
+  ALLOCATE ( rho1(-nz:nz), rho2(-nz:nz,-nc:nc,nr), g2(-nz:nz,-nc:nc,nr), z(-nz:nz) )
 
   z_box(:) = [ ( -0.5*box + (REAL(k)-0.5)*dz_box, k = 1, nk ) ] ! Coordinates in simulation box
   z(:)     = [ ( REAL(k)*dz, k = -nz, nz ) ]                    ! Coordinates around interface
@@ -167,6 +175,8 @@ PROGRAM grint
      WRITE ( sav_tag, fmt='(i3.3)' ) t                      ! Number of this configuration
      INQUIRE ( file = cnf_prefix//sav_tag, exist = exists ) ! Check the file exists
      IF ( .NOT. exists ) EXIT                               ! We have come to the end of the data
+
+     IF ( MOD(t,10)==0 ) WRITE ( unit=output_unit, fmt='(a)' ) 'Processing file '//cnf_prefix//sav_tag
 
      CALL read_cnf_atoms ( cnf_prefix//sav_tag, n, box, r ) ! Read configuration
      r(3,:) = r(3,:) - z_mid              ! Place liquid slab approximately in centre of box
@@ -229,17 +239,18 @@ PROGRAM grint
   DO iz = -nz, nz ! Loop over z coordinate
 
      z1  = z(iz)
-     rho1_z1 = f1tanh ( z1, c1tanh ) ! Use fitted single-particle density 
+     rho1_z1 = f1tanh ( z1, c1tanh ) ! Use fitted single-particle density (an approximation)
 
-     DO  ic = 1, nc ! Loop over cos(theta)
+     DO  ic = -nc, nc ! Loop over cos(theta)
 
-        c = -1.0 + ( REAL(ic) - 0.5 ) * dc
+        c = REAL(ic) * dc
 
         DO ir = 1, nr ! Loop over radial distance
 
            rij_mag = ( REAL( ir ) - 0.5 ) * dr
            z2      = z1 - c * rij_mag
-           rho1_z2 = f1tanh ( z2, c1tanh ) ! Use fitted single-particle density
+           rho1_z2 = f1tanh ( z2, c1tanh ) ! Use fitted single-particle density (an approximation)
+
            g2(iz,ic,ir) = rho2(iz,ic,ir) / ( rho1_z1 * rho1_z2  )
 
         END DO ! End loop over radial distance
@@ -250,7 +261,9 @@ PROGRAM grint
 
   ! Output results
 
-  OPEN ( newunit=unit, file=den_prefix//'out', status='replace', iostat=ioerr )
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Box average density profile output to ' // den_prefix//out_tag
+
+  OPEN ( newunit=unit, file=den_prefix//out_tag, status='replace', iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
      WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening dens file', ioerr
      STOP 'Error in grint'
@@ -260,9 +273,11 @@ PROGRAM grint
   END DO
   CLOSE(unit=unit)
 
-  OPEN ( newunit=unit, file=rho1_prefix//'out', status='replace', iostat=ioerr )
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Single-particle density profile rho1 output to ' // rho_prefix//out_tag
+
+  OPEN ( newunit=unit, file=rho_prefix//out_tag, status='replace', iostat=ioerr )
   IF ( ioerr /= 0 ) THEN
-     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening rho1 file', ioerr
+     WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening rho file', ioerr
      STOP 'Error in grint'
   END IF
   DO k = -nz, nz
@@ -270,23 +285,43 @@ PROGRAM grint
   END DO
   CLOSE(unit=unit)
 
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Pair distribution function g2 output in selected slices'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Each slice has fixed z=z1 and c=cos(theta)'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Filenames have the form g2_ZZZ_CCC'//out_tag
+
   ! Slices for selected values of iz, ic
 
-  IF ( nz>99 ) STOP 'The output filename format will only cope with nz<100'
-  IF ( nc>99 ) STOP 'The output filename format will only cope with nc<100'
+  iz_max = MIN ( iz_max, nz )
+  iz_max = iz_max / zskip
+  iz_max = iz_max * zskip
+  IF ( iz_max>99 ) STOP 'The output filename format will only cope with iz_max<100'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'ZZZ             z1'
+  DO iz = -iz_max, iz_max, zskip
+     WRITE ( unit=output_unit, fmt='(sp,i3.2,f15.5)' ) iz, z(iz)
+  END DO
+  WRITE ( unit=output_unit, fmt='(a)' ) '-ve sign means z1 on gas side, +ve sign means z1 on liquid side'
 
-  DO iz = -nz, nz, zskip
+  ic_max = nc / cskip
+  ic_max = ic_max * cskip
+  IF ( ic_max>99 ) STOP 'The output filename format will only cope with ic_max<100'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'CCC     cos(theta)'
+  DO ic = -ic_max, ic_max, cskip
+     WRITE ( unit=output_unit, fmt='(sp,i3.2,f15.5)' ) ic, REAL(ic) * dc
+  END DO
+  WRITE ( unit=output_unit, fmt='(a)' ) '-ve sign means z1<z2, +ve sign means z1>z2'
+
+  DO iz = -iz_max, iz_max, zskip
      WRITE ( z_tag, fmt='(sp,i3.2)' ) iz ! encoded with +/- sign
-     DO ic = 1, nc, cskip
-        WRITE ( c_tag, fmt='(i2.2)' ) ic
-        OPEN ( newunit=unit, file=rho2_prefix//z_tag//c_tag//out_tag, status='replace', iostat=ioerr )
+     DO ic = -ic_max, ic_max, cskip
+        WRITE ( c_tag, fmt='(sp,i3.2)' ) ic ! encode with +/- sign
+        OPEN ( newunit=unit, file=g2_prefix//z_tag//'_'//c_tag//out_tag, status='replace', iostat=ioerr )
         IF ( ioerr /= 0 ) THEN
-           WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening rho2 file', ioerr
+           WRITE ( unit=error_unit, fmt='(a,i15)') 'Error opening g2 file', ioerr
            STOP 'Error in grint'
         END IF
         DO ir = 1, nr ! Loop over radial distance
            rij_mag = ( REAL( ir ) - 0.5 ) * dr
-           WRITE ( unit=unit, fmt='(3f15.6)' ) rij_mag, rho2(iz,ic,ir), g2(iz,ic,ir)
+           WRITE ( unit=unit, fmt='(2f15.6)' ) rij_mag, g2(iz,ic,ir)
         END DO
         CLOSE(unit=unit)
      END DO
@@ -321,19 +356,19 @@ CONTAINS
 
           rij    = r(:,i) - r(:,j)
           rij    = rij - ANINT ( rij / box ) * box ! Apply PBC
-          rij_sq = SUM(rij**2) ! Magnitude of separation
+          rij_sq = SUM(rij**2) ! Squared magnitude of separation
 
-          IF ( rij_sq > r_cut_sq ) CYCLE
+          IF ( rij_sq > r_cut_sq ) CYCLE ! No need to consider separations out of range
 
-          rij_mag = SQRT ( rij_sq )
+          rij_mag = SQRT ( rij_sq ) ! Magnitude of separation
           ir = 1 + FLOOR ( rij_mag/dr )
-          ir = MAX(1, ir) ! Guard against roundoff
-          ir = MIN(nr,ir) ! Guard against roundoff
+          ir = MAX (  1, ir ) ! Guard against roundoff
+          ir = MIN ( nr, ir ) ! Guard against roundoff
 
           c  = rij(3) / rij_mag ! Cosine of angle
-          ic = 1 + FLOOR ( (1.0+c)/dc )
-          ic = MAX(1, ic) ! Guard against roundoff
-          ic = MIN(nc,ic) ! Guard against roundoff
+          ic = NINT ( c / dc )
+          ic = MAX ( -nc, ic ) ! Guard against roundoff
+          ic = MIN (  nc, ic ) ! Guard against roundoff
 
           rho2(iz,ic,ir) = rho2(iz,ic,ir) + 1.0 / rij_sq ! Incorporating r**2 factor here
 
