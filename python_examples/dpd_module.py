@@ -82,20 +82,20 @@ def force ( box, a, r ):
             rij = r[i,:]-r[i+1:,:]           # Separation vectors for j>i
             rij = rij - np.rint(rij)         # Periodic boundary conditions in box=1 units
             rij = rij * box                  # Now in sigma=1 units
-            rij_sq   = np.sum(rij**2,axis=1) # Squared separations for j>1
-            rij_mag  = np.sqrt(rij_sq)       # Separations for j>i
-            rij_hat  = rij / rij_mag[:,np.newaxis]        # Unit separation vectors
-            in_range = rij_sq < 1.0                       # Set flags for within cutoff
-            wij      = np.where(in_range,1.0-rij_mag,0.0) # Weight functions
-            pot = 0.5 * wij**2                # Pair potentials
-            vir = wij * rij_mag               # Pair virials
-            lap = 3.0-2.0/rij_mag             # Pair Laplacians
-            fij = wij[:,np.newaxis] * rij_hat # Pair forces
-            total = total + PotentialType ( pot=sum(pot), vir=sum(vir), lap=sum(lap) )
-            f[i,:] = f[i,:] + np.sum(fij,axis=0)
+            rij_sq    = np.sum(rij**2,axis=1) # Squared separations for j>1
+            rij_mag   = np.sqrt(rij_sq)       # Separations for j>i
+            rij_hat   = rij / rij_mag[:,np.newaxis]        # Unit separation vectors
+            in_range  = rij_sq < 1.0                       # Set flags for within cutoff
+            wij       = np.where(in_range,1.0-rij_mag,0.0) # Weight functions
+            pot       = 0.5 * wij**2                # Pair potentials
+            vir       = wij * rij_mag               # Pair virials
+            lap       = np.where(in_range,3.0-2.0/rij_mag,0.0) # Pair Laplacians
+            fij       = wij[:,np.newaxis] * rij_hat # Pair forces
+            total     = total + PotentialType ( pot=sum(pot), vir=sum(vir), lap=sum(lap) )
+            f[i,:]    = f[i,:] + np.sum(fij,axis=0)
             f[i+1:,:] = f[i+1:,:] - fij
-            jvals = np.extract(in_range,np.arange(i+1,n))
-            pairs = pairs + [ (i,j,rij_mag[j-i-1],rij_hat[j-i-1,:]) for j in jvals ]
+            jvals     = np.extract(in_range,np.arange(i+1,n))
+            pairs     = pairs + [ (i,j,rij_mag[j-i-1],rij_hat[j-i-1,:]) for j in jvals ]
 
     else:
         for i,j in combinations(range(n),2): # Double loop over pairs of atoms

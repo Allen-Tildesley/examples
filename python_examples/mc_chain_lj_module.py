@@ -121,9 +121,9 @@ def regrow ( temperature, m_max, k_max, bond, k_spring, r ):
     w_new = 1.0
     for i in range(n-m,n): # Loop to regrow last m atoms, computing new weight
         for k in range(k_max): # Loop over k_max tries
-            d          = random_bond ( bond, std, d_max )          # Generate random bond length around d=bond
-            r_try[k,:] = r[i-1,:] + d * random_vector()            # Trial position in random direction from i-1
-            partial    = potential_1 ( r_try[k,:], r[:i,:] ) # Nonbonded interactions with earlier atoms
+            d          = random_bond ( bond, std, d_max )      # Generate random bond length around d=bond
+            r_try[k,:] = r[i-1,:] + d * random_vector()        # Trial position in random direction from i-1
+            partial    = potential_1 ( r_try[k,:], r[:i-1,:] ) # Nonbonded interactions with earlier atoms (not i-1)
             w[k]       = 0.0 if partial.ovr else np.exp(-partial.pot/temperature) # Weight for this try
         w_sum = np.sum(w)
         if w_sum<w_tol: # Early exit if this happens at any stage
@@ -157,9 +157,9 @@ def regrow ( temperature, m_max, k_max, bond, k_spring, r ):
 
         # Remaining tries only required to compute weight
         for k in range(1,k_max): # Loop over k_max-1 other tries
-            d          = random_bond ( bond, std, d_max )          # Generate random bond length around d=bond
-            r_try[k,:] = r[i-1,:] + d * random_vector()            # Trial position in random direction from i-1
-            partial    = potential_1 ( r_try[k,:], r[:i,:] ) # Nonbonded interactions with earlier atoms
+            d          = random_bond ( bond, std, d_max )      # Generate random bond length around d=bond
+            r_try[k,:] = r[i-1,:] + d * random_vector()        # Trial position in random direction from i-1
+            partial    = potential_1 ( r_try[k,:], r[:i-1,:] ) # Nonbonded interactions with earlier atoms (not i-1)
             w[k]       = 0.0 if partial.ovr else np.exp(-partial.pot/temperature) # Weight for this try
 
         w_sum = np.sum(w)
@@ -195,8 +195,8 @@ def potential ( r ):
 
     total = PotentialType ( pot=0.0, ovr=False ) # Initialize
 
-    for i in range(n-1):
-        partial = potential_1 ( r[i,:], r[i+1:,:] )
+    for i in range(n-2):
+        partial = potential_1 ( r[i,:], r[i+2:,:] ) # not i+1
         if partial.ovr:
             total.ovr = True
             break
@@ -243,7 +243,7 @@ def potential_1 ( ri, r ):
         sr6  = sr2 ** 3
         sr12 = sr6 ** 2
         pot  = sr12 - sr6
-
+        
         partial = PotentialType ( pot=np.sum(pot), ovr=False )
 
     else:

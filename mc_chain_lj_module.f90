@@ -389,7 +389,7 @@ CONTAINS
        partial = partial + pair
 
     END DO ! End loop over selected range of partners
-
+    
     partial%pot = partial%pot * 4.0 ! Numerical factor of 4*epsilon
     partial%ovr = .FALSE.           ! No overlaps detected (redundant but for clarity)
 

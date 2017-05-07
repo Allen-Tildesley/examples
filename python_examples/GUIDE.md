@@ -254,9 +254,11 @@ Replica exchange (as used by Calvo et al) would also improve the sampling at low
 Below we report the excess, potential, energy per atom _PE_,
 and the excess heat capacity per atom _C<sub>v</sub>_(ex),
 as well as the radius of gyration _R_<sub>g</sub>.
-The program default run length is 10 blocks of 5000 steps.
+The program default run length is 10 blocks of 5000 steps,
+but the results below were obtained with blocks of 100000 steps,
+like the Fortran examples.
 For lower temperatures (below 0.40), longer runs (10 blocks of 1000000
-steps) were used.
+steps) were used for the Fortran examples, but these were not attempted here.
 For temperatures higher than 1.0,
 the bond length fluctuations become unphysically large for this value of _k_<sub>spring</sub>.
 
@@ -267,9 +269,9 @@ Here we give analogous results for the program default spring constant of _k_<su
 
 _T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 ----- | -------   | --------        | --------
-1.00  | -1.384(4) | 1.513(3)        | 1.23(2)
-
-* At first glance, the average _PE_ seems wrong???
+1.00  |-0.589(2)  |  1.440(1)       |  1.230(5)
+2.00  | 0.369(1)  |  1.843(1)       |  0.579(3)
+5.00  | 1.987(6)  |  2.040(1)       |  0.466(4)
 
 Similar models were employed in `md_chain_nve_lj` and `md_chain_mts_lj`:
 _N_=13 atoms and equilibrium bond length of 1.122462&sigma;.
@@ -277,22 +279,42 @@ Here we report results for constrained bond lengths, using the first program,
 and for _k_<sub>spring</sub>=400 and 10000 (the program default value), using the second program.
 In all cases, the primary indicator of a correctly-functioning program is energy conservation,
 and this was checked in all cases.
+Averages below were computed over 10 blocks of 100000 steps (same as for the Fortran examples),
+whereas the program default is a more modest 10x10000 steps;
+otherwise program default input values were used.
 
+Results for constrained system (columns 2:4 RATTLE, columns 5:7 MILC-SHAKE)
 
-constrained
+_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_ | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
+-----   | -----     | -----           | -----           | -----     | -----           | -----
+-1.3495 | 0.401(2)  |     1.184(1)    |   2.47(3)       | 0.402(4)  |      1.183(3)   |   2.42(2)
+-1.2195 | 0.449(2)  |     1.209(2)    |   2.35(1)       | 0.449(2)  |      1.208(1)   |   2.35(2)
+-1.0968 | 0.504(1)  |     1.230(1)    |   2.30(2)       | 0.504(2)  |      1.227(1)   |   2.29(2)
+-0.1244 | 1.016(5)  |     1.459(5)    |   2.03(2)       | 1.010(7)  |      1.466(5)   |   2.02(2)
+ 1.0456 | 1.999(6)  |     1.752(7)    |   1.653(2)      | 2.006(5)  |      1.760(7)   |   1.650(2)
+ 3.6459 | 4.996(3)  |     1.897(7)    |   1.534(1)      | 4.993(2)  |      1.890(4)   |   1.534(1)
 
-_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
------   | -----     | -----           | -----
+Results for _k_<sub>spring</sub>=10000 system
 
-_k_<sub>spring</sub>=10000
-
-_E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+_E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
 -----    | -----     | -----           | -----
+-0.9494  | 0.401(2)  |  1.199(2)       |  3.27(4)
+-0.7694  | 0.440(1)  |  1.240(1)       |  3.24(4)
+-0.5943  | 0.510(2)  |  1.244(2)       |  2.90(4)
+ 0.7857  | 1.003(4)  |  1.415(7)       |  2.63(3)
+ 2.8858  | 2.00(2)   |  1.75(2)        |  2.02(3)
+ 8.3859  | 4.99(2)   |  1.903(5)       |  1.98(2)
 
-_k_<sub>spring</sub>=400
+Results for _k_<sub>spring</sub>=400 system
 
-_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
 -----   | -----     | -----           | -----
+-0.9942 | 0.399(1)  | 1.181(1)        | 3.6(1)
+-0.8042 | 0.449(1)  | 1.210(1)        | 3.12(5)
+-0.6558 | 0.496(1)  | 1.229(2)        | 3.07(5)
+ 0.7565 | 0.996(3)  | 1.450(5)        | 2.54(2)
+ 2.9036 | 2.014(5)  | 1.75(1)         | 2.08(2)
+ 8.3488 | 4.999(5)  | 1.932(7)        | 1.973(5)
 
 When comparing results with the MC program, several points should be remembered.
 
@@ -300,11 +322,10 @@ When comparing results with the MC program, several points should be remembered.
 2. While we use _k_<sub>spring</sub>=10000 to highlight the multiple timestep method,
 it is quite likely that energy flow between bond vibrations and other degrees of freedom will be inefficient,
 due to the timescale separation.
-3. The constant-_NVE_ and constant-_NVT_ ensembles are expected to yield different behaviour around the collapse transition.
+3. The constant-_NVE_ and constant-_NVT_ ensembles are expected to yield different behaviour around the collapse transition. We do not focus on this region, in the Python tests.
 4. Molecular dynamics is not expected to thoroughly explore the energy landscape at low temperatures,
 giving instead (typically) quasi-harmonic vibrations in a single basin.
-The default run lengths are very modest here: 10 blocks,
-each consisting of 10000 steps of length &delta;t=0.002.
+We do not focus on this region, in the Python tests.
 
 ## DPD program
 For testing we compare with an approximate DPD equation of state for _P_.
@@ -321,13 +342,20 @@ and the expected value of _P_ (labelled EOS below)
 is printed for comparison at the end.
 We give results obtained by both
 the Lowe thermostat (L) and the Shardlow algorithm (S).
+Results below were obtained with runs of 10 blocks, each 10000 steps
+as for the Lennard-Jones examples (program default is 10x1000).
 We take the default values of _a_ &rho;/T=75, and of other parameters not mentioned below.
 
  _T_   | &rho; | _P_ (EOS) | _P_ (L)   | _P_ (S)
  ----- | ----- | -----     | -----     | -----
- 1.0   | 5.0   | 41.887    | 41.55(1)  | 41.533(7)
+ 0.5   | 3.0   | 11.864    | 11.821(2) | 11.818(1)
+ 1.0   | 3.0   | 23.587    | 23.635(3) | 23.636(2)
+ 1.5   | 3.0   | 35.276    | 35.458(3) | 35.452(4)
+ 2.0   | 3.0   | 46.951    | 47.263(3) | 47.264(4)
+ 1.0   | 2.0   | 14.187    | 14.318(2) | 14.319(2)
+ 1.0   | 4.0   | 32.811    | 32.626(1) | 32.624(2)
+ 1.0   | 5.0   | 41.887    | 41.530(3) | 41.528(2)
 
-* The configurational temperature seems to be wrong??
 * Not convinced slow version is working properly??
 
 ## Test programs for potentials, forces and torques

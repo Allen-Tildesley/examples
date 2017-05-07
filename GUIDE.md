@@ -530,10 +530,9 @@ and for _k_<sub>spring</sub>=400 and 10000 (the program default value), using th
 In all cases, the primary indicator of a correctly-functioning program is energy conservation,
 and this was checked in all cases.
 
-
 Results for constrained system:
 
-_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
 -----   | -----     | -----           | -----
 -2.0246 | 0.2485(2) | 1.06374(4)      | 2.176(6)
 -1.9145 | 0.296(2)  | 1.073(1)        | 2.38(8)  
@@ -547,7 +546,7 @@ _E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 
 Results for _k_<sub>spring</sub>=10000 system:
 
-_E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+_E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
 -----    | -----     | -----           | -----
 -1.7734  | 0.2496(2) | 1.0695(1)       | 2.96(4)
 -1.3444  | 0.301(2)  | 1.144(2)        | 5.5(3)  
@@ -561,7 +560,7 @@ _E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 
 Results for _k_<sub>spring</sub>=400 system:
 
-_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
+_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
 -----   | -----     | -----           | -----
 -1.7934 | 0.2487(2) | 1.0646(1)       | 2.89(5)
 -1.6250 | 0.299(1)  | 1.0753(4)       | 3.24(7)
