@@ -1,5 +1,9 @@
 # Brief Guide to Python Examples
 This subdirectory contains Python versions of some of the example programs.
+Some details of tests carried out on the programs are also given.
+Do not expect to duplicate these results,
+they are simply a guide as to the kind of behaviour to expect.
+
 Python has some advantages over Fortran:
 it is an interpreted language, rather than a compiled one,
 which allows faster code development,
@@ -187,22 +191,45 @@ Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    
 `mc_zvt_lj.py`         | 0.748(2)  | 1.00  | -3.32(2)   | 0.64(2)  | -3.72(1)   | 0.34(2)  |
 
 ## Hard-particle programs
-Equations of state are discussed in the main GUIDE.
-Comparison may be made with equations of state and/or simulation results in the literature
+The programs `mc_nvt_hs.py` and `md_nve_hs.py` illustrate, respectively,
+the simplest MC and MD methods for the basic hard-sphere model.
+The temperature is not important in the first case: a factor _kT_ is used to normalize the energies.
+The energy, in the second case, is identical with the (exactly conserved) kinetic energy,
+and hence closely related to the temperature.
+Equations of state for this model have been reported many times.
+Here we refer to some fairly recent, useful, sources of data and/or fitted equations
 
 * H Hansen-Goos, _J Chem Phys,_ __144,__ 164506 (2016)
 * MN Bannerman, L Lue, LV Woodcock, _J Chem Phys,_ __132,__ 084507 (2010)
 * J Kolafa, S Labik, A Malijevsky, _Phys Chem Chem Phys,_ __6,__ 2335 (2004)
 
-and a program to evaluate the EOS from the Hansen-Goos (2016) paper may be found in `eos_hs.py`.
-
-Here we start to gather test simulation results for python versions of the hard-sphere codes.
+The paper of Kolafa et al (2004) is particularly careful to discuss corrections
+due to different ensembles and system size. Here we just present the raw results
+for a small system, _N_=256; programs are run with default parameters,
+except that the test runs were longer than default: 10 blocks of 10000 steps,
+same as for the Fortran examples.
+Starting fcc lattice configurations may be prepared using `initialize` in
+the usual way.
+The EOS is taken from the Hansen-Goos (2016) paper, and a program to evaluate it
+may be found in `eos_hs.py`.
 
 &rho; | _P_ (EOS) | _P_ `mc_nvt_hs.py`| _P_ `md_nve_hs.py` | &rho; `mc_npt_hs.py`
------ | -----     | -----    | ----- | -----
-0.50  | 1.6347    | 1.630(8) | 1.633(2) | 0.493(4)
+----- | -----     | -----             | -----              | -----
+0.50  | 1.6347    | 1.626(2)          | 1.633(1)           | 0.499(2)
+0.55  | 2.0574    | 2.053(3)          | 2.056(1)           | 0.552(2)
+0.60  | 2.5769    | 2.571(3)          | 2.573(1)           | 0.600(2)
+0.65  | 3.2171    | 3.207(6)          | 3.215(1)           | 0.642(1)
+0.70  | 4.0087    | 3.994(6)          | 4.005(2)           | 0.702(2)
+0.75  | 4.9910    | 4.959(6)          | 4.984(1)           | 0.752(3)
 
-For the _NPT_ simulation the pressure was set to the EOS value corresponding to the desired density.
+We must remember that _P_ is calculated by a box-scaling method in the _NVT_ simulation,
+which may introduce a small systematic error. This can be reduced by reducing the
+scaling factor, at the expense of worsening the statistics.
+We also provide a program `mc_npt_hs.py` to illustrate the constant-_NPT_ method.
+For the averages of &rho; reported above, the input pressure was that given by
+the corresponding EOS entry.
+With default parameters, volume move acceptance ratio was nearly 5% at the highest pressure,
+and around 11% at the lowest pressure studied here.
 
 We also provide two programs to simulate the hard spherocylinder model,
 of cylinder length _L_ and diameter _D_:
@@ -264,14 +291,18 @@ the bond length fluctuations become unphysically large for this value of _k_<sub
 
 _T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 ----- | ------    | ------          | ------
+1.00  | -0.492(1) | 1.514(1)         | 1.387(7)
 
 Here we give analogous results for the program default spring constant of _k_<sub>spring</sub>=400.
 
 _T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 ----- | -------   | --------        | --------
-1.00  |-0.589(2)  |  1.440(1)       |  1.230(5)
-2.00  | 0.369(1)  |  1.843(1)       |  0.579(3)
-5.00  | 1.987(6)  |  2.040(1)       |  0.466(4)
+0.40  | -2.08(2)  |  1.065(1)       | 0.37(9)
+0.45  | -1.84(3)  |  1.104(6)       | 1.5(3)
+0.5   | -1.80(3)  |  1.110(9)       | 2.0(4)
+1.00  | -0.589(2) |  1.440(1)       | 1.230(5)
+2.00  |  0.369(1) |  1.843(1)       | 0.579(3)
+5.00  |  1.987(6) |  2.040(1)       | 0.466(4)
 
 Similar models were employed in `md_chain_nve_lj` and `md_chain_mts_lj`:
 _N_=13 atoms and equilibrium bond length of 1.122462&sigma;.

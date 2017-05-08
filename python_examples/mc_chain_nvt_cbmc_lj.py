@@ -32,12 +32,6 @@ def calc_variables ( ):
     They are collected and returned as a list, for use in the main program.
     """
 
-    # In this example we simulate using the cut (but not shifted) potential
-    # The values of < p_c >, < e_c > and density should be consistent (for this potential)
-    # For comparison, long-range corrections are also applied to give
-    # estimates of < e_f > and < p_f > for the full (uncut) potential
-    # The value of the cut-and-shifted potential is not used, in this example
-
     import numpy as np
     import math
     from averages_module    import msd, VariableType

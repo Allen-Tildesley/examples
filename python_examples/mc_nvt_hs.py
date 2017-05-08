@@ -133,6 +133,7 @@ r = r - np.rint ( r ) # Periodic boundaries
 assert not overlap ( box, r ), 'Overlap in initial configuration'
 
 # Initialize arrays for averaging and write column headings
+m_ratio = 0.0
 run_begin ( calc_variables() )
 
 for blk in range(1,nblock+1): # Loop over blocks
