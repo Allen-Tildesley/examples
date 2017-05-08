@@ -234,19 +234,25 @@ and around 11% at the lowest pressure studied here.
 We also provide two programs to simulate the hard spherocylinder model,
 of cylinder length _L_ and diameter _D_:
 `mc_npt_sc.py` and `mc_nvt_sc.py`.
-Configurations may be prepared as described in the Fortran example GUIDE,
-and since the simulations are quite expensive, we have simply used those
-configurations as the starting points for fairly short test runs of the
-Python codes. For _L_=5, _N_=256, with the default run length
-(10 blocks, 1000 steps each) we have compared with the results of
-McGrother et al (1996).
+Configurations may be prepared as described in the Fortran example GUIDE.
+Test runs were performed using 10 blocks of 10000 steps (as for the Fortran examples);
+the program default is 10x1000.
+For _L_=5, _N_=256 (a very small system, not recommended for serious work)
+we compare with the results of McGrother et al (1996).
+See the Fortran GUIDE for comments about units, and other literature values.
 
 * SC McGrother, DC Williamson, G Jackson, _J Chem Phys,_ __104,__ 6755 (1996)
 
 _P_ _v_<sub>mol</sub> | &rho; _v_<sub>mol</sub> | _P_ | &rho; | _S_ | &rho; | _S_ | _P_ | _S_
 ----- | ----- | ----- | ----- | ----- | -----       | -----       | -----       | -----
 (M)   | (M)   | (M)   | (M)   | (M)   | `mc_npt_sc` | `mc_npt_sc` | `mc_nvt_sc` | `mc_nvt_sc`
-6.20  | 0.448 | 1.393 | 0.101 | 0.754 | 0.101(1)   | 0.83(1)    | 1.35(1)    | 0.85(1)
+2.53  | 0.310 | 0.568 | 0.070 | 0.041 | 0.0693(3)   | 0.096(8)    | 0.577(2)    | 0.089(5)
+3.63  | 0.352 | 0.816 | 0.079 | 0.053 | 0.0794(2)   | 0.119(8)    | 0.814(2)    | 0.081(8)
+4.89  | 0.397 | 1.099 | 0.089 | 0.136 | 0.0898(2)   | 0.32(1)     | 1.098(3)    | 0.24(2)
+5.05  | 0.400 | 1.135 | 0.090 | 0.170 | 0.0901(2)   | 0.191(8)    | 1.141(5)    | 0.15(2)&Dagger;
+5.40  | 0.419 | 1.213 | 0.094 | 0.574 | 0.0948(2)   | 0.57(1)     | 1.224(4)    | 0.54(1)
+5.80  | 0.436 | 1.303 | 0.098 | 0.714 | 0.0991(2)   | 0.769(8)    | 1.281(6)    | 0.791(3)
+6.20  | 0.448 | 1.393 | 0.101 | 0.754 | 0.1024(2)   | 0.834(6)    | 1.381(5)    | 0.789(5)
 
 The `mc_npt_sc` runs use pressures from column 3 above;
 the `mc_nvt_sc` runs are at densities taken from column 4.
@@ -254,9 +260,10 @@ At the highest pressure, using default parameters,
 move acceptance ratio was around 30%,
 and volume acceptance ratio around 10%.
 These values rose to 50% and 15% respectively at the lowest pressure.
-No attempt was made to run the program
+The &Dagger; reminds us that results for these run lengths,
 near the isotropic-nematic transition,
-where very slow evolution of the nematic order parameter would be observed.
+where very slow evolution of the nematic order parameter would be observed,
+are unreliable.
 Also the system size is about 25% that used by McGrother,
 which has a direct effect on the measured nematic order parameter.
 With these caveats in mind,
