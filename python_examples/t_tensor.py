@@ -236,35 +236,37 @@ print()
 print("{:>66}{:>40}{:>40}".format('.....Result from T tensor','.....Result from Euler angles','.........Difference') )
 
 print('\nDipole-dipole')
+e_fmt = "{:30}{:36.6f}{:40.6f}{:40.2e}"
+f_fmt = "{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}"
 
 # Calculate the dipole-dipole energy
 v12t = -np.einsum('i,ij,j',mu1,tt2,mu2 ) # Contract both dipoles with T2
 v12e = (mu1_mag*mu2_mag/r12_mag**3) * ( c12-3.0*c1*c2 )
-print("{:30}{:36.6f}{:40.6f}{:40.2e}".format('Energy',v12t,v12e,v12t-v12e) )
+print(e_fmt.format('Energy',v12t,v12e,v12t-v12e) )
 
 # Calculate the dipole-dipole force
 f12t = -np.einsum ( 'ijk,j,k->i',tt3,mu1,mu2) # Contract T3 with both dipoles
 f12e = (3.0*mu1_mag*mu2_mag/r12_mag**4) * ( (c12-5.0*c1*c2)*r12_hat + c2*e1 + c1*e2 )
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Force',*f12t,*f12e,*(f12t-f12e)) )
+print(f_fmt.format('Force',*np.concatenate((f12t,f12e,f12t-f12e)) ))
 
 # Calculate the dipole-dipole torques
 g   = -np.einsum( 'ij,j->i',tt2,mu2 ) # Contract T2 with dipole 2
 t1t = -np.cross ( mu1, g )            # Cross-product result with dipole 1
 g   = e2 - 3.0*c2*r12_hat             # Compare result from angles
 t1e = -(mu1_mag*mu2_mag/r12_mag**3) * np.cross ( e1, g )
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Torque on 1',*t1t,*t1e,*(t1t-t1e)) )
+print(f_fmt.format('Torque on 1',*np.concatenate((t1t,t1e,t1t-t1e)) ))
 g   = -np.einsum( 'ij,j->i',tt2,mu1) # Contract T2 with dipole 1
 t2t = -np.cross ( mu2, g )           # Cross-product result with dipole 2
 g   = e1 - 3.0*c1 * r12_hat          # Compare result from angles
 t2e = -(mu1_mag*mu2_mag/r12_mag**3) * np.cross ( e2, g )
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Torque on 2',*t2t,*t2e,*(t2t-t2e)) )
+print(f_fmt.format('Torque on 2',*np.concatenate((t2t,t2e,t2t-t2e)) ))
 
 print('\nDipole-quadrupole')
 
 # Calculate the dipole-quadrupole energy
 v12t = -(1.0/3.0) * np.einsum ('i,ijk,jk',mu1,tt3,quad2) # Contract dipole 1 with T3 and quadrupole 2
 v12e = (1.5*mu1_mag*quad2_mag/r12_mag**4) * ( c1*(1.0-5.0*c2**2) + 2.0*c2*c12 ) 
-print("{:30}{:36.6f}{:40.6f}{:40.2e}".format('Energy',v12t,v12e,v12t-v12e) )
+print(e_fmt.format('Energy',v12t,v12e,v12t-v12e) )
 
 # Calculate the dipole-quadrupole force
 f12t = -(1.0/3.0) * np.einsum( 'ijkl,j,kl->i', tt4, mu1, quad2 ) # Contract T4 with dipole 1 and quadrupole 2
@@ -273,27 +275,27 @@ f12e = -(1.5*mu1_mag*quad2_mag/r12_mag**5) * (  # Compare result from angles
             + ( 1.0 - 5.0*c2**2 ) * e1
             + ( 2.0*c12 - 10.0*c1*c2 ) * e2
           )
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Force',*f12t,*f12e,*(f12t-f12e)) )
+print(f_fmt.format('Force',*np.concatenate((f12t,f12e,f12t-f12e)) ))
 
 # Calculate the dipole-quadrupole torques
 g   = -(1.0/3.0)*np.einsum('ijk,jk->i', tt3, quad2 ) # Contract T3 with quadrupole 2
 t1t = -np.cross ( mu1, g )                           # Cross-product result with dipole 1
 g   =  (1.0-5.0*c2**2) * r12_hat + 2.0*c2 * e2       # Compare result from angles
 t1e = -(1.5*mu1_mag*quad2_mag/r12_mag**4) * np.cross ( e1, g )
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Torque on 1',*t1t,*t1e,*(t1t-t1e)) )
+print(f_fmt.format('Torque on 1',*np.concatenate((t1t,t1e,t1t-t1e)) ))
 gg  = -(1.0/3.0)*np.einsum('ijk,k->ij', tt3, mu1 ) # Contract T3 with dipole 1
 gg  = np.einsum('ik,jk->ij', quad2, gg )           # Contract result with quadrupole 2
 t2t = -2.0*skew ( gg )                             # Contract with Levi-Civita symbol
 g   =  (c12-5.0*c1*c2) * r12_hat + c2 * e1 # Compare result from angles
 t2e = -(3.0*mu1_mag*quad2_mag/r12_mag**4) * np.cross ( e2, g )
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Torque on 2',*t2t,*t2e,*(t2t-t2e)) )
+print(f_fmt.format('Torque on 2',*np.concatenate((t2t,t2e,t2t-t2e)) ))
 
 print('\nQuadrupole-dipole')
 
 # Calculate the quadrupole-dipole energy
 v12t = (1.0/3.0) * np.einsum ('i,ijk,jk',mu2,tt3,quad1) # Contract dipole on 2 with T3 and quadrupole on 1
 v12e = -(1.5*quad1_mag*mu2_mag/r12_mag**4) * ( c2*(1.0-5.0*c1**2) + 2.0*c1*c12 ) 
-print("{:30}{:36.6f}{:40.6f}{:40.2e}".format('Energy',v12t,v12e,v12t-v12e) )
+print(e_fmt.format('Energy',v12t,v12e,v12t-v12e) )
 
 # Calculate the quadrupole-dipole force
 f12t = (1.0/3.0) *  np.einsum( 'ijkl,j,kl->i', tt4, mu2, quad1 ) # Contract T4 with quadrupole 1 and dipole 2
@@ -302,7 +304,7 @@ f12e = (1.5*quad1_mag*mu2_mag/r12_mag**5) * (  # Compare result from angles
         + ( 1.0-5.0*c1**2 ) * e2
         + ( 2.0*c12 - 10.0*c1*c2 ) * e1
         )
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Force',*f12t,*f12e,*(f12t-f12e)) )
+print(f_fmt.format('Force',*np.concatenate((f12t,f12e,f12t-f12e)) ))
 
 # Calculate the quadrupole-dipole torques
 gg  = (1.0/3.0)*np.einsum( 'ijk,k->ij', tt3, mu2 ) # Contract T3 with dipole 2
@@ -310,12 +312,12 @@ gg  = np.einsum('ik,jk->ij', quad1, gg )           # Contract result with quadru
 t1t = -2.0*skew ( gg )                             # Contract with Levi-Civita symbol
 g   = (c12-5.0*c1*c2) * r12_hat + c1 * e2 # Compare result from angles
 t1e = (3.0*quad1_mag*mu2_mag/r12_mag**4) * np.cross ( e1, g )
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Torque on 1',*t1t,*t1e,*(t1t-t1e)) )
+print(f_fmt.format('Torque on 1',*np.concatenate((t1t,t1e,t1t-t1e)) ))
 g   = (1.0/3.0)*np.einsum( 'ijk,jk->i', tt3, quad1 ) # Contract T3 with quadrupole 1
 t2t = -np.cross ( mu2, g )                           # Cross product result with dipole 2
 g   = (1.0-5.0*c1**2) * r12_hat + 2.0*c1 * e1 # Compare result from angles
 t2e = (1.5*quad1_mag*mu2_mag/r12_mag**4) * np.cross ( e2, g )
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Torque on 2',*t2t,*t2e,*(t2t-t2e)) )
+print(f_fmt.format('Torque on 2',*np.concatenate((t2t,t2e,t2t-t2e)) ))
 
 print('\nQuadrupole-quadrupole')
 
@@ -324,7 +326,7 @@ v12t = (1.0/9.0) * np.einsum( 'ijkl,ij,kl', tt4, quad1, quad2 ) # Contract T4 wi
 v12e = (0.75*quad1_mag*quad2_mag/r12_mag**5) * (  # Compare result from angles
           1.0 - 5.0*c1**2 - 5.0*c2**2 + 2.0*c12**2 + 35.0*(c1*c2)**2 - 20.0*c1*c2*c12
         )
-print("{:30}{:36.6f}{:40.6f}{:40.2e}".format('Energy',v12t,v12e,v12t-v12e) )
+print(e_fmt.format('Energy',v12t,v12e,v12t-v12e) )
 
 # Calculate the quadrupole-quadrupole force
 f12t = (1.0/9.0) * np.einsum( 'ijklm,jk,lm->i', tt5, quad1, quad2 ) # Contract T5 with both quadrupoles
@@ -333,7 +335,7 @@ f12e = (0.75*quad1_mag*quad2_mag/r12_mag**6) * (  # Compare result from angles
          + ( 10.0*c1 - 70.0*c1*c2**2 + 20.0*c2*c12 ) * e1
          + ( 10.0*c2 - 70.0*c2*c1**2 + 20.0*c1*c12 ) * e2
         )          
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Force',*f12t,*f12e,*(f12t-f12e)) )
+print(f_fmt.format('Force',*np.concatenate((f12t,f12e,f12t-f12e)) ))
 
 # Calculate the quadrupole-quadrupole torques
 gg  = (1.0/9.0)*np.einsum( 'ijkl,kl->ij', tt4, quad2 ) # Contract T4 with quadrupole 2
@@ -341,10 +343,10 @@ gg  = np.einsum( 'ik,jk->ij', quad1, gg )              # Contract result with qu
 t1t = -2.0*skew ( gg )                                 # Contract with Levi-Civita symbol
 g   = 2.5*(c1*(7.0*c2**2-1.0)-2.0*c2*c12) * r12_hat - (5.0*c1*c2-c12) * e2 # Compare result from angles
 t1e = -(3.0*quad1_mag*quad2_mag/r12_mag**5) * np.cross ( e1, g )
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Torque on 1',*t1t,*t1e,*(t1t-t1e)) )
+print(f_fmt.format('Torque on 1',*np.concatenate((t1t,t1e,t1t-t1e)) ))
 gg  = (1.0/9.0)*np.einsum( 'ijkl,kl->ij', tt4, quad1 ) # Contract T4 with quadrupole 1
 gg  = np.einsum( 'ik,jk->ij', quad2, gg )              # Contract result with quadrupole 2
 t2t = -2.0*skew ( gg )                                 # Contract with Levi-Civita symbol
 g   = 2.5*(c2*(7.0*c1**2-1.0)-2.0*c1*c12) * r12_hat -(5.0*c1*c2-c12) * e1 # Compare result from angles
 t2e = -(3.0*quad1_mag*quad2_mag/r12_mag**5) * np.cross ( e2, g )
-print("{:30}{:12.6f}{:12.6f}{:12.6f}{:16.6f}{:12.6f}{:12.6f}{:16.2e}{:12.2e}{:12.2e}".format('Torque on 2',*t2t,*t2e,*(t2t-t2e)) )
+print(f_fmt.format('Torque on 2',*np.concatenate((t2t,t2e,t2t-t2e)) ))
