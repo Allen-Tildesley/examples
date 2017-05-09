@@ -234,12 +234,12 @@ and around 11% at the lowest pressure studied here.
 We also provide two programs to simulate the hard spherocylinder model,
 of cylinder length _L_ and diameter _D_:
 `mc_npt_sc.py` and `mc_nvt_sc.py`.
-Configurations may be prepared as described in the Fortran example GUIDE.
+Configurations may be prepared as described in the Fortran example [GUIDE](../GUIDE.md).
 Test runs were performed using 10 blocks of 10000 steps (as for the Fortran examples);
 the program default is 10x1000.
 For _L_=5, _N_=256 (a very small system, not recommended for serious work)
 we compare with the results of McGrother et al (1996).
-See the Fortran GUIDE for comments about units, and other literature values.
+See the Fortran [GUIDE](../GUIDE.md) for comments about units, and other literature values.
 
 * SC McGrother, DC Williamson, G Jackson, _J Chem Phys,_ __104,__ 6755 (1996)
 
@@ -315,13 +315,16 @@ Similar models were employed in `md_chain_nve_lj` and `md_chain_mts_lj`:
 _N_=13 atoms and equilibrium bond length of 1.122462&sigma;.
 Here we report results for constrained bond lengths, using the first program,
 and for _k_<sub>spring</sub>=400 and 10000 (the program default value), using the second program.
-In all cases, the primary indicator of a correctly-functioning program is energy conservation,
-and this was checked in all cases.
-Averages below were computed over 10 blocks of 100000 steps (same as for the Fortran examples),
+Averages below were computed over 10 blocks of 100000 steps of length &delta;t=0.002
+(same as for the Fortran examples),
 whereas the program default is a more modest 10x10000 steps;
 otherwise program default input values were used.
+The primary indicator of a correctly-functioning program is energy conservation,
+and this was checked in all cases.
+Energies were chosen to give average temperatures close to the values used in
+the MC simulations above.
 
-Results for constrained system (columns 2:4 RATTLE, columns 5:7 MILC-SHAKE)
+Results for constrained system (columns 2:4 RATTLE, columns 5:7 MILC-SHAKE):
 
 _E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_ | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
 -----   | -----     | -----           | -----           | -----     | -----           | -----
@@ -332,7 +335,7 @@ _E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_ | _T_       | _R_<sub>g<
  1.0456 | 1.999(6)  |     1.752(7)    |   1.653(2)      | 2.006(5)  |      1.760(7)   |   1.650(2)
  3.6459 | 4.996(3)  |     1.897(7)    |   1.534(1)      | 4.993(2)  |      1.890(4)   |   1.534(1)
 
-Results for _k_<sub>spring</sub>=10000 system
+Results for _k_<sub>spring</sub>=10000 system using MTS:
 
 _E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
 -----    | -----     | -----           | -----
@@ -343,7 +346,7 @@ _E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
  2.8858  | 2.00(2)   |  1.75(2)        |  2.02(3)
  8.3859  | 4.99(2)   |  1.903(5)       |  1.98(2)
 
-Results for _k_<sub>spring</sub>=400 system
+Results for _k_<sub>spring</sub>=400 system using MTS:
 
 _E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
 -----   | -----     | -----           | -----

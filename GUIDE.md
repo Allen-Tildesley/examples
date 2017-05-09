@@ -527,24 +527,28 @@ Similar models were employed in `md_chain_nve_lj` and `md_chain_mts_lj`:
 _N_=13 atoms and equilibrium bond length of 1.122462&sigma;.
 Here we report results for constrained bond lengths, using the first program,
 and for _k_<sub>spring</sub>=400 and 10000 (the program default value), using the second program.
-In all cases, the primary indicator of a correctly-functioning program is energy conservation,
+The default run lengths are fairly modest here: 10 blocks,
+each consisting of 100000 steps of length &delta;t=0.002.
+The primary indicator of a correctly-functioning program is energy conservation,
 and this was checked in all cases.
+Energies were chosen to give average temperatures close to the values used in
+the MC simulations above.
 
-Results for constrained system:
+Results for constrained system (columns 2:4 RATTLE, columns 5:7 MILC-SHAKE):
 
-_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
------   | -----     | -----           | -----
--2.0246 | 0.2485(2) | 1.06374(4)      | 2.176(6)
--1.9145 | 0.296(2)  | 1.073(1)        | 2.38(8)  
--1.6145 | 0.345(4)  | 1.125(2)        | 3.14(8)  
--1.3495 | 0.404(1)  | 1.182(2)        | 2.39(1)  
--1.2195 | 0.451(1)  | 1.207(1)        | 2.36(2)  
--1.0968 | 0.499(2)  | 1.234(1)        | 2.28(1)  
--0.1244 | 1.009(5)  | 1.471(5)        | 2.04(2)  
- 1.0456 | 2.008(5)  | 1.754(9)        | 1.653(3)
- 3.6459 | 4.996(4)  | 1.889(7)        | 1.534(1)
+_E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_ | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
+-----   | -----     | -----           | -----           | -----     | -----           | -----
+-2.0246 | 0.2485(2) | 1.06374(4)      | 2.176(6)        | 0.2475(1) | 1.06450(3)      | 2.172(7)
+-1.9145 | 0.296(2)  | 1.073(1)        | 2.38(8)         | 0.2989(3) | 1.0724(1)       | 2.27(2)
+-1.6145 | 0.345(4)  | 1.125(2)        | 3.14(8)         | 0.347(2)  | 1.125(1)        | 3.16(6)
+-1.3495 | 0.404(1)  | 1.182(2)        | 2.39(1)         | 0.404(2)  | 1.183(2)        | 2.50(2)
+-1.2195 | 0.451(1)  | 1.207(1)        | 2.36(2)         | 0.449(2)  | 1.210(1)        | 2.34(2)
+-1.0968 | 0.499(2)  | 1.234(1)        | 2.28(1)         | 0.503(2)  | 1.231(2)        | 2.28(2)
+-0.1244 | 1.009(5)  | 1.471(5)        | 2.04(2)         | 1.024(6)  | 1.455(7)        | 2.01(2)
+ 1.0456 | 2.008(5)  | 1.754(9)        | 1.653(3)        | 2.009(7)  | 1.753(8)        | 1.652(3)
+ 3.6459 | 4.996(4)  | 1.889(7)        | 1.534(1)        | 4.988(3)  | 1.901(6)        | 1.534(1)
 
-Results for _k_<sub>spring</sub>=10000 system:
+Results for _k_<sub>spring</sub>=10000 system using MTS:
 
 _E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
 -----    | -----     | -----           | -----
@@ -558,7 +562,7 @@ _E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
  2.8858  | 1.98(2)   | 1.752(14)       | 2.08(6)
  8.3859  | 5.04(4)   | 1.904(2)        | 1.94(2)
 
-Results for _k_<sub>spring</sub>=400 system:
+Results for _k_<sub>spring</sub>=400 system using MTS:
 
 _E_     | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
 -----   | -----     | -----           | -----
@@ -581,8 +585,6 @@ due to the timescale separation.
 3. The constant-_NVE_ and constant-_NVT_ ensembles are expected to yield different behaviour around the collapse transition.
 4. Molecular dynamics is not expected to thoroughly explore the energy landscape at low temperatures,
 giving instead (typically) quasi-harmonic vibrations in a single basin.
-The default run lengths are fairly modest here: 10 blocks,
-each consisting of 100000 steps of length &delta;t=0.002.
 
 For the hard-sphere square-well chain, the aim was to show the operation of the Wang-Landau method.
 Here we used pivot and crankshaft moves as well as CBMC regrowth.
