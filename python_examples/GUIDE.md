@@ -166,29 +166,55 @@ at the start of the main module; the user may override this by editing this stat
 but the program will then run (yet another) order of magnitude more slowly,
 so it may be necessary to reduce the run length still further.
 
-Because of the much shorter run lengths,
-results in the tables below should be regarded with caution.
-These programs are much less thoroughly tested than their Fortran counterparts.
-
 ### Lennard-Jones MD programs
 
-Source                 | &rho;    | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
-------                 | -----    | -----     | --------   | -------- | --------- | -------    | -------  | --------
-Thol et al (2015) (cs) | 0.75     | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |          
-Thol et al (2016) (f)  | 0.75     | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
-`md_nve_lj.py`         | 0.75     | 1.001(1)  | -2.9280    | 0.98(1)  |  2.30(4)  | -3.7277    | 0.38(1)  |          
-`md_nvt_lj.py`         | 0.75     | 1.00      | -2.95(3)   | 0.95(4)  |  0.6(1)   | -3.75(3)   | 0.35(4)  | 0.6(1)
-`md_npt_lj.py`         | 0.748(3) | 1.00      | -2.91(3)   | 0.99     |           | -3.71(3)   | 0.393(5) |
-`bd_nvt_lj.py`         | 0.75     | 1.00      | -2.93(2)   | 0.97(2)  |  1.5(2)   | -3.73(2)   | 0.37(2)  | 1.5(2)
+The first test of the MD codes is that energy, or the appropriate energy-like variable, is conserved.
+The following table uses runs of 10 blocks,
+each consisting of a number of steps to give 16 units of time per block
+with the indicated timestep (e.g. 1000&times;0.016, 2000&times;0.008 etc).
+We report the MSD values of the conserved variable for each program.
+
+&Delta;t | `md_nve_lj` | `md_nvt_lj` | `md_npt_lj`
+-------- | --------    | --------    | --------
+0.016    | 4.1613&times;10<sup>-6</sup>  | 4.3865&times;10<sup>-6</sup>  | 5.4746&times;10<sup>-6</sup>
+0.008    | 1.8896&times;10<sup>-7</sup>  | 2.0417&times;10<sup>-7</sup>  | 2.5920&times;10<sup>-7</sup>
+0.004    | 1.3705&times;10<sup>-8</sup>  | 1.3769&times;10<sup>-8</sup>  | 2.0192&times;10<sup>-8</sup>
+0.002    | 1.3866&times;10<sup>-9</sup>  | 1.1486&times;10<sup>-9</sup>  | 1.5887&times;10<sup>-9</sup>
+0.001    | 1.2650&times;10<sup>-10</sup>  | 1.8297&times;10<sup>-10</sup>  | 2.3865&times;10<sup>-10</sup>
+
+Log-log plots show the expected dependence MSD &prop; &Delta;t<sup>4</sup>,
+hence RMSD &prop; &Delta;t<sup>2</sup>,
+except for some small deviations at the smallest timestep.
+
+Now we compare EOS data with typical test runs of our programs.
+The results in the following table use the same run lengths
+as for the Fortran examples, and default parameters otherwise.
+Numbers in parentheses (here and in the following tables)
+indicate errors in the last quoted digit, estimated from block averages.
+Results without error estimates are fixed (such as the temperature or density) or conserved.
+
+Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)   | _C_ (f)  
+------                 | -----     | -----     | --------   | -------- | --------- | -------    | -------   | --------
+Thol et al (2015) (cs) | 0.75      | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |           |          
+Thol et al (2016) (f)  | 0.75      | 1.00      |            |          |           | -3.7212    | 0.3996    | 2.2630  
+`md_nve_lj.py`         | 0.75      | 1.0027(4) | -2.9278    | 0.988(3) |  2.24(1)  | -3.7274    | 0.387(3)  |          
+`md_nvt_lj.py`         | 0.75      | 1.00      | -2.937(3)  | 0.975(4) |  2.1(1)   | -3.737(3)  | 0.374(4)  | 2.1(1)
+`md_npt_lj.py`         | 0.7509(5) | 1.00      | -2.942(5)  | 0.994(1) |           | -3.743(6)  | 0.3908(6) |
+`bd_nvt_lj.py`         | 0.75      | 1.00      | -2.931(3)  | 0.976(5) |  2.2(1)   | -3.731(3)  | 0.374(5)  | 2.2(1)
 
 ### Lennard-Jones MC programs
+
+The results in the following table use the same run lengths
+as for the Fortran examples, and default parameters otherwise.
 
 Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C_ (f)
 ------                 | -----     | ----- | -------    | -------  | -------    | -------  | --------
 Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630  
-`mc_nvt_lj.py`         | 0.75      | 1.00  | -3.330(2)  | 0.65(2)  | -3.732(2)  | 0.35(2)  |  2.30(2)
-`mc_npt_lj.py`         | 0.750(1)  | 1.00  | -3.328(8)  | 0.69     | -3.730(9)  | 0.355(5) |
-`mc_zvt_lj.py`         | 0.748(2)  | 1.00  | -3.32(2)   | 0.64(2)  | -3.72(1)   | 0.34(2)  |
+`mc_nvt_lj.py`         | 0.75      | 1.00  | -3.3315(7) | 0.653(4) | -3.7331(7) | 0.352(4) |  2.274(9)
+`mc_npt_lj.py`         | 0.7510(6) | 1.00  | -3.339(4)  | 0.69     | -3.741(5)  | 0.360(2) |
+`mc_zvt_lj.py`         | 0.7497(3) | 1.00  | -3.329(2)  | 0.656(4) | -3.731(2)  | 0.355(4) |
+
+For a discussion of the effects of cutoff correction on the pressure results, see the Fortran [GUIDE](../GUIDE.md).
 
 ## Hard-particle programs
 The programs `mc_nvt_hs.py` and `md_nve_hs.py` illustrate, respectively,
@@ -236,7 +262,7 @@ of cylinder length _L_ and diameter _D_:
 `mc_npt_sc.py` and `mc_nvt_sc.py`.
 Configurations may be prepared as described in the Fortran example [GUIDE](../GUIDE.md).
 Test runs were performed using 10 blocks of 10000 steps (as for the Fortran examples);
-the program default is 10x1000.
+the program default is 10&times;1000.
 For _L_=5, _N_=256 (a very small system, not recommended for serious work)
 we compare with the results of McGrother et al (1996).
 See the Fortran [GUIDE](../GUIDE.md) for comments about units, and other literature values.
@@ -317,7 +343,7 @@ Here we report results for constrained bond lengths, using the first program,
 and for _k_<sub>spring</sub>=400 and 10000 (the program default value), using the second program.
 Averages below were computed over 10 blocks of 100000 steps of length &delta;t=0.002
 (same as for the Fortran examples),
-whereas the program default is a more modest 10x10000 steps;
+whereas the program default is a more modest 10&times;10000 steps;
 otherwise program default input values were used.
 The primary indicator of a correctly-functioning program is energy conservation,
 and this was checked in all cases.
@@ -384,7 +410,7 @@ is printed for comparison at the end.
 We give results obtained by both
 the Lowe thermostat (L) and the Shardlow algorithm (S).
 Results below were obtained with runs of 10 blocks, each 10000 steps
-as for the Lennard-Jones examples (program default is 10x1000).
+as for the Lennard-Jones examples (program default is 10&times;1000).
 We take the default values of _a_ &rho;/T=75, and of other parameters not mentioned below.
 
  _T_   | &rho; | _P_ (EOS) | _P_ (L)   | _P_ (S)

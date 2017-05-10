@@ -109,7 +109,27 @@ They are not responsible for our (Fortran) program!
 
 ### Lennard-Jones MD, BD and SMC programs
 First we look at the MD (and related) programs, which use the cut-and-shifted potential.
-Here we compare with typical test runs from our programs using default parameters, _N_=256, except where stated.
+
+The first test of the MD codes is that energy, or the appropriate energy-like variable, is conserved.
+The following table uses runs of 10 blocks,
+each consisting of a number of steps to give 16 units of time per block
+with the indicated timestep (e.g. 1000&times;0.016, 2000&times;0.008 etc).
+We report the MSD values of the conserved variable for each program.
+
+&Delta;t | `md_nve_lj` | `md_nvt_lj` | `md_npt_lj`
+-------- | --------    | --------    | --------
+0.016    | 4.3284&times;10<sup>-6</sup>  | 4.0409&times;10<sup>-6</sup>  | 4.5875&times;10<sup>-6</sup>
+0.008    | 1.8430&times;10<sup>-7</sup>  | 2.0036&times;10<sup>-7</sup>  | 2.4402&times;10<sup>-7</sup>
+0.004    | 1.3121&times;10<sup>-8</sup>  | 1.4494&times;10<sup>-8</sup>  | 1.4956&times;10<sup>-8</sup>
+0.002    | 1.2621&times;10<sup>-9</sup>  | 1.3526&times;10<sup>-9</sup>  | 1.5914&times;10<sup>-9</sup>
+0.001    | 1.8530&times;10<sup>-10</sup>  | 2.1371&times;10<sup>-10</sup>  | 2.1005&times;10<sup>-10</sup>
+
+Log-log plots show the expected dependence MSD &prop; &Delta;t<sup>4</sup>,
+hence RMSD &prop; &Delta;t<sup>2</sup>,
+except for some small deviations at the smallest timestep.
+
+Now we compare EOS data
+with typical test runs from our programs using default parameters, _N_=256, except where stated.
 Note that _E_ is the total internal energy per atom,
 that _C_ is short for _C<sub>v</sub>_ (per atom) and _P_ is the pressure,
 all including the ideal gas contributions.
@@ -117,6 +137,10 @@ The Smart Monte Carlo code `smc_nvt_lj` is included here since it uses the
 cut-and-shifted potential which corresponds to the force calculation
 (although it is not essential to do so).
 Similarly, we include here the Brownian dynamics program `bd_nvt_lj`.
+
+Numbers in parentheses (here and in the following tables)
+indicate errors in the last quoted digit, estimated from block averages.
+Results without error estimates are fixed (such as the temperature or density) or conserved.
 
 Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
 ------                 | -----     | -----     | --------   | -------- | --------- | -------    | -------  | --------
@@ -134,7 +158,7 @@ Thol et al (2016) (f)  | 0.75      | 1.00      |            |          |        
 `smc_nvt_lj`&sharp;(c) | 0.75      | 1.00      | -2.930(3)  | 0.98(2)  |  2.26(3)  | -3.729(3)  | 0.38(2)  | 2.27(3)
 
 &Dagger; Indicates a larger system size, _N_=864, needed to make the link-list method viable. Note that
-the speedup is not enormous for this system size, corresponding to 4x4x4 cells.
+the speedup is not enormous for this system size, corresponding to 4&times;4&times;4 cells.
 
 &sect; The constant-pressure simulation was run at _P_=0.99, the program default.
 
@@ -164,11 +188,11 @@ most of the test runs are actually slower, not faster, than `md_nve_lj`.
 
 Source          | &delta;t    | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  |  _E_ (MSD)
 -------         | --------    | -------   | ---------  | -------- | --------- | -------    | -------  |  ------
-`md_nve_lj`     | 0.005       | 1.0038(1) | -3.5199    | 0.557(2) | 2.26(1)   | -3.7157    | 0.410(2) | 1.7x10<sup>-8</sup>
-`md_lj_mts`&dagger; | 0.005 (111) | 1.002(3)  | -3.5199    | 0.58(1)  | 2.4(1)  | -3.7157    | 0.43(2)  | 1.6x10<sup>-8</sup>
-`md_lj_mts`&Dagger; | 0.002 (142) | 1.0040(2) | -3.5196(2) | 0.559(1) | 2.26(1) | -3.7153(2) | 0.412(1) | 1.1x10<sup>-7</sup>
-`md_lj_mts`&sect; | 0.005 (142) | 1.017(2)  | -3.491(4)  | 0.610(7) | 2.26(1)   | -3.686(4)  | 0.463(7) | 6.8x10<sup>-6</sup>
-`md_lj_mts`&para; | 0.005 (142) | 1.0094(8) | -3.508(2)  | 0.576(3) | 2.26(1)   | -3.703(2)  | 0.429(3) | 7.8x10<sup>-7</sup>
+`md_nve_lj`     | 0.005       | 1.0038(1) | -3.5199    | 0.557(2) | 2.26(1)   | -3.7157    | 0.410(2) | 1.7&times;10<sup>-8</sup>
+`md_lj_mts`&dagger; | 0.005 (111) | 1.002(3)  | -3.5199    | 0.58(1)  | 2.4(1)  | -3.7157    | 0.43(2)  | 1.6&times;10<sup>-8</sup>
+`md_lj_mts`&Dagger; | 0.002 (142) | 1.0040(2) | -3.5196(2) | 0.559(1) | 2.26(1) | -3.7153(2) | 0.412(1) | 1.1&times;10<sup>-7</sup>
+`md_lj_mts`&sect; | 0.005 (142) | 1.017(2)  | -3.491(4)  | 0.610(7) | 2.26(1)   | -3.686(4)  | 0.463(7) | 6.8&times;10<sup>-6</sup>
+`md_lj_mts`&para; | 0.005 (142) | 1.0094(8) | -3.508(2)  | 0.576(3) | 2.26(1)   | -3.703(2)  | 0.429(3) | 7.8&times;10<sup>-7</sup>
 
 &dagger; All the timesteps the same length, as a check of the program book-keeping.
 
@@ -203,7 +227,7 @@ Thol et al (2016) (f)        | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.72
 
 &Dagger; Indicates a larger system size, _N_=864 (or approximately so for `mc_zvt_lj_ll`).
 Note that the linked lists do not give an enormous speedup for this system size,
-which corresponds to 4x4x4 cells.
+which corresponds to 4&times;4&times;4 cells.
 
 &sect; The constant pressure simulations were run at _P_=0.69, the program default.
 The measured _C<sub>p</sub>_ (full) values were 5.28(7) for `mc_npt_lj` and 5.04(16) for `mc_npt_lj_ll`,
