@@ -174,7 +174,7 @@ each consisting of a number of steps to give 16 units of time per block
 with the indicated timestep (e.g. 1000&times;0.016, 2000&times;0.008 etc).
 We report the MSD values of the conserved variable for each program.
 
-&Delta;t | `md_nve_lj` | `md_nvt_lj` | `md_npt_lj`
+&delta;t | `md_nve_lj` | `md_nvt_lj` | `md_npt_lj`
 -------- | --------    | --------    | --------
 0.016    | 4.1613&times;10<sup>-6</sup>  | 4.3865&times;10<sup>-6</sup>  | 5.4746&times;10<sup>-6</sup>
 0.008    | 1.8896&times;10<sup>-7</sup>  | 2.0417&times;10<sup>-7</sup>  | 2.5920&times;10<sup>-7</sup>
@@ -182,8 +182,8 @@ We report the MSD values of the conserved variable for each program.
 0.002    | 1.3866&times;10<sup>-9</sup>  | 1.1486&times;10<sup>-9</sup>  | 1.5887&times;10<sup>-9</sup>
 0.001    | 1.2650&times;10<sup>-10</sup>  | 1.8297&times;10<sup>-10</sup>  | 2.3865&times;10<sup>-10</sup>
 
-Log-log plots show the expected dependence MSD &prop; &Delta;t<sup>4</sup>,
-hence RMSD &prop; &Delta;t<sup>2</sup>,
+Log-log plots show the expected dependence MSD &prop; &delta;t<sup>4</sup>,
+hence RMSD &prop; &delta;t<sup>2</sup>,
 except for some small deviations at the smallest timestep.
 
 Now we compare EOS data with typical test runs of our programs.
