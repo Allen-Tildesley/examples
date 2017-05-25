@@ -115,7 +115,7 @@ def regrow ( temperature, m_max, k_max, bond, k_spring, r ):
         r[:n-m,:] = r_old[m:,:] # Copy last n-m atoms
 
     # Take the opportunity to place atom 0 at the origin
-    r0        = r[0,:]
+    r0        = np.copy(r[0,:])
     r[:n-m,:] = r[:n-m,:] - r0
 
     w_new = 1.0
@@ -152,7 +152,7 @@ def regrow ( temperature, m_max, k_max, bond, k_spring, r ):
 
         # Old position and weight are stored as try 0
         r_try[0,:] = r[i,:]
-        partial    = potential_1 ( r_try[0,:], r[:i,:] ) # Nonbonded energy with earlier atoms
+        partial    = potential_1 ( r_try[0,:], r[:i-1,:] ) # Nonbonded energy with earlier atoms (not i-1)
         w[0]       = 0.0 if partial.ovr else np.exp(-partial.pot/temperature) # Weight for this try
 
         # Remaining tries only required to compute weight
