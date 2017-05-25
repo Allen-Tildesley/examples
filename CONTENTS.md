@@ -1,5 +1,5 @@
 # Contents
-This is a list of the code examples appearing in the text, in order,
+This is a list of the Fortran code examples appearing in the text, in order,
 indicating the corresponding online program files.
 The online [GUIDE](GUIDE.md) provides more information about running these programs,
 but there they are grouped together by system studied,
