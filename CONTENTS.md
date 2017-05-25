@@ -11,7 +11,14 @@ which are widely used,
 are not explicitly listed below.
 
 ### 1.1 Calculation of T tensors
+[t_tensor.f90](t_tensor.f90)
+
 ### 1.2 Double loop for Lennard-Jones potential
+This code snippet appears in the text, not online.
+However similar examples may be found in
+[mc_lj_module.f90](mc_lj_module.f90) and
+[md_lj_module.f90](md_lj_module.f90).
+
 ### 1.3 Site–site potential energy calculation
 ### 1.4 Periodic boundaries for truncated octahedron
 ### 1.5 Periodic boundaries for rhombic dodecahedron
