@@ -86,6 +86,7 @@ while True: # Loop until configurations or naming scheme exhausted
     # To make best use of NumPy, we loop over cyclic offset shifts and process N rij pairs at once.
     # factor=2 accounts for both ij and ji, but if N is even, the last shift 
     # includes both ij and ji pairs already, so factor=1
+    # The idea dates back to S Brode and R Ahlrichs Comput Phys Commun 42, 51 (1986)
     nshift=n//2
     for shift in range(nshift):
         rij        = r - np.roll(r,shift+1,axis=0)                   # Difference between N pairs of coordinates

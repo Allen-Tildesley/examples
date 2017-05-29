@@ -545,6 +545,19 @@ The results in this case are moderately insensitive to the value of `r_cl`, but 
 it above 3 includes all atoms in a single cluster, while reducing it below 1.15 will start to
 separate isolated atoms into clusters of their own.
 
+Clustering algorithms are part of the standard toolkit of data analysis, and in practical
+applications it may be more efficient and convenient to use a packaged implementation of
+an algorithm such as `dbscan`  
+
+* M Ester, H-P Kriegel, J Sander, X Xu. (1996).
+[Proc. Second Int. Conf. on Knowledge Discovery and Data Mining (KDD-96) p 226](https://www.aaai.org/Papers/KDD/1996/KDD96-037.pdf)
+(Eds: E Simoudis, J Han, UM Fayyad; AAAI Press, 1996).
+
+A Python implementation of `dbscan` is available as part of the `sklearn` <http://scikit-learn.org/> library.
+For systems in periodic boundaries, rather than supplying the atomic positions, the user should
+compute a distance matrix using the minimum image convention, and supply that to the routine,
+as suggested by [Turci](https://francescoturci.wordpress.com/2016/03/16/clustering-and-periodic-boundaries/).
+
 ## Correlation function program
 The aim of the program `corfun` is to illustrate the direct method, and the FFT method,
 for calculating time correlation functions.
@@ -637,6 +650,7 @@ Only `n//2` shifts are needed to cover every distinct `ij` pair.
 There is a slight subtlety on the last shift, if `n` is even:
 both `ij` and `ji` pairs appear,
 and so the usual incrementing factor 2 is replaced by a factor 1.
+The idea dates back to S Brode and R Ahlrichs Comput Phys Commun 42, 51 (1986).
 The actual histogramming is conveniently performed
 by the built-in NumPy `histogram` routine.
 

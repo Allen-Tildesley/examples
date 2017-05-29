@@ -889,6 +889,19 @@ The results in this case are moderately insensitive to the value of `r_cl`, but 
 it above 3 includes all atoms in a single cluster, while reducing it below 1.15 will start to
 separate isolated atoms into clusters of their own.
 
+Clustering algorithms are part of the standard toolkit of data analysis, and in practical
+applications it may be more efficient and convenient to use a packaged implementation of
+an algorithm such as `dbscan`  
+
+* M Ester, H-P Kriegel, J Sander, X Xu. (1996). Proc. Second Int. Conf. on Knowledge Discovery
+and Data Mining (KDD-96) p 226 (Eds: E Simoudis, J Han, UM Fayyad; AAAI Press, 1996).
+
+Fortran implementations of `dbscan` are available from various sources.
+For systems in periodic boundaries, rather than supplying the atomic positions, the user should
+compute a distance matrix using the minimum image convention, and supply that to the routine,
+as suggested by [Turci](https://francescoturci.wordpress.com/2016/03/16/clustering-and-periodic-boundaries/)
+in the context of a Python version.
+
 ## Correlation function program
 The aim of the program `corfun` is to illustrate the direct method, and the FFT method,
 for calculating time correlation functions.
