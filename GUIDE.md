@@ -893,8 +893,9 @@ Clustering algorithms are part of the standard toolkit of data analysis, and in 
 applications it may be more efficient and convenient to use a packaged implementation of
 an algorithm such as `dbscan`  
 
-* M Ester, H-P Kriegel, J Sander, X Xu. (1996). Proc. Second Int. Conf. on Knowledge Discovery
-and Data Mining (KDD-96) p 226 (Eds: E Simoudis, J Han, UM Fayyad; AAAI Press, 1996).
+* M Ester, H-P Kriegel, J Sander, X Xu. (1996).
+[Proc. Second Int. Conf. on Knowledge Discovery and Data Mining (KDD-96) p 226](https://www.aaai.org/Papers/KDD/1996/KDD96-037.pdf)
+(Eds: E Simoudis, J Han, UM Fayyad; AAAI Press, 1996).
 
 Fortran implementations of `dbscan` are available from various sources.
 For systems in periodic boundaries, rather than supplying the atomic positions, the user should
