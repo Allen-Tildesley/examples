@@ -120,14 +120,17 @@ However a working version of a similar kind may be found in
 ### 5.3 Force routine using linked lists
 [md_lj_ll_module.f90](md_lj_ll_module.f90) and [link_list_module.f90](link_list_module.f90).
 These may be used instead of [md_lj_module.f90](md_lj_module.f90)
-in combination with [md_nve_lj.f90](md_nve_lj.f90).
+in combination with [md_nve_lj.f90](md_nve_lj.f90) or [md_nvt_lj.f90](md_nvt_lj.f90).
 
 ### 5.4 Monte Carlo routines using linked lists
 [mc_lj_ll_module.f90](mc_lj_ll_module.f90) and [link_list_module.f90](link_list_module.f90).
 These may be used instead of [mc_lj_module.f90](mc_lj_module.f90)
 in combination with [mc_nvt_lj.f90](mc_nvt_lj.f90),
-[mc_npt_lj.f90](mc_npt_lj.f90),
+[mc_npt_lj.f90](mc_npt_lj.f90), or
 [mc_zvt_lj.f90](mc_zvt_lj.f90).
+However, for simplicity the routines have not been designed to be especially robust against
+large changes in system dimensions or number of particles: this could be fixed
+by including some memory reallocation statements in the Fortran.
 
 ### 5.5 Multiple-timestep algorithm, Lennard-Jones atoms
 [md_lj_mts.f90](md_lj_mts.f90) and [md_lj_mts_module.f90](md_lj_mts_module.f90).
