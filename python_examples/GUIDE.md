@@ -553,7 +553,7 @@ an algorithm such as `dbscan`
 [Proc. Second Int. Conf. on Knowledge Discovery and Data Mining (KDD-96) p 226](https://www.aaai.org/Papers/KDD/1996/KDD96-037.pdf)
 (Eds: E Simoudis, J Han, UM Fayyad; AAAI Press, 1996).
 
-A Python implementation of `dbscan` is available as part of the `sklearn` <http://scikit-learn.org/> library.
+A Python implementation of `dbscan` is available as part of the [sklearn](http://scikit-learn.org) library.
 For systems in periodic boundaries, rather than supplying the atomic positions, the user should
 compute a distance matrix using the minimum image convention, and supply that to the routine,
 as suggested by [Turci](https://francescoturci.wordpress.com/2016/03/16/clustering-and-periodic-boundaries/).
