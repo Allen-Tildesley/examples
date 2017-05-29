@@ -23,7 +23,6 @@ build dependencies in each case.
 
 Several other small programs are not described in the text,
 but are mentioned in the online [GUIDE](GUIDE.md):
-* [initialize_chain.f90](initialize_chain.f90), with [initialize_chain_module.f90](initialize_chain_module.f90)
 * [adjust.f90](adjust.f90)
 * [resize.f90](resize.f90)
 * [eos_lj.f90](eos_lj.f90) with [eos_lj_module.f90](eos_lj_module.f90)
@@ -135,6 +134,7 @@ in combination with [mc_nvt_lj.f90](mc_nvt_lj.f90),
 
 ### 5.6 Initialization of a crystal lattice
 [initialize.f90](initialize.f90) and [initialize_module.f90](initialize_module.f90).
+This program also has options to initialize a random configuration, and a chain of atoms.
 
 ### 6.1 Force routine using the Ewald sum
 [ewald.f90](ewald.f90) with [ewald_module.f90](ewald_module.f90) and [mesh_module.f90](mesh_module.f90).

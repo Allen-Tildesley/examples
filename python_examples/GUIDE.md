@@ -129,7 +129,10 @@ Typically, runs produce a final configuration `cnf.out`
 and intermediate configurations `cnf.001`, `cnf.002` etc during the run.
 
 Some of the programs simulate a single chain of atoms, without periodic boundary conditions.
-Initial configurations for these may be prepared using the `initialize_chain.py` program.
+Initial configurations for these may also be prepared using the `initialize.py` program,
+selecting `"molecules":"chain"`, an appropriate number of atoms, for example `"n":13`,
+and `"velocities":true` if required. There is an option `"constraints":true` if the velocities
+should be chosen with constraints applied relative to the bonds between neighbouring atoms in the chain.
 
 ## Lennard-Jones simulation programs
 State points for the Lennard-Jones potential,
@@ -234,7 +237,7 @@ due to different ensembles and system size. Here we just present the raw results
 for a small system, _N_=256; programs are run with default parameters,
 except that the test runs were longer than default: 10 blocks of 10000 steps,
 same as for the Fortran examples.
-Starting fcc lattice configurations may be prepared using `initialize` in
+Starting fcc lattice configurations may be prepared using `initialize.py` in
 the usual way.
 The EOS is taken from the Hansen-Goos (2016) paper, and a program to evaluate it
 may be found in `eos_hs.py`.
@@ -306,7 +309,7 @@ and the latter appearing in Rosenbluth weights,
 which govern the acceptance/rejection of moves.
 For comparison with the paper of Calvo, Doye and Wales, _J Chem Phys,_ __116,__ 2642 (2002),
 test runs were carried out using _N_=13 atoms, a bond length of 1.122462&sigma;
-(prepared using `initialize_chain.py` with random non-overlapping atom positions)
+(prepared using `initialize.py` with `"molecules":"chain"` to give random non-overlapping atom positions)
 and a rather low spring potential _k_<sub>spring</sub>=20.
 We only use CBMC moves in this code: for a practical application it would be advisable
 to include other kinds of move, for example crankshaft, pivot, and bridging moves.

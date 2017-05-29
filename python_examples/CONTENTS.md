@@ -23,7 +23,6 @@ They are not explicitly listed below.
 
 Several other small programs are not described in the text,
 but are mentioned in the online [GUIDE](GUIDE.md):
-* [initialize_chain.py](initialize_chain.py)
 * [eos_lj.py](eos_lj.py) with [eos_lj_module.py](eos_lj_module.py)
 * [eos_hs.py](eos_hs.py)
 
@@ -127,6 +126,7 @@ A Fortran version is available.
 
 ### 5.6 Initialization of a crystal lattice
 [initialize.py](initialize.py).
+This program also has options to initialize a random configuration, and a chain of atoms.
 
 ### 6.1 Force routine using the Ewald sum
 [ewald.py](ewald.py) with [ewald_module.py](ewald_module.py) and [mesh_module.py](mesh_module.py).

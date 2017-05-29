@@ -31,12 +31,18 @@ Typically, runs produce a final configuration `cnf.out`
 and intermediate configurations `cnf.001`, `cnf.002` etc during the run.
 
 Some of the programs simulate a single chain of atoms, without periodic boundary conditions.
-Initial configurations for these may be prepared using the `initialize_chain` program.
+Initial configurations for these may also be prepared using the `initialize` program
+selecting `molecules="chain"`, an appropriate number of atoms, for example `n=13`,
+and `velocities=.true.` if required. There is an option `constraints=.true.` if the velocities
+should be chosen with constraints applied relative to the bonds between neighbouring atoms in the chain.
 
 A utility program,
 `adjust` takes in an MC or MD configuration and
 scales the velocities to change the kinetic energy per atom by a specified amount,
 and/or the positions (and the box length) to change the density by a specified amount.
+A program `resize` multiplies the box length by an integer factor, and duplicates the
+atomic positions accordingly.
+You may prefer to write your own program or script to perform these types of operation.
 
 ## Lennard-Jones simulation programs
 A large number of the examples simulate the Lennard-Jones liquid.
@@ -492,7 +498,7 @@ and the latter appearing in Rosenbluth weights,
 which govern the acceptance/rejection of moves.
 For comparison with the paper of Calvo, Doye and Wales, _J Chem Phys,_ __116,__ 2642 (2002),
 test runs were carried out using _N_=13 atoms, a bond length of 1.122462&sigma;
-(prepared using `initialize_chain` with random non-overlapping atom positions)
+(prepared using `initialize` with `molecules="chain"` to give random non-overlapping atom positions)
 and a rather low spring potential _k_<sub>spring</sub>=20.
 We only use CBMC moves in this code: for a practical application it would be advisable
 to include other kinds of move, for example crankshaft, pivot, and bridging moves.
@@ -616,7 +622,8 @@ In a practical application it would be advisable to include some bridging moves 
 Reasonably long chains have been studied by Taylor, Paul and Binder, _J Chem Phys,_ __131,__ 114907 (2009),
 who provide references to earlier simulation work, as well as exact results for very short chains.
 Here we choose _N_=13, bond length equal to &sigma;, and a nonbonded interaction range of 1.5&sigma;.
-The starting chain configuration can be prepared using `initialize_chain` in the usual way.
+The starting chain configuration can be prepared using `initialize` in the usual way
+(note the non-default value of the bond length).
 
 As a reference for comparison, we ran a set of canonical ensemble calculations with `mc_chain_nvt_sw`.
 The program default is to run for 10 blocks, each of 100000 steps;
