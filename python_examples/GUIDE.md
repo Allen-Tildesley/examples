@@ -416,7 +416,7 @@ is printed for comparison at the end.
 We give results obtained by both
 the Lowe thermostat (L) and the Shardlow algorithm (S).
 Results below were obtained with runs of 10 blocks, each 10000 steps
-as for the Lennard-Jones examples (program default is 10&times;1000).
+as for the Fortran examples (program default is 10&times;1000).
 We take the default values of _a_ &rho;/T=75, and of other parameters not mentioned below.
 
  _T_   | &rho; | _P_ (EOS) | _P_ (L)   | _P_ (S)
@@ -428,8 +428,6 @@ We take the default values of _a_ &rho;/T=75, and of other parameters not mentio
  1.0   | 2.0   | 14.187    | 14.318(2) | 14.319(2)
  1.0   | 4.0   | 32.811    | 32.626(1) | 32.624(2)
  1.0   | 5.0   | 41.887    | 41.530(3) | 41.528(2)
-
-* Not convinced slow version is working properly??
 
 ## Test programs for potentials, forces and torques
 Two program files are provided: `test_pot_atom.py` and `test_pot_linear.py`,

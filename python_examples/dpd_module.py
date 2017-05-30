@@ -114,7 +114,7 @@ def force ( box, a, r ):
                 total  = total + PotentialType ( pot=pot, vir=vir, lap=lap )
                 f[i,:] = f[i,:] + fij
                 f[j,:] = f[j,:] - fij
-                pairs.append((i,j,rij_hat,rij_mag)) # add to list of pair information
+                pairs.append((i,j,rij_mag,rij_hat)) # add to list of pair information
 
     # Multiply results by numerical factors
     total.pot = total.pot * a
