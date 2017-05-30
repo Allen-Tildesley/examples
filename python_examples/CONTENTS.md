@@ -23,6 +23,7 @@ They are not explicitly listed below.
 
 Several other small programs are not described in the text,
 but are mentioned in the online [GUIDE](GUIDE.md):
+* [adjust.py](adjust.py)
 * [eos_lj.py](eos_lj.py) with [eos_lj_module.py](eos_lj_module.py)
 * [eos_hs.py](eos_hs.py)
 

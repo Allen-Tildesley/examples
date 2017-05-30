@@ -134,6 +134,12 @@ selecting `"molecules":"chain"`, an appropriate number of atoms, for example `"n
 and `"velocities":true` if required. There is an option `"constraints":true` if the velocities
 should be chosen with constraints applied relative to the bonds between neighbouring atoms in the chain.
 
+A utility program,
+`adjust.py` takes in an MC or MD configuration and
+scales the velocities to change the kinetic energy per atom by a specified amount,
+and/or the positions (and the box length) to change the density by a specified amount.
+You may prefer to write your own program or script to perform these types of operation.
+
 ## Lennard-Jones simulation programs
 State points for the Lennard-Jones potential,
 in its cut (but not shifted) form, denoted (c),
