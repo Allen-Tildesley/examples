@@ -142,7 +142,7 @@ and full form (f),
 are discussed in the Fortran examples [GUIDE](../GUIDE.md).
 Except where otherwise stated,
 we use our default liquid state point (&rho;,_T_)=(0.75,1.0) for testing,
-with _N_=256 atoms,
+with _N_=256 atoms, _R_<sub>c</sub>=2.5&sigma;,
 and compare with the same equations of state due to Thol et al
 
 * M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)
