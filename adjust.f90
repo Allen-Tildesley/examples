@@ -61,8 +61,8 @@ PROGRAM adjust
   CHARACTER(len=7), PARAMETER :: filename = 'cnf.inp'
 
   CHARACTER(len=10)  :: molecules       ! Character string, input, used to specify molecule_option
-  INTEGER            :: molecule_option ! User option for atoms, linear, nonlinear or chain molecule
-  INTEGER, PARAMETER :: atoms = 0, linear = 1, nonlinear = 2, chain = 3
+  INTEGER            :: molecule_option ! User option for atom, linear, nonlinear or chain molecule
+  INTEGER, PARAMETER :: atom = 0, linear = 1, nonlinear = 2, chain = 3
 
   REAL, PARAMETER :: tol = 1.e-9
 
@@ -70,7 +70,7 @@ PROGRAM adjust
 
   ! Set default parameters
   velocities = .FALSE. ! By default, assume MC configuration
-  molecules  = 'atoms' ! Options are 'atoms', 'chain', 'linear', 'nonlinear'
+  molecules  = 'atom'  ! Options are 'atom', 'chain', 'linear', 'nonlinear'
   delta_rho  = 0.0     ! If neither of these two items is changed ...
   delta_kin  = 0.0     ! ... program will just write out information
 
@@ -102,9 +102,9 @@ PROGRAM adjust
      molecule_option = linear
      WRITE ( unit=output_unit, fmt='(a)' ) 'Linear molecules, periodic boundaries'
 
-  ELSE IF ( INDEX ( molecules, 'atoms') /= 0 ) THEN
+  ELSE IF ( INDEX ( molecules, 'atom') /= 0 ) THEN
 
-     molecule_option = atoms
+     molecule_option = atom
      WRITE ( unit=output_unit, fmt='(a)' ) 'Atoms, periodic boundaries'
 
   ELSE
@@ -140,7 +140,7 @@ PROGRAM adjust
 
   SELECT CASE ( molecule_option )
 
-  CASE ( atoms, chain )
+  CASE ( atom, chain )
      IF ( velocities ) THEN
         CALL read_cnf_atoms ( filename, n, box, r, v )
      ELSE
@@ -191,7 +191,7 @@ PROGRAM adjust
 
      SELECT CASE ( molecule_option )
 
-     CASE ( atoms, chain )
+     CASE ( atom, chain )
 
         IF ( velocities ) THEN
            CALL write_cnf_atoms ( filename, n, box, r, v )

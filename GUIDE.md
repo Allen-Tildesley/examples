@@ -40,8 +40,6 @@ A utility program,
 `adjust` takes in an MC or MD configuration and
 scales the velocities to change the kinetic energy per atom by a specified amount,
 and/or the positions (and the box length) to change the density by a specified amount.
-A program `resize` multiplies the box length by an integer factor, and duplicates the
-atomic positions accordingly.
 You may prefer to write your own program or script to perform these types of operation.
 
 ## Lennard-Jones simulation programs

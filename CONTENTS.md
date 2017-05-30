@@ -24,7 +24,6 @@ build dependencies in each case.
 Several other small programs are not described in the text,
 but are mentioned in the online [GUIDE](GUIDE.md):
 * [adjust.f90](adjust.f90)
-* [resize.f90](resize.f90)
 * [eos_lj.f90](eos_lj.f90) with [eos_lj_module.f90](eos_lj_module.f90)
 * [eos_hs.f90](eos_hs.f90)
 
