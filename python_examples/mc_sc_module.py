@@ -110,7 +110,7 @@ def overlap_1 ( ri, ei, box, r, e ):
         rij = rij - np.rint(rij)  # Periodic boundary conditions in box=1 units
         rij_sq = np.sum(rij**2)   # Squared separation
         if rij_sq > range_box_sq: # Check no possibility of overlap
-            break
+            continue
         rij_sq = rij_sq * box_sq # Now in D=1 units
         rij    = rij    * box    # Now in D=1 units
         rei    = np.dot ( rij, ei     )
@@ -185,7 +185,7 @@ def n_overlap_1 ( ri, ei, box, r, e ):
         rij = rij - np.rint(rij)  # Periodic boundary conditions in box=1 units
         rij_sq = np.sum(rij**2)   # Squared separation
         if rij_sq > range_box_sq: # Check no possibility of overlap
-            break
+            continue
         rij_sq = rij_sq * box_sq # Now in D=1 units
         rij    = rij    * box    # Now in D=1 units
         rei    = np.dot ( rij, ei     )
