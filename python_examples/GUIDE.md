@@ -663,7 +663,7 @@ Only `n//2` shifts are needed to cover every distinct `ij` pair.
 There is a slight subtlety on the last shift, if `n` is even:
 both `ij` and `ji` pairs appear,
 and so the usual incrementing factor 2 is replaced by a factor 1.
-The idea dates back to S Brode and R Ahlrichs Comput Phys Commun 42, 51 (1986).
+The idea dates back to S Brode and R Ahlrichs, _Comput Phys Commun,_ __42,__ 51 (1986).
 The actual histogramming is conveniently performed
 by the built-in NumPy `histogram` routine.
 
