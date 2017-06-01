@@ -26,7 +26,7 @@
 
 """Energy, force, and move routines for SMC, LJ potential."""
 
-fast = False # Change this to replace NumPy force evaluation with slower Python
+fast = True # Change this to replace NumPy force evaluation with slower Python
 
 class PotentialType:
     """A composite variable for interactions."""
@@ -140,6 +140,7 @@ def force_1 ( ri, box, r_cut, r ):
         rij_sq = np.sum(rij**2,axis=1)  # Squared separations
         in_range = rij_sq < r_cut_box_sq                    # Set mask for within cutoff
         rij_sq   = rij_sq * box_sq                          # Now in sigma=1 units
+        rij      = rij * box                                # Now in sigma=1 units
         sr2      = np.where ( in_range, 1.0 / rij_sq, 0.0 ) # (sigma/rij)**2, only if in range
         ovr      = sr2 > sr2_ovr                            # Set flags for any overlaps
         if np.any(ovr):
@@ -165,6 +166,7 @@ def force_1 ( ri, box, r_cut, r ):
             rij_sq = np.sum(rij**2)  # Squared separation
             if rij_sq < r_cut_box_sq:    # Check within cutoff
                 rij_sq = rij_sq * box_sq # Now in sigma=1 units
+                rij    = rij * box       # Now in sigma=1 units
                 sr2    = 1.0 / rij_sq    # (sigma/rij)**2
                 ovr    = sr2 > sr2_ovr   # Overlap if too close
                 if ovr:

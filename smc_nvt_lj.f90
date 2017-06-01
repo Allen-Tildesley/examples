@@ -58,7 +58,7 @@ PROGRAM smc_nvt_lj
   ! Most important variables
   REAL    :: box         ! Box length
   REAL    :: temperature ! Temperature (specified)
-  INTEGER :: move_mode   ! Selects single- or multi-atom moves
+  LOGICAL :: single_atom ! Selects single- or multi-atom moves
   REAL    :: fraction    ! Fraction of atoms to move in multi-atom move
   REAL    :: dt          ! Time step (effectively determines typical displacement)
   REAL    :: r_cut       ! Potential cutoff distance
@@ -74,11 +74,8 @@ PROGRAM smc_nvt_lj
   CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
   CHARACTER(len=3), PARAMETER :: out_tag    = 'out'
   CHARACTER(len=3)            :: sav_tag    = 'sav' ! May be overwritten with block number
-  CHARACTER(len=30)           :: mode
 
-  INTEGER, PARAMETER :: single_atom = 1, multi_atom = 2
-
-  NAMELIST /nml/ nblock, nstep, r_cut, dt, mode, temperature, fraction
+  NAMELIST /nml/ nblock, nstep, r_cut, dt, single_atom, temperature, fraction
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'smc_nvt_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Smart Monte Carlo, constant-NVT ensemble'
@@ -90,10 +87,10 @@ PROGRAM smc_nvt_lj
   nblock      = 10
   nstep       = 10000
   r_cut       = 2.5
-  temperature = 1.0           ! Default temperature T
-  dt          = 0.1           ! Together with v_rms=sqrt(T) determines typical displacement
-  mode        = 'single-atom' ! Other option is 'multi-atom', probably requiring smaller dt
-  fraction    = 1.0           ! Only applicable in multi-atom mode
+  temperature = 1.0    ! Default temperature T
+  dt          = 0.1    ! Together with v_rms=sqrt(T) determines typical displacement
+  single_atom = .TRUE. ! .false. selects multi-atom mode, probably requiring smaller dt
+  fraction    = 1.0    ! Only applicable in multi-atom mode
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -111,20 +108,15 @@ PROGRAM smc_nvt_lj
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance', r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Time step',                 dt
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature',               temperature
-  IF ( INDEX( lowercase(mode), 'sing' ) /= 0 ) THEN
-     move_mode = single_atom
+  IF ( single_atom ) THEN
      WRITE ( unit=output_unit, fmt='(a,t40,a15)' ) 'Move mode is ', 'single-atom'
-  ELSE IF ( INDEX( lowercase(mode), 'mult' ) /= 0 ) THEN
-     move_mode = multi_atom
+  ELSE
      WRITE ( unit=output_unit, fmt='(a,t40,a15)'   ) 'Move mode is ', 'multi-atom'
      WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Fraction of atoms moving', fraction
      IF ( fraction < 0.0 .OR. fraction > 1.0 ) THEN
         WRITE ( unit=error_unit, fmt='(a)') 'Error: fraction out of range'
         STOP 'Error in smc_nvt_lj'
      END IF
-  ELSE
-     WRITE ( unit=error_unit, fmt='(a,a)') 'Error: unrecognized move mode ', mode
-     STOP 'Error in smc_nvt_lj'
   END IF
   v_rms = SQRT ( temperature ) ! RMS value for velocity selection
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Typical dr', v_rms*dt
@@ -156,9 +148,7 @@ PROGRAM smc_nvt_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
-        SELECT CASE ( move_mode )
-
-        CASE ( single_atom )
+        IF ( single_atom ) THEN ! Single-atom moves
 
            n_move = 0
            DO i = 1, n ! Loop over atoms
@@ -200,7 +190,7 @@ PROGRAM smc_nvt_lj
 
            m_ratio = REAL(n_move) / REAL(n)
 
-        CASE ( multi_atom )
+        ELSE ! Multi-atom moves
 
            CALL RANDOM_NUMBER ( zeta )                         ! Select N uniform random numbers
            move = SPREAD ( zeta < fraction, dim=1, ncopies=3 ) ! Construct mask for moving atoms
@@ -240,7 +230,7 @@ PROGRAM smc_nvt_lj
 
            END IF ! End test for overlap
 
-        END SELECT
+        END IF
 
         ! Calculate and accumulate variables for this step
         CALL blk_add ( calc_variables() )

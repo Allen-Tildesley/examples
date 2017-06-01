@@ -175,7 +175,7 @@ at the start of the main module; the user may override this by editing this stat
 but the program will then run (yet another) order of magnitude more slowly,
 so it may be necessary to reduce the run length still further.
 
-### Lennard-Jones MD programs
+### Lennard-Jones MD, BD and SMC programs
 
 The first test of the MD codes is that energy, or the appropriate energy-like variable, is conserved.
 The following table uses runs of 10 blocks,
@@ -197,7 +197,8 @@ except for some small deviations at the smallest timestep.
 
 Now we compare EOS data with typical test runs of our programs.
 The results in the following table use the same run lengths
-as for the Fortran examples, and default parameters otherwise.
+as for the Fortran examples (i.e. longer than the default value in the program),
+and default parameters otherwise.
 Numbers in parentheses (here and in the following tables)
 indicate errors in the last quoted digit, estimated from block averages.
 Results without error estimates are fixed (such as the temperature or density) or conserved.
@@ -209,7 +210,15 @@ Thol et al (2016) (f)  | 0.75      | 1.00      |            |          |        
 `md_nve_lj.py`         | 0.75      | 1.0027(4) | -2.9278    | 0.988(3) |  2.24(1)  | -3.7274    | 0.387(3)  |          
 `md_nvt_lj.py`         | 0.75      | 1.00      | -2.937(3)  | 0.975(4) |  2.1(1)   | -3.737(3)  | 0.374(4)  | 2.1(1)
 `md_npt_lj.py`         | 0.7509(5) | 1.00      | -2.942(5)  | 0.994(1) |           | -3.743(6)  | 0.3908(6) |
+`smc_nvt_lj`&sharp;(a) | 0.75      | 1.00      | -2.929(1)  | 0.979(3) |  2.256(4) | -3.729(1)  | 0.378(3)  | 2.264(4)
+`smc_nvt_lj`&sharp;(b) | 0.75      | 1.00      | -2.932(2)  | 0.95(1)  |  2.28(3)  | -3.732(2)  | 0.35(1)   | 2.29(3)
+`smc_nvt_lj`&sharp;(c) | 0.75      | 1.00      | -2.934(3)  | 0.94(1)  |  2.24(2)  | -3.733(3)  | 0.34(1)   | 2.24(2)
 `bd_nvt_lj.py`         | 0.75      | 1.00      | -2.931(3)  | 0.976(5) |  2.2(1)   | -3.731(3)  | 0.374(5)  | 2.2(1)
+
+&sharp; The `smc_nvt_lj` program was tested (a) in default, single-particle-move, mode, with &delta;t=0.1;
+(b) in multi-particle mode, moving 100% of particles, with &delta;t=0.02;
+and (c) in multi-particle mode, moving 30% of particles, with &delta;t=0.03.
+These values give acceptance rates in the 45% &ndash; 55% range.
 
 ### Lennard-Jones MC programs
 
