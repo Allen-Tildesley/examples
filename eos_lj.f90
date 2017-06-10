@@ -5,7 +5,7 @@ PROGRAM eos_lj
   !------------------------------------------------------------------------------------------------!
   ! This software was written in 2016/17                                                           !
   ! by Michael P. Allen <m.p.allen@warwick.ac.uk>/<m.p.allen@bristol.ac.uk>                        !
-  ! and Dominic J. Tildesley <dominic.tildesley@epfl.ch> ("the authors"),                          !
+  ! and Dominic J. Tildesley <d.tildesley7@gmail.com> ("the authors"),                             !
   ! to accompany the book "Computer Simulation of Liquids", second edition, 2017 ("the text"),     !
   ! published by Oxford University Press ("the publishers").                                       !
   !                                                                                                !
