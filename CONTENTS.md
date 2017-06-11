@@ -7,8 +7,7 @@ for easier comparison of the typical test results.
 Although links are provided here to the individual files,
 it is expected that you will have downloaded them all together.
 
-Not all the examples have online files:
-in some cases the code was provided in the text.
+Not all the examples have online files: in some cases the code was provided in the text.
 
 The utility module files
 [averages_module.f90](averages_module.f90),

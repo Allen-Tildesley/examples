@@ -1,5 +1,5 @@
 .DS_Store
 *.o
 *.mod
-a.out
 build_*
+a.out

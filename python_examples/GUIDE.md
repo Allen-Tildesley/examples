@@ -12,7 +12,7 @@ Variables may be created and redefined at runtime, as required.
 Object-oriented programming fits very well with the Python design,
 but it is well suited to other styles as well.
 It is widely used as a vehicle to introduce students to scientific programming.
-For an excellent introductory text, see
+For an excellent introductory text, see:
 
 * _Learning Scientific Programming with Python,_ C Hill (Cambridge University Press, 2015).
 
