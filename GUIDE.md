@@ -1027,10 +1027,7 @@ in a cubic box of side 30&sigma;, at a temperature _T_=0.90.
 For this system, &rho;<sub>G</sub> &asymp; 0.024, &rho;<sub>L</sub> &asymp; 0.713
 (see Trokhymchuk, op. cit.). A set of 100 configurations from this run, together
 with the output of `grint.f90` with default parameters, are provided in the
-file `grint_data.zip`. The slices for _z_>0 (_z_<sub>1</sub> in the liquid) and
-_c_<0 (_z_<sub>2</sub> further in the liquid) most resemble homogeneous liquid
-pair distribution functions. Those with _z_<0, _c_>0, where both particles are
-on the gas side, are the most noisy and show least structure.
+file `grint_data.zip` in the [Data repository](https://github.com/Allen-Tildesley/data).
 
 ## Error calculation
 The program `error_calc` is a self-contained illustration of the effects of
