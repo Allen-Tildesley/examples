@@ -4,7 +4,8 @@ Some details of tests carried out on the programs are also given.
 Do not expect to duplicate these results,
 they are simply a guide as to the kind of behaviour to expect.
 If you find a definite programming error,
-please report it via the [Issues](https://github.com/Allen-Tildesley/examples/issues) tab above.
+please report it via the [Issues](https://github.com/Allen-Tildesley/examples/issues) tab above
+(you will need to be signed into GitHub to do this).
 
 ## Data Input
 Most of the Fortran codes use a `namelist` to input a few parameters from standard input.
