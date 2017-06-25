@@ -2,7 +2,9 @@
 This software was written in 2016/17
 by Michael P. Allen <m.p.allen@warwick.ac.uk>/<m.p.allen@bristol.ac.uk>
 and Dominic J. Tildesley <d.tildesley7@gmail.com> ("the authors"),
-to accompany the book "Computer Simulation of Liquids", second edition, 2017 ("the text"),
+to accompany the book
+[Computer Simulation of Liquids](https://global.oup.com/academic/product/computer-simulation-of-liquids-9780198803201),
+second edition, 2017 ("the text"),
 published by Oxford University Press ("the publishers").
 
 ## Licence
@@ -30,7 +32,7 @@ a straightforward approach to modular programming, and a basic simplicity.
 It is also a compiled language, which means that it is quite efficient,
 and widely used, so it is easy to find compilers which are
 optimized for different machine architectures.
-The common tools for parallelizing scientific codesv(OpenMP and MPI)
+The common tools for parallelizing scientific codes (OpenMP and MPI)
 are compatible with Fortran.
 The [User Guide](./GUIDE.md) contains some notes to assist in running the programs,
 and some typical results.
