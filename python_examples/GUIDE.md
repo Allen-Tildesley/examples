@@ -675,6 +675,8 @@ of _N_=256 Lennard-Jones atoms,
 cut (but not shifted) at _R_<sub>c</sub>=2.5&sigma;,
 at the usual state point &rho;=0.75, _T_=1.0.
 The interval between configurations was 100 MC sweeps.
+This data set is provided in the
+file `pair_distribution_data.zip` in the [Data repository](https://github.com/Allen-Tildesley/data).
 Using the default resolution of 0.02&sigma;,
 identical results were obtained as for the Fortran example.
 

@@ -266,7 +266,7 @@ However, this estimate is based on the assumption
 that the pair distribution function _g(R<sub>c</sub>)_=1.
 In fact, the choice _R<sub>c</sub>_=2.5 is a poor one in this regard,
 lying near a local minimum where _g(R<sub>c</sub>)_&asymp; 0.91
-(an illustration appears below).
+(an illustration of _g(r)_ appears below in the __Pair distribution function__ section).
 Consequently the applied correction is slightly too large,
 and the resulting estimated pressure is systematically too low by &asymp; 0.03.
 This serves as a reminder to always make clear what the cutoff is,
@@ -984,8 +984,10 @@ of _N_=256 Lennard-Jones atoms,
 cut (but not shifted) at _R_<sub>c</sub>=2.5&sigma;,
 at the usual state point &rho;=0.75, _T_=1.0.
 The interval between configurations was 100 MC sweeps.
-Using the default resolution of 0.02&sigma;, the results shown below were obtained
-for _g(r)_.
+This data set is provided in the
+file `pair_distribution_data.zip` in the [Data repository](https://github.com/Allen-Tildesley/data).
+Using the default resolution of 0.02&sigma;,
+the results shown below were obtained for _g(r)_.
 
 ![alt text](gr.png "g(r) test results")
 
