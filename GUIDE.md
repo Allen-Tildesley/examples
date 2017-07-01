@@ -710,7 +710,7 @@ or &epsilon; = 5 kJ mol<sup>-1</sup> to a good approximation,
 &sigma;=0.483nm,
 and bond lengths equal to &sigma;.
 
-Tests were performed at &rho;=0.32655 which is equivalent to &rho<sub>4</sub>=1.108g cm<sup>-3</sup>
+Tests were performed at &rho;=0.32655 which is equivalent to &rho;<sub>4</sub>=1.108g cm<sup>-3</sup>
 in Mossa et al (2002).
 Comparisons of potential energy (_PE_=_E_-3_T_ converted to kJ/mol with a factor 5)
 were made with the fit given by eqn (6) of that paper.
