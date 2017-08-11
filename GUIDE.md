@@ -300,10 +300,17 @@ It was found convenient to start from a lower temperature,
 with configurations at gas and liquid densities, with roughly equal numbers of particles,
 and slowly work upwards in temperature, to equilibrate.
 Note that the program expects two starting configurations: `cnf1.inp` and `cnf2.inp`.
+The total number of atoms was fixed at _N_<sub>L</sub>+_N_<sub>G</sub>=512
+and total volume _V_<sub>L</sub>+_V_<sub>G</sub>&asymp;5514.
 Exchanges of box identity are expected as the critical temperature is approached,
 and so one should not place blind trust in the separate box averages reported by the program,
-but refer to histograms of density, energy etc.
-At _T_=1.0, however, these exchanges of box identity are quite infrequent,
+but refer to histograms of density, energy etc.,
+illustrative examples of which appear here.
+
+![alt text](mc_gibbs_lj_his.png "mc_gibbs_lj histograms")
+
+At _T_=1.0, however, these exchanges of box identity
+are expected to be infrequent, were not observed in the test runs,
 and the averages corresponded well to literature values for the coexistence parameters.
 The production run corresponded to default parameters in the program.
 
@@ -311,7 +318,7 @@ Source  | &rho;<sub>L</sub> | &rho;<sub>G</sub> | _P_<sub>L</sub> | _P_<sub>G</s
 -------              | -------- | -------- | -------  | -------- | --------------  | --------------
 Trokhymchuk et al MC | 0.6542   | 0.0439   | 0.0336   | 0.0336   |                 |
 Trokhymchuk et al MD | 0.6507   | 0.0500   | 0.0380   | 0.0380   | -2.713 &Dagger; | 1.047 &Dagger;
-`mc_gibbs_lj`        | 0.652(1) | 0.050(1) | 0.028(1) | 0.038(1) | -2.730(5)       | 1.054(8)
+`mc_gibbs_lj`        | 0.653(1) | 0.050(1) | 0.031(2) | 0.038(1) | -2.731(5)       | 1.049(9)
 
 &Dagger; Indicates values for given &rho; and _T_ from the Thol et al (2016) EOS (f) with cutoff correction.
 

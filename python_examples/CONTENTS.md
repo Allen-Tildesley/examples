@@ -176,8 +176,7 @@ A Fortran version is available.
 [mc_chain_nvt_cbmc_lj.py](mc_chain_nvt_cbmc_lj.py) and [mc_chain_lj_module.py](mc_chain_lj_module.py).
 
 ### 9.3 Gibbs ensemble simulation
-We do not provide a Python version of this example.
-A Fortran version is available.
+[mc_gibbs_lj.py](mc_gibbs_lj.py).
 
 ### 11.1 Molecular dynamics using Lees–Edwards boundaries
 We do not provide a Python version of this example.

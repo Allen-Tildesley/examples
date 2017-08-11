@@ -40,7 +40,7 @@ PROGRAM mc_gibbs_lj
   ! For example, for Lennard-Jones, sigma = 1, epsilon = 1
 
   ! Note that long-range corrections are not included in the acceptance/rejection
-  ! of creation and destruction moves, but are added to the simulation averages
+  ! of creation and destruction moves
 
   ! Despite the program name, there is nothing here specific to Lennard-Jones
   ! The model is defined in mc_module
@@ -243,54 +243,63 @@ PROGRAM mc_gibbs_lj
            IF ( zeta > 0.5 ) THEN ! Try swapping 1->2
 
               x12_try     = x12_try + 1
-              i           = random_integer ( 1, n(1) )                        ! Choose atom at random in system 1
-              partial_old = potential_1 ( 1, n(1), r(:,i), i, box(1), r_cut ) ! Old atom potential, virial, etc
-              IF ( partial_old%ovr ) THEN ! should never happen
-                 WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
-                 STOP 'Error in mc_gibbs_lj'
-              END IF
-              partial_new = potential_1 ( n(1)+1, n(1)+n(2), ri, 0, box(2), r_cut ) ! New atom potential, virial, etc
 
-              IF ( .NOT. partial_new%ovr .AND. n(1) > 1 ) THEN ! Test for non-overlapping configuration & disallow n(1)->0
+              IF ( n(1) > 1 ) THEN ! Disallow n(1)->0
+                 i           = random_integer ( 1, n(1) )                        ! Choose atom at random in system 1
+                 partial_old = potential_1 ( 1, n(1), r(:,i), i, box(1), r_cut ) ! Old atom potential, virial, etc
+                 IF ( partial_old%ovr ) THEN ! should never happen
+                    WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
+                    STOP 'Error in mc_gibbs_lj'
+                 END IF
+                 partial_new = potential_1 ( n(1)+1, n(1)+n(2), ri, 0, box(2), r_cut ) ! New atom potential, virial, etc
 
-                 delta = ( partial_new%pot - partial_old%pot ) / temperature ! Use cut (not shifted) potential
-                 delta = delta - LOG ( box(2)**3 / REAL ( n(2)+1 ) ) ! Creation in 2
-                 delta = delta + LOG ( box(1)**3 / REAL ( n(1) ) )   ! Destruction in 1
+                 IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
 
-                 IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                    CALL swap ( i, ri )               ! Carry out swap
-                    total(1) = total(1) - partial_old ! Update total values
-                    total(2) = total(2) + partial_new ! Update total values
-                    x12_acc  = x12_acc + 1            ! Increment 1->2 move counter
-                 END IF ! End accept Metropolis test
+                    delta = ( partial_new%pot - partial_old%pot ) / temperature ! Use cut (not shifted) potential
+                    delta = delta - LOG ( box(2)**3 / REAL ( n(2)+1 ) ) ! Creation in 2
+                    delta = delta + LOG ( box(1)**3 / REAL ( n(1) ) )   ! Destruction in 1
 
-              END IF ! End test for overlapping configuration & disallow n(1)->0
+                    IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
+                       CALL swap ( i, ri )               ! Carry out swap
+                       total(1) = total(1) - partial_old ! Update total values
+                       total(2) = total(2) + partial_new ! Update total values
+                       x12_acc  = x12_acc + 1            ! Increment 1->2 move counter
+                    END IF ! End accept Metropolis test
+
+                 END IF ! End test for non-overlapping configuration
+              END IF ! End test to disallow n(1)->0
 
            ELSE ! Try swapping 2->1
+
               x21_try     = x21_try + 1
-              i           = random_integer ( n(1)+1, n(1)+n(2) )                        ! Choose atom at random in system 2
-              partial_old = potential_1 ( n(1)+1, n(1)+n(2), r(:,i), i, box(2), r_cut ) ! Old atom potential, virial, etc
-              IF ( partial_old%ovr ) THEN ! should never happen
-                 WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
-                 STOP 'Error in mc_gibbs_lj'
-              END IF
-              partial_new = potential_1 ( 1, n(1), ri, 0, box(1), r_cut ) ! New atom potential, virial, etc
 
-              IF ( .NOT. partial_new%ovr .AND. n(2) > 1 ) THEN ! Test for non-overlapping configuration & disallow n(2)->0
+              IF ( n(2) > 1 ) THEN ! Disallow n(2)->0
+                 i           = random_integer ( n(1)+1, n(1)+n(2) )                        ! Choose atom at random in system 2
+                 partial_old = potential_1 ( n(1)+1, n(1)+n(2), r(:,i), i, box(2), r_cut ) ! Old atom potential, virial, etc
+                 IF ( partial_old%ovr ) THEN ! should never happen
+                    WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
+                    STOP 'Error in mc_gibbs_lj'
+                 END IF
+                 partial_new = potential_1 ( 1, n(1), ri, 0, box(1), r_cut ) ! New atom potential, virial, etc
 
-                 delta = ( partial_new%pot - partial_old%pot ) / temperature ! Use cut (not shifted) potential
-                 delta = delta - LOG ( box(1)**3 / REAL ( n(1)+1 ) ) ! Creation in 1
-                 delta = delta + LOG ( box(2)**3 / REAL ( n(2) ) )   ! Destruction in 2
+                 IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
 
-                 IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                    CALL swap ( i, ri )               ! Carry out swap
-                    total(2) = total(2) - partial_old ! Update total values
-                    total(1) = total(1) + partial_new ! Update total values
-                    x21_acc  = x21_acc + 1            ! Increment 2->1 move counter
-                 END IF ! End accept Metropolis test
+                    delta = ( partial_new%pot - partial_old%pot ) / temperature ! Use cut (not shifted) potential
+                    delta = delta - LOG ( box(1)**3 / REAL ( n(1)+1 ) ) ! Creation in 1
+                    delta = delta + LOG ( box(2)**3 / REAL ( n(2) ) )   ! Destruction in 2
 
-              END IF ! End test for overlapping configuration & disallow n(2)->0
-           END IF
+                    IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
+                       CALL swap ( i, ri )               ! Carry out swap
+                       total(2) = total(2) - partial_old ! Update total values
+                       total(1) = total(1) + partial_new ! Update total values
+                       x21_acc  = x21_acc + 1            ! Increment 2->1 move counter
+                    END IF ! End accept Metropolis test
+
+                 END IF ! End test for non-overlapping configuration
+
+              END IF ! End test to disallow n(2)->0
+
+           END IF ! End choice between trying to swap 1->2 and 2->1
 
         END DO ! End loop over swap attempts
 
@@ -307,7 +316,7 @@ PROGRAM mc_gibbs_lj
         vol_old(:)   = box(:)**3                   ! Old volumes
         vol_new(:)   = vol_old(:) + [-dv,dv]       ! New volumes
         box_new(:)   = vol_new(:)**(1.0/3.0)       ! New box lengths
-        IF ( MINVAL(box_new) < r_cut ) THEN
+        IF ( MINVAL(box_new) < 2.0*r_cut ) THEN
            WRITE ( unit=error_unit, fmt='(a,2f15.6)') 'Box length too small', box_new
            STOP 'Error in mc_gibbs_lj'
         END IF
@@ -364,8 +373,8 @@ CONTAINS
 
     ! In this example we simulate using the cut (but not shifted) potential
     ! The values of < p_c >,  < e_c > and < density > should be consistent (for this potential)
-    ! For comparison, long-range corrections are also applied to give
-    ! estimates of < e_f > and < p_f > for the full (uncut) potential
+    ! For simplicity, long-range corrections are not applied here to give estimates of 
+    ! < e_f > and < p_f > for the full (uncut) potential, but this is straightforward to do.
     ! The value of the cut-and-shifted potential is not used, in this example
 
     TYPE(variable_type) :: m1_r, m2_r, x12_r, x21_r, v_r
@@ -384,7 +393,7 @@ CONTAINS
     ! The %nam and some other components need only be defined once, at the start of the program,
     ! but for clarity and readability we assign all the values together below
 
-    ! Move, creation, and destruction acceptance ratios
+    ! Move, swap, volume exchange acceptance ratios
     m1_r  = variable_type ( nam = 'Move ratio (1)',    val = m1_ratio,  instant = .FALSE. )
     m2_r  = variable_type ( nam = 'Move ratio (2)',    val = m2_ratio,  instant = .FALSE. )
     x12_r = variable_type ( nam = 'Swap ratio (1->2)', val = x12_ratio, instant = .FALSE. )
