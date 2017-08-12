@@ -1,32 +1,54 @@
 # SCons build file for the various programs
-# Run this typing 'scons'
-# Clean the program by 'scons -c' (i.e., remove object, module and executable)
+# Run this by typing 'scons'
+# Clean the programs by 'scons -c' (i.e., remove object, module and executable files)
 
 import os, sys
 
-env_normal=Environment(ENV=os.environ)
-env_lapack=Environment(ENV=os.environ)
-env_fftw=Environment(ENV=os.environ)
-env_mpi=Environment(ENV=os.environ,F90='mpif90',LINK='mpif90')
-env_omp=Environment(ENV=os.environ)
+# This has been tested using SCons v2.5.1, gfortran v6.3,
+# using MacOS Sierra (10.12) with compilers and libraries installed through MacPorts.
+# It may not work on your system. It is possible that you can get it to work by
+# changing the flags and library/include paths defined in the following few statements.
+# The most likely trouble spots are the programs that use the non-standard
+# environments: env_lapack, env_fftw, env_mpi, and env_omp. You may be able to make
+# some progress by commenting out the corresponding "variants" lines below, and
+# compiling only the programs that use env_normal.
 
-# Assume that gfortran will be used. 
-#Tool('gfortran')(env_normal)
-#Tool('mpif90')(env_mpi)
-#MY_F90FLAGS='-O2 -finline-functions -funswitch-loops -fwhole-file'
-MY_F90FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2008 -Wall'
-FFTW_F90FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2008 -Wall -I/opt/local/include'
-OMP_F90FLAGS='-fdefault-real-8 -fall-intrinsics -fopenmp -std=f2008 -Wall'
-MY_LINKFLAGS=''
-LAPACK_LINKFLAGS='-L/opt/local/lib/lapack -llapack'
-FFTW_LINKFLAGS='-L/opt/local/lib -lfftw3'
+# If you don't like using SCons, or can't get it to work,
+# it is not difficult to compile the programs using other methods.
+# Bear in mind that, with Fortran, it is usually essential to compile any
+# modules that are used by the main program, before compiling the main program itself.
+# Take a look at this file in any case, as it shows the file dependencies for each example.
+
+# If you see an error in this file, or a specific improvement that would improve robustness
+# or portability, please feel free to raise an issue on the GitHub examples repository.
+# Unfortunately, due to the enormous variety of computing platforms and compilers,
+# we cannot offer more specific advice on the build process.
+
+# Assume that gfortran will be used as the default compiler
+# NB by default we do not invoke any optimization
+MY_FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2008 -Wall'
+LAPACK_LIBPATH='/opt/local/lib/lapack'
+LAPACK_LIBS='lapack'
+FFTW_LIBPATH='/opt/local/lib'
+FFTW_LIBS='fftw3'
+FFTW_INCLUDE='/opt/local/include'
+OMP_FLAGS='-fopenmp'
 OMP_LINKFLAGS='-fopenmp'
 
-env_normal.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
-env_lapack.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=LAPACK_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
-env_fftw.Append(F90FLAGS=FFTW_F90FLAGS,LINKFLAGS=FFTW_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
-env_mpi.Append(F90FLAGS=MY_F90FLAGS,LINKFLAGS=MY_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
-env_omp.Append(F90FLAGS=OMP_F90FLAGS,LINKFLAGS=OMP_LINKFLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR = '${TARGET.dir}',F90PATH='${TARGET.dir}')
+env_normal=Environment(ENV=os.environ)
+env_normal.Append(F90FLAGS=MY_FLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR='${TARGET.dir}',F90PATH=['${TARGET.dir}'])
+
+env_lapack=env_normal.Clone()
+env_lapack.Append(LIBPATH=[LAPACK_LIBPATH],LIBS=LAPACK_LIBS)
+
+env_fftw=env_normal.Clone()
+env_fftw.Append(F90PATH=[FFTW_INCLUDE])
+env_fftw.Append(LIBPATH=[FFTW_LIBPATH],LIBS=FFTW_LIBS)
+
+env_mpi=env_normal.Clone(F90='mpif90',LINK='mpif90')
+
+env_omp=env_normal.Clone()
+env_omp.Append(F90FLAGS=OMP_FLAGS,LINKFLAGS=OMP_LINKFLAGS)
 
 utilities=['config_io_module.f90','averages_module.f90','maths_module.f90']
 utnomaths=['config_io_module.f90','averages_module.f90']
