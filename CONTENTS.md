@@ -16,7 +16,7 @@ The utility module files
 and a small module containing long-range-correction formulae
 [lrc_lj_module.f90](lrc_lj_module.f90)
 are widely used by the simulation programs.
-They are not explicitly listed below:
+They are not explicitly listed in most cases below:
 the [SConstruct](SConstruct) file gives a full list of the
 build dependencies in each case.
 

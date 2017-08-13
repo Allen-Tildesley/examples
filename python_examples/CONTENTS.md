@@ -18,7 +18,7 @@ The utility module files
 and a small module containing long-range-correction formulae
 [lrc_lj_module.py](lrc_lj_module.py)
 are widely used by the simulation programs.
-They are not explicitly listed below.
+They are not explicitly listed in most cases below.
 
 Several other small programs are not described in the text,
 but are mentioned in the online [GUIDE](GUIDE.md):
@@ -179,8 +179,7 @@ A Fortran version is available.
 [mc_gibbs_lj.py](mc_gibbs_lj.py).
 
 ### 11.1 Molecular dynamics using Lees–Edwards boundaries
-We do not provide a Python version of this example.
-A Fortran version is available.
+[md_nvt_lj_le.py](md_nvt_lj_le.py) and [md_lj_le_module.py](md_lj_le_module.py).
 
 ### 11.2 Cell structure and linked lists in sheared boundaries
 We do not provide a Python version of this example.

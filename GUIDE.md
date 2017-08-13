@@ -367,11 +367,11 @@ link-cell program).
 The given program defaults, including a time step of 0.005, were used throughout,
 except for the strain rate which was varied.
 
-Strain rate | _E_       | _P_       | &eta;    | _E_       | _P_       | &eta;
------       | -----     | -----     | -----    | -----     | -----     | -----
-0.04        | 1.8043(1) | 6.3907(7) | 2.30(4)  | 1.8039(3) | 6.389(2)  | 2.31(4)
-0.16        | 1.8103(2) | 6.431(1)  | 2.254(8) | 1.8098(2) | 6.427(1)  | 2.23(1)
-0.64        | 1.8649(2) | 6.778(1)  | 1.939(2) | 1.8646(2) | 6.776(1)  | 1.935(2)
+Strain rate | _E_       | _P_      | &eta;    | _E_       | _P_       | &eta;
+-----       | -----     | -----    | -----    | -----     | -----     | -----
+0.04        | 1.8042(1) | 6.390(1) | 2.38(4)  | 1.8039(3) | 6.389(2)  | 2.31(4)
+0.16        | 1.8095(2) | 6.426(1) | 2.228(8) | 1.8098(2) | 6.427(1)  | 2.23(1)
+0.64        | 1.8648(2) | 6.777(2) | 1.938(2) | 1.8646(2) | 6.776(1)  | 1.935(2)
 
 In the table above, for each strain rate,
 the results in columns 2-4 come from `md_nvt_lj_le`
@@ -382,6 +382,9 @@ The results, particularly the increase in _E_ and _P_,
 and the decrease in shear viscosity &eta;,
 as the strain rate increases,
 are in good agreement with the above papers.
+Incidentally, at the highest strain rate 0.64,
+the configurational temperature is systematically about 1% lower
+than the (constrained) kinetic temperature.
 
 ## Hard-particle programs
 The programs `mc_nvt_hs` and `md_nve_hs` illustrate, respectively,

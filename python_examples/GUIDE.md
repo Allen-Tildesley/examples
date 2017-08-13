@@ -295,6 +295,40 @@ However, this assumes _g(R<sub>c</sub>)_=1,
 whereas actually _g(R<sub>c</sub>)_&asymp; 0.95 at this density.
 Hence the correction is too large by approximately 0.01.
 
+## Lees-Edwards programs
+The program `md_nvt_lj_le.py` is intended to illustrate
+the moving boundaries used in nonequilibrium shear flow simulations and
+an algorithm for integrating the SLLOD equations of motion with constrained kinetic energy.
+The program uses the short-ranged WCA Lennard-Jones potential,
+in order to compare results with the following papers:
+
+* G Pan, JF Ely, C McCabe, DJ Isbister, _J Chem Phys,_ __122,__ 094114 (2005)
+* KP Travis, DJ Searles, DJ Evans, _Mol Phys,_ __95,__ 195 (1998)
+
+Testing was performed at the state point used in those papers: &rho;=0.8442, _T_=0.722.
+A system size _N_=256 was used.
+The given program defaults, including a time step of 0.005,
+were used to give the results in the table below,
+except that the run length was increased to 10&times;100000 steps,
+the same as for the Fortran example,
+and the strain rate was varied as shown.
+
+Strain rate | _E_       | _P_      | &eta;    
+-----       | -----     | -----    | -----    
+0.04        | 1.8040(2) | 6.389(1) | 2.31(3)  
+0.16        | 1.8099(3) | 6.428(2) | 2.227(9)
+0.64        | 1.8648(2) | 6.777(1) | 1.940(2)
+
+In all cases the kinetic energy was conserved very accurately by the algorithm.
+The results, particularly the increase in _E_ and _P_,
+and the decrease in shear viscosity &eta;,
+as the strain rate increases,
+are in good agreement with the above papers,
+and with the results of the Fortran programs.
+Incidentally, at the highest strain rate 0.64,
+the configurational temperature is systematically about 1% lower
+than the (constrained) kinetic temperature.
+
 ## Hard-particle programs
 The programs `mc_nvt_hs.py` and `md_nve_hs.py` illustrate, respectively,
 the simplest MC and MD methods for the basic hard-sphere model.
