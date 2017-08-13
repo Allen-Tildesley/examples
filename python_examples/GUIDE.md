@@ -295,7 +295,7 @@ However, this assumes _g(R<sub>c</sub>)_=1,
 whereas actually _g(R<sub>c</sub>)_&asymp; 0.95 at this density.
 Hence the correction is too large by approximately 0.01.
 
-## Lees-Edwards programs
+## Lees-Edwards program
 The program `md_nvt_lj_le.py` is intended to illustrate
 the moving boundaries used in nonequilibrium shear flow simulations and
 an algorithm for integrating the SLLOD equations of motion with constrained kinetic energy.
