@@ -137,7 +137,7 @@ CONTAINS
     run_err = 0.0
 
     ! Write initial instantaneous values
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Initial values'
+    IF ( ANY(variables(:)%instant) ) WRITE ( unit=output_unit, fmt='(a)' ) 'Initial values'
     DO i = 1, n_avg
        IF ( variables(i)%instant ) THEN
           WRITE ( unit=output_unit, fmt=sngl_fmt ) variables(i)%nam, variables(i)%val
@@ -249,7 +249,7 @@ CONTAINS
     WRITE ( unit=output_unit, fmt=* )
 
     ! Write final instantaneous values
-    WRITE ( unit=output_unit, fmt='(/,a)' ) 'Final values'
+    IF ( ANY(variables(:)%instant) ) WRITE ( unit=output_unit, fmt='(/,a)' ) 'Final values'
     DO i = 1, SIZE ( variables )
        IF ( variables(i)%instant ) THEN
           WRITE ( unit=output_unit, fmt=sngl_fmt ) variables(i)%nam, variables(i)%val

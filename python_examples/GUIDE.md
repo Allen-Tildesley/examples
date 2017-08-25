@@ -510,6 +510,73 @@ due to the timescale separation.
 giving instead (typically) quasi-harmonic vibrations in a single basin.
 We do not focus on this region, in the Python tests.
 
+For the hard-sphere square-well chain, the aim was to show the operation of the Wang-Landau method.
+In `mc_chain_wl_sw.py` we use pivot and crankshaft moves as well as CBMC regrowth.
+In a practical application it would be advisable to include some bridging moves as well.
+Reasonably long chains, _N_=128, have been studied by this method,
+and exact results are available for very short chains;
+see, for example,
+
+* MP Taylor,  _J Chem Phys,_ __118,__ 883 (2003),
+* JE Magee, L Lue, RA Curtis, _Phys Rev E,_ __78,__ 031803 (2008),
+* MP Taylor, W Paul, K Binder, _J Chem Phys,_ __131,__ 114907 (2009),
+
+who provide references to other simulation work.
+
+For testing purposes our aims are quite modest:
+we choose _N_=6, bond length equal to &sigma;, and a nonbonded interaction range of 1.5&sigma;.
+The starting chain configuration can be prepared using `initialize.py` in the usual way
+(note the non-default value of the bond length).
+Default parameters are used in `mc_chain_wl_sw.py`,
+including a flatness criterion of 0.9.
+The entropy modification constant `ds` is halved at each stage,
+and there are 20 stages.
+For this system, the energy range (in units of the well depth) is
+_E_ = 0 &hellip; -10.
+The principal result is the histogram of entropies _S(E)_ produced at the final stage.
+For convenience we (arbitrarily) define _S_(0)=0.
+We conduct a set of nine independent WL runs,
+and report the results from the two runs with the highest and lowest values of _S_(-10),
+which bracket all the other results in the set,
+as a rough indication of the errors.
+We compare with the exact values calculated from the density of states
+of Taylor (2003), normalized in the same way to make _S_(0)=0.
+
+_E_    | _S(E)_ (exact) | _S(E)_ (WL) | _S(E)_ (WL)
+------ | ------         | ------      | ------
+  0.0  |   0.0000       |   0.0000    |   0.0000
+ -1.0  |   0.7521       |   0.7561    |   0.7506
+ -2.0  |   0.6661       |   0.6655    |   0.6510
+ -3.0  |   0.2108       |   0.2067    |   0.1984
+ -4.0  |  -0.4433       |  -0.4352    |  -0.4560
+ -5.0  |  -1.3484       |  -1.3837    |  -1.3385
+ -6.0  |  -2.4438       |  -2.5051    |  -2.4393
+ -7.0  |  -3.6832       |  -3.7044    |  -3.6725
+ -8.0  |  -5.8548       |  -5.8702    |  -5.8534
+ -9.0  |  -8.4766       |  -8.4457    |  -8.5045
+ -10.0 | -14.9981       | -14.5896    | -15.2831
+
+As a further check, we ran a set of canonical ensemble calculations for the same system
+with `mc_chain_nvt_sw` at selected temperatures.
+The program default is to run for 10 blocks, each of 100000 steps;
+this was increased to 10 blocks of 500000 steps for temperatures
+below 0.25.
+The results may be compared with values reconstructed using the
+`wl_hist` program from the simulation histograms.
+Below we show the heat capacity per atom from the above two WL runs (red),
+from the exact density of states of Taylor (black),
+and from the canonical ensemble calculations (blue error bars).
+
+![alt text](wl.png "Wang-Landau test results")
+
+It is also straightforward to compare average energies and radii of gyration,
+but we do not do that here.
+
+Because of the slow speed of the Python codes,
+we make no attempt to reproduce the tests conducted with the Fortran
+versions
+for the _N=13_ chains.
+
 ## DPD program
 For testing we compare with an approximate DPD equation of state for _P_.
 

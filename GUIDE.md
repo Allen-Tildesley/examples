@@ -628,17 +628,75 @@ due to the timescale separation.
 giving instead (typically) quasi-harmonic vibrations in a single basin.
 
 For the hard-sphere square-well chain, the aim was to show the operation of the Wang-Landau method.
-Here we used pivot and crankshaft moves as well as CBMC regrowth.
+In `mc_chain_wl_sw` we use pivot and crankshaft moves as well as CBMC regrowth.
 In a practical application it would be advisable to include some bridging moves as well.
-Reasonably long chains have been studied by Taylor, Paul and Binder, _J Chem Phys,_ __131,__ 114907 (2009),
-who provide references to earlier simulation work, as well as exact results for very short chains.
-Here we choose _N_=13, bond length equal to &sigma;, and a nonbonded interaction range of 1.5&sigma;.
+Reasonably long chains, _N_=128, have been studied by this method,
+and exact results are available for very short chains;
+see, for example,
+
+* MP Taylor,  _J Chem Phys,_ __118,__ 883 (2003),
+* JE Magee, L Lue, RA Curtis, _Phys Rev E,_ __78,__ 031803 (2008),
+* MP Taylor, W Paul, K Binder, _J Chem Phys,_ __131,__ 114907 (2009),
+
+who provide references to other simulation work.
+
+For testing purposes our aims are quite modest:
+we choose _N_=6, bond length equal to &sigma;, and a nonbonded interaction range of 1.5&sigma;.
 The starting chain configuration can be prepared using `initialize` in the usual way
 (note the non-default value of the bond length).
+Default parameters are used in `mc_chain_wl_sw`,
+including a flatness criterion of 0.9.
+The entropy modification constant `ds` is halved at each stage,
+and there are 20 stages.
+For this system, the energy range (in units of the well depth) is
+_E_ = 0 &hellip; -10.
+The principal result is the histogram of entropies _S(E)_ produced at the final stage.
+For convenience we (arbitrarily) define _S_(0)=0.
+We conduct a set of nine independent WL runs,
+and report the results from the two runs with the highest and lowest values of _S_(-10),
+which bracket all the other results in the set,
+as a rough indication of the errors.
+We compare with the exact values calculated from the density of states
+of Taylor (2003), normalized in the same way to make _S_(0)=0.
 
-As a reference for comparison, we ran a set of canonical ensemble calculations with `mc_chain_nvt_sw`.
+_E_    | _S(E)_ (exact) | _S(E)_ (WL) | _S(E)_ (WL)
+------ | ------         | ------      | ------
+  0.0  |   0.0000       |   0.0000    |   0.0000
+ -1.0  |   0.7521       |   0.7629    |   0.7518
+ -2.0  |   0.6661       |   0.7014    |   0.6683
+ -3.0  |   0.2108       |   0.2308    |   0.2108
+ -4.0  |  -0.4433       |  -0.4152    |  -0.4449
+ -5.0  |  -1.3484       |  -1.3316    |  -1.3444
+ -6.0  |  -2.4438       |  -2.4256    |  -2.4322
+ -7.0  |  -3.6832       |  -3.6634    |  -3.6733
+ -8.0  |  -5.8548       |  -5.8440    |  -5.8620
+ -9.0  |  -8.4766       |  -8.4050    |  -8.4733
+ -10.0 | -14.9981       | -14.6824    | -15.0295
+
+As a further check, we ran a set of canonical ensemble calculations for the same system
+with `mc_chain_nvt_sw` at selected temperatures.
 The program default is to run for 10 blocks, each of 100000 steps;
-this was increased to 10 blocks of 500000 steps for temperatures below 0.25.
+this was increased to 10 blocks of 500000 steps for temperatures
+below 0.25.
+The results may be compared with values reconstructed using the
+`wl_hist` program from the simulation histograms.
+Below we show the heat capacity per atom from the above two WL runs (red),
+from the exact density of states of Taylor (black),
+and from the canonical ensemble calculations (blue error bars).
+
+![alt text](wl.png "Wang-Landau test results")
+
+It is also straightforward to compare average energies and radii of gyration,
+but we do not do that here.
+
+As the chain length increases, the energy landscape becomes more challenging.
+For _N_=13, with the same bond length of &sigma;,
+and nonbonded interaction range of 1.5&sigma;,
+sensible results may still be achieved
+with the simple example program `mc_chain_wl_sw`.
+Once more, as a reference for comparison,
+we ran a set of canonical ensemble calculations with `mc_chain_nvt_sw`,
+using the same parameters described above.
 The results are shown on the left of the following table.
 
 _T_   |  _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex) | _PE_ | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
@@ -658,31 +716,30 @@ method | _NVT_    | _NVT_     | _NVT_      |   WL    |   WL   |  WL
 Results obtained from a run of the Wang-Landau program `mc_chain_wl_sw`,
 using the same model, are given on the right of the table above.
 The program was run with default parameters:
-the flatness criterion was set at 80% and there were 20 stages during which the entropy
-modification constant `ds` was halved at each stage.
+except that the flatness criterion was set at 80%.
 The results are from the histograms produced in the 20th stage.
 This analysis can also be performed (for any desired temperature) by the program `wl_hist`, after the run.
 The results are generally in good agreement with the canonical ensemble test runs.
 The most significant discrepancies are in the heat capacities at the lowest two temperatures,
 which reflects the poor sampling of the canonical ensemble program (with these basic MC moves),
-and (probably to a lesser extent) the sampling problems about to be discussed.
+and the sampling problems about to be discussed.
 
 This particular test run illustrated one drawback of the simplest Wang-Landau implementation:
 two low-lying energies (corresponding to _q_=38 and 39 square-well interactions) were discovered
 during the very last stage, in which `ds` is very small.
 Accordingly, the system remained stuck in these low-energy states for a very long time,
-until their tabulated entropy _s(q)_ reached a high enough value to allow _q_ to change;
+until their tabulated entropy _S(q)_ reached a high enough value to allow _q_ to change;
 even then, the final weight of the lowest state in the final "flat" histogram
 could not be considered completely reliable.
 The overall run length was of order 90000 blocks of 10000 steps each,
 most of it spent in stage 20.
 
-If the run were repeated with the same parameters,
-one cannot guarantee that the same result will be obtained:
-indeed, it is more likely that the run would conclude much earlier, within a few thousand blocks,
-without ever discovering these low-lying energies.
-This would affect the results, particularly at the lower temperatures,
-and of course there would be no indication of anything wrong.
+Repeating the run with the same parameters typically produces different results,
+depending on whether, and when, these low-lying states are discovered.
+This affects the canonical ensemble results reconstructed from the histograms
+through `wl_hist`, particularly at the lower temperatures,
+while the higher temperatures are largely unaffected.
+From a single run, or a few runs, there might be no indication of anything wrong.
 It is always a danger with any Monte Carlo method, including Wang-Landau,
 that inaccessible configurations will not be sampled.
 Various improvements of the method may be found in the literature.

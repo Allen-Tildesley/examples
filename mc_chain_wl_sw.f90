@@ -70,6 +70,7 @@ PROGRAM mc_chain_wl_sw
   REAL    :: pivot_fraction ! fraction of atoms to try in pivot per step
   INTEGER :: n_pivot        ! number of pivot tries per step
   INTEGER :: q              ! total attractive interaction (negative of energy)
+  INTEGER :: q_min          ! min value of q seen in simulation (maximum energy)
   INTEGER :: q_max          ! max value of q seen in simulation (minimum energy)
   REAL    :: flatness       ! flatness criterion
   LOGICAL :: flat           ! Flag indicating that histogram is flat
@@ -77,7 +78,7 @@ PROGRAM mc_chain_wl_sw
   INTEGER :: stage          ! Counts stages in entropy function refinement
   INTEGER :: nstage         ! Determines termination point for run
   REAL    :: ds             ! Entropy increment for Wang-Landau method
-  INTEGER :: nq             ! Maximum anticipated energy
+  INTEGER :: nq             ! Maximum anticipated q
 
   ! Histograms and tables
   REAL, DIMENSION(:), ALLOCATABLE :: h ! Histogram of q values (0:nq)
@@ -114,7 +115,7 @@ PROGRAM mc_chain_wl_sw
   pivot_max      = 0.5   ! maximum move angle in pivot
   pivot_fraction = 0.2   ! fraction of atoms to try in pivot moves
   range          = 1.5   ! range of attractive well
-  flatness       = 0.8   ! histogram flatness criterion
+  flatness       = 0.9   ! histogram flatness criterion
 
   ! Read run parameters from namelist
   ! Comment out, or replace, this section if you don't like namelists
@@ -164,6 +165,7 @@ PROGRAM mc_chain_wl_sw
   END IF
   q = qcount ( range )
   WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Initial energy', q
+  q_min = q ! Min q seen so far
   q_max = q ! Max q seen so far
 
   ! Initialize arrays for averaging and write column headings
@@ -233,7 +235,9 @@ PROGRAM mc_chain_wl_sw
      flat = histogram_flat ( flatness ) ! Check for flatness
 
      IF ( flat ) THEN ! End of this stage
-        WRITE ( unit=output_unit, fmt='(t70,3(a,i0))' ) 'stage ', stage, ' q_max ', q_max, ' count ', COUNT(h(0:q_max)>0.5)
+        WRITE ( unit=output_unit, fmt='(a,1x,4(a,i0))' ) &
+             & REPEAT('-',111), 'stage ', stage, ' q_min ', q_min, &
+             & ' q_max ', q_max, ' count ', COUNT(h(q_min:q_max)>0.5)
         IF ( nstage < 1000 ) WRITE(sav_tag,'(i3.3)') stage       ! Number configuration by stage
         CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, bond, r ) ! Save configuration
         CALL write_histogram ( his_prefix//sav_tag )             ! Save histogram
@@ -243,8 +247,8 @@ PROGRAM mc_chain_wl_sw
 
   END DO ! End loop over blocks
 
-  ! Conventional run averages are not appropriate, but we do generate specimen results
-  CALL write_results
+  CALL run_end ( calc_variables() ) ! Output run averages, although these are really not relevant
+  CALL write_results                ! Specimen results at selected temperatures
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r ) ! Write out final configuration
 
@@ -278,9 +282,12 @@ CONTAINS
     p_r = variable_type ( nam = 'Pivot ratio',  val = p_ratio, instant = .FALSE. )
 
     ! Histogram diagnostics
-    h_min = variable_type ( nam = 'Histogram min', val = REAL(MINVAL(h(0:q_max))), instant = .FALSE. )
-    h_max = variable_type ( nam = 'Histogram max', val = REAL(MAXVAL(h(0:q_max))), instant = .FALSE. )
-    h_avg = variable_type ( nam = 'Histogram avg', val = REAL(SUM(h(0:q_max)))/REAL(q_max+1), instant = .FALSE. )
+    h_min = variable_type ( nam = 'Histogram min', &
+         & val = REAL(MINVAL(h(q_min:q_max))), instant = .FALSE. )
+    h_max = variable_type ( nam = 'Histogram max', &
+         & val = REAL(MAXVAL(h(q_min:q_max))), instant = .FALSE. )
+    h_avg = variable_type ( nam = 'Histogram avg', &
+         & val = REAL(SUM(h(q_min:q_max)))/REAL(q_max+1-q_min), instant = .FALSE. )
 
     ! Collect together for averaging
     variables = [ r_r, c_r, p_r, h_min, h_max, h_avg ]
@@ -309,6 +316,7 @@ CONTAINS
     s(q) = s(q) + ds
     g(q) = g(q) + r_g
 
+    q_min = MIN ( q, q_min )
     q_max = MAX ( q, q_max )
 
   END SUBROUTINE update_histogram
@@ -318,7 +326,7 @@ CONTAINS
     LOGICAL            :: flat     ! Returns a signal that the histogram is "sufficiently flat"
     REAL,   INTENT(in) :: flatness ! Specified degree of flatness to pass the test
 
-    ! We only look at the histogram up to the maximum q visited during the run
+    ! We only look at the histogram in the range of q visited during the run
     ! The flatness parameter should be in (0,1), higher values corresponding to flatter histograms
 
     REAL :: avg
@@ -328,14 +336,14 @@ CONTAINS
        STOP 'Error in histogram_flat'
     END IF
 
-    avg = SUM ( h(0:q_max) ) / REAL(q_max+1)
+    avg = SUM ( h(q_min:q_max) ) / REAL(q_max+1-q_min)
 
     IF ( avg < 0.0 ) THEN ! This should never happen, unless h somehow overflows
-       WRITE ( unit=error_unit, fmt='(a,*(es20.8))' ) 'Error in h ', h(0:q_max)
+       WRITE ( unit=error_unit, fmt='(a,*(es20.8))' ) 'Error in h ', h(q_min:q_max)
        STOP 'Error in histogram_flat'
     END IF
 
-    flat = REAL(MINVAL(h(0:q_max))) > flatness*avg
+    flat = REAL(MINVAL(h(q_min:q_max))) > flatness*avg
 
   END FUNCTION histogram_flat
 
@@ -348,6 +356,8 @@ CONTAINS
     ! Note that h and g will be reset to zero at the start of the next stage
     ! so it is OK to normalize them here
     ! Also we reset the baseline for entropy to avoid the numbers getting too large
+    ! We set s(q_min)=0.0 for convenience; relative to this, most other entropies
+    ! will be negative, but this is not a problem.
 
     INTEGER :: q, ioerr, his_unit
     REAL    :: norm
@@ -366,10 +376,10 @@ CONTAINS
     h    = h / norm
 
     ! Reset baseline for entropy
-    norm       = MINVAL ( s(0:q_max) )
-    s(0:q_max) = s(0:q_max) - norm
+    norm           = s(q_min)
+    s(q_min:q_max) = s(q_min:q_max) - norm
 
-    DO q = 0, q_max
+    DO q = q_min, q_max
        WRITE ( unit=his_unit, fmt='(3f15.6,es20.8)') e(q), h(q), g(q), s(q)
     END DO
 
@@ -391,7 +401,7 @@ CONTAINS
     INTEGER :: i, qs_max
     REAL    :: t, s_max, norm, g_avg, e_avg, e_msd
 
-    ALLOCATE ( boltz(0:q_max) )
+    ALLOCATE ( boltz(q_min:q_max) )
     ALLOCATE ( t_vals(10) ) ! Ideally we could omit this as Fortran 2003 should automatically allocate
     t_vals = [ 0.15, 0.18, 0.2, 0.22, 0.25, 0.3, 0.5, 1.0, 2.0, 5.0 ]
 
@@ -402,19 +412,18 @@ CONTAINS
        t = t_vals(i)
 
        ! Locate maximum Boltzmann factor (helps avoid overflows)
-       qs_max = MAXLOC ( s(0:q_max) - e(0:q_max) / t, dim=1 )
-       qs_max = qs_max - 1 ! Correct for the slice numbering starting at zero
-       s_max  = s(qs_max)
+       qs_max = MAXLOC ( s(q_min:q_max) - e(q_min:q_max) / t, dim=1 )
+       s_max  = s(qs_max + q_min - 1)
 
        ! Compute Boltzmann weights including density of states
-       boltz = s(0:q_max) - s_max - e(0:q_max) / t
+       boltz = s(q_min:q_max) - s_max - e(q_min:q_max) / t
        boltz = EXP ( boltz )
 
        ! Calculate averages
        norm  = SUM ( boltz )
-       g_avg = SUM ( boltz * g(0:q_max) ) / norm
-       e_avg = SUM ( boltz * e(0:q_max) ) / norm
-       e_msd = SUM ( boltz * (e(0:q_max) - e_avg )**2  ) / norm
+       g_avg = SUM ( boltz * g(q_min:q_max) ) / norm
+       e_avg = SUM ( boltz * e(q_min:q_max) ) / norm
+       e_msd = SUM ( boltz * (e(q_min:q_max) - e_avg )**2  ) / norm
        e_avg = e_avg / REAL(n)            ! Energy per atom
        e_msd = e_msd / ( REAL(n) * t**2 ) ! Heat capacity per atom
 

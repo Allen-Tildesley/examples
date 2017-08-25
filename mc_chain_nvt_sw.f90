@@ -63,8 +63,9 @@ PROGRAM mc_chain_nvt_sw
   REAL    :: pivot_fraction ! fraction of atoms to try in pivot per step
   INTEGER :: n_pivot        ! number of pivot tries per step
   INTEGER :: q              ! total attractive interaction (negative of energy)
+  INTEGER :: q_min          ! min value of q seen in simulation (maximum energy)
   INTEGER :: q_max          ! max value of q seen in simulation (minimum energy)
-  INTEGER :: nq             ! Maximum anticipated energy
+  INTEGER :: nq             ! Maximum anticipated q
 
   ! Histograms and tables
   REAL, DIMENSION(:), ALLOCATABLE :: h ! Histogram of q values (0:nq)
@@ -153,6 +154,7 @@ PROGRAM mc_chain_nvt_sw
   END IF
   q = qcount ( range )
   WRITE ( unit=output_unit, fmt='(a,t40,i15)' ) 'Initial energy', q
+  q_min = q ! Min q seen so far
   q_max = q ! Max q seen so far
 
   ! Initialize arrays for averaging and write column headings
@@ -160,11 +162,11 @@ PROGRAM mc_chain_nvt_sw
   p_ratio = 0.0
   c_ratio = 0.0
   CALL run_begin ( calc_variables() )
+  h(:) = 0.0
 
   DO blk = 1, nblock ! Begin loop over blocks
 
      CALL blk_begin
-     h(:) = 0.0
 
      DO stp = 1, nstep ! Begin loop over steps
 
@@ -203,7 +205,6 @@ PROGRAM mc_chain_nvt_sw
      CALL blk_end ( blk )                                     ! Output block averages
      IF ( nblock < 1000 ) WRITE(sav_tag,'(i3.3)') blk         ! Number configuration by block
      CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, bond, r ) ! Save configuration
-     CALL write_histogram ( his_prefix//sav_tag )             ! Save histogram
 
   END DO ! End loop over blocks
 
@@ -216,6 +217,7 @@ PROGRAM mc_chain_nvt_sw
   END IF
 
   CALL write_cnf_atoms ( cnf_prefix//out_tag, n, bond, r )
+  CALL write_histogram ( his_prefix//out_tag )
 
   CALL deallocate_arrays
   DEALLOCATE ( h, s, e )
@@ -251,17 +253,17 @@ CONTAINS
     c_r = variable_type ( nam = 'Crank ratio',  val = c_ratio, instant = .FALSE. )
     p_r = variable_type ( nam = 'Pivot ratio',  val = p_ratio, instant = .FALSE. )
 
-    ! Total potential energy of system pe atom
+    ! Total potential energy of system per atom
     ! PE=negative of the number of square-well contacts divided by N
-    e_x = variable_type ( nam = 'PE', val = -REAL(q)/REAL(n) )
+    e_x = variable_type ( nam = 'PE/N', val = -REAL(q)/REAL(n) )
 
     ! Radius of gyration
     r_g = variable_type ( nam = 'Rg', val = SQRT(rsq) )
 
-    ! Heat Capacity (excess, without ideal gas contribution, extensive)
-    ! MSD of total PE / T
+    ! Heat Capacity (excess, without ideal gas contribution)
+    ! MSD of total PE / (sqrt(N)*T)
     ! PE=negative of the number of square-well contacts
-    c_x = variable_type ( nam = 'Cv(ex)', val = -REAL(q)/(SQRT(REAL(n))*temperature), &
+    c_x = variable_type ( nam = 'Cv(ex)/N', val = -REAL(q)/(SQRT(REAL(n))*temperature), &
          &                method = msd, instant = .FALSE. )
 
     ! Collect together for averaging
@@ -278,6 +280,7 @@ CONTAINS
     END IF
 
     h(q)  = h(q) + 1.0
+    q_min = MIN ( q, q_min )
     q_max = MAX ( q, q_max )
 
   END SUBROUTINE update_histogram
@@ -289,6 +292,7 @@ CONTAINS
     CHARACTER(len=*), INTENT(in) :: filename
 
     INTEGER :: q, ioerr, his_unit
+    REAL    :: norm
 
     OPEN ( newunit=his_unit, file=filename, status='replace', action='write', iostat=ioerr )
     IF ( ioerr /= 0 ) THEN
@@ -296,8 +300,10 @@ CONTAINS
        STOP 'Error in write_histogram'
     END IF
 
-    DO q = 0, q_max
-       WRITE ( unit=his_unit, fmt='(i10,es20.8)') q, h(q)
+    norm = SUM ( h )
+    h    = h / norm
+    DO q = q_min, q_max
+       WRITE ( unit=his_unit, fmt='(f10.0,es20.8)') e(q), h(q)
     END DO
 
     CLOSE ( unit=his_unit )

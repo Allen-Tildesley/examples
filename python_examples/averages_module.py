@@ -67,9 +67,12 @@ def run_begin ( variables ):
     import numpy as np
     global n_avg, headings, subheads, line_fmt, line_width, method, add, run_nrm, run_avg, run_err
 
-    print('Initial values')
+    need_header=True
     for variable in variables:
         if variable.instant:
+            if need_header:
+                print('Initial values')
+                need_header=False
             print(sngl_fmt.format(variable.nam,variable.val))
 
     n_avg = len(variables)
@@ -192,9 +195,12 @@ def run_end ( variables ):
     time_stamp()
     print()
 
-    print('Final values')
+    need_header=True
     for variable in variables:
         if variable.instant:
+            if need_header:
+                print('Final values')
+                need_header=False
             print(sngl_fmt.format(variable.nam,variable.val))
 
 def cke_calc():

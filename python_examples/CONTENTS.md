@@ -169,8 +169,13 @@ test data.
 [error_calc.py](error_calc.py).
 
 ### 9.1 Wang–Landau simulation of chain molecule
-We do not provide a Python version of this example.
-A Fortran version is available.
+[mc_chain_wl_sw.py](mc_chain_wl_sw.py) and [mc_chain_sw_module.py](mc_chain_sw_module.py).
+Also provided is a small program
+[wl_hist.py](wl_hist.py)
+to do post-processing of the histograms produced by the Wang-Landau simulation
+and, for comparison,
+a constant-temperature MC program
+[mc_chain_nvt_sw.py](mc_chain_nvt_sw.py).
 
 ### 9.2 Configuration-biased simulation of chain molecule
 [mc_chain_nvt_cbmc_lj.py](mc_chain_nvt_cbmc_lj.py) and [mc_chain_lj_module.py](mc_chain_lj_module.py).
