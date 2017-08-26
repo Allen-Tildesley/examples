@@ -235,9 +235,10 @@ PROGRAM mc_chain_wl_sw
      flat = histogram_flat ( flatness ) ! Check for flatness
 
      IF ( flat ) THEN ! End of this stage
-        WRITE ( unit=output_unit, fmt='(a,1x,4(a,i0))' ) &
-             & REPEAT('-',111), 'stage ', stage, ' q_min ', q_min, &
-             & ' q_max ', q_max, ' count ', COUNT(h(q_min:q_max)>0.5)
+        WRITE ( unit=output_unit, fmt='(a)' ) REPEAT('-',63)
+        WRITE ( unit=output_unit, fmt='(a,i3,a,3i3)' ) 'stage', stage, &
+             & ' q_min q_max q_count =', q_min, q_max, COUNT(h(q_min:q_max)>0.5)
+        WRITE ( unit=output_unit, fmt='(a)' ) REPEAT('-',63)
         IF ( nstage < 1000 ) WRITE(sav_tag,'(i3.3)') stage       ! Number configuration by stage
         CALL write_cnf_atoms ( cnf_prefix//sav_tag, n, bond, r ) ! Save configuration
         CALL write_histogram ( his_prefix//sav_tag )             ! Save histogram
@@ -261,12 +262,11 @@ CONTAINS
   FUNCTION calc_variables () RESULT ( variables )
     USE averages_module, ONLY : variable_type
     IMPLICIT NONE
-    TYPE(variable_type), DIMENSION(6) :: variables ! The 6 variables listed below
+    TYPE(variable_type), DIMENSION(3) :: variables ! The 3 variables listed below
 
     ! This function returns all variables of interest in an array, for use in the main program
-    ! The output during this simulation is essentially diagnostic, the averages don't mean much
 
-    TYPE(variable_type) :: r_r, c_r, p_r, h_min, h_max, h_avg
+    TYPE(variable_type) :: r_r, c_r, p_r
 
     ! Variables of interest, of type variable_type, containing three components:
     !   %val: the instantaneous value
@@ -281,16 +281,8 @@ CONTAINS
     c_r = variable_type ( nam = 'Crank ratio',  val = c_ratio, instant = .FALSE. )
     p_r = variable_type ( nam = 'Pivot ratio',  val = p_ratio, instant = .FALSE. )
 
-    ! Histogram diagnostics
-    h_min = variable_type ( nam = 'Histogram min', &
-         & val = REAL(MINVAL(h(q_min:q_max))), instant = .FALSE. )
-    h_max = variable_type ( nam = 'Histogram max', &
-         & val = REAL(MAXVAL(h(q_min:q_max))), instant = .FALSE. )
-    h_avg = variable_type ( nam = 'Histogram avg', &
-         & val = REAL(SUM(h(q_min:q_max)))/REAL(q_max+1-q_min), instant = .FALSE. )
-
     ! Collect together for averaging
-    variables = [ r_r, c_r, p_r, h_min, h_max, h_avg ]
+    variables = [ r_r, c_r, p_r ]
 
   END FUNCTION calc_variables
 

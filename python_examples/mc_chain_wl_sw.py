@@ -30,7 +30,6 @@ def calc_variables ( ):
     """Calculates all variables of interest.
 
     They are collected and returned as a list, for use in the main program.
-    The output during this simulation is essentially diagnostic, the averages don't mean much
     """
 
     import numpy as np
@@ -49,13 +48,8 @@ def calc_variables ( ):
     c_r = VariableType ( nam = 'Crank ratio',  val = c_ratio, instant = False )
     p_r = VariableType ( nam = 'Pivot ratio',  val = p_ratio, instant = False )
 
-    # Histogram diagnostics
-    h_min = VariableType ( nam = 'Histogram min', val = np.amin(h[q_min:q_max+1]).astype(np.float_), instant = False )
-    h_max = VariableType ( nam = 'Histogram max', val = np.amax(h[q_min:q_max+1]).astype(np.float_), instant = False )
-    h_avg = VariableType ( nam = 'Histogram avg', val = np.average(h[q_min:q_max+1]), instant = False )
-
     # Collect together into a list for averaging
-    return [ r_r, c_r, p_r, h_min, h_max, h_avg ]
+    return [ r_r, c_r, p_r ]
 
 def update_histogram(q,q_min,q_max):
     """Updates the probability histogram of (negative) energies
@@ -320,9 +314,10 @@ while True: # Loop over blocks
     flat = histogram_flat ( flatness, q_min, q_max, h ) # Check for flatness
 
     if flat: # End of this stage
-        print("{:111}{:>6}{:3d}{:>7}{:3d}{:>7}{:3d}{:>7}{:3d}".format(
-            '-'*111,'stage',stage,'q_min',q_min,'q_max',q_max,
-            'count',np.count_nonzero(h[q_min:q_max+1]>0.5)))
+        print("{:63}".format('-'*63))
+        print("{:5}{:3d}{:22}{:3d}{:3d}{:3d}".format(
+            'stage',stage,' q_min q_max q_count =',q_min,q_max,np.count_nonzero(h[q_min:q_max+1]>0.5)))
+        print("{:63}".format('-'*63))
         sav_tag = str(stage).zfill(3) if stage<1000 else 'sav' # Number configuration by stage
         write_cnf_atoms ( cnf_prefix+sav_tag, n, bond, r )     # Save configuration
         write_histogram ( his_prefix+sav_tag )                 # Save histogram
