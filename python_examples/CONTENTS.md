@@ -144,8 +144,7 @@ We do not provide a Python version of this example.
 A Fortran version is available.
 
 ### 7.3 Replica exchange, by message-passing
-We do not provide a Python version of this example.
-A Fortran version is available.
+[mc_nvt_lj_re.py](mc_nvt_lj_re.py) and [mc_lj_module.py](mc_lj_module.py).
 
 ### 8.1 Calculating the pair distribution function
 [pair_distribution.py](pair_distribution.py).

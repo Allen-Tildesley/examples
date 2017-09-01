@@ -232,8 +232,11 @@ Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    
 ------                 | -----     | ----- | -------    | -------  | -------    | -------  | --------
 Thol et al (2016) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630  
 `mc_nvt_lj.py`         | 0.75      | 1.00  | -3.3315(7) | 0.653(4) | -3.7331(7) | 0.352(4) |  2.274(9)
+`mc_nvt_lj_re`&sharp;  | 0.75      | 1.00  | -3.3314(4) | 0.652(2) | -3.7330(4) | 0.351(2) |  2.272(5)
 `mc_npt_lj.py`         | 0.7510(6) | 1.00  | -3.339(4)  | 0.69     | -3.741(5)  | 0.360(2) |
 `mc_zvt_lj.py`         | 0.7497(3) | 1.00  | -3.329(2)  | 0.656(4) | -3.731(2)  | 0.355(4) |
+
+&sharp; The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
 
 The measured pressures _P_ (c) are systematically a little low.
 This reflects the approximate nature of
@@ -294,6 +297,71 @@ the pressure correction is &Delta; _P_&asymp;-0.23.
 However, this assumes _g(R<sub>c</sub>)_=1,
 whereas actually _g(R<sub>c</sub>)_&asymp; 0.95 at this density.
 Hence the correction is too large by approximately 0.01.
+
+### Replica exchange program
+The `mc_nvt_lj_re.py` program uses MPI to handle communications between processes.
+Here are some notes on the way the code is written.
+
+We have used the [mpi4py](http://mpi4py.scipy.org) package of Python bindings to MPI.
+To run this example you will have to install this package,
+with a compatible implementation of MPI.
+We have tested it with Open MPI.
+Other Python packages which interface with MPI
+and other implementations of MPI itself are, of course, available.
+
+We have adopted the simple approach of communicating single Python objects
+using the supplied methods with lowercase names such as `bcast`, `send`, `recv`, `allreduce`,
+which employ _pickle_ behind the scenes.
+NumPy arrays are exchanged as buffers, using the uppercase-named method `Sendrecv_replace`,
+with automatic detection of data type and length.
+This should be faster, but we have not made much effort to optimize the speed.
+The MPI `Init` and `Finalize` functions are not explicitly called:
+mpi4py invokes them automatically when the MPI module is loaded, and when the Python process exits, respectively.
+
+We have only attempted to handle the most obvious errors at the start of the program,
+such as missing configuration files and incorrect user data,
+by closing down all the processes.
+A production code would take more care to handle exceptions during the run.
+Unhandled exceptions could possibly lead to processes hanging or becoming deadlocked,
+so you should be aware of the dangers in running this example.
+
+In the program, all processes write to their standard output, but the default in MPI is
+for all this output to be collated (in an undefined order) and written to a single channel. Testing
+was carried out using Open MPI, which allows the program to be run with a command line which includes
+an option for each process to write to separate files, similar to the following:
+```
+mpiexec -n 4 -output-filename out ./mc_nvt_lj_re.py < mc.inp
+```
+whereby the standard output files are named `out##`, the `##` part being determined by the process rank.
+If your implementation does not have this option, you should edit the code to explicitly open a file for
+standard output, with a process-rank-dependent name, and associate the output channel with it.
+
+The `mc_nvt_lj_re.py` program conducts runs at several temperatures: four were used in testing.
+The default program values include _T_=1.0, which is reported above, and here is the complete set,
+with expected values from the Thol et al (2016) equation of state (f) corrected for cutoff.
+As usual the program employed the cut (but not shifted) potential.
+All runs are for density &rho;=0.75, _N_=256, as usual;
+default parameters are used, except for the run lengths,
+which are set to 10 blocks of 10000 steps, as per the Fortran version.
+At the lowest temperature, the full-potential system would lie in the coexistence region,
+and the estimated pressure is negative.
+
+Source                 | _T_    | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)   | _C<sub>v</sub>_ (f)
+------                 | -----  | -------    | -------  | -------    | -------   | --------
+Thol et al (2016) (f)  | 0.8772 | -3.6001    | 0.1942   | -4.0017    | -0.1070   |  2.3081  
+`mc_nvt_lj_re`         | 0.8772 | -3.6130(6) | 0.141(3) | -4.0146(6) | -0.160(3) |  2.310(7)
+Thol et al (2016) (f)  | 1.0000 | -3.3197    | 0.7008   | -3.7212    |  0.3996   |  2.2630  
+`mc_nvt_lj_re`         | 1.0000 | -3.3314(4) | 0.652(2) | -3.7330(4) |  0.351(2) |  2.272(5)
+Thol et al (2016) (f)  | 1.1400 | -3.0055    | 1.2571   | -3.4070    |  0.9559   |  2.2278  
+`mc_nvt_lj_re`         | 1.1400 | -3.0155(4) | 1.211(2) | -3.4171(4) |  0.910(2) |  2.224(4)
+Thol et al (2016) (f)  | 1.2996 | -2.6523    | 1.8667   | -3.0539    |  1.5655   |  2.1989  
+`mc_nvt_lj_re`         | 1.2996 | -2.6620(7) | 1.819(3) | -3.0636(7) |  1.518(3) |  2.206(6)
+
+The above (default) temperatures are chosen to give swap acceptance ratios all fairly close to 20% here
+(of course, the set of temperatures, and all other run parameters, may be chosen by the user in a
+JSON list contained in the input file).
+It should be noted that process `m` reports the swap acceptance ratio for exchanges with process `m+1`,
+and the output file for the process with highest rank will report a zero swap ratio.
 
 ## Lees-Edwards program
 The program `md_nvt_lj_le.py` is intended to illustrate

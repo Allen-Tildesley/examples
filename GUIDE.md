@@ -331,23 +331,51 @@ whereas actually _g(R<sub>c</sub>)_&asymp; 0.95 at this density.
 Hence the correction is too large by approximately 0.01.
 
 ### Replica exchange program
+The `mc_nvt_lj_re` program uses MPI to handle communications between processes.
+Here are some notes on the way the code is written.
+
+We have only attempted to handle the most obvious errors at the start of the program,
+such as missing configuration files and incorrect user data,
+by closing down all the processes.
+A production code would take more care to handle exceptions during the run.
+Unhandled exceptions could possibly lead to processes hanging or becoming deadlocked,
+so you should be aware of the dangers in running this example.
+
+In the program, all processes write to their standard output `output_unit`, but the default in MPI is
+for all this output to be collated (in an undefined order) and written to a single channel. Testing
+was carried out using Open MPI, which allows the program to be run with a command line which includes
+an option for each process to write to separate files, similar to the following:
+```
+mpirun -np 4 -output-filename out ./mc_nvt_lj_re < mc.inp
+```
+whereby the standard output files are named `out##`, the `##` part being determined by the process rank.
+If your implementation does not have this option, you should edit the code to explicitly open a file for
+standard output, with a process-rank-dependent name, and associate the `output_unit` with it.
+
 The `mc_nvt_lj_re` program conducts runs at several temperatures: four were used in testing.
 The default program values include _T_=1.0, which is reported above, and here is the complete set,
 with expected values from the Thol et al (2016) equation of state (f) corrected for cutoff.
 As usual the program employed the cut (but not shifted) potential.
-All runs are for density &rho;=0.75.
-At the lowest temperature, the full-potential system would lie in the coexistence region.
+All runs are for density &rho;=0.75, _N_=256, as usual.
+At the lowest temperature, the full-potential system would lie in the coexistence region,
+and the estimated pressure is negative.
 
 Source                 | _T_    | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)   | _C<sub>v</sub>_ (f)
 ------                 | -----  | -------   | -------  | -------   | -------   | --------
 Thol et al (2016) (f)  | 0.8772 | -3.6001   | 0.1942   | -4.0017   | -0.1070   |  2.3081  
 `mc_nvt_lj_re`         | 0.8772 | -3.613(1) | 0.140(2) | -4.014(1) | -0.161(2) |  2.31(1)
-Thol et al (2016) (f)  | 1.0000 | -3.3197   | 0.7008   | -3.7212   | 0.3996    |  2.2630  
+Thol et al (2016) (f)  | 1.0000 | -3.3197   | 0.7008   | -3.7212   |  0.3996   |  2.2630  
 `mc_nvt_lj_re`         | 1.0000 | -3.332(1) | 0.648(2) | -3.734(1) |  0.347(2) |  2.258(4)
 Thol et al (2016) (f)  | 1.1400 | -3.0055   | 1.2571   | -3.4070   |  0.9559   |  2.2278  
 `mc_nvt_lj_re`         | 1.1400 | -3.016(1) | 1.212(2) | -3.417(1) |  0.911(2) |  2.233(4)
 Thol et al (2016) (f)  | 1.2996 | -2.6523   | 1.8667   | -3.0539   |  1.5655   |  2.1989  
 `mc_nvt_lj_re`         | 1.2996 | -2.662(1) | 1.820(3) | -3.063(1) |  1.519(3) |  2.214(5)
+
+The above (default) temperatures are chosen to give swap acceptance ratios all fairly close to 20% here
+(of course, the set of temperatures, and all other run parameters, may be chosen by the user in a
+namelist contained in the input file).
+It should be noted that process `m` reports the swap acceptance ratio for exchanges with process `m+1`,
+and the output file for the process with highest rank will report a zero swap ratio.
 
 ## Lees-Edwards programs
 The programs `md_nvt_lj_le` and `md_nvt_lj_llle` are intended to illustrate:

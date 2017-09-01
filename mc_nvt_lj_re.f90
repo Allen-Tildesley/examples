@@ -245,9 +245,9 @@ PROGRAM mc_nvt_lj_re
 
         x_ratio = 0.0
 
-        DO updown = 1, 2 ! Loop to look one way then the other
+        DO updown = 0, 1 ! Loop to look one way then the other
 
-           IF ( MOD(m,2) == MOD(updown,2) ) THEN ! Look up, partner is m+1
+           IF ( MOD(m,2) == updown ) THEN ! Look up, partner is m+1
 
               IF ( m+1 < nproc ) THEN ! Ensure partner exists
                  other_beta = every_beta(m+1) ! We already know the other beta
