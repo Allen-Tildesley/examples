@@ -557,9 +557,9 @@ CONTAINS
        STOP 'Error in random_rotate_quaternion'
     END IF
 
-    axis = random_vector ( )                ! Choose random unit vector
-    CALL RANDOM_NUMBER ( zeta )             ! Random number between 0 and 1
-    angle = ( 2.0*angle - 1.0 ) * angle_max ! Uniform random angle in desired range
+    axis = random_vector ( )               ! Choose random unit vector
+    CALL RANDOM_NUMBER ( zeta )            ! Random number between 0 and 1
+    angle = ( 2.0*zeta - 1.0 ) * angle_max ! Uniform random angle in desired range
 
     e = rotate_quaternion ( angle, axis, old ) ! General rotation function
 
