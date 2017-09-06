@@ -39,14 +39,14 @@ PROGRAM mc_nvt_poly_lj
   ! For example, for Lennard-Jones, sigma = 1, epsilon = 1
 
   ! Despite the program name, there is nothing here specific to Lennard-Jones
-  ! The model is defined in mc_module
+  ! The model (including the cutoff distance) is defined in mc_module
 
   USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               config_io_module, ONLY : read_cnf_mols, write_cnf_mols
   USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
-  USE               maths_module,     ONLY : metropolis, random_rotate_quaternion, random_translate_vector
+  USE               maths_module,     ONLY : metropolis, random_rotate_quaternion, random_translate_vector, q_to_a
   USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                                     potential_1, potential, n, r, e, potential_type
+       &                                     potential_1, potential, n, na, db, r, e, d, potential_type
 
   IMPLICIT NONE
 
@@ -55,35 +55,34 @@ PROGRAM mc_nvt_poly_lj
   REAL :: dr_max      ! Maximum MC translational displacement
   REAL :: de_max      ! Maximum MC rotational displacement
   REAL :: temperature ! Specified temperature
-  REAL :: r_cut       ! Potential cutoff distance
 
   ! Composite interaction = pot & vir & ovr variables
   TYPE(potential_type) :: total, partial_old, partial_new
 
-  INTEGER              :: blk, stp, i, nstep, nblock, moves, ioerr
-  REAL                 :: delta, m_ratio
-  REAL, DIMENSION(3)   :: ri
-  REAL, DIMENSION(0:3) :: ei
+  INTEGER               :: blk, stp, i, a, nstep, nblock, moves, ioerr
+  REAL                  :: delta, m_ratio
+  REAL, DIMENSION(3)    :: ri
+  REAL, DIMENSION(0:3)  :: ei
+  REAL, DIMENSION(3,3)  :: ai
+  REAL, DIMENSION(na,3) :: di
 
   CHARACTER(len=4), PARAMETER :: cnf_prefix = 'cnf.'
   CHARACTER(len=3), PARAMETER :: inp_tag    = 'inp'
   CHARACTER(len=3), PARAMETER :: out_tag    = 'out'
   CHARACTER(len=3)            :: sav_tag    = 'sav' ! May be overwritten with block number
 
-  NAMELIST /nml/ nblock, nstep, temperature, r_cut, dr_max, de_max
+  NAMELIST /nml/ nblock, nstep, temperature, dr_max, de_max
 
   WRITE ( unit=output_unit, fmt='(a)' ) 'mc_nvt_poly_lj'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, polyatomic molecule'
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Simulation uses cut-and-shifted potential'
   CALL introduction
 
   CALL RANDOM_SEED () ! Initialize random number generator
 
   ! Set sensible default run parameters for testing
   nblock      = 10
-  nstep       = 10000
+  nstep       = 20000
   temperature = 1.0
-  r_cut       = 2.5
   dr_max      = 0.05
   de_max      = 0.05
 
@@ -101,7 +100,6 @@ PROGRAM mc_nvt_poly_lj
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of blocks',          nblock
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of steps per block', nstep
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Temperature',               temperature
-  WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Potential cutoff distance', r_cut
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum r displacement',    dr_max
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Maximum e displacement',    de_max
 
@@ -110,13 +108,21 @@ PROGRAM mc_nvt_poly_lj
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of molecules',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density of molecules',  REAL(n) / box**3
-  CALL allocate_arrays ( box, r_cut )
+  CALL allocate_arrays ( box )
   CALL read_cnf_mols ( cnf_prefix//inp_tag, n, box, r, e ) ! Second call is to get r and e
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
 
+  ! Calculate all bond vectors
+  DO i = 1, n ! Loop over molecules
+     ai = q_to_a ( e(:,i) ) ! Rotation matrix for i
+     DO a = 1, na ! Loop over all atoms
+        d(:,a,i) = MATMUL ( db(:,a), ai ) ! NB: equivalent to ai_T*db, ai_T=transpose of ai
+     END DO ! End loop over all atoms
+  END DO ! End loop over molecules
+
   ! Initial energy and overlap check
-  total = potential ( box, r_cut )
+  total = potential ( box )
   IF ( total%ovr ) THEN
      WRITE ( unit=error_unit, fmt='(a)') 'Overlap in initial configuration'
      STOP 'Error in mc_nvt_poly_lj'
@@ -136,7 +142,7 @@ PROGRAM mc_nvt_poly_lj
 
         DO i = 1, n ! Begin loop over atoms
 
-           partial_old = potential_1 ( r(:,i), e(:,i), i, box, r_cut ) ! Old molecule potential, virial, etc
+           partial_old = potential_1 ( r(:,i), d(:,:,i), i, box ) ! Old molecule potential, virial, etc
 
            IF ( partial_old%ovr ) THEN ! should never happen
               WRITE ( unit=error_unit, fmt='(a)') 'Overlap in current configuration'
@@ -146,8 +152,12 @@ PROGRAM mc_nvt_poly_lj
            ri = random_translate_vector ( dr_max/box, r(:,i) ) ! Trial move to new position (in box=1 units)
            ri = ri - ANINT ( ri )                              ! Periodic boundary correction
            ei = random_rotate_quaternion ( de_max, e(:,i) )    ! Trial rotation
+           ai = q_to_a ( ei ) ! Rotation matrix for i
+           DO a = 1, na ! Loop over all atoms
+              di(:,a) = MATMUL ( db(:,a), ai ) ! NB: equivalent to ai_T*db, ai_T=transpose of ai
+           END DO ! End loop over all atoms
 
-           partial_new = potential_1 ( ri, ei, i, box, r_cut ) ! New molecule potential, virial etc
+           partial_new = potential_1 ( ri, di, i, box ) ! New molecule potential, virial etc
 
            IF ( .NOT. partial_new%ovr ) THEN ! Test for non-overlapping configuration
 
@@ -155,10 +165,11 @@ PROGRAM mc_nvt_poly_lj
               delta = delta / temperature               ! Divide by temperature
 
               IF ( metropolis ( delta ) ) THEN ! Accept Metropolis test
-                 total  = total + partial_new - partial_old ! Update potential energy
-                 r(:,i) = ri                                ! Update position
-                 e(:,i) = ei                                ! Update quaternion
-                 moves  = moves + 1                         ! Increment move counter
+                 total    = total + partial_new - partial_old ! Update potential energy
+                 r(:,i)   = ri                                ! Update position
+                 e(:,i)   = ei                                ! Update quaternion
+                 d(:,:,i) = di                                ! Update bond vectors
+                 moves    = moves + 1                         ! Increment move counter
               END IF ! End accept Metropolis test
 
            END IF ! End test for non-overlapping configuration
@@ -195,12 +206,11 @@ CONTAINS
     ! This routine calculates all variables of interest and (optionally) writes them out
     ! They are collected together in the variables array, for use in the main program
 
-    ! In this example we simulate using the cut-and-shifted potential only
-    ! The values of < p_s >, < e_s > and density should be consistent (for this potential)
+    ! In this example we simulate using the shifted-force potential only
+    ! The values of < p_sf >, < e_sf > and density should be consistent (for this potential)
     ! There are no long-range or delta corrections
-    ! The value of the cut (but not shifted) potential is not used, in this example
 
-    TYPE(variable_type) :: m_r, e_s, p_s
+    TYPE(variable_type) :: m_r, e_sf, p_sf
     REAL                :: vol, rho
 
     ! Preliminary calculations
@@ -218,16 +228,16 @@ CONTAINS
     ! Move acceptance ratio
     m_r = variable_type ( nam = 'Move ratio', val = m_ratio, instant = .FALSE. )
 
-    ! Internal energy per molecule (cut-and-shifted potential)
-    ! Ideal gas contribution (assuming nonlinear molecules) plus total (cut-and-shifted) PE divided by N
-    e_s = variable_type ( nam = 'E/N cut&shift', val = 3.0*temperature + total%pot/REAL(n) )
+    ! Internal energy per molecule (shifted-force potential)
+    ! Ideal gas contribution (assuming nonlinear molecules) plus total PE divided by N
+    e_sf = variable_type ( nam = 'E/N shifted force', val = 3.0*temperature + total%pot/REAL(n) )
 
-    ! Pressure (cut-and-shifted potential)
+    ! Pressure (shifted-force potential)
     ! Ideal gas contribution plus total virial divided by V
-    p_s = variable_type ( nam = 'P cut&shift', val = rho*temperature + total%vir/vol )
+    p_sf = variable_type ( nam = 'P shifted force', val = rho*temperature + total%vir/vol )
 
     ! Collect together for averaging
-    variables = [ m_r, e_s, p_s ]
+    variables = [ m_r, e_sf, p_sf ]
 
   END FUNCTION calc_variables
 

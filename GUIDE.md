@@ -789,7 +789,7 @@ composed of Lennard-Jones interaction sites.
 For simplicity the sites are taken to be identical, although the program is easily generalized.
 Molecular orientations are represented by quaternions,
 which are used to calculate the rotation matrix
-and hence the LJ site positions.
+and hence the interaction site positions.
 
 We test this with the three-site model of orthoterphenyl, a fragile glassformer,
 described in the following publications amongst others.
@@ -799,46 +799,54 @@ described in the following publications amongst others.
 * S Mossa, E La Nave, HE Stanley, C Donati, F Sciortino, P Tartaglia, _Phys Rev E,_ __65,__ 041205 (2002)
 * E La Nave, S Mossa, F Sciortino, P Tartaglia, _J Chem Phys,_ __120,__ 6128 (2004)
 
+We compare with the results of Mossa et al (2002).
 The sites are arranged at the vertices of an isosceles triangle with bond angle 75 degrees,
-LJ parameters &epsilon;/_k_<sub>B</sub> = 600K
-or &epsilon; = 5 kJ mol<sup>-1</sup> to a good approximation,
+LJ parameters &epsilon; = 5.276 kJ mol<sup>-1</sup>,
 &sigma;=0.483nm,
-and bond lengths equal to &sigma;.
+and two equal bonds of length &sigma;.
+The program employs the usual reduced units based on &epsilon; and &sigma;
+and in these units the potential cutoff of Mossa et al (2002) is _R_<sub>c</sub>=2.612;
+the pair potential is Lennard-Jones with a shifted-force correction term, linear in _r_,
+to make the potential and its derivative vanish at _r_=_R_<sub>c</sub>.
+Apart from the temperatures,
+default program parameters were used throughout the tests.
 
 Tests were performed at &rho;=0.32655 which is equivalent to &rho;<sub>4</sub>=1.108g cm<sup>-3</sup>
 in Mossa et al (2002).
-Comparisons of potential energy (_PE_=_E_-3 _T_ converted to kJ/mol with a factor 5)
-were made with the fit given by eqn (6) of that paper.
+Comparisons of potential energy (_PE_=_E_-3 _T_ converted to kJ/mol with a factor 5.276)
+were made with the fit given by eqn (23) of that paper.
+Note that &epsilon;/k<sub>B</sub>&asymp;635 K.
 
-_T_   | _E_       | _P_      | _T_ (K) | _PE_ (kJ/mol) | eqn (6)
------ | -----     | -----    | -----   | -----         | -----
-0.5   | -14.30(1) | 1.63(3)  |  300    | -79.00(5)     | -77.52
-1.0   | -11.21(1) | 5.52(3)  |  600    | -71.05(5)     | -68.55
-1.5   | -8.262(7) | 8.95(2)  |  900    | -63.81(4)     | -61.19
-2.0   | -5.52(1)  | 11.86(3) | 1200    | -57.60(5)     | -54.69
+_T_   | _E_        | _P_       | _T_ (K) | _PE_ (kJ/mol) | _PE_ (kJ/mol) eqn (23)
+----- | -----      | -----     | -----   | -----         | -----
+0.5   | -12.993(3) |  1.773(8) |  317    | -76.47(2)     | -76.945
+1.0   | -9.817(9)  |  5.86(2)  |  635    | -67.62(5)     | -67.634
+1.5   | -6.84(1)   |  9.38(4)  |  952    | -59.83(5)     | -60.011
+2.0   | -4.07(1)   | 12.37(4)  | 1270    | -53.13(5)     | -53.265
 
-Exact agreement is not expected because the potential of Mossa et al (2002) has a different
-cutoff correction, but the agreement is reasonable.
-A second set of tests were performed at _T_=0.63333=380K
-at the specified densities &rho;<sub>1</sub>, &hellip; &rho;<sub>5</sub>.
+A second set of tests was performed at _T_=0.6&asymp;380K
+at the specified densities &rho;<sub>1</sub>, &hellip; &rho;<sub>5</sub> of Mossa et al (2002).
 Here the excess pressure (_P_(ex)=_P_-&rho;_T_ converted to MPa
-with a factor 73.54 based on the values of &epsilon; and &sigma;)
+with a factor 77.75 based on the values of &epsilon; and &sigma;)
 is compared with the fit given by eqn (28) and the coefficients in Table III of Mossa et al (2002).
 NB the volumes to insert into the equation are those of their Table I,
 which are specific to their system size.
+In addition their eqn (29) with coefficients in Table V is a fit to their potential energy,
+which we calculate from the simulation as described above.
 
-Id    | &rho;   | _E_        | _P_     | _P_(ex) (MPa) | eqn (28)
------ | -----   | -----      | -----   | -----         | -----
-1     | 0.30533 | -12.737(7) | 0.35(2) | 12(2)         | 19.077
-2     | 0.31240 | -13.025(7) | 0.99(2) | 58(2)         | 60.143
-3     | 0.31918 | -13.293(8) | 1.66(2) | 107(2)        | 112.798
-4     | 0.32655 | -13.50(1)  | 2.60(2) | 176(1)        | 177.222
-5     | 0.33451 | -13.65(1)  | 3.95(2) | 274(1)        | 253.510
+Id    | &rho;   | _E_        | _P_     | _P_(ex) (MPa) | _P_(ex) (MPa) eqn (28) | _PE_ (kJ/mol) | _PE_ (kJ/mol) eqn (29)
+----- | -----   | -----      | -----   | -----         | -----                  | ------        | ------
+1     | 0.30533 | -11.625(4) | 0.45(1) | 20.7(7)       | 19.077                 | -70.83(2)     | -70.818
+2     | 0.31240 | -11.914(6) | 1.01(2) | 64(2)         | 60.143                 | -72.36(3)     | -72.289
+3     | 0.31918 | -12.143(5) | 1.74(1) | 120(2)        | 112.798                | -73.56(3)     | -73.601
+4     | 0.32655 | -12.400(4) | 2.53(1) | 181(1)        | 177.222                | -74.92(2)     | -74.886
+5     | 0.33451 | -12.487(4) | 3.84(1) | 283(1)        | 253.510                | -75.38(2)     | -75.825
 
-Although not perfect at the ends of the range, the agreement is not bad;
-once more, the difference in cutoff correction should be borne in mind.
-Note that Mossa et al (2002) used a different value
-&epsilon;=5.276 kJ/mol which, with their cutoff term, gives a well depth 4.985 kJ/mol.
+In making these comparisons,
+our default run length (10 blocks of 20000 sweeps each) should be borne in mind,
+since this system can show sluggish behaviour.
+The MD simulations of Mossa et al (2002) are reported to extend to several hundred nanoseconds
+(of order 10<sup>7</sup> MD timesteps) at the lowest temperatures.
 
 ## DPD program
 For the `dpd` example, we recommend generating an initial configuration

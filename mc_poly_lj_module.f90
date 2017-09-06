@@ -38,21 +38,26 @@ MODULE mc_module
   INTEGER,                                PUBLIC :: n ! number of molecules
   REAL,    DIMENSION(:,:),   ALLOCATABLE, PUBLIC :: r ! centre of mass positions (3,n)
   REAL,    DIMENSION(:,:),   ALLOCATABLE, PUBLIC :: e ! quaternions (0:3,n)
+  REAL,    DIMENSION(:,:,:), ALLOCATABLE, PUBLIC :: d ! bond vectors (0:3,na,n)
 
-  ! Private data
-  ! Bond vectors in body-fixed frame
+  ! Bond vectors in body-fixed frame (na and db are public)
   ! Isosceles triangle, 3 sites, with unit bond length and bond angle alpha, which we set to 75 degrees here
-  REAL,                  PARAMETER :: pi = 4.0*atan(1.0)
-  REAL,                  PARAMETER :: alpha = 75.0 * pi / 180.0, alpha2 = alpha / 2.0
-  INTEGER,               PARAMETER :: na = 3
-  REAL, DIMENSION(3,na), PARAMETER :: db = RESHAPE ( [ &
+  REAL,                  PARAMETER         :: pi = 4.0*ATAN(1.0)
+  REAL,                  PARAMETER         :: alpha = 75.0 * pi / 180.0, alpha2 = alpha / 2.0
+  INTEGER,               PARAMETER, PUBLIC :: na = 3
+  REAL, DIMENSION(3,na), PARAMETER, PUBLIC :: db = RESHAPE ( [ &
        & -SIN(alpha2), 0.0,    -COS(alpha2)/3.0, & 
        &  0.0,         0.0, 2.0*COS(alpha2)/3.0, &
        &  SIN(alpha2), 0.0,    -COS(alpha2)/3.0 ], [3,na] )
 
+  ! Cutoff distance and force-shift parameters (all private) chosen as per the reference:
+  ! S Mossa, E La Nave, HE Stanley, C Donati, F Sciortino, P Tartaglia, Phys Rev E, 65, 041205 (2002)
+  REAL, PARAMETER :: r_cut   = 2.612 ! in sigma=1 units, where r_cut = 1.2616 nm, sigma = 0.483 nm
+  REAL, PARAMETER :: sr_cut  = 1.0/r_cut, sr_cut6 = sr_cut**6, sr_cut12 = sr_cut6**2
+  REAL, PARAMETER :: lambda1 = 4.0*(7.0*sr_cut6-13.0*sr_cut12)
+  REAL, PARAMETER :: lambda2 = -24.0*(sr_cut6-2.0*sr_cut12)*sr_cut
+  
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
-
-  REAL, PARAMETER :: diameter = 2.0 * SQRT ( MAXVAL ( SUM(db**2,dim=1) ) ) ! Molecular diameter
 
   ! Public derived type
   TYPE, PUBLIC :: potential_type   ! A composite variable for interactions comprising
@@ -90,9 +95,10 @@ CONTAINS
     IMPLICIT NONE
 
     INTEGER :: i
+    REAL    :: diameter
 
     WRITE ( unit=output_unit, fmt='(a)' ) 'Lennard-Jones potential'
-    WRITE ( unit=output_unit, fmt='(a)' ) 'Cut-and-shifted'
+    WRITE ( unit=output_unit, fmt='(a)' ) 'Cut-and-force-shifted'
     WRITE ( unit=output_unit, fmt='(a)' ) 'Diameter, sigma = 1'    
     WRITE ( unit=output_unit, fmt='(a)' ) 'Well depth, epsilon = 1'  
 
@@ -100,7 +106,12 @@ CONTAINS
     DO i = 1, na ! Loop over atoms
        WRITE ( unit=output_unit, fmt='(a,i1,t40,3f15.6)' ) 'Body-fixed atom vector ', i, db(:,i)
     END DO ! End loop over atoms
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Molecular diameter ', diameter
+
+    diameter = 2.0 * SQRT ( MAXVAL ( SUM(db**2,dim=1) ) )
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Molecular diameter', diameter
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'r_cut', r_cut
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Force-shift lambda1', lambda1
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Force-shift lambda2', lambda2
 
   END SUBROUTINE introduction
 
@@ -111,15 +122,15 @@ CONTAINS
 
   END SUBROUTINE conclusion
 
-  SUBROUTINE allocate_arrays ( box, r_cut )
+  SUBROUTINE allocate_arrays ( box )
     IMPLICIT NONE
     REAL, INTENT(in) :: box   ! simulation box length
-    REAL, INTENT(in) :: r_cut ! potential cutoff distance
 
-    REAL :: rm_cut_box
+    REAL :: rm_cut_box, diameter
 
-    ALLOCATE ( r(3,n), e(0:3,n) )
+    ALLOCATE ( r(3,n), e(0:3,n), d(3,na,n) )
 
+    diameter   = 2.0 * SQRT ( MAXVAL ( SUM(db**2,dim=1) ) )
     rm_cut_box = ( r_cut+diameter ) / box
     IF ( rm_cut_box > 0.5 ) THEN
        WRITE ( unit=error_unit, fmt='(a,f15.6)') 'rm_cut/box too large ', rm_cut_box
@@ -131,15 +142,14 @@ CONTAINS
   SUBROUTINE deallocate_arrays
     IMPLICIT NONE
 
-    DEALLOCATE ( r, e )
+    DEALLOCATE ( r, e, d )
 
   END SUBROUTINE deallocate_arrays
 
-  FUNCTION potential ( box, r_cut ) RESULT ( total )
+  FUNCTION potential ( box ) RESULT ( total )
     IMPLICIT NONE
     TYPE(potential_type) :: total ! Returns a composite of pot, vir etc
     REAL, INTENT(in)     :: box   ! Simulation box length
-    REAL, INTENT(in)     :: r_cut ! Potential cutoff distance
 
     ! total%pot is the nonbonded cut-and-shifted potential energy for whole system
     ! total%vir is the corresponding virial for whole system
@@ -150,8 +160,13 @@ CONTAINS
     TYPE(potential_type) :: partial ! Molecular contribution to total
     INTEGER              :: i
 
-    IF ( SIZE(r,dim=2)  /= n ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+    IF ( ANY ( SHAPE(r)  /= [3,n] ) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,3i15)' ) 'Array bounds error for r', n, SHAPE(r)
+       STOP 'Error in potential'
+    END IF
+
+    IF ( ANY ( SHAPE(d)  /= [3,na,n] ) ) THEN ! should never happen
+       WRITE ( unit=error_unit, fmt='(a,5i15)' ) 'Array bounds error for d', na, n, SHAPE(d)
        STOP 'Error in potential'
     END IF
 
@@ -159,7 +174,7 @@ CONTAINS
 
     DO i = 1, n - 1
 
-       partial = potential_1 ( r(:,i), e(:,i), i, box, r_cut, gt )
+       partial = potential_1 ( r(:,i), d(:,:,i), i, box, gt )
 
        IF ( partial%ovr ) THEN
           total%ovr = .TRUE. ! Overlap detected
@@ -174,16 +189,14 @@ CONTAINS
 
   END FUNCTION potential
 
-  FUNCTION potential_1 ( ri, ei, i, box, r_cut, j_range ) RESULT ( partial )
-    USE maths_module, ONLY : q_to_a
+  FUNCTION potential_1 ( ri, di, i, box, j_range ) RESULT ( partial )
     IMPLICIT NONE
-    TYPE(potential_type)                :: partial ! Returns a composite of pot, vir etc for given molecule
-    REAL,    DIMENSION(3),   INTENT(in) :: ri      ! Coordinates of molecule of interest
-    REAL,    DIMENSION(0:3), INTENT(in) :: ei      ! Quaternion of molecule of interest
-    INTEGER,                 INTENT(in) :: i       ! Index of molecule of interest
-    REAL,                    INTENT(in) :: box     ! Simulation box length
-    REAL,                    INTENT(in) :: r_cut   ! Potential cutoff distance
-    INTEGER, OPTIONAL,       INTENT(in) :: j_range ! Optional partner index range
+    TYPE(potential_type)                 :: partial ! Returns a composite of pot, vir etc for given molecule
+    REAL,    DIMENSION(3),    INTENT(in) :: ri      ! Coordinates of molecule of interest
+    REAL,    DIMENSION(3,na), INTENT(in) :: di      ! Bond vectors of molecule of interest
+    INTEGER,                  INTENT(in) :: i       ! Index of molecule of interest
+    REAL,                     INTENT(in) :: box     ! Simulation box length
+    INTEGER, OPTIONAL,        INTENT(in) :: j_range ! Optional partner index range
 
     ! partial%pot is the nonbonded cut-and-shifted potential energy of molecule ri,ei with a set of other molecules
     ! partial%vir is the corresponding virial of molecule ri,ei
@@ -194,25 +207,15 @@ CONTAINS
 
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
-    ! Note that this is the shifted LJ potential
+    ! Note that this is the force-shifted LJ potential with a linear smoothing term
+    ! S Mossa, E La Nave, HE Stanley, C Donati, F Sciortino, P Tartaglia, Phys Rev E, 65, 041205 (2002)
 
     INTEGER               :: j, j1, j2, a, b
-    REAL                  :: rm_cut_box, rm_cut_box_sq, r_cut_sq
-    REAL                  :: sr2, sr6, sr12, rij_sq, rab_sq, virab, pot_cut
+    REAL                  :: diameter, rm_cut_box, rm_cut_box_sq, r_cut_sq
+    REAL                  :: sr2, sr6, sr12, rij_sq, rab_sq, virab, rmag
     REAL, DIMENSION(3)    :: rij, rab, fab
-    REAL, DIMENSION(3,na) :: di, dj
-    REAL, DIMENSION(3,3)  :: ai, aj
     REAL, PARAMETER       :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
     TYPE(potential_type)  :: pair
-
-    IF ( SIZE(r,dim=2)  /= n ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
-       STOP 'Error in potential_1'
-    END IF
-    IF ( SIZE(e,dim=2)  /= n ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for e', n, SIZE(e,dim=2)
-       STOP 'Error in potential_1'
-    END IF
 
     IF ( PRESENT ( j_range ) ) THEN
        SELECT CASE ( j_range )
@@ -231,23 +234,12 @@ CONTAINS
        j2 = n
     END IF
 
+    diameter      = 2.0 * SQRT ( MAXVAL ( SUM(db**2,dim=1) ) )
     rm_cut_box    = ( r_cut + diameter ) / box ! Molecular cutoff in box=1 units
     rm_cut_box_sq = rm_cut_box**2              ! squared
     r_cut_sq      = r_cut**2                   ! Potential cutoff squared in sigma=1 units
 
-    ! Calculate potential at cutoff
-    sr2     = 1.0 / r_cut_sq ! in sigma=1 units
-    sr6     = sr2**3
-    sr12    = sr6**2
-    pot_cut = sr12 - sr6
-
     partial = potential_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
-
-    ! Compute all space-fixed atom vectors for molecule i
-    ai = q_to_a ( ei ) ! Rotation matrix for i
-    DO a = 1, na ! Loop over all atoms
-       di(:,a) = MATMUL ( db(:,a), ai ) ! NB: equivalent to ai_T*db, ai_T=transpose of ai
-    END DO ! End loop over all atoms
 
     DO j = j1, j2 ! Loop over selected range of partner molecules
 
@@ -261,18 +253,12 @@ CONTAINS
 
           rij = rij * box ! Now in sigma = 1 units
 
-          ! Compute all space-fixed atom vectors for molecule j
-          aj = q_to_a ( e(:,j) ) ! Rotation matrix for j
-          DO a = 1, na ! Loop over all atoms
-             dj(:,a) = MATMUL ( db(:,a), aj ) ! NB: equivalent to aj_T*db, aj_T=transpose of aj
-          END DO ! End loop over all atoms
-
           ! Double loop over atoms on both molecules
           DO a = 1, na      
              DO b = 1, na
 
-                rab    = rij + di(:,a) - dj(:,b) ! Atom-atom vector, sigma=1 units
-                rab_sq = SUM ( rab**2 )          ! Squared atom-atom separation, sigma=1 units
+                rab    = rij + di(:,a) - d(:,b,j) ! Atom-atom vector, sigma=1 units
+                rab_sq = SUM ( rab**2 )           ! Squared atom-atom separation, sigma=1 units
 
                 IF ( rab_sq < r_cut_sq ) THEN ! Test within potential cutoff 
 
@@ -284,13 +270,13 @@ CONTAINS
                       RETURN               ! Return immediately
                    END IF
 
+                   rmag     = sqrt(rab_sq)
                    sr6      = sr2**3
                    sr12     = sr6**2
-                   pair%pot = sr12 - sr6               ! LJ atom-atom pair potential (cut but not shifted)
-                   virab    = pair%pot + sr12          ! LJ atom-atom pair virial
-                   pair%pot = pair%pot - pot_cut       ! LJ atom-atom pair potential (cut-and-shifted)
-                   fab      = rab * virab * sr2        ! LJ atom-atom pair force
-                   pair%vir = DOT_PRODUCT ( rij, fab ) ! Contribution to molecular virial
+                   pair%pot = 4.0*(sr12-sr6) + lambda1 + lambda2*rmag ! LJ atom-atom pair potential (force-shifted)
+                   virab    = 24.0*(2.0*sr12-sr6 ) - lambda2*rmag     ! LJ atom-atom pair virial
+                   fab      = rab * virab * sr2                       ! LJ atom-atom pair force
+                   pair%vir = DOT_PRODUCT ( rij, fab )                ! Contribution to molecular virial
 
                    partial = partial + pair
 
@@ -305,9 +291,8 @@ CONTAINS
     END DO ! End loop over selected range of partner molecules
 
     ! Include numerical factors
-    partial%pot = partial%pot * 4.0        ! 4*epsilon
-    partial%vir = partial%vir * 24.0 / 3.0 ! 24*epsilon and divide virial by 3
-    partial%ovr = .FALSE.                  ! No overlaps detected (redundant, but for clarity)
+    partial%vir = partial%vir / 3.0 ! Divide virial by 3
+    partial%ovr = .FALSE.           ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential_1
 
