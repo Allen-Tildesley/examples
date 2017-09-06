@@ -56,6 +56,7 @@ The `SConstruct` file may need to be edited
 such as `fftw3` and `lapack` on your system).
 Then, simply type `scons` to build each full example program in its own directory.
 A few examples consist of individual routines or modules,
+rather than working programs,
 so there is no need to build them.
 
 The build process for the Fortran examples has been tested using SCons v2.5.1
@@ -66,6 +67,15 @@ Bear in mind that, with Fortran, it is usually essential to compile any
 modules that are used by the main program, before compiling the main program itself.
 Take a look at the `SConstruct` file in any case,
 as it shows the file dependencies for each example.
+Also bear in mind that several alternative module files
+(e.g. `md_lj_module.f90`, `md_lj_ll_module.f90`, `md_lj_omp_module.f90`)
+contain modules with the same name (`md_module` in this case),
+since they act as drop-in replacements for each other.
+To avoid confusion during compilation due to intermediate files with the same name
+(e.g. `md_module.mod`)
+it is advisable to __compile each example in its own build directory__
+(which is what the `SConstruct` file is configured to do)
+or to delete all intermediate files before each individual compilation.
 
 We have used gfortran v6.3 for testing, but have attempted to stick to code which conforms
 to the Fortran 2008 standard. To our knowledge, the only GNU extensions appear in the function
