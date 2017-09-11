@@ -52,11 +52,9 @@ def random_perpendicular_vector ( old ):
     # Note that we do not require the reference vector to be of unit length
     # However we do require its length to be greater than a small tolerance!
 
-    tol = 1.e-6
-
     assert old.size==3, 'Error in old vector dimension'
     norm = np.sum ( old**2 ) # Old squared length
-    assert norm>tol, "{}{:15.3e}{:15.3e}".format('old normalization error', norm, tol)
+    assert not np.isclose(norm,0.0,atol=1.e-6), 'old too small {} {} {}'.format(*old)
     n = old / np.sqrt(norm) # Normalized old vector
 
     while True: # Loop until generated vector is not too small
@@ -90,6 +88,19 @@ def random_quaternion():
     f = np.sqrt ( ( 1.0 - norm1 ) / norm2 )
     return np.array ( ( zeta[0], zeta[1], beta[0]*f, beta[1]*f ), dtype=np.float_ ) # Random quaternion
 
+def random_rotate_quaternion ( angle_max, old ):
+    """Returns a unit quaternion rotated by a maximum angle (in radians) relative to the old quaternion."""
+    import numpy as np
+
+    # Note that the reference quaternion should be normalized and we test for this
+    assert old.size==4, 'Error in old quaternion dimension'
+    assert np.isclose(np.sum(old**2),1.0), 'old normalization error {} {} {} {}'.format(*old)
+
+    axis = random_vector()                             # Choose random unit vector
+    angle = ( 2.0*np.random.rand() - 1.0 ) * angle_max # Uniform random angle in desired range
+    e = rotate_quaternion ( angle, axis, old )         # General rotation function
+    return e
+
 def random_translate_vector ( dr_max, old ):
     """Returns a vector translated by a random amount."""
 
@@ -105,17 +116,13 @@ def random_rotate_vector ( angle_max, old ):
     """Returns a vector rotated by a small amount relative to the old one."""
 
     import numpy as np
-    
+
     # A small randomly chosen vector is added to the old one, and the result renormalized
     # Provided angle_max is << 1, it is approximately the maximum rotation angle (in radians)
     # The magnitude of the rotation is not uniformly sampled, but this should not matter
 
     # Note that the old vector should be normalized and we test for this
-
-    tol = 1.e-6
-
-    norm = np.sum ( old**2 ) # Old squared length
-    assert np.fabs ( norm - 1.0 ) < tol, "{}{:20.8e}{:20.8e}".format('old normalization error', norm, tol)
+    assert np.isclose(np.sum(old**2),1.0), 'old normalization error {} {} {}'.format(*old)
 
     # Choose new orientation by adding random small vector
     e    = old + angle_max * random_vector ()
@@ -141,10 +148,9 @@ def metropolis ( delta ):
 
 def rotate_vector ( angle, axis, old ):
 
-    """Returns a vector rotated from the old one by specified angle about specified axis."""
+    """Returns a vector rotated from the old one by angle about axis."""
 
     import numpy as np
-    from math import isclose
     
     # Note that the axis vector should be normalized and we test for this
     # In general, the old vector need not be normalized, and the same goes for the result
@@ -152,7 +158,7 @@ def rotate_vector ( angle, axis, old ):
 
     assert old.size == 3, 'Incorrect size of old'
     assert axis.size == 3, 'Incorrect size of axis'
-    assert isclose(np.sum(axis**2),1.0), 'Non-unit vector {} {} {}'.format(*axis)
+    assert np.isclose(np.sum(axis**2),1.0), 'Non-unit vector {} {} {}'.format(*axis)
 
     c    = np.cos ( angle )
     s    = np.sin ( angle )
@@ -162,6 +168,38 @@ def rotate_vector ( angle, axis, old ):
     e = c * old + ( 1.0 - c ) * proj * axis + s * np.cross ( axis, old )
 
     return e
+
+def rotate_quaternion ( angle, axis, old ):
+    """Returns a quaternion rotated by angle about axis relative to old quaternion."""
+
+    import numpy as np
+
+    # Note that the axis vector should be normalized and we test for this
+    # In general, the old quaternion need not be normalized, and the same goes for the result
+    # although in our applications we only ever use unit quaternions (to represent orientations)
+    assert old.size==4, 'Error in old quaternion dimension'
+    assert axis.size==3, 'Error in axis dimension'
+    assert np.isclose (np.sum(axis**2),1.0), 'axis normalization error {} {} {}'.format(*axis)
+
+    # Standard formula for rotation quaternion, using half angles
+    rot = np.sin(0.5*angle) * axis
+    rot = np.array([np.cos(0.5*angle),rot[0],rot[1],rot[2]],dtype=np.float_)
+
+    e = quatmul ( rot, old ) # Apply rotation to old quaternion
+    return e
+
+def quatmul ( a, b ):
+    """Returns quaternion product of two supplied quaternions."""
+
+    import numpy as np
+
+    assert a.size==4, 'Error in a dimension'
+    assert b.size==4, 'Error in b dimension'
+
+    return np.array ( [ a[0]*b[0] - a[1]*b[1] - a[2]*b[2] - a[3]*b[3],
+                        a[1]*b[0] + a[0]*b[1] - a[3]*b[2] + a[2]*b[3],
+                        a[2]*b[0] + a[3]*b[1] + a[0]*b[2] - a[1]*b[3],
+                        a[3]*b[0] - a[2]*b[1] + a[1]*b[2] + a[0]*b[3] ], dtype=np.float_ )
 
 def nematic_order ( e ):
     """Returns a nematic orientational order parameter."""
@@ -187,3 +225,25 @@ def nematic_order ( e ):
 
     evals = np.linalg.eigvalsh(q)
     return evals[2]
+
+def q_to_a ( q ):
+    """Returns a 3x3 rotation matrix calculated from supplied quaternion."""
+
+    import numpy as np
+
+    # The rows of the rotation matrix correspond to unit vectors of the molecule in the space-fixed frame
+    # The third row  a(3,:) is "the" axis of the molecule, for uniaxial molecules
+    # Use a to convert space-fixed to body-fixed axes thus: db = np.dot(a,ds)
+    # Use transpose of a to convert body-fixed to space-fixed axes thus: ds = np.dot(db,a)
+
+    # The supplied quaternion should be normalized and we check for this
+    assert np.isclose(np.sum(q**2),1.0), 'quaternion normalization error {} {} {} {}'.format(*q)
+
+    # Write out row by row, for clarity
+    a = np.empty( (3,3), dtype=np.float_ )
+    a[0,:] = [ q[0]**2+q[1]**2-q[2]**2-q[3]**2,   2*(q[1]*q[2]+q[0]*q[3]),       2*(q[1]*q[3]-q[0]*q[2])     ]
+    a[1,:] = [     2*(q[1]*q[2]-q[0]*q[3]),   q[0]**2-q[1]**2+q[2]**2-q[3]**2,   2*(q[2]*q[3]+q[0]*q[1])     ]
+    a[2,:] = [     2*(q[1]*q[3]+q[0]*q[2]),       2*(q[2]*q[3]-q[0]*q[1]),   q[0]**2-q[1]**2-q[2]**2+q[3]**2 ]
+
+    return a
+

@@ -270,7 +270,7 @@ CONTAINS
                       RETURN               ! Return immediately
                    END IF
 
-                   rmag     = sqrt(rab_sq)
+                   rmag     = SQRT(rab_sq)
                    sr6      = sr2**3
                    sr12     = sr6**2
                    pair%pot = 4.0*(sr12-sr6) + lambda1 + lambda2*rmag ! LJ atom-atom pair potential (force-shifted)

@@ -98,8 +98,7 @@ We also supply a constant-pressure version [mc_npt_hs.py](mc_npt_hs.py).
 [mc_zvt_lj.py](mc_zvt_lj.py) and  [mc_lj_module.py](mc_lj_module.py).
 
 ### 4.7 Monte Carlo program using quaternions
-We do not provide a Python version of this example.
-A Fortran version is available.
+[mc_nvt_poly_lj.py](mc_nvt_poly_lj.py) and [mc_poly_lj_module.py](mc_poly_lj_module.py).
 
 ### 4.8 Monte Carlo of hard spherocylinders
 [mc_nvt_sc.py](mc_nvt_sc.py) and [mc_sc_module.py](mc_sc_module.py).

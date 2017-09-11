@@ -645,6 +645,73 @@ we make no attempt to reproduce the tests conducted with the Fortran
 versions
 for the _N=13_ chains.
 
+## Polyatomic Lennard-Jones program
+The program `mc_nvt_poly_lj.py` conducts Monte Carlo simulations of a system of rigid molecules
+composed of Lennard-Jones interaction sites.
+For simplicity the sites are taken to be identical, although the program is easily generalized.
+Molecular orientations are represented by quaternions,
+which are used to calculate the rotation matrix
+and hence the interaction site positions.
+
+We test this with the three-site model of orthoterphenyl, a fragile glassformer,
+described in the following publications amongst others.
+
+* LJ Lewis, G Wahnstrom, _Sol State Commun,_ __86,__ 295 (1993)
+* LJ Lewis, G Wahnstrom, _Phys Rev E,_ __50,__ 3865 (1994)
+* S Mossa, E La Nave, HE Stanley, C Donati, F Sciortino, P Tartaglia, _Phys Rev E,_ __65,__ 041205 (2002)
+* E La Nave, S Mossa, F Sciortino, P Tartaglia, _J Chem Phys,_ __120,__ 6128 (2004)
+
+We compare with the results of Mossa et al (2002).
+The sites are arranged at the vertices of an isosceles triangle with bond angle 75 degrees,
+LJ parameters &epsilon; = 5.276 kJ mol<sup>-1</sup>,
+&sigma;=0.483nm,
+and two equal bonds of length &sigma;.
+The program employs the usual reduced units based on &epsilon; and &sigma;
+and in these units the potential cutoff of Mossa et al (2002) is _R_<sub>c</sub>=2.612;
+the pair potential is Lennard-Jones with a shifted-force correction term, linear in _r_,
+to make the potential and its derivative vanish at _r_=_R_<sub>c</sub>.
+Apart from the temperatures
+and much longer runs (10 blocks of 20000 steps each, the same as the Fortran tests),
+default program parameters were used throughout.
+
+Tests were performed at &rho;=0.32655 which is equivalent to &rho;<sub>4</sub>=1.108g cm<sup>-3</sup>
+in Mossa et al (2002).
+Comparisons of potential energy (_PE_=_E_-3 _T_ converted to kJ/mol with a factor 5.276)
+were made with the fit given by eqn (23) of that paper.
+Note that &epsilon;/k<sub>B</sub>&asymp;635 K.
+
+_T_   | _E_        | _P_       | _T_ (K) | _PE_ (kJ/mol) | _PE_ (kJ/mol) eqn (23)
+----- | -----      | -----     | -----   | -----         | -----
+0.5   | -12.995(2) |  1.763(9) |  317    | -76.48(2)     | -76.945
+1.0   | -9.813(15) |  5.86(4)  |  635    | -67.60(8)     | -67.634
+1.5   | -6.87(1)   |  9.33(2)  |  952    | -59.99(5)     | -60.011
+2.0   | -4.10(1)   | 12.30(3)  | 1270    | -53.29(5)     | -53.265
+
+A second set of tests was performed at _T_=0.6&asymp;380K
+at the specified densities &rho;<sub>1</sub>, &hellip; &rho;<sub>5</sub> of Mossa et al (2002).
+Here the excess pressure (_P_(ex)=_P_-&rho;_T_ converted to MPa
+with a factor 77.75 based on the values of &epsilon; and &sigma;)
+is compared with the fit given by eqn (28) and the coefficients in Table III of Mossa et al (2002).
+NB the volumes to insert into the equation are those of their Table I,
+which are specific to their system size.
+In addition their eqn (29) with coefficients in Table V is a fit to their potential energy,
+which we calculate from the simulation as described above.
+
+Id    | &rho;   | _E_        | _P_     | _P_(ex) (MPa) | _P_(ex) (MPa) eqn (28) | _PE_ (kJ/mol) | _PE_ (kJ/mol) eqn (29)
+----- | -----   | -----      | -----   | -----         | -----                  | ------        | ------
+1     | 0.30533 | -11.617(7) | 0.47(2) | 22(2)         | 19.077                 | -70.79(4)     | -70.818
+2     | 0.31240 | -11.927(4) | 1.00(2) | 63(2)         | 60.143                 | -72.42(2)     | -72.289
+3     | 0.31918 | -12.16(1)  | 1.66(3) | 114(2)        | 112.798                | -73.65(5)     | -73.601
+4     | 0.32655 | -12.393(6) | 2.52(2) | 181(2)        | 177.222                | -74.88(3)     | -74.886
+5     | 0.33451 | -12.498(3) | 3.82(1) | 281(1)        | 253.510                | -75.44(2)     | -75.825
+
+In making these comparisons,
+our limited run length (10 blocks of 20000 sweeps each) should be borne in mind,
+since this system can show sluggish behaviour.
+The MD simulations of Mossa et al (2002) are reported to extend to several hundred nanoseconds
+(of order 10<sup>7</sup> MD timesteps) at the lowest temperatures.
+It should be noted that this Python code is quite slow compared to the simpler atomic LJ examples.
+
 ## DPD program
 For testing we compare with an approximate DPD equation of state for _P_.
 
