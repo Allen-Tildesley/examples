@@ -1075,7 +1075,7 @@ which is accumulated as a histogram of walker positions,
 should be obtained using the default input values,
 with an empty input record `{}`;
 these defaults include setting `et` initially to the exact ground state energy.
-Other values such as `{et:0.6}` may be supplied through standard input in the usual way.
+Other values such as `{"et":0.6}` may be supplied through standard input in the usual way.
 This type of simulation is sensitive to the initial value,
 and quite noisy:
 possible improvements are discussed in general terms in the text.

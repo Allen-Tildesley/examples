@@ -199,8 +199,7 @@ A Fortran version is available.
 
 ### 13.1 Path-integral Monte Carlo
 [qmc_pi_sho.py](qmc_pi_sho.py) for the simple harmonic oscillator.
-We do not provide a Python version of the Lennard-Jones example.
-A Fortran version is available.
+[qmc_pi_lj.py](qmc_pi_lj.py) and [qmc_pi_lj_module.py](qmc_pi_lj_module.py) for Lennard-Jones.
 
 ### 13.2 Quantum Monte Carlo using a diffusion equation
 [qmc_walk_sho.py](qmc_walk_sho.py).
