@@ -45,6 +45,7 @@ MODULE qmc_module
   ! Public derived type
   TYPE, PUBLIC :: potential_type ! A composite variable for interaction energies comprising
      REAL    :: pot ! the cut (but not shifted) potential energy and
+     REAL    :: vir ! the virial and
      LOGICAL :: ovr ! a flag indicating overlap (i.e. pot too high to use)
    CONTAINS
      PROCEDURE :: add_potential_type
@@ -60,6 +61,7 @@ CONTAINS
     TYPE(potential_type)              :: c    ! Result is the sum of
     CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  +   b%pot
+    c%vir = a%vir  +   b%vir
     c%ovr = a%ovr .OR. b%ovr
   END FUNCTION add_potential_type
 
@@ -68,6 +70,7 @@ CONTAINS
     TYPE(potential_type)              :: c    ! Result is the difference of
     CLASS(potential_type), INTENT(in) :: a, b ! the two inputs
     c%pot = a%pot  -   b%pot
+    c%vir = a%vir  -   b%vir
     c%ovr = a%ovr .OR. b%ovr ! This is meaningless, but inconsequential
   END FUNCTION subtract_potential_type
 
@@ -114,11 +117,12 @@ CONTAINS
 
   FUNCTION potential ( box, r_cut ) RESULT ( total )
     IMPLICIT NONE
-    TYPE(potential_type) :: total ! Returns a composite of pot and ovr
+    TYPE(potential_type) :: total ! Returns a composite of pot, vir and ovr
     REAL, INTENT(in)     :: box   ! Simulation box length
     REAL, INTENT(in)     :: r_cut ! Potential cutoff distance
 
     ! total%pot is the nonbonded cut (not shifted) classical potential energy for whole system
+    ! total%vir is the corresponding virial for whole system
     ! total%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this flag is .true., the values of total%pot etc should not be used
     ! Actual calculation is performed by function potential_1
@@ -135,7 +139,7 @@ CONTAINS
        STOP 'Error in potential'
     END IF
 
-    total = potential_type ( pot=0.0, ovr=.FALSE. ) ! Initialize
+    total = potential_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
 
     DO k = 1, p ! Loop over ring polymers
        DO i = 1, n - 1 ! Loop over atoms within polymer
@@ -158,7 +162,7 @@ CONTAINS
 
   FUNCTION potential_1 ( rik, i, k, box, r_cut, j_range ) RESULT ( partial )
     IMPLICIT NONE
-    TYPE(potential_type)           :: partial ! Returns a composite of pot and ovr for given atom
+    TYPE(potential_type)           :: partial ! Returns a composite of pot, vir and ovr for given atom
     REAL, DIMENSION(3), INTENT(in) :: rik     ! Coordinates of atom of interest
     INTEGER,            INTENT(in) :: i, k    ! Index and polymer id of atom of interest
     REAL,               INTENT(in) :: box     ! Simulation box length
@@ -166,6 +170,7 @@ CONTAINS
     INTEGER, OPTIONAL,  INTENT(in) :: j_range ! Optional partner index range
 
     ! partial%pot is the nonbonded cut (not shifted) classical potential energy of atom rik with a set of other atoms
+    ! partial%vir is the corresponding virial of atom rik
     ! partial%ovr is a flag indicating overlap (potential too high) to avoid overflow
     ! If this is .true., the value of partial%pot should not be used
     ! The coordinates in rik are not necessarily identical with those in r(:,i,k)
@@ -177,7 +182,7 @@ CONTAINS
 
     INTEGER              :: j, j1, j2
     REAL                 :: r_cut_box, r_cut_box_sq, box_sq
-    REAL                 :: sr2, sr6, r_ik_jk_sq
+    REAL                 :: sr2, sr6, sr12, r_ik_jk_sq
     REAL, DIMENSION(3)   :: r_ik_jk
     REAL, PARAMETER      :: sr2_ovr = 1.77 ! overlap threshold (pot > 100)
     TYPE(potential_type) :: pair
@@ -212,7 +217,7 @@ CONTAINS
     r_cut_box_sq = r_cut_box**2
     box_sq       = box**2
 
-    partial = potential_type ( pot=0.0, ovr=.FALSE. ) ! Initialize
+    partial = potential_type ( pot=0.0, vir=0.0, ovr=.FALSE. ) ! Initialize
 
     DO j = j1, j2 ! Loop over selected range of partners
 
@@ -234,7 +239,9 @@ CONTAINS
           END IF
 
           sr6      = sr2**3
-          pair%pot = sr6**2 - sr6 ! LJ potential (cut but not shifted)
+          sr12     = sr6**2
+          pair%pot = sr12 - sr6      ! LJ potential (cut but not shifted)
+          pair%vir = pair%pot + sr12 ! LJ pair virial
 
           partial = partial + pair
 
@@ -244,6 +251,7 @@ CONTAINS
 
     ! Include numerical factors
     partial%pot = partial%pot * 4.0 / REAL ( p ) ! Classical potentials are weaker by a factor p
+    partial%vir = partial%vir * 24.0 / REAL(3*p) ! 24*epsilon and divide virial by 3 & by p
     partial%ovr = .FALSE.                        ! No overlaps detected (redundant, but for clarity)
 
   END FUNCTION potential_1
@@ -257,7 +265,7 @@ CONTAINS
     ! total is the quantum spring potential for whole system
     ! Actual calculation is performed by subroutine spring_1
 
-    INTEGER :: i, k
+    INTEGER :: i, k, kp
     REAL    :: partial_pot
 
     IF ( n /= SIZE(r,dim=2) ) THEN ! should never happen
@@ -271,87 +279,45 @@ CONTAINS
 
     total = 0.0
 
-    DO k = 1, p ! Loop over ring polymers
-       DO i = 1, n ! Loop over atoms within polymer
+    DO k = 1, p ! Loop over atoms within polymer
 
-          partial_pot = spring_1 ( r(:,i,k), i, k, box, k_spring, gt )
+       kp = k+1
+       IF ( kp > p ) kp = 1
+       
+       DO i = 1, n ! Loop over ring polymers
+
+          partial_pot = spring_1 ( r(:,i,k), r(:,i,kp), box, k_spring )
           total       = total + partial_pot
 
-       END DO ! End loop over atoms within polymer
-    END DO ! End loop over ring polymers
+       END DO ! End loop over ring polymers
+
+    END DO ! End loop over atoms within polymer
 
   END FUNCTION spring
 
-  FUNCTION spring_1 ( rik, i, k, box, k_spring, l_range ) RESULT ( partial_pot )
+  FUNCTION spring_1 ( rik, ril, box, k_spring ) RESULT ( partial_pot )
     IMPLICIT NONE
     REAL                           :: partial_pot ! Returns quantum potential for given atom
     REAL, DIMENSION(3), INTENT(in) :: rik         ! Coordinates of atom of interest
-    INTEGER,            INTENT(in) :: i, k        ! Index and polymer id of atom of interest
+    REAL, DIMENSION(3), INTENT(in) :: ril         ! Coordinates of other atom of interest
     REAL,               INTENT(in) :: box         ! Simulation box length
     REAL,               INTENT(in) :: k_spring    ! Spring potential constant
-    INTEGER, OPTIONAL,  INTENT(in) :: l_range     ! Optional partner index range
 
-    ! partial_pot is the quantum spring energy of atom (i,k) in rik for polymer k
-    ! with its neighbours (i,k-1) and (i,k+1), in the ring 1..p
+    ! partial_pot is the quantum spring energy of atom (i,k) in rik for polymer bead k
+    ! with its neighbour (i,l) in the same polymer ring
     ! The coordinates in rik are not necessarily identical with those in r(:,i,k)
     ! The partner atom index is always the same as i
-    ! The optional argument l_range restricts partner polymer ids to l=k-1, or l=k+1
 
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
 
-    INTEGER            :: l, l1, l2
-    REAL               :: box_sq
     REAL               :: r_ik_il_sq
     REAL, DIMENSION(3) :: r_ik_il
 
-    IF ( n /= SIZE(r,dim=2) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r, n=', n, SIZE(r,dim=2)
-       STOP 'Error in spring_1'
-    END IF
-    IF ( p /= SIZE(r,dim=3) ) THEN ! should never happen
-       WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r, p=', p, SIZE(r,dim=3)
-       STOP 'Error in spring_1'
-    END IF
-
-    IF ( PRESENT ( l_range ) ) THEN
-       SELECT CASE ( l_range )
-       CASE ( lt ) ! Look at l = k-1 only
-          l1 = k-1
-          l2 = k-1
-       CASE ( gt ) ! Look at l = k+1 only
-          l1 = k+1
-          l2 = k+1
-       CASE default ! should never happen
-          WRITE ( unit = error_unit, fmt='(a,i10)') 'l_range error ', l_range
-          STOP 'Impossible error in spring_1'
-       END SELECT
-    ELSE ! Look at both l = k-1 and k+1
-       l1 = k-1
-       l2 = k+1
-    END IF
-
-    box_sq = box**2
-    partial_pot = 0.0 ! Initialize
-
-    DO l = l1, l2, 2 ! Loop over neighbours skipping l=k
-
-       IF ( l < 1 ) THEN
-          r_ik_il(:) = rik(:) - r(:,i,p) ! link to end of ring polymer
-       ELSE IF ( l > p ) THEN
-          r_ik_il(:) = rik(:) - r(:,i,1) ! link to start of ring polymer
-       ELSE
-          r_ik_il(:) = rik(:) - r(:,i,l)
-       END IF
-
-       r_ik_il(:)  = r_ik_il(:) - ANINT ( r_ik_il(:) ) ! Periodic boundaries in box=1 units
-       r_ik_il_sq  = SUM ( r_ik_il**2 ) * box_sq       ! Squared distance in sigma=1 units
-       partial_pot = partial_pot + r_ik_il_sq          ! Spring potential
-
-    END DO ! End loop over possibilities skipping l=k
-
-    ! Include numerical factors
-    partial_pot = partial_pot * 0.5 * k_spring 
+    r_ik_il(:)  = rik(:) - ril(:)
+    r_ik_il(:)  = r_ik_il(:) - ANINT ( r_ik_il(:) ) ! Periodic boundaries in box=1 units
+    r_ik_il_sq  = SUM ( r_ik_il**2 ) *  box**2      ! Squared distance in sigma=1 units
+    partial_pot = 0.5 * k_spring * r_ik_il_sq       ! Spring potential
 
   END FUNCTION spring_1
 

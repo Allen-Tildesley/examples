@@ -12,20 +12,44 @@ Most of the Fortran codes use a `namelist` to input a few parameters from standa
 This gives an easy way to specify default values in the program itself, and to use a
 keyword-based syntax to specify values different from the default ones at run-time.
 The input file, or string, should usually begin with `&nml` and end with `/`.
-As a minimum, the program will expect to read `&nml /` (an empty list), but to
-change the parameters, typical input might be
+As a minimum, the program will expect to read `&nml /` (an empty list),
+and on a Linux/Unix/bash system a typical command line would be
 ```
-&nml nblock=20, nstep=10000, dt=0.002 /
+echo '&nml /' | ./mc_nvt_lj
 ```
-and the `key=value` pairs may be set out on different lines if you wish.
+or similar.
+To change the parameters, the namelist input might include the new values like this
+```
+&nml nblock=20, nstep=10000, temperature=2.0 /
+```
+Alternatively the namelist may be supplied in a file,
+for instance `run.inp` containing
+```
+&nml
+nblock=20,
+nstep=10000,
+temperature=2.0
+/
+```
+and the program run like this
+```
+./mc_nvt_lj < run.inp
+```
+As indicated, the `key=value` pairs may be set out on different lines if you wish.
 
 ## Initial Configuration
 Simulation runs for bulk liquids require a starting configuration which can usually be prepared using
 the `initialize` program (built, by the default SConstruct file, in `build_initialize/`).
 The default parameters produce an FCC configuration of 256 atoms at reduced density &rho;=0.75,
 writing out just the positions (for an MC program) to a file `cnf.inp`.
-If the parameter `velocities=.true.` is supplied, then positions and velocities are
-written to the file, corresponding to a reduced temperature _T_ = 1.0.
+You would run the program as described above,
+for instance on a Linux/Unix/bash system like this
+```
+echo '&nml /' | ./initialize
+```
+If the parameter `velocities=.true.` is supplied within the namelist,
+then positions and velocities are written to the file,
+corresponding to a reduced temperature _T_ = 1.0.
 These values of &rho; and _T_ (see below) lie in the liquid region of the Lennard-Jones phase diagram.
 Non-default values may, of course, be supplied for this or other models.
 The `cnf.inp` file may then be copied to the directory in which the run is carried out.
@@ -43,6 +67,32 @@ A utility program, `adjust`, takes in an MC or MD configuration and
 scales the velocities to change the kinetic energy per atom by a specified amount,
 and/or the positions (and the box length) to change the density by a specified amount.
 You may prefer to write your own program or script to perform these types of operation.
+
+## Visualizing configurations
+Our simulation configuration files have a very simple format:
+the first line is the number of molecules,
+the second line is the periodic box length (we always use cubic boxes),
+or occasionally the bond length (for chain molecules which are simulated without a box),
+and the third and subsequent lines each contain the coordinates of one atom or molecule.
+The first three numbers on each of these lines are always the (x,y,z) position,
+in simulation units (e.g. Lennard-Jones &sigma;=1).
+The rest of the numbers on each line contain velocities, orientation vectors etc.,
+as appropriate.
+
+This format is not compatible with most molecular visualization programs,
+such as [JMOL](http://jmol.sourceforge.net/)
+or [VMD](http://www.ks.uiuc.edu/Research/vmd/).
+However, conversion into the basic [XYZ](https://en.wikipedia.org/wiki/XYZ_file_format) format
+is easily achieved using a simple program, script, or editor. For example,
+on most Linux/Unix systems, the `awk` language will be available:
+```
+awk '(NR==1) {print} (NR==2) {print "Comment line"} (NR>2) {printf "%5s%15.6f%15.6f%15.6f\n", ("Ar"),($1*3.4),($2*3.4),($3*3.4)}' cnf.inp > cnf.xyz
+```
+This produces a file which should be recognized as a set of Argon atoms with positions
+(in Angstroms) appropriate to their van der Waals diameter.
+This can be read into a molecular visualizer,
+which will typically have various options for representing the atoms.
+No attempt is made here to represent the periodicity of the system in the `cnf.xyz` file.
 
 ## Lennard-Jones simulation programs
 A large number of the examples simulate the Lennard-Jones liquid.
@@ -1197,8 +1247,8 @@ Larger values of _P_ give energies closer to the exact quantum mechanical canoni
 For this simple model,
 exact results can also be calculated for the finite values of _P_ used in the simulation
 
-* KS Schweizer, RM Stratt, D Chandler, PG Wolynes, _J Chem Phys,_ __75,__ 1347 (1981).
-* M Takahashi, M Imada, _J Phys Soc Japan,_ __53,__ 3765 (1984).
+* KS Schweizer, RM Stratt, D Chandler, PG Wolynes, _J Chem Phys,_ __75,__ 1347 (1981),
+* M Takahashi, M Imada, _J Phys Soc Japan,_ __53,__ 3765 (1984),
 
 and a routine to evaluate these is included in the example.
 No special techniques are used to accelerate the simulation;
@@ -1220,3 +1270,72 @@ _P_  | _E_ (MC)  | _E_ (exact)
  6   | 0.4694(6) | 0.468708
  7   | 0.4778(6) | 0.477941
  8   | 0.4846(9) | 0.484244
+
+The program `qmc_pi_lj` applies the path-integral method to the Lennard-Jones fluid.
+The simplest, primitive, algorithm is used,
+together with the crudest estimators for energy and pressure.
+The program uses
+single-particle Monte Carlo moves for the individual beads in the ring polymer,
+along with translations of the centre-of-mass of each polymer.
+As mentioned in the text, there are many improvements of all these aspects
+of the algorithm, which are recommended for production work.
+
+The program takes in configuration files `cnf##.inp` where the `##` reflects
+the polymer bead number, in the range 1 to _P_.
+These files have the same format as the classical Lennard-Jones configurations.
+They may be prepared in the same way as usual,
+from the `initialize` program, from a run of `mc_nvt_lj`
+at the appropriate density and temperature,
+or from a run of `qmc_pi_lj` for a different value of _P_.
+It does no harm if these starting configurations are simply duplicates of each other,
+provided that a preliminary run is conducted to allow the polymers to equilibrate,
+after which all the output files `cnf##.out` may be renamed to `cnf##.inp`.
+
+For testing, we compare with a set of simulations of neon,
+
+* M Neumann, M Zoppi, _Phys Rev E,_ __65,__ 031203 (2002),
+
+which are mainly based on an empirical pair potential,
+but include selected results for Lennard-Jones for the case _P_=32.
+The LJ parameters for neon are &epsilon;=36.8K, &sigma;=0.2789nm, atomic mass _m_=20.18u,
+and hence a reduced de Boer parameter &lambda;=0.092&sigma;,
+which is the default value in the program.
+We choose their lowest-temperature state point,
+(_T_,&rho;)=(25.8K,36.28nm<sup>-3</sup>)=(0.701087,0.787069) in reduced LJ units.
+We use _N_=108 atoms, compared with Neumann and Zoppi's _N_=256,
+and our runs are five times shorter (10 blocks of 10000 sweeps);
+these differences should not be critical.
+The maximum centre-of-mass displacement is 0.1&sigma;.
+Because the intra-polymer springs increase in strength with _P_,
+the maximum displacement parameter for individual bead moves
+is reduced from 0.06&sigma; for _P_=2
+down to 0.02&sigma; for _P_=32.
+These choices give reasonable acceptance ratios for both kinds of move.
+In the table below we report:
+the rms radius _R_ of the ring polymers,
+the average spring potential _E_(spring) per atom,
+the kinetic energy _KE_ per atom,
+total energy _E_ per atom, and pressure _p_
+(the last two including the standard long-range correction
+for the applied cutoff _R_<sub>c</sub>=2.5&sigma;).
+
+_P_         | _R_        | _E_(spring) |  _KE_      |  _E_      |  _p_
+------      | ------     | ------      | ------     | ------    | ------
+1 &dagger;  | 0.0        |  0.0        | 1.052      | -4.692(1) | -0.756(5)
+2           | 0.04043(1) |  0.8963(7)  | 1.2070(7)  | -4.454(1) | -0.408(6)
+4           | 0.04942(1) |  2.906(1)   | 1.301(1)   | -4.320(3) | -0.231(9)
+8           | 0.05181(2) |  7.073(3)   | 1.340(3)   | -4.261(3) | -0.150(8)
+16          | 0.05247(2) | 15.479(4)   | 1.347(4)   | -4.252(4) | -0.148(5)
+32          | 0.05261(4) | 32.287(8)   | 1.365(8)   | -4.233(8) | -0.140(6)
+32 &Dagger; | 0.053      | 32.3008     | 1.352      | -4.227    | -0.039
+
+&dagger; For completeness the _P_=1 runs were performed using `mc_nvt_lj`.
+
+&Dagger; These results are taken from Table I of Neumann and Zoppi (2002),
+converted into LJ reduced units.
+
+A drawback of this state point is that the pressure is negative,
+suggesting instability with respect to phase separation.
+Nonetheless we have seen no evidence of crystalline structure
+in the simulated configurations,
+and assume that the liquid phase is metastable.
