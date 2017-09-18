@@ -961,9 +961,13 @@ are obtained.
 Sample results using default program parameters are shown here.
 The direct method is indicated in black, plotting only every fifth point for clarity.
 The FFT result is shown as a red line: it matches the direct method as expected.
+The library function result is not shown, as it is indistinguishable from the first two.
 The exactly known function is a blue line.
 There are clear discrepancies with the results of the simulation,
 as expected, due to the rather short duration of the latter.
+The very slow direct method could easily be edited out of the program,
+and the run length dramatically increased,
+to obtain more accurate results.
 
 ![corfun test results](corfun.png "corfun test results")
 
