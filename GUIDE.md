@@ -357,7 +357,7 @@ and so one should not place blind trust in the separate box averages reported by
 but refer to histograms of density, energy etc.,
 illustrative examples of which appear here.
 
-![alt text](mc_gibbs_lj_his.png "mc_gibbs_lj histograms")
+![mc_gibbs_lj histograms](mc_gibbs_lj_his.png "mc_gibbs_lj histograms")
 
 At _T_=1.0, however, these exchanges of box identity
 are expected to be infrequent, were not observed in the test runs,
@@ -762,7 +762,7 @@ Below we show the heat capacity per atom from the above two WL runs (red),
 from the exact density of states of Taylor (black),
 and from the canonical ensemble calculations (blue error bars).
 
-![alt text](wl.png "Wang-Landau test results")
+![Wang-Landau test results](wl.png "Wang-Landau test results")
 
 It is also straightforward to compare average energies and radii of gyration,
 but we do not do that here.
@@ -1079,7 +1079,7 @@ The exactly known function is a blue line.
 There are very small discrepancies with the results of the simulation,
 due to the finite length of the latter.
 
-![alt text](corfun.png "corfun test results")
+![corfun test results](corfun.png "corfun test results")
 
 ## Diffusion program
 The program `diffusion` reads in a sequence of configurations and calculates
@@ -1124,7 +1124,7 @@ every fifth point is shown for the results of `diffusion`,
 while the exact results are indicated as lines.
 For the default program parameters, the diffusion coefficient is _D_=1.
 
-![alt text](diffusion.png "diffusion test results")
+![diffusion test results](diffusion.png "diffusion test results")
 
 ## Pair distribution function
 The program `pair_distribution` reads in a set of configurations and calculates
@@ -1142,7 +1142,7 @@ file `pair_distribution_data.zip` in the [Data repository](https://github.com/Al
 Using the default resolution of 0.02&sigma;,
 the results shown below were obtained for _g(r)_.
 
-![alt text](gr.png "g(r) test results")
+![g(r) test results](gr.png "g(r) test results")
 
 ## Interface pair correlation function
 The program `grint.f90` reads in a set of configurations and calculates
