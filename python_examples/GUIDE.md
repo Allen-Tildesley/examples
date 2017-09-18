@@ -764,6 +764,13 @@ The MD simulations of Mossa et al (2002) are reported to extend to several hundr
 It should be noted that this Python code is quite slow compared to the simpler atomic LJ examples.
 
 ## DPD program
+For the `dpd.py` example, we recommend generating an initial configuration
+using the `initialize.py` program, with JSON input similar to the following
+```
+{"n":100,"density":3.0,"lattice":false,"velocities":true,"soft":true}
+```
+The above value of the density is typical when using this method to model water.
+
 For testing we compare with an approximate DPD equation of state for _P_.
 
 * RD Groot, PB Warren, _J Chem Phys,_ __107,__ 4423 (1997)
@@ -920,7 +927,7 @@ compute a distance matrix using the minimum image convention, and supply that to
 as suggested by [Turci](https://francescoturci.wordpress.com/2016/03/16/clustering-and-periodic-boundaries/).
 
 ## Correlation function program
-The aim of the program `corfun` is to illustrate the direct method, and the FFT method,
+The aim of the program `corfun.py` is to illustrate the direct method, and the FFT method,
 for calculating time correlation functions.
 The program is self contained: it generates the time dependent data itself,
 using a generalized Langevin equation,

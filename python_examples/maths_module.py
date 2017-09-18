@@ -57,6 +57,8 @@ def random_perpendicular_vector ( old ):
     assert not np.isclose(norm,0.0,atol=1.e-6), 'old too small {} {} {}'.format(*old)
     n = old / np.sqrt(norm) # Normalized old vector
 
+    tol = 1.e-6
+    
     while True: # Loop until generated vector is not too small
        e    = random_vector () # Randomly oriented unit vector
        proj = np.dot ( e, n )  # Projection along old

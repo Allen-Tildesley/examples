@@ -793,7 +793,7 @@ method | _NVT_    | _NVT_     | _NVT_      |   WL    |   WL   |  WL
 
 Results obtained from a run of the Wang-Landau program `mc_chain_wl_sw`,
 using the same model, are given on the right of the table above.
-The program was run with default parameters:
+The program was run with default parameters,
 except that the flatness criterion was set at 80%.
 The results are from the histograms produced in the 20th stage.
 This analysis can also be performed (for any desired temperature) by the program `wl_hist`, after the run.
@@ -1201,7 +1201,7 @@ The program contains extensive comments to explain what is being calculated at e
 The aim of `fft3dwrap` is to illustrate the way a standard Fast Fourier Transform
 library routine is wrapped in a user program.
 We numerically transform a 3D Gaussian function,
-and compare with the analytically, exactly, known result,
+and compare with the analytically, exactly, known result.
 User input defines the number of grid points and the box size;
 sensible defaults are provided.
 The library that we use for this example is [FFTW](http://www.fftw.org/).
