@@ -1047,6 +1047,52 @@ identical results were obtained as for the Fortran example.
 
 ![g(r) test results](gr.png "g(r) test results")
 
+## Interface pair correlation function
+The program `grint.py` reads in a set of configurations and calculates
+the pair correlation function for a system that is inhomogeneous in the
+z direction. It is assumed that the configurations consist of a liquid slab,
+surrounded by gas, with the interfaces lying in the _xy_-plane.
+The two interfaces are located by fitting the instantaneous density profile
+to a difference of two tanh functions. Then the single-particle density function,
+relative to each of the interface locations, is calculated.
+To make the process as robust as possible, an initial guess at the mid-point
+of the liquid slab should be provided, and this is updated automatically as
+successive configurations are read in, so as to shift the liquid slab into
+the middle of the periodic box, before fitting.
+Also, the results of one fit are passed on as the starting point of the next one.
+The program handles cubic boxes only;
+the modifications necessary to handle non-cubic boxes are fairly easy to make,
+but we will not do that here.
+No attempt is made to correct for capillary-wave fluctuations affecting the
+width of the interface.
+
+Having located, and combined, the two interfaces, the histograms for calculating
+the one-body and two-body densities are accumulated, in a coordinate system
+which has its origin at the interface. The one-body density is then fitted by
+a single tanh curve: this could easily be changed by the user if desired.
+For simplicity, in the normalization of the two-body density to give the
+pair correlation function, we use the _fitted_ tanh form of the single particle
+density. This is obviously an approximation, and could be replaced by a better fit,
+or an interpolation scheme, to evaluate the function at arbitrary z.
+Finally, the program writes out the average, overall, density profile, the
+single-particle density (with fit) and slices at selected values of z and c
+through the pair correlation function.
+
+In testing this program, it is important to use a large enough system so that
+all values of z<sub>1</sub> and z<sub>2</sub> of interest (measured relative to
+the interface position) lie far from the _other_ interface position.
+
+The program was tested on a system of _N_=10000 atoms, interacting through
+the Lennard-Jones potential cut (but not shifted) at _R_<sub>c</sub>=2.5&sigma;,
+in a cubic box of side 30&sigma;, at a temperature _T_=0.90.
+For this system, &rho;<sub>G</sub> &asymp; 0.024, &rho;<sub>L</sub> &asymp; 0.713
+(see Trokhymchuk, op. cit.). A set of 100 configurations from this run, together
+with the output of the Fortran example, `grint.f90`, with default parameters,
+are provided in the file `grint_data.zip` in the [Data repository](https://github.com/Allen-Tildesley/data).
+The output of `grint.py` is very similar to that of `grint.f90`.
+The Python version takes advantage of a curve fitting routine provided in SciPy,
+and the one-dimensional and multi-dimensional histogramming routines in NumPy.
+
 ## Error calculation
 The program `error_calc.py` is a self-contained illustration of the effects of
 correlations on the estimation of errors for a time series.

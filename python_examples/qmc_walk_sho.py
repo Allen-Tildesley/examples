@@ -40,10 +40,10 @@
 # results are output as averages over the production period.
 # The simulated ground state wave function may be compared with the exact result for this simple problem.
 #
-# Reads several variables and options from standard input using a namelist nml
-# Leave namelist empty to accept supplied defaults
-# The default parameters run the simulation with et = 0.5, the exact groundstate energy for this potential.
-# You can then try, say, et = 0.6 and et = 0.4, observing the behaviour of the number of walkers in each case.
+# Reads several variables and options from standard input using JSON format
+# Leave input empty "{}" to accept supplied defaults
+# The default parameters run the simulation with "et":0.5, the exact groundstate energy for this potential.
+# You can then try, say, "et":0.6 and "et":0.4, observing the behaviour of the number of walkers in each case.
 #
 # Many of the parameters, and the updating scheme for et, are taken from the following paper:
 # I Kostin, B Faber and K Schulten, Amer J Phys, 64, 633 (1996).

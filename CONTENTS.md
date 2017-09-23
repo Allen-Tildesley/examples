@@ -225,7 +225,8 @@ However, a working example of the density profile calculation may be found in
 
 ### 14.2 Radial distribution function in a planar interface
 [grint.f90](grint.f90) and [grint_module.f90](grint_module.f90).
-We also provide a (comparatively large) file [grint_data.zip](grint_data.zip) containing test data.
+We also provide a (comparatively large) file `grint_data.zip` containing test data
+in the [Data repository](https://github.com/Allen-Tildesley/data).
 
 ### 14.3 Cluster analysis
 [cluster.f90](cluster.f90).

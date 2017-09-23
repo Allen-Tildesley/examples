@@ -80,9 +80,6 @@ def calc_variables ( ):
 # Reads several variables and options from standard input using JSON format
 # Leave input empty "{}" to accept supplied defaults
 
-# Reads several variables and options from standard input using a namelist nml
-# Leave namelist empty to accept supplied defaults
-
 # Input configuration, output configuration, all calculations, and all results 
 # are given in mass = 1 units, and in simulation units defined by the model 
 # For example, for Lennard-Jones, sigma = 1, epsilon = 1

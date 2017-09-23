@@ -208,8 +208,9 @@ A Fortran version is available.
 A Fortran version of this code snippet appears in the text, not online.
 
 ### 14.2 Radial distribution function in a planar interface
-We do not provide a Python version of this example.
-A Fortran version is available.
+[grint.py](grint.py).
+We also provide a (comparatively large) file `grint_data.zip` containing test data
+in the [Data repository](https://github.com/Allen-Tildesley/data).
 
 ### 14.3 Cluster analysis
 [cluster.py](cluster.py).
