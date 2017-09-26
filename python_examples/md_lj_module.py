@@ -170,13 +170,14 @@ def hessian ( box, r_cut, r, f ):
 
     if fast:
         for i in range(n-1):
-            rij = r[i,:] - r[i+1:,:]         # Separation vectors
-            rij = rij - np.rint ( rij )      # Periodic boundary conditions in box=1 units
-            rij_sq = np.sum ( rij**2 )       # Squared separation
+            rij      = r[i,:] - r[i+1:,:]    # Separation vectors
+            rij      = rij - np.rint ( rij ) # Periodic boundary conditions in box=1 units
+            rij_sq   = np.sum(rij**2,axis=1) # Squared separations for j>1
             in_range = rij_sq < r_cut_box_sq # Set flags for within cutoff
-            rij_sq = rij_sq * box_sq # Now in sigma=1 units
-            rij = rij * box          # Now in sigma=1 units
-            fij = f[i,:] - f[i+1:,:] # Differences in forces
+            rij_sq   = rij_sq * box_sq       # Now in sigma=1 units
+            rij      = rij * box             # Now in sigma=1 units
+            fij      = f[i,:] - f[i+1:,:]    # Differences in forces
+
             ff   = np.sum(fij*fij,axis=1)
             rf   = np.sum(rij*fij,axis=1)
             sr2  = np.where ( in_range, 1.0 / rij_sq, 0.0 ) # Only where in range
