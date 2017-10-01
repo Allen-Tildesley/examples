@@ -253,26 +253,43 @@ Now we compare EOS data with typical test runs of our programs.
 The results in the following table use the same run lengths
 as for the Fortran examples (i.e. longer than the default value in the program),
 and default parameters otherwise.
+Results for Smart Monte Carlo and Brownian Dynamics are included,
+as they use the same cut-and-shifted potential.
+
 Numbers in parentheses (here and in the following tables)
 indicate errors in the last quoted digit, estimated from block averages.
 Results without error estimates are fixed (such as the temperature or density) or conserved.
 
-Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)   | _C_ (f)  
-------                 | -----     | -----     | --------   | -------- | --------- | -------    | -------   | --------
-Thol et al (2015) (cs) | 0.75      | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |           |          
-Thol et al (2016) (f)  | 0.75      | 1.00      |            |          |           | -3.7212    | 0.3996    | 2.2630  
-`md_nve_lj.py`         | 0.75      | 1.0027(4) | -2.9278    | 0.988(3) |  2.24(1)  | -3.7274    | 0.387(3)  |          
-`md_nvt_lj.py`         | 0.75      | 1.00      | -2.937(3)  | 0.975(4) |  2.1(1)   | -3.737(3)  | 0.374(4)  | 2.1(1)
-`md_npt_lj.py`         | 0.7509(5) | 1.00      | -2.942(5)  | 0.994(1) |           | -3.743(6)  | 0.3908(6) |
-`smc_nvt_lj`&sharp;(a) | 0.75      | 1.00      | -2.929(1)  | 0.979(3) |  2.256(4) | -3.729(1)  | 0.378(3)  | 2.264(4)
-`smc_nvt_lj`&sharp;(b) | 0.75      | 1.00      | -2.932(2)  | 0.95(1)  |  2.28(3)  | -3.732(2)  | 0.35(1)   | 2.29(3)
-`smc_nvt_lj`&sharp;(c) | 0.75      | 1.00      | -2.934(3)  | 0.94(1)  |  2.24(2)  | -3.733(3)  | 0.34(1)   | 2.24(2)
-`bd_nvt_lj.py`         | 0.75      | 1.00      | -2.931(3)  | 0.976(5) |  2.2(1)   | -3.731(3)  | 0.374(5)  | 2.2(1)
+Source                       | &rho;     | _T_       | _E_ (cs)   | _P_ (cs)  | _C_ (cs)  | _E_ (f)    | _P_ (f)   | _C_ (f)  
+------                       | -----     | -----     | --------   | --------  | --------- | -------    | -------   | --------
+Thol et al (2015) (cs)       | 0.75      | 1.00      | -2.9286    | 0.9897    |  2.2787   |            |           |          
+Thol et al (2016) (f)        | 0.75      | 1.00      |            |           |           | -3.7212    | 0.3996    | 2.2630  
+`md_nve_lj.py`               | 0.75      | 1.0027(4) | -2.9278    | 0.988(3)  |  2.24(1)  | -3.7274    | 0.387(3)  |          
+`md_nvt_lj.py`               | 0.75      | 1.00      | -2.937(3)  | 0.975(4)  |  2.1(1)   | -3.737(3)  | 0.374(4)  | 2.1(1)
+`md_npt_lj.py`&sect;         | 0.7509(5) | 1.00      | -2.942(5)  | 0.994(1)  |           | -3.743(6)  | 0.3908(6) |
+`md_nve_lj.py`&Dagger;       | 0.75      | 1.0006(1) | -2.9283(1) | 0.9903(7) |  2.26(1)  | -3.7279(1) | 0.3887(7) |
+`md_nvt_lj.py`&Dagger;       | 0.75      | 1.00      | -2.934(2)  | 0.982(3)  |  2.4(1)   | -3.734(2)  | 0.381(3)  | 2.4(1)
+`md_npt_lj.py`&sect;&Dagger; | 0.7505(4) | 1.00      | -2.936(4)  | 0.9920(7) |           | -3.736(5)  | 0.3896(2) |
+`smc_nvt_lj`&sharp;(a)       | 0.75      | 1.00      | -2.929(1)  | 0.979(3)  |  2.256(4) | -3.729(1)  | 0.378(3)  | 2.264(4)
+`smc_nvt_lj`&sharp;(b)       | 0.75      | 1.00      | -2.932(2)  | 0.95(1)   |  2.28(3)  | -3.732(2)  | 0.35(1)   | 2.29(3)
+`smc_nvt_lj`&sharp;(c)       | 0.75      | 1.00      | -2.934(3)  | 0.94(1)   |  2.24(2)  | -3.733(3)  | 0.34(1)   | 2.24(2)
+`bd_nvt_lj.py`               | 0.75      | 1.00      | -2.931(3)  | 0.976(5)  |  2.2(1)   | -3.731(3)  | 0.374(5)  | 2.2(1)
+
+&sect; The constant-pressure simulation was run at _P_=0.99, the program default.
 
 &sharp; The `smc_nvt_lj` program was tested (a) in default, single-particle-move, mode, with &delta;t=0.1;
 (b) in multi-particle mode, moving 100% of particles, with &delta;t=0.02;
 and (c) in multi-particle mode, moving 30% of particles, with &delta;t=0.03.
 These values give acceptance rates in the 45% &ndash; 55% range.
+
+&Dagger; Indicates a larger system size, _N_=864, and a neighbour-list method:
+the main program is edited to import routines from `md_lj_ll_module.py` rather than `md_lj_module.py`.
+A cell structure is used, similar to the Fortran example.
+Linked lists are _not_ used (despite the module name!), as there is no advantage to this in Python.
+The resulting code is not especially efficient for this system size, with 4&times;4&times;4 cells,
+and in a practical application when performance is an issue
+Python/NumPy would probably not be used for the force routine.
+However, the module illustrates the basic idea of this approach.
 
 ### Lennard-Jones MC programs
 
@@ -431,12 +448,14 @@ were used to give the results in the table below,
 except that the run length was increased to 10&times;100000 steps,
 the same as for the Fortran example,
 and the strain rate was varied as shown.
+In the table below, for each strain rate,
+the results in columns 2-4 come from `md_nvt_lj_le.py`.
 
-Strain rate | _E_       | _P_      | &eta;    
------       | -----     | -----    | -----    
-0.04        | 1.8040(2) | 6.389(1) | 2.31(3)  
-0.16        | 1.8099(3) | 6.428(2) | 2.227(9)
-0.64        | 1.8648(2) | 6.777(1) | 1.940(2)
+Strain rate | _E_       | _P_      | &eta;    | _E_       | _P_      | &eta;    
+-----       | -----     | -----    | -----    | -----     | -----    | -----  
+0.04        | 1.8040(2) | 6.389(1) | 2.31(3)  | 1.8035(5) | 6.387(3) | 2.4(1)
+0.16        | 1.8099(3) | 6.428(2) | 2.227(9) | 1.8087(4) | 6.421(3) | 2.19(2)
+0.64        | 1.8648(2) | 6.777(1) | 1.940(2) | 1.8645(4) | 6.775(3) | 1.933(6)
 
 In all cases the kinetic energy was conserved very accurately by the algorithm.
 The results, particularly the increase in _E_ and _P_,
@@ -447,6 +466,18 @@ and with the results of the Fortran programs.
 Incidentally, at the highest strain rate 0.64,
 the configurational temperature is systematically about 1% lower
 than the (constrained) kinetic temperature.
+
+The results in columns 5-7 come from the same program,
+edited to import routines from `md_lj_llle_module.py` rather than `md_lj_le_module.py`.
+This version uses neighbour lists, in the same way as `md_lj_ll_module.py`.
+The system size is unchanged;
+however, for this system the program is very inefficient (compared with the simpler version without lists)
+and consequently the runs used for testing are only 10&times;20000 steps.
+The inefficiency probably results from the very small cells and hence short NumPy arrays,
+which incur significant overheads.
+It is worth repeating that in a practical application,
+when performance is an issue,
+Python/NumPy would probably not be used for the force routine.
 
 ## Hard-particle programs
 The programs `mc_nvt_hs.py` and `md_nve_hs.py` illustrate, respectively,

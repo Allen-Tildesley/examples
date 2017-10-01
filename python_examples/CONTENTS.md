@@ -112,8 +112,14 @@ A Fortran version is available.
 A Fortran version of this code snippet appears in the text, not online.
 
 ### 5.3 Force routine using linked lists
-We do not provide a Python version of this example.
-A Fortran version is available.
+[md_lj_ll_module.py](md_lj_ll_module.py).
+This may be used
+in combination with [md_nve_lj.py](md_nve_lj.py), [md_nvt_lj.py](md_nvt_lj.py), or [md_npt_lj.py](md_npt_lj.py).
+In each case, the program needs to be edited so as to import routines from this module
+instead of [md_lj_module.py](md_lj_module.py).
+Despite the name, linked lists are _not_ used, as there is no advantage in Python.
+However, the module illustrates the cell structure, and the calculation of forces between neighbouring cells,
+analogous to the Fortran example.
 
 ### 5.4 Monte Carlo routines using linked lists
 We do not provide a Python version of this example.
@@ -185,8 +191,14 @@ a constant-temperature MC program
 [md_nvt_lj_le.py](md_nvt_lj_le.py) and [md_lj_le_module.py](md_lj_le_module.py).
 
 ### 11.2 Cell structure and linked lists in sheared boundaries
-We do not provide a Python version of this example.
-A Fortran version is available.
+[md_lj_llle_module.py](md_lj_llle_module.py).
+This may be used
+in combination with [md_nve_lj_le.py](md_nve_lj_le.py),
+edited so as to import routines from this module
+instead of [md_lj_le_module.py](md_lj_le_module.py).
+Despite the name, linked lists are _not_ used, as there is no advantage in Python.
+However, the module illustrates the cell structure, and the calculation of forces between neighbouring cells,
+analogous to the Fortran example.
 
 ### 12.1 Brownian dynamics program
 [bd_nvt_lj.py](bd_nvt_lj.py) and [md_lj_module.py](md_lj_module.py).
