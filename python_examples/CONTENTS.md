@@ -193,7 +193,7 @@ a constant-temperature MC program
 ### 11.2 Cell structure and linked lists in sheared boundaries
 [md_lj_llle_module.py](md_lj_llle_module.py).
 This may be used
-in combination with [md_nve_lj_le.py](md_nve_lj_le.py),
+in combination with [md_nvt_lj_le.py](md_nvt_lj_le.py),
 edited so as to import routines from this module
 instead of [md_lj_le_module.py](md_lj_le_module.py).
 Despite the name, linked lists are _not_ used, as there is no advantage in Python.
