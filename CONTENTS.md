@@ -26,6 +26,11 @@ but are mentioned in the online [GUIDE](GUIDE.md):
 * [eos_lj.f90](eos_lj.f90) with [eos_lj_module.f90](eos_lj_module.f90)
 * [eos_hs.f90](eos_hs.f90)
 
+An additional molecular dynamics program using quaternions
+[md_nvt_poly_lj.f90](md_nvt_poly_lj.f90) and [md_poly_lj_module.f90](md_poly_lj_module.f90)
+is described in the online [GUIDE](GUIDE.md),
+but does not appear in the text.
+
 ### 1.1 Calculation of T tensors
 [t_tensor.f90](t_tensor.f90).
 
@@ -100,6 +105,9 @@ We also supply a constant-pressure version [mc_npt_hs.f90](mc_npt_hs.f90).
 
 ### 4.7 Monte Carlo program using quaternions
 [mc_nvt_poly_lj.f90](mc_nvt_poly_lj.f90) and [mc_poly_lj_module.f90](mc_poly_lj_module.f90).
+We also supply a molecular dynamics program
+[md_nvt_poly_lj.f90](md_nvt_poly_lj.f90) and [md_poly_lj_module.f90](md_poly_lj_module.f90)
+to simulate the same model.
 
 ### 4.8 Monte Carlo of hard spherocylinders
 [mc_nvt_sc.f90](mc_nvt_sc.f90) and [mc_sc_module.f90](mc_sc_module.f90).

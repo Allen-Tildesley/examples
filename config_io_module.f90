@@ -183,11 +183,11 @@ CONTAINS
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: r        ! Molecular positions (3,n)
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: e        ! Orientation vectors (3,n) or quaternions (4,n)
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: v        ! Molecular velocities (3,n)
-    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: w        ! Angular velocities (3,n)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(out)   :: w        ! Angular velocities/momenta (3,n)
 
     ! The first call of this routine is just to get n and box, used to allocate arrays
     ! The second call attempts to read in the molecular positions, orientations
-    ! and optionally velocities, angular velocities
+    ! and optionally velocities, angular velocities/momenta
 
     INTEGER :: cnf_unit, ioerr, i
 
@@ -252,7 +252,7 @@ CONTAINS
              STOP 'Error in read_cnf_mols'
           END IF
 
-          ! Read positions, orientation vectors or quaternions, velocities, angular velocities
+          ! Read positions, orientation vectors or quaternions, velocities, angular velocities/momenta
           DO i = 1, n
              READ ( unit=cnf_unit, fmt=*, iostat=ioerr ) r(:,i), e(:,i), v(:,i), w(:,i)
              IF ( ioerr /= 0 ) THEN
@@ -292,7 +292,7 @@ CONTAINS
     REAL, DIMENSION(:,:),           INTENT(in) :: r        ! Molecular positions (3,n)
     REAL, DIMENSION(:,:),           INTENT(in) :: e        ! Orientation vectors (3,n) or quaternions (0:3,n)
     REAL, DIMENSION(:,:), OPTIONAL, INTENT(in) :: v        ! Molecular velocities (3,n)
-    REAL, DIMENSION(:,:), OPTIONAL, INTENT(in) :: w        ! Angular velocities (3,n)
+    REAL, DIMENSION(:,:), OPTIONAL, INTENT(in) :: w        ! Angular velocities/momenta (3,n)
 
     INTEGER :: cnf_unit, ioerr, i
 
@@ -330,7 +330,7 @@ CONTAINS
           STOP 'Error in write_cnf_mols'
        END IF
 
-       ! Write positions, orientation vectors or quaternions, velocities, angular velocities
+       ! Write positions, orientation vectors or quaternions, velocities, angular velocities/momenta
        DO i = 1, n
           WRITE ( unit=cnf_unit, fmt='(*(f15.10))') r(:,i), e(:,i), v(:,i), w(:,i)
        END DO

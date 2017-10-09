@@ -64,7 +64,7 @@ def read_cnf_mols ( filename, with_v=False, quaternions=False ):
     if with_v:
         assert cols >= cols_re+6, "{:d}{}{:d}".format(cols,' cols less than',cols_re+6)
         v = revw[:,cols_re  :cols_re+3].astype(np.float_) # Velocity array
-        w = revw[:,cols_re+3:cols_re+6].astype(np.float_) # Angular velocity array
+        w = revw[:,cols_re+3:cols_re+6].astype(np.float_) # Angular velocity/momentum array
         return n, box, r, e, v, w
     else:
         return n, box, r, e
@@ -116,7 +116,7 @@ def write_cnf_mols ( filename, nn, box, *args ):
         re=np.concatenate((args[0],args[1]),axis=1) # Just r and e
         np.savetxt(filename,re,header=my_header,fmt='%15.10f',comments='')
 
-    else: # Positions, orientations, velocities and angular velocities
+    else: # Positions, orientations, velocities and angular velocities/momenta
         n, d = args[2].shape
         assert n==nn, "v shape mismatch {:d}{:d}".format(n,nn)
         assert d==3, "v shape mismatch {:d}".format(d)

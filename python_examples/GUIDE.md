@@ -655,7 +655,8 @@ When comparing results with the MC program, several points should be remembered.
 2. While we use _k_<sub>spring</sub>=10000 to highlight the multiple timestep method,
 it is quite likely that energy flow between bond vibrations and other degrees of freedom will be inefficient,
 due to the timescale separation.
-3. The constant-_NVE_ and constant-_NVT_ ensembles are expected to yield different behaviour around the collapse transition. We do not focus on this region, in the Python tests.
+3. The constant-_NVE_ and constant-_NVT_ ensembles are expected to yield different behaviour around the collapse transition.
+We do not focus on this region, in the Python tests.
 4. Molecular dynamics is not expected to thoroughly explore the energy landscape at low temperatures,
 giving instead (typically) quasi-harmonic vibrations in a single basin.
 We do not focus on this region, in the Python tests.
@@ -771,6 +772,7 @@ _T_   | _E_        | _P_       | _T_ (K) | _PE_ (kJ/mol) | _PE_ (kJ/mol) eqn (23
 
 A second set of tests was performed at _T_=0.6&asymp;380K
 at the specified densities &rho;<sub>1</sub>, &hellip; &rho;<sub>5</sub> of Mossa et al (2002).
+A set of starting configurations is provided in the [Data repository](https://github.com/Allen-Tildesley/data).
 Here the excess pressure (_P_(ex)=_P_-&rho;_T_ converted to MPa
 with a factor 77.75 based on the values of &epsilon; and &sigma;)
 is compared with the fit given by eqn (28) and the coefficients in Table III of Mossa et al (2002).
@@ -793,6 +795,74 @@ since this system can show sluggish behaviour.
 The MD simulations of Mossa et al (2002) are reported to extend to several hundred nanoseconds
 (of order 10<sup>7</sup> MD timesteps) at the lowest temperatures.
 It should be noted that this Python code is quite slow compared to the simpler atomic LJ examples.
+
+For comparison we provide a molecular dynamics code `md_nvt_poly_lj.py` for the same model.
+The program takes the molecular mass _M_ to be unity.
+Mossa et al (2002) ascribe a notional mass of 78u to each of the three LJ sites,
+so _M_&asymp;3.9&times;10<sup>-25</sup>kg.
+Combined with the above values of &epsilon; and &sigma;,
+this gives a time scale (_M_/&epsilon;)<sup>1/2</sup>&sigma; &asymp; 3.22 ps.
+The timestep of &delta;t=0.01 ps used by Mossa et al (2002)
+corresponds to the default value in the program `dt=0.003` in these units.
+By default, the program simulates the constant-_NVE_ ensemble,
+but there is an option to simulate at constant _NVT_ by velocity randomization (Andersen thermostat).
+If the latter option is selected,
+the program will read configurations in the same format as `mc_nvt_poly_lj.py` (positions and quaternions only),
+selecting random initial velocities and angular momenta,
+which can be convenient.
+
+By default the program calculates the inertia tensor from the LJ site bond vectors,
+assuming equal masses.
+For simplicity it is assumed that the bond vectors are defined such that
+the principal axes of the inertia tensor coincide with
+the xyz axes of the molecular coordinate system,
+with the centre of mass at the origin;
+it is always possible to arrange this.
+In general,
+the three principal moments of inertia will all be different,
+so the molecule is an asymmetric top.
+The MD algorithm for rotation is a symplectic one
+in which a `kick` propagator advances the space-fixed angular momenta,
+using the torque on each molecule,
+and a succession of `drift` steps implement free rotation about each of the principal axes.
+This is described in the text, section 3.3; see
+
+* A Dullweber, B Leimkuhler, R McLachlan, _J Chem Phys,_ __107,__ 5840 (1997),
+* TF Miller, M Eleftheriou, P Pattnaik, A Ndirango, D Newns, GJ Martyna, _J Chem Phys,_ __116,__ 8649 (2002).
+
+The results below are for test runs in both constant-_NVE_  and constant-_NVT_ ensembles,
+at (approximately) the same state points as those given above.
+All runs were 10&times;5000 steps in length and used program defaults,
+except for `t_interval=1` and the specified temperature in the _NVT_ case.
+Because of the slow execution of the Python code,
+these runs are significantly shorter than the comparable Fortran examples,
+and very much shorter than the runs of Mossa et al (2002).
+For constant-_NVE_ runs we report RMS energy fluctuations,
+and _T_ is the average translational temperature.
+
+ &rho;   | _T_       | _E_        | _P_       | _E_(RMS)
+ -----   | -----     | -----      | -----     | -----
+ 0.32655 | 0.5       | -13.035(7) |  1.66(2)  |
+ 0.32655 | 0.5025(9) | -13.0355   |  1.606(9) | 1.14&times;10<sup>-8</sup>
+ 0.32655 | 1.0       | -9.74(1)   |  6.03(3)  |
+ 0.32655 | 1.013(1)  | -9.7372    |  5.975(7) | 1.01&times;10<sup>-7</sup>
+ 0.32655 | 1.5       | -6.81(1)   |  9.41(4)  |
+ 0.32655 | 1.508(1)  | -6.8136    |  9.407(5) | 3.64&times;10<sup>-7</sup>
+ 0.32655 | 2.0       | -4.16(3)   | 12.26(7)  |
+ 0.32655 | 1.986(2)  | -4.1570    | 12.291(8) | 9.04&times;10<sup>-7</sup>
+
+ &rho;   |  _T_       | _E_        | _P_      | _E_ (RMS)
+ -----   | -----      | -----      | -----    | -----
+ 0.30533 |  0.6       | -11.624(6) | 0.48(2)  |
+ 0.30533 |  0.6018(7) | -11.6239   | 0.453(6) | 1.33&times;10<sup>-8</sup>
+ 0.31240 |  0.6       | -11.902(9) | 1.13(2)  |
+ 0.31240 |  0.604(1)  | -11.9018   | 1.049(7) | 1.49&times;10<sup>-8</sup>
+ 0.31918 |  0.6       | -12.206(7) | 1.59(2)  |
+ 0.31918 |  0.596(1)  | -12.2065   | 1.63(1)  | 1.64&times;10<sup>-8</sup>
+ 0.32655 |  0.6       | -12.379(8) | 2.50(2)  |
+ 0.32655 |  0.599(1)  | -12.3793   | 2.58(1)  | 1.93&times;10<sup>-8</sup>
+ 0.33451 |  0.6       | -12.541(4) | 3.66(1)  |
+ 0.33451 |  0.601(1)  | -12.5411   | 3.70(1)  | 2.40&times;10<sup>-8</sup>
 
 ## DPD program
 For the `dpd.py` example, we recommend generating an initial configuration

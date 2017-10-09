@@ -26,6 +26,11 @@ but are mentioned in the online [GUIDE](GUIDE.md):
 * [eos_lj.py](eos_lj.py) with [eos_lj_module.py](eos_lj_module.py)
 * [eos_hs.py](eos_hs.py)
 
+An additional molecular dynamics program using quaternions
+[md_nvt_poly_lj.py](md_nvt_poly_lj.py) and [md_poly_lj_module.py](md_poly_lj_module.py)
+is described in the online [GUIDE](GUIDE.md),
+but does not appear in the text.
+
 ### 1.1 Calculation of T tensors
 [t_tensor.py](t_tensor.py).
 
@@ -99,6 +104,9 @@ We also supply a constant-pressure version [mc_npt_hs.py](mc_npt_hs.py).
 
 ### 4.7 Monte Carlo program using quaternions
 [mc_nvt_poly_lj.py](mc_nvt_poly_lj.py) and [mc_poly_lj_module.py](mc_poly_lj_module.py).
+We also supply a molecular dynamics program
+[md_nvt_poly_lj.py](md_nvt_poly_lj.py) and [md_poly_lj_module.py](md_poly_lj_module.py)
+to simulate the same model.
 
 ### 4.8 Monte Carlo of hard spherocylinders
 [mc_nvt_sc.py](mc_nvt_sc.py) and [mc_sc_module.py](mc_sc_module.py).

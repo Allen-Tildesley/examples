@@ -876,6 +876,7 @@ _T_   | _E_        | _P_       | _T_ (K) | _PE_ (kJ/mol) | _PE_ (kJ/mol) eqn (23
 
 A second set of tests was performed at _T_=0.6&asymp;380K
 at the specified densities &rho;<sub>1</sub>, &hellip; &rho;<sub>5</sub> of Mossa et al (2002).
+A set of starting configurations is provided in the [Data repository](https://github.com/Allen-Tildesley/data).
 Here the excess pressure (_P_(ex)=_P_-&rho;_T_ converted to MPa
 with a factor 77.75 based on the values of &epsilon; and &sigma;)
 is compared with the fit given by eqn (28) and the coefficients in Table III of Mossa et al (2002).
@@ -897,6 +898,71 @@ our default run length (10 blocks of 20000 sweeps each) should be borne in mind,
 since this system can show sluggish behaviour.
 The MD simulations of Mossa et al (2002) are reported to extend to several hundred nanoseconds
 (of order 10<sup>7</sup> MD timesteps) at the lowest temperatures.
+
+For comparison we provide a molecular dynamics code `md_nvt_poly_lj` for the same model.
+The program takes the molecular mass _M_ to be unity.
+Mossa et al (2002) ascribe a notional mass of 78u to each of the three LJ sites,
+so _M_&asymp;3.9&times;10<sup>-25</sup>kg.
+Combined with the above values of &epsilon; and &sigma;,
+this gives a time scale (_M_/&epsilon;)<sup>1/2</sup>&sigma; &asymp; 3.22 ps.
+The timestep of &delta;t=0.01 ps used by Mossa et al (2002)
+corresponds to the default value in the program `dt=0.003` in these units.
+By default, the program simulates the constant-_NVE_ ensemble,
+but there is an option to simulate at constant _NVT_ by velocity randomization (Andersen thermostat).
+If the latter option is selected,
+the program will read configurations in the same format as `mc_nvt_poly_lj` (positions and quaternions only),
+selecting random initial velocities and angular momenta,
+which can be convenient.
+
+By default the program calculates the inertia tensor from the LJ site bond vectors,
+assuming equal masses.
+For simplicity it is assumed that the bond vectors are defined such that
+the principal axes of the inertia tensor coincide with
+the xyz axes of the molecular coordinate system,
+with the centre of mass at the origin;
+it is always possible to arrange this.
+In general,
+the three principal moments of inertia will all be different,
+so the molecule is an asymmetric top.
+The MD algorithm for rotation is a symplectic one
+in which a `kick` propagator advances the space-fixed angular momenta,
+using the torque on each molecule,
+and a succession of `drift` steps implement free rotation about each of the principal axes.
+This is described in the text, section 3.3; see
+
+* A Dullweber, B Leimkuhler, R McLachlan, _J Chem Phys,_ __107,__ 5840 (1997),
+* TF Miller, M Eleftheriou, P Pattnaik, A Ndirango, D Newns, GJ Martyna, _J Chem Phys,_ __116,__ 8649 (2002).
+
+The results below are for test runs in both constant-_NVE_  and constant-_NVT_ ensembles,
+at (approximately) the same state points as those given above.
+All runs were 10&times;20000 steps in length and used program defaults,
+except for `t_interval=1` and the specified temperature in the _NVT_ case.
+For constant-_NVE_ runs we report RMS energy fluctuations,
+and _T_ is the average translational temperature.
+
+ &rho;   | _T_       | _E_        | _P_       | _E_(RMS)
+ -----   | -----     | -----      | -----     | -----
+ 0.32655 | 0.5       | -12.984(5) |  1.81(1)  |
+ 0.32655 | 0.5082(4) | -12.9838   |  1.755(6) | 1.23&times;10<sup>-8</sup>
+ 0.32655 | 1.0       | -9.80(2)   |  5.87(4)  |
+ 0.32655 | 1.004(1)  | -9.8006    |  5.896(5) | 9.88&times;10<sup>-8</sup>
+ 0.32655 | 1.5       | -6.83(1)   |  9.35(3)  |
+ 0.32655 | 1.506(1)  | -6.8326    |  9.378(6) | 3.67&times;10<sup>-7</sup>
+ 0.32655 | 2.0       | -4.05(1)   | 12.42(4)  |
+ 0.32655 | 2.007(1)  | -4.0507    | 12.405(4) | 9.39&times;10<sup>-7</sup>
+
+ &rho;   |  _T_       | _E_        | _P_      | _E_ (RMS)
+ -----   | -----      | -----      | -----    | -----
+ 0.30533 |  0.6       | -11.613(5) | 0.45(2)  |
+ 0.30533 |  0.6013(8) | -11.6131   | 0.485(4) | 1.31&times;10<sup>-8</sup>
+ 0.31240 |  0.6       | -11.892(6) | 1.04(2)  |
+ 0.31240 |  0.6039(8) | -11.8923   | 1.058(5) | 1.52&times;10<sup>-8</sup>
+ 0.31918 |  0.6       | -12.147(4) | 1.75(1)  |
+ 0.31918 |  0.603(1)  | -12.1465   | 1.710(9) | 1.73&times;10<sup>-8</sup>
+ 0.32655 |  0.6       | -12.362(3) | 2.61(1)  |
+ 0.32655 |  0.604(2)  | -12.3616   | 2.58(1)  | 2.05&times;10<sup>-8</sup>
+ 0.33451 |  0.6       | -12.453(7) | 3.96(2)  |
+ 0.33451 |  0.612(1)  | -12.4532   | 3.87(1)  | 2.53&times;10<sup>-8</sup>
 
 ## DPD program
 For the `dpd` example, we recommend generating an initial configuration

@@ -140,11 +140,9 @@ r = r - np.rint ( r ) # Periodic boundaries
 
 # Calculate all bond vectors
 d  = np.empty ( (n,na,3), dtype=np.float_ )
-di = np.empty ( (na,3), dtype=np.float_ )
 for i, ei in enumerate(e):
     ai = q_to_a ( ei ) # Rotation matrix for i
-    for a in range(na):
-        d[i,a,:] = np.dot ( db[a,:], ai ) # NB: equivalent to ai_T*db, ai_T=transpose of ai
+    d[i,:,:] = np.dot ( db, ai ) # NB: equivalent to ai_T*db, ai_T=transpose of ai
 
 # Initial energy and overlap check
 total = potential ( box, r, d )
@@ -172,8 +170,7 @@ for blk in range(1,nblock+1): # Loop over blocks
             ri = ri - np.rint ( ri )                            # Periodic boundary correction
             ei = random_rotate_quaternion ( de_max, e[i,:] )    # Trial rotation
             ai = q_to_a ( ei ) # Rotation matrix for i
-            for a in range(na):
-                di[a,:] = np.dot ( db[a,:], ai ) # NB: equivalent to ai_T*db, ai_T=transpose of ai
+            di = np.dot ( db, ai ) # NB: equivalent to ai_T*db, ai_T=transpose of ai
             partial_new = potential_1 ( ri, di, box, rj, dj ) # New atom potential, virial etc
 
             if not partial_new.ovr: # Test for non-overlapping configuration

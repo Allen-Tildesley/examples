@@ -54,7 +54,7 @@ class PotentialType:
     """A composite variable for interactions."""
 
     def __init__(self, pot, vir, ovr):
-        self.pot = pot # the potential energy cut (but not shifted) at r_cut
+        self.pot = pot # the potential energy
         self.vir = vir # the virial
         self.ovr = ovr # a flag indicating overlap (i.e. pot too high to use)
 
