@@ -108,6 +108,9 @@ def u1_propagator ( t ):
     import numpy as np
 
     # U1 part
+    # The propagator for r looks different from the formula given on p142 of the text.
+    # However it is easily derived from that formula, bearing in mind that coordinates in
+    # this program are divided by the box length, which is itself updated in this routine.
 
     x = t * p_eps / w_eps # Time step * time derivative of strain
     c = (1.0-np.exp(-x))/x if x>0.001 else np.polyval([-1/24,1/6,-1/2,1.0],x) # Guard against small values

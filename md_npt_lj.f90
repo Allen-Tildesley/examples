@@ -229,6 +229,9 @@ CONTAINS
     REAL, PARAMETER :: c1 = -1.0/2.0, c2 = 1.0/6.0, c3 = -1.0/24.0
 
     ! U1 part
+    ! The propagator for r(:,:) looks different from the formula given on p142 of the text.
+    ! However it is easily derived from that formula, bearing in mind that coordinates in
+    ! this program are divided by the box length, which is itself updated in this routine.
 
     x = t * p_eps / w_eps ! Time step * time derivative of strain
 
