@@ -4,8 +4,8 @@
 
 import os, sys
 
-# This has been tested using SCons v2.5.1, gfortran v6.3,
-# using MacOS Sierra (10.12) with compilers and libraries installed through MacPorts.
+# This has been tested using SCons v3.0.4, gfortran v8.2.0,
+# using MacOS Mojave (10.14.2) with compilers and libraries installed through MacPorts.
 # It may not work on your system. It is possible that you can get it to work by
 # changing the flags and library/include paths defined in the following few statements.
 # The most likely trouble spots are the programs that use the non-standard
@@ -36,7 +36,8 @@ OMP_FLAGS='-fopenmp'
 OMP_LINKFLAGS='-fopenmp'
 
 env_normal=Environment(ENV=os.environ)
-env_normal.Append(F90FLAGS=MY_FLAGS,FORTRANMODDIRPREFIX='-J',FORTRANMODDIR='${TARGET.dir}',F90PATH=['${TARGET.dir}'])
+env_normal.Append(F90FLAGS=MY_FLAGS,FORTRANMODDIR='${TARGET.dir}',F90PATH=['${TARGET.dir}'])
+# Earlier versions also needed FORTRANMODDIRPREFIX='-J'
 
 env_lapack=env_normal.Clone()
 env_lapack.Append(LIBPATH=[LAPACK_LIBPATH],LIBS=LAPACK_LIBS)
