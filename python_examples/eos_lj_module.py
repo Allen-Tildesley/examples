@@ -30,7 +30,7 @@
 # M Thol, G Rutkai, R Span, J Vrabec, R Lustig, Int J Thermophys 36, 25 (2015)
 # M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, J Phys Chem Ref Data 45, 023101 (2016)
 # Those authors also supply C++ codes (in the supplementary information of those papers)
-# They are NOT responsible for this Fortran code, which was written independently by Michael P Allen
+# They are NOT responsible for this Python code, which was written independently by Michael P Allen
 # A similar notation, consistent with the papers, is retained for clarity.
 
 
