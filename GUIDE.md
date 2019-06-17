@@ -109,7 +109,7 @@ the latter giving an estimate for the full potential (f).
 Differences between the different models are discussed in various places,
 see e.g.
 
-* A Trokhymchuk, J Alejandre, _J Chem Phys,_ __111,__ 8510 (1999).
+* [A Trokhymchuk, J Alejandre, _J Chem Phys,_ __111,__ 8510 (1999)](https://doi.org/10.1063/1.480192).
 
 Using their table V as a guide, we take the critical point to be roughly located at:
 
@@ -146,15 +146,15 @@ lies in the liquid region of the phase diagram for all these variants of the mod
 
 Approximate equations of state for the full LJ potential have been presented by
 
-* JK Johnson, JA Zollweg, KE Gubbins, _Mol Phys_, __78,__ 591 (1993)
-* J Kolafa and I Nezbeda, _Fluid Phase Equil,_ __100,__ 1 (1994)
-* M Mecke, A Muller, J Winkelmann, J Vrabec, J Fischer, R Span, W Wagner,
-_Int J Thermophys,_ __17,__ 391 (1996) and __19,__ 1493(E) (1998)
+* [JK Johnson, JA Zollweg, KE Gubbins, _Mol Phys_, __78,__ 591 (1993)](https://doi.org/10.1080/00268979300100411).
+* [J Kolafa and I Nezbeda, _Fluid Phase Equil,_ __100,__ 1 (1994)](https://doi.org/10.1016/0378-3812(94)80001-4).
+* [M Mecke, A Muller, J Winkelmann, J Vrabec, J Fischer, R Span, W Wagner,
+_Int J Thermophys,_ __17,__ 391 (1996)](https://doi.org/10.1007/BF01443399) and [__19,__ 1493(E) (1998)](https://doi.org/10.1023/A:1021995905315).
 
 For testing our programs we used the more recent fitted equations of state presented by
 
-* M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)
-* M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, _J Phys Chem Ref Data,_ __45,__ 023101 (2016)
+* [M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)](https://doi.org/10.1007/s10765-014-1764-4).
+* [M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, _J Phys Chem Ref Data,_ __45,__ 023101 (2016)](https://doi.org/10.1063/1.4945000).
 
 for both the cut-and-shifted potential (denoted cs below), at _R_<sub>c</sub>=2.5&sigma;,
 and the full potential (denoted f).
@@ -198,17 +198,17 @@ Numbers in parentheses (here and in the following tables)
 indicate errors in the last quoted digit, estimated from block averages.
 Results without error estimates are fixed (such as the temperature or density) or conserved.
 
-Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)  
+Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)
 ------                 | -----     | -----     | --------   | -------- | --------- | -------    | -------  | --------
-Thol et al (2015) (cs) | 0.75      | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |          
-Thol et al (2016) (f)  | 0.75      | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630  
+[Thol et al (2015)](https://doi.org/10.1007/s10765-014-1764-4) (cs) | 0.75      | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |
+[Thol et al (2016)](https://doi.org/10.1063/1.4945000) (f)  | 0.75      | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630
 `md_nvt_lj`            | 0.75      | 1.00      | -2.940(4)  | 0.965(6) |  2.27(12) | -3.740(4)  | 0.363(6) | 2.27(12)
 `md_npt_lj`&sect;      | 0.7514(6) | 1.00      | -2.947(6)  | 0.995(1) |           | -3.748(7)  | 0.391(1) |
-`md_nve_lj`            | 0.75      | 1.0022(3) | -2.9289    | 0.987(2) |  2.24(1)  | -3.7284    | 0.386(2) |          
-`md_nve_lj_omp`        | 0.75      | 1.0027(2) | -2.9278    | 0.986(2) |  2.28(1)  | -3.7273    | 0.385(2) |          
-`md_nve_lj_vl`         | 0.75      | 1.0023(3) | -2.9278    | 0.992(2) |  2.24(1)  | -3.7274    | 0.391(2) |          
-`md_nve_lj_ll`&Dagger; | 0.75      | 1.0010(1) | -2.9272    | 0.992(1) |  2.28(1)  | -3.7268    | 0.391(1) |          
-`md_nvt_lj_ll`&Dagger; | 0.75      | 1.00      | -2.927(2)  | 0.994(3) |  2.3(1)   | -3.727(2)  | 0.392(3) | 2.3(1)         
+`md_nve_lj`            | 0.75      | 1.0022(3) | -2.9289    | 0.987(2) |  2.24(1)  | -3.7284    | 0.386(2) |
+`md_nve_lj_omp`        | 0.75      | 1.0027(2) | -2.9278    | 0.986(2) |  2.28(1)  | -3.7273    | 0.385(2) |
+`md_nve_lj_vl`         | 0.75      | 1.0023(3) | -2.9278    | 0.992(2) |  2.24(1)  | -3.7274    | 0.391(2) |
+`md_nve_lj_ll`&Dagger; | 0.75      | 1.0010(1) | -2.9272    | 0.992(1) |  2.28(1)  | -3.7268    | 0.391(1) |
+`md_nvt_lj_ll`&Dagger; | 0.75      | 1.00      | -2.927(2)  | 0.994(3) |  2.3(1)   | -3.727(2)  | 0.392(3) | 2.3(1)
 `smc_nvt_lj`&sharp;(a) | 0.75      | 1.00      | -2.9300(5) | 0.971(2) |  2.263(5) | -3.7296(5) | 0.369(2) | 2.270(5)
 `smc_nvt_lj`&sharp;(b) | 0.75      | 1.00      | -2.928(2)  | 0.99(1)  |  2.26(2)  | -3.728(2)  | 0.39(1)  | 2.27(2)
 `smc_nvt_lj`&sharp;(c) | 0.75      | 1.00      | -2.930(3)  | 0.98(2)  |  2.26(3)  | -3.729(3)  | 0.38(2)  | 2.27(3)
@@ -229,7 +229,7 @@ because a larger cutoff (by default _R<sub>c</sub>_=4.0&sigma;) is used to illus
 The program was tested with _N_=400 (box length 8.1).
 The usual state point is simulated: &rho;=0.75 throughout.
 No fitted EOS for the cs potential for this cutoff is available; obviously the estimates for the full potential
-should be comparable with the values given above from Thol et al (2016).
+should be comparable with the values given above from [Thol et al (2016)](https://doi.org/10.1063/1.4945000).
 Smallest timestep &delta;t (called `dt1` in the program)
 and multiple-timestep-multipliers (the `n_mts` array) are given in column 2.
 In all cases the run length was equal to 10 blocks of 20000 steps of length 0.005.
@@ -265,7 +265,7 @@ Our MC programs use the cut (but not shifted) potential
 In this case, the value of _C<sub>v</sub>_ (reported as _C_ below)
 should be equal to the value for the full potential,
 since the energy LRC is independent of temperature.
-The Thol et al (2016) EOS for the full potential
+The [Thol et al (2016)](https://doi.org/10.1063/1.4945000) EOS for the full potential
 is used to predict results for the cut (but not shifted) potential (denoted c),
 at _R_<sub>c</sub>=2.5&sigma;, using the same LRC and delta corrections as in the MC codes.
 Once again, all values in the table include the ideal gas contribution.
@@ -273,14 +273,14 @@ Except where indicated, tests are performed for _N_=256.
 
 Source                       | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C_ (f)
 ------                       | -----     | ----- | -------    | -------  | -------    | -------  | --------
-Thol et al (2016) (f)        | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630  
+[Thol et al (2016)](https://doi.org/10.1063/1.4945000) (f)        | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630
 `mc_nvt_lj`                  | 0.75      | 1.00  | -3.332(1)  | 0.651(3) | -3.734(1)  | 0.350(3) |  2.28(1)
 `mc_nvt_lj_re`&sharp;        | 0.75      | 1.00  | -3.332(1)  | 0.648(2) | -3.734(1)  | 0.347(2) |  2.258(4)
 `mc_nvt_lj_ll`&Dagger;       | 0.75      | 1.00  | -3.3230(3) | 0.669(1) | -3.7246(3) | 0.367(1) |  2.27(1)
-`mc_npt_lj`&sect;            | 0.7501(2) | 1.00  | -3.331(1)  | 0.666(2) | -3.733(1)  | 0.364(2) |          
-`mc_npt_lj_ll`&Dagger;&sect; | 0.7506(4) | 1.00  | -3.332(3)  | 0.660(3) | -3.734(3)  | 0.358(3) |          
-`mc_zvt_lj`&para;            | 0.7504(4) | 1.00  | -3.333(3)  | 0.668(4) | -3.735(3)  | 0.366(4) |          
-`mc_zvt_lj_ll`&Dagger;&para; | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |          
+`mc_npt_lj`&sect;            | 0.7501(2) | 1.00  | -3.331(1)  | 0.666(2) | -3.733(1)  | 0.364(2) |
+`mc_npt_lj_ll`&Dagger;&sect; | 0.7506(4) | 1.00  | -3.332(3)  | 0.660(3) | -3.734(3)  | 0.358(3) |
+`mc_zvt_lj`&para;            | 0.7504(4) | 1.00  | -3.333(3)  | 0.668(4) | -3.735(3)  | 0.366(4) |
+`mc_zvt_lj_ll`&Dagger;&para; | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |
 
 &Dagger; Indicates a larger system size, _N_=864 (or approximately so for `mc_zvt_lj_ll`).
 Note that the linked lists do not give an enormous speedup for this system size,
@@ -288,11 +288,11 @@ which corresponds to 4&times;4&times;4 cells.
 
 &sect; The constant pressure simulations were run at _P_=0.69, the program default.
 The measured _C<sub>p</sub>_ (full) values were 5.28(7) for `mc_npt_lj` and 5.04(16) for `mc_npt_lj_ll`,
-compared with Thol et al (2016) EOS giving 5.22.
+compared with [Thol et al (2016)](https://doi.org/10.1063/1.4945000) EOS giving 5.22.
 The `mc_npt_lj_ll` program was run with non-default value `db_max`=0.015 to give a volume acceptance ratio around 9%.
 
 &para; The grand canonical programs were run at activity _z_=0.0795, the program default value.
-The Thol et al (2016) LRC-corrected value to give &rho;=0.75 would be _z_=0.080627.
+The [Thol et al (2016)](https://doi.org/10.1063/1.4945000) LRC-corrected value to give &rho;=0.75 would be _z_=0.080627.
 For `mc_zvt_lj` the box length was _L_=7&sigma;; for `mc_zvt_lj_ll` _L_=10.5&sigma;.
 Acceptance rate of creation/destruction moves is quite small, at about 0.3%.
 For other state points see below.
@@ -325,20 +325,20 @@ have been applied.
 
 In principle, there should be a delta correction for the configurational temperature.
 Long-range corrections to _T_<sub>c</sub> are discussed by
-A Baranyai _J Chem Phys,_ __112,__ 3964 (2000) and by
-A Lervik, O Wilhelmsen, TT Trinh, HR Nagel, _J Chem Phys,_ __143,__ 114106 (2015).
+[A Baranyai _J Chem Phys,_ __112,__ 3964 (2000)](https://doi.org/10.1063/1.480995) and by
+[A Lervik, O Wilhelmsen, TT Trinh, HR Nagel, _J Chem Phys,_ __143,__ 114106 (2015)](https://doi.org/10.1063/1.4930540).
 
 Tests for the grand canonical MC program were initially conducted at a slightly lower density,
 very close to the liquid-vapour coexistence line (see Gibbs simulations below).
 A box length of 7&sigma; was used, and creation/destruction acceptance ratios were around 1.5%.
-Comparison was made with the Thol et al (2016) equation of state, with corrections for the cutoff.
+Comparison was made with the [Thol et al (2016)](https://doi.org/10.1063/1.4945000) equation of state, with corrections for the cutoff.
 The corresponding density is lower than the liquid coexistence density for the full potential,
 so there is no guarantee that the EOS will be accurate
 (it is only fitted in the single-phase regions of the full potential).
 
-Source                |  z     | &rho;     | _T_  | _E_ (c)   | _P_ (c)    | _E_ (f)   | _P_ (f)  
--------               | ----   | -----     | ---- | --------- | -------    | -------   | -------  
-Thol et al (2016) (c) | 0.032  | 0.65325   | 1.0  | -2.7212   | 0.0457     | -3.0710   | -0.1828  
+Source                |  z     | &rho;     | _T_  | _E_ (c)   | _P_ (c)    | _E_ (f)   | _P_ (f)
+-------               | ----   | -----     | ---- | --------- | -------    | -------   | -------
+[Thol et al (2016)](https://doi.org/10.1063/1.4945000) (c) | 0.032  | 0.65325   | 1.0  | -2.7212   | 0.0457     | -3.0710   | -0.1828
 `mc_zvt_lj`           | 0.032  | 0.6532(5) | 1.0  | -2.728(3) | 0.0325(25) | -3.078(4) | -0.196(2)
 
 ### Gibbs Monte Carlo program
@@ -366,11 +366,11 @@ The production run corresponded to default parameters in the program.
 
 Source  | &rho;<sub>L</sub> | &rho;<sub>G</sub> | _P_<sub>L</sub> | _P_<sub>G</sub> | _E_<sub>L</sub> (c) | _E_<sub>G</sub> (c)
 -------              | -------- | -------- | -------  | -------- | --------------  | --------------
-Trokhymchuk et al MC | 0.6542   | 0.0439   | 0.0336   | 0.0336   |                 |
-Trokhymchuk et al MD | 0.6507   | 0.0500   | 0.0380   | 0.0380   | -2.713 &Dagger; | 1.047 &Dagger;
+[Trokhymchuk et al](https://doi.org/10.1063/1.480192) MC | 0.6542   | 0.0439   | 0.0336   | 0.0336   |                 |
+[Trokhymchuk et al MD](https://doi.org/10.1063/1.480192) | 0.6507   | 0.0500   | 0.0380   | 0.0380   | -2.713 &Dagger; | 1.047 &Dagger;
 `mc_gibbs_lj`        | 0.653(1) | 0.050(1) | 0.031(2) | 0.038(1) | -2.731(5)       | 1.049(9)
 
-&Dagger; Indicates values for given &rho; and _T_ from the Thol et al (2016) EOS (f) with cutoff correction.
+&Dagger; Indicates values for given &rho; and _T_ from the [Thol et al (2016)](https://doi.org/10.1063/1.4945000) EOS (f) with cutoff correction.
 
 The small discrepancy between measured pressures in the two phases reflects the approximate nature
 of the delta correction for potential discontinuity, particularly in the liquid phase (see above).
@@ -404,7 +404,7 @@ standard output, with a process-rank-dependent name, and associate the `output_u
 
 The `mc_nvt_lj_re` program conducts runs at several temperatures: four were used in testing.
 The default program values include _T_=1.0, which is reported above, and here is the complete set,
-with expected values from the Thol et al (2016) equation of state (f) corrected for cutoff.
+with expected values from the [Thol et al (2016)](https://doi.org/10.1063/1.4945000) equation of state (f) corrected for cutoff.
 As usual the program employed the cut (but not shifted) potential.
 All runs are for density &rho;=0.75, _N_=256, as usual.
 At the lowest temperature, the full-potential system would lie in the coexistence region,
@@ -412,13 +412,13 @@ and the estimated pressure is negative.
 
 Source                 | _T_    | _E_ (c)   | _P_ (c)  | _E_ (f)   | _P_ (f)   | _C<sub>v</sub>_ (f)
 ------                 | -----  | -------   | -------  | -------   | -------   | --------
-Thol et al (2016) (f)  | 0.8772 | -3.6001   | 0.1942   | -4.0017   | -0.1070   |  2.3081  
+[Thol et al (2016)](https://doi.org/10.1063/1.4945000) (f)  | 0.8772 | -3.6001   | 0.1942   | -4.0017   | -0.1070   |  2.3081
 `mc_nvt_lj_re`         | 0.8772 | -3.613(1) | 0.140(2) | -4.014(1) | -0.161(2) |  2.31(1)
-Thol et al (2016) (f)  | 1.0000 | -3.3197   | 0.7008   | -3.7212   |  0.3996   |  2.2630  
+[Thol et al (2016)](https://doi.org/10.1063/1.4945000) (f)  | 1.0000 | -3.3197   | 0.7008   | -3.7212   |  0.3996   |  2.2630
 `mc_nvt_lj_re`         | 1.0000 | -3.332(1) | 0.648(2) | -3.734(1) |  0.347(2) |  2.258(4)
-Thol et al (2016) (f)  | 1.1400 | -3.0055   | 1.2571   | -3.4070   |  0.9559   |  2.2278  
+[Thol et al (2016)](https://doi.org/10.1063/1.4945000) (f)  | 1.1400 | -3.0055   | 1.2571   | -3.4070   |  0.9559   |  2.2278
 `mc_nvt_lj_re`         | 1.1400 | -3.016(1) | 1.212(2) | -3.417(1) |  0.911(2) |  2.233(4)
-Thol et al (2016) (f)  | 1.2996 | -2.6523   | 1.8667   | -3.0539   |  1.5655   |  2.1989  
+[Thol et al (2016)](https://doi.org/10.1063/1.4945000) (f)  | 1.2996 | -2.6523   | 1.8667   | -3.0539   |  1.5655   |  2.1989
 `mc_nvt_lj_re`         | 1.2996 | -2.662(1) | 1.820(3) | -3.063(1) |  1.519(3) |  2.214(5)
 
 The above (default) temperatures are chosen to give swap acceptance ratios all fairly close to 20% here
@@ -435,8 +435,8 @@ and an adapted link-cell method required to handle the modified boundaries.
 These programs both use the short-ranged WCA Lennard-Jones potential,
 in order to compare results with the following papers:
 
-* G Pan, JF Ely, C McCabe, DJ Isbister, _J Chem Phys,_ __122,__ 094114 (2005)
-* KP Travis, DJ Searles, DJ Evans, _Mol Phys,_ __95,__ 195 (1998)
+* [G Pan, JF Ely, C McCabe, DJ Isbister, _J Chem Phys,_ __122,__ 094114 (2005)](https://doi.org/10.1063/1.1858861).
+* [KP Travis, DJ Searles, DJ Evans, _Mol Phys,_ __95,__ 195 (1998)](https://doi.org/10.1080/00268979809483151).
 
 Testing was performed at the state point used in those papers: &rho;=0.8442, _T_=0.722.
 A system size _N_=256 was used
@@ -473,16 +473,16 @@ and hence closely related to the temperature.
 Equations of state for this model have been reported many times.
 Here we refer to some fairly recent, useful, sources of data and/or fitted equations
 
-* H Hansen-Goos, _J Chem Phys,_ __144,__ 164506 (2016)
-* MN Bannerman, L Lue, LV Woodcock, _J Chem Phys,_ __132,__ 084507 (2010)
-* J Kolafa, S Labik, A Malijevsky, _Phys Chem Chem Phys,_ __6,__ 2335 (2004)
+* [H Hansen-Goos, _J Chem Phys,_ __144,__ 164506 (2016)](https://doi.org/10.1063/1.4947534).
+* [MN Bannerman, L Lue, LV Woodcock, _J Chem Phys,_ __132,__ 084507 (2010)](https://doi.org/10.1063/1.3328823).
+* [J Kolafa, S Labik, A Malijevsky, _Phys Chem Chem Phys,_ __6,__ 2335 (2004)](https://doi.org/10.1039/B402792B).
 
-The paper of Kolafa et al (2004) is particularly careful to discuss corrections
+The paper of [Kolafa et al (2004)](https://doi.org/10.1039/B402792B) is particularly careful to discuss corrections
 due to different ensembles and system size. Here we just present the raw results
 for a small system, _N_=256; programs are run with default parameters.
 Starting fcc lattice configurations may be prepared using `initialize` in
 the usual way.
-The EOS is taken from the Hansen-Goos (2016) paper, and a program to evaluate it
+The EOS is taken from the [Hansen-Goos (2016)](https://doi.org/10.1063/1.4947534) paper, and a program to evaluate it
 may be found in `eos_hs.f90`.
 
 &rho; | _P_ (EOS) | _P_ `mc_nvt_hs`| _P_ `md_nve_hs` | &rho; `mc_npt_hs`
@@ -528,11 +528,11 @@ but allows us to explore up to &rho;=0.148
 which is sufficient for our purposes.
 Equations of state from MC simulations are presented in two papers
 
-* SC McGrother, DC Williamson, G Jackson, _J Chem Phys,_ __104,__ 6755 (1996)
-* PG Bolhuis, D Frenkel, _J Chem Phys,_ __106,__ 666 (1997)
+* [SC McGrother, DC Williamson, G Jackson, _J Chem Phys,_ __104,__ 6755 (1996)](https://doi.org/10.1063/1.471343)
+* [PG Bolhuis, D Frenkel, _J Chem Phys,_ __106,__ 666 (1997)](https://doi.org/10.1063/1.473404).
 
 In making comparisons, care must be taken with the units.
-McGrother et al (1996) quote
+[McGrother et al (1996)](https://doi.org/10.1063/1.471343) quote
 densities in the form of the packing fraction &eta;=&rho; _v_<sub>mol</sub>
 and pressures as _P_ _v_<sub>mol</sub>,
 where _v_<sub>mol</sub> is the molecular volume.
@@ -540,7 +540,7 @@ We translate selected values from their Table V
 (denoted (M) below)
 into our reduced units based on _D_=1 below;
 for _L/D_=5, _v_<sub>mol</sub>=4.4506.
-(Bolhuis and Frenkel (1997) define reduced densities relative to
+([Bolhuis and Frenkel (1997)](https://doi.org/10.1063/1.473404) define reduced densities relative to
 the density of closest packing of spherocylinders,
 while reporting pressures the same way as McGrother et al.
 We do not use the Bolhuis-Frenkel results below.)
@@ -574,7 +574,7 @@ Also the system size is about 25% that used by McGrother,
 which has a direct effect on the measured nematic order parameter.
 With these caveats in mind,
 which apply mainly to the middle three state points in the table,
-agreement between the two programs, and with the results of McGrother,
+agreement between the two programs, and with the results of [McGrother et al (1996)](https://doi.org/10.1063/1.471343),
 is reasonable.
 
 ## Chain simulation programs
@@ -585,7 +585,7 @@ both bonded and non-bonded interactions,
 the former being used to select atom positions,
 and the latter appearing in Rosenbluth weights,
 which govern the acceptance/rejection of moves.
-For comparison with the paper of Calvo, Doye and Wales, _J Chem Phys,_ __116,__ 2642 (2002),
+For comparison with the paper of [Calvo, Doye and Wales, _J Chem Phys,_ __116,__ 2642 (2002)](https://doi.org/10.1063/1.1435572),
 test runs were carried out using _N_=13 atoms, a bond length of 1.122462&sigma;
 (prepared using `initialize` with `molecules="chain"` to give random non-overlapping atom positions)
 and a rather low spring potential _k_<sub>spring</sub>=20.
@@ -603,23 +603,23 @@ the bond length fluctuations become unphysically large for this value of _k_<sub
 
 _T_   | _PE_      | _R_<sub>g</sub> | _C<sub>v</sub>_(ex)
 ----- | ------    | ------          | ------
-0.26  | -2.044(7) | 1.074(1)        | 3.3(2)  
+0.26  | -2.044(7) | 1.074(1)        | 3.3(2)
 0.28  | -1.967(5) | 1.086(1)        | 4.16(9)
-0.29  | -1.905(4) | 1.096(1)        | 4.6(1)  
+0.29  | -1.905(4) | 1.096(1)        | 4.6(1)
 0.30  | -1.893(7) | 1.098(1)        | 4.71(9)
 0.31  | -1.819(3) | 1.1105(8)       | 4.34(6)
-0.32  | -1.789(2) | 1.1162(5)       | 4.2(1)  
+0.32  | -1.789(2) | 1.1162(5)       | 4.2(1)
 0.33  | -1.742(3) | 1.1254(5)       | 4.05(1)
-0.34  | -1.705(4) | 1.133(1)        | 3.7(1)  
+0.34  | -1.705(4) | 1.133(1)        | 3.7(1)
 0.35  | -1.672(3) | 1.140(1)        | 3.49(8)
 0.40  | -1.50(1)  | 1.173(3)        | 2.51(17)
-0.45  | -1.40(1)  | 1.201(3)        | 2.26(8)  
-0.50  | -1.297(8) | 1.224(1)        | 1.99(2)  
+0.45  | -1.40(1)  | 1.201(3)        | 2.26(8)
+0.50  | -1.297(8) | 1.224(1)        | 1.99(2)
 1.00  | -0.438(2) | 1.538(2)        | 1.371(3)
 
 At the lowest temperatures, the acceptance rate of CBMC moves (with the default parameters) was around 2%,
 while at _T_=0.35 it was around 11%, increasing further at higher temperatures.
-The results are broadly in agreement with Calvo et al (2002) showing a similar sized peak in _C<sub>v</sub>_,
+The results are broadly in agreement with [Calvo et al (2002)](https://doi.org/10.1063/1.1435572) showing a similar sized peak in _C<sub>v</sub>_,
 although at a somewhat lower temperature (0.30 as opposed to 0.35).
 
 Here we give analogous results for the program default spring constant of _k_<sub>spring</sub>=400.
@@ -672,7 +672,7 @@ Results for _k_<sub>spring</sub>=10000 system using MTS:
 _E_      | _T_       | _R_<sub>g</sub> | _C<sub>v</sub>_
 -----    | -----     | -----           | -----
 -1.7734  | 0.2496(2) | 1.0695(1)       | 2.96(4)
--1.3444  | 0.301(2)  | 1.144(2)        | 5.5(3)  
+-1.3444  | 0.301(2)  | 1.144(2)        | 5.5(3)
 -1.1394  | 0.350(2)  | 1.173(2)        | 3.70(5)
 -0.9494  | 0.399(1)  | 1.199(1)        | 3.19(5)
 -0.7694  | 0.448(1)  | 1.230(2)        | 3.09(3)
@@ -712,9 +712,9 @@ Reasonably long chains, _N_=128, have been studied by this method,
 and exact results are available for very short chains;
 see, for example,
 
-* MP Taylor,  _J Chem Phys,_ __118,__ 883 (2003),
-* JE Magee, L Lue, RA Curtis, _Phys Rev E,_ __78,__ 031803 (2008),
-* MP Taylor, W Paul, K Binder, _J Chem Phys,_ __131,__ 114907 (2009),
+* [MP Taylor,  _J Chem Phys,_ __118,__ 883 (2003)](https://doi.org/10.1063/1.1523914),
+* [JE Magee, L Lue, RA Curtis, _Phys Rev E,_ __78,__ 031803 (2008)](https://doi.org/10.1103/PhysRevE.78.031803),
+* [MP Taylor, W Paul, K Binder, _J Chem Phys,_ __131,__ 114907 (2009)](https://doi.org/10.1063/1.3227751),
 
 who provide references to other simulation work.
 
@@ -735,7 +735,7 @@ and report the results from the two runs with the highest and lowest values of _
 which bracket all the other results in the set,
 as a rough indication of the errors.
 We compare with the exact values calculated from the density of states
-of Taylor (2003), normalized in the same way to make _S_(0)=0.
+of [Taylor (2003)](https://doi.org/10.1063/1.1523914), normalized in the same way to make _S_(0)=0.
 
 _E_    | _S(E)_ (exact) | _S(E)_ (WL) | _S(E)_ (WL)
 ------ | ------         | ------      | ------
@@ -759,7 +759,7 @@ below 0.25.
 The results may be compared with values reconstructed using the
 `wl_hist` program from the simulation histograms.
 Below we show the heat capacity per atom from the above two WL runs (red),
-from the exact density of states of Taylor (black),
+from the exact density of states of [Taylor (2003)](https://doi.org/10.1063/1.1523914) (black),
 and from the canonical ensemble calculations (blue error bars).
 
 ![Wang-Landau test results](wl.png "Wang-Landau test results")
@@ -844,25 +844,25 @@ and hence the interaction site positions.
 We test this with the three-site model of orthoterphenyl, a fragile glassformer,
 described in the following publications amongst others.
 
-* LJ Lewis, G Wahnstrom, _Sol State Commun,_ __86,__ 295 (1993)
-* LJ Lewis, G Wahnstrom, _Phys Rev E,_ __50,__ 3865 (1994)
-* S Mossa, E La Nave, HE Stanley, C Donati, F Sciortino, P Tartaglia, _Phys Rev E,_ __65,__ 041205 (2002)
-* E La Nave, S Mossa, F Sciortino, P Tartaglia, _J Chem Phys,_ __120,__ 6128 (2004)
+* [LJ Lewis, G Wahnstrom, _Sol State Commun,_ __86,__ 295 (1993)](https://doi.org/10.1016/0038-1098(93)90376-X).
+* [LJ Lewis, G Wahnstrom, _Phys Rev E,_ __50,__ 3865 (1994)](https://doi.org/10.1103/PhysRevE.50.3865).
+* [S Mossa, E La Nave, HE Stanley, C Donati, F Sciortino, P Tartaglia, _Phys Rev E,_ __65,__ 041205 (2002)](https://doi.org/10.1103/PhysRevE.65.041205).
+* [E La Nave, S Mossa, F Sciortino, P Tartaglia, _J Chem Phys,_ __120,__ 6128 (2004)](https://doi.org/10.1063/1.1650295).
 
-We compare with the results of Mossa et al (2002).
+We compare with the results of [Mossa et al (2002)](https://doi.org/10.1103/PhysRevE.65.041205).
 The sites are arranged at the vertices of an isosceles triangle with bond angle 75 degrees,
 LJ parameters &epsilon; = 5.276 kJ mol<sup>-1</sup>,
 &sigma;=0.483nm,
 and two equal bonds of length &sigma;.
 The program employs the usual reduced units based on &epsilon; and &sigma;
-and in these units the potential cutoff of Mossa et al (2002) is _R_<sub>c</sub>=2.612;
+and in these units the potential cutoff of [Mossa et al (2002)](https://doi.org/10.1103/PhysRevE.65.041205) is _R_<sub>c</sub>=2.612;
 the pair potential is Lennard-Jones with a shifted-force correction term, linear in _r_,
 to make the potential and its derivative vanish at _r_=_R_<sub>c</sub>.
 Apart from the temperatures,
 default program parameters were used throughout the tests.
 
 Tests were performed at &rho;=0.32655 which is equivalent to &rho;<sub>4</sub>=1.108g cm<sup>-3</sup>
-in Mossa et al (2002).
+in [Mossa et al (2002)](https://doi.org/10.1103/PhysRevE.65.041205).
 Comparisons of potential energy (_PE_=_E_-3 _T_ converted to kJ/mol with a factor 5.276)
 were made with the fit given by eqn (23) of that paper.
 Note that &epsilon;/k<sub>B</sub>&asymp;635 K.
@@ -875,11 +875,11 @@ _T_   | _E_        | _P_       | _T_ (K) | _PE_ (kJ/mol) | _PE_ (kJ/mol) eqn (23
 2.0   | -4.07(1)   | 12.37(4)  | 1270    | -53.13(5)     | -53.265
 
 A second set of tests was performed at _T_=0.6&asymp;380K
-at the specified densities &rho;<sub>1</sub>, &hellip; &rho;<sub>5</sub> of Mossa et al (2002).
+at the specified densities &rho;<sub>1</sub>, &hellip; &rho;<sub>5</sub> of [Mossa et al (2002)](https://doi.org/10.1103/PhysRevE.65.041205).
 A set of starting configurations is provided in the [Data repository](https://github.com/Allen-Tildesley/data).
 Here the excess pressure (_P_(ex)=_P_-&rho;_T_ converted to MPa
 with a factor 77.75 based on the values of &epsilon; and &sigma;)
-is compared with the fit given by eqn (28) and the coefficients in Table III of Mossa et al (2002).
+is compared with the fit given by eqn (28) and the coefficients in Table III of [Mossa et al (2002)](https://doi.org/10.1103/PhysRevE.65.041205).
 NB the volumes to insert into the equation are those of their Table I,
 which are specific to their system size.
 In addition their eqn (29) with coefficients in Table V is a fit to their potential energy,
@@ -896,16 +896,16 @@ Id    | &rho;   | _E_        | _P_     | _P_(ex) (MPa) | _P_(ex) (MPa) eqn (28) 
 In making these comparisons,
 our default run length (10 blocks of 20000 sweeps each) should be borne in mind,
 since this system can show sluggish behaviour.
-The MD simulations of Mossa et al (2002) are reported to extend to several hundred nanoseconds
+The MD simulations of [Mossa et al (2002)](https://doi.org/10.1103/PhysRevE.65.041205) are reported to extend to several hundred nanoseconds
 (of order 10<sup>7</sup> MD timesteps) at the lowest temperatures.
 
 For comparison we provide a molecular dynamics code `md_nvt_poly_lj` for the same model.
 The program takes the molecular mass _M_ to be unity.
-Mossa et al (2002) ascribe a notional mass of 78u to each of the three LJ sites,
+[Mossa et al (2002)](https://doi.org/10.1103/PhysRevE.65.041205) ascribe a notional mass of 78u to each of the three LJ sites,
 so _M_&asymp;3.9&times;10<sup>-25</sup>kg.
 Combined with the above values of &epsilon; and &sigma;,
 this gives a time scale (_M_/&epsilon;)<sup>1/2</sup>&sigma; &asymp; 3.22 ps.
-The timestep of &delta;t=0.01 ps used by Mossa et al (2002)
+The timestep of &delta;t=0.01 ps used by [Mossa et al (2002)](https://doi.org/10.1103/PhysRevE.65.041205)
 corresponds to the default value in the program `dt=0.003` in these units.
 By default, the program simulates the constant-_NVE_ ensemble,
 but there is an option to simulate at constant _NVT_ by velocity randomization (Andersen thermostat).
@@ -930,8 +930,8 @@ using the torque on each molecule,
 and a succession of `drift` steps implement free rotation about each of the principal axes.
 This is described in the text, section 3.3; see
 
-* A Dullweber, B Leimkuhler, R McLachlan, _J Chem Phys,_ __107,__ 5840 (1997),
-* TF Miller, M Eleftheriou, P Pattnaik, A Ndirango, D Newns, GJ Martyna, _J Chem Phys,_ __116,__ 8649 (2002).
+* [A Dullweber, B Leimkuhler, R McLachlan, _J Chem Phys,_ __107,__ 5840 (1997)](https://doi.org/10.1063/1.474310),
+* [TF Miller, M Eleftheriou, P Pattnaik, A Ndirango, D Newns, GJ Martyna, _J Chem Phys,_ __116,__ 8649 (2002)](https://doi.org/10.1063/1.1473654).
 
 The results below are for test runs in both constant-_NVE_  and constant-_NVT_ ensembles,
 at (approximately) the same state points as those given above.
@@ -975,12 +975,11 @@ The above value of the density is typical when using this method to model water.
 
 For testing we compare with an approximate DPD equation of state for _P_.
 
-* RD Groot, PB Warren, _J Chem Phys,_ __107,__ 4423 (1997)
-* TP Liyana-Arachchi, SN Jamadagni, D Eike, PH Koenig, JI Siepmann,
-_J Chem Phys,_ __142,__ 044902 (2015)
+* [RD Groot, PB Warren, _J Chem Phys,_ __107,__ 4423 (1997)](https://doi.org/10.1063/1.474784).
+* [TP Liyana-Arachchi, SN Jamadagni, D Eike, PH Koenig, JI Siepmann, _J Chem Phys,_ __142,__ 044902 (2015)](https://doi.org/10.1063/1.4905918).
 
-The paper of Liyana-Arachchi et al (2015) is an improvement of the original
-EOS of Groot and Warren (1997), which is more accurate and
+The paper of [Liyana-Arachchi et al (2015)](https://doi.org/10.1063/1.4905918) gives an improvement of the original
+EOS of [Groot and Warren (1997)](https://doi.org/10.1063/1.474784), which is more accurate and
 applicable over a wider range of state points.
 The function is included in the `dpd` program,
 and the expected value of _P_ (labelled EOS below)
@@ -1076,7 +1075,7 @@ using the solution of Poisson's equation in Fourier space.
 In doing so, accuracy is improved by optimizing the so-called influence function G.
 In this example, we use a simple sharpening function discussed by
 
-* V Ballenegger, JJ Cerda, C Holm, _J Chem Theo Comp,_ __8,__ 936 (2012)
+* [V Ballenegger, JJ Cerda, C Holm, _J Chem Theo Comp,_ __8,__ 936 (2012)](https://doi.org/10.1021/ct2001792).
 
 but more sophisticated optimized functions are possible. It is easy to comment out
 this sharpening function, to see the extent of the correction; it is reasonably
@@ -1111,7 +1110,7 @@ separate isolated atoms into clusters of their own.
 
 Clustering algorithms are part of the standard toolkit of data analysis, and in practical
 applications it may be more efficient and convenient to use a packaged implementation of
-an algorithm such as `dbscan`  
+an algorithm such as `dbscan`
 
 * M Ester, H-P Kriegel, J Sander, X Xu. (1996).
 [Proc. Second Int. Conf. on Knowledge Discovery and Data Mining (KDD-96) p 226](https://www.aaai.org/Papers/KDD/1996/KDD96-037.pdf)
@@ -1249,7 +1248,7 @@ The program was tested on a system of _N_=10000 atoms, interacting through
 the Lennard-Jones potential cut (but not shifted) at _R_<sub>c</sub>=2.5&sigma;,
 in a cubic box of side 30&sigma;, at a temperature _T_=0.90.
 For this system, &rho;<sub>G</sub> &asymp; 0.024, &rho;<sub>L</sub> &asymp; 0.713
-(see Trokhymchuk, op. cit.). A set of 100 configurations from this run, together
+(see [Trokhymchuk, op. cit.](https://doi.org/10.1063/1.480192)). A set of 100 configurations from this run, together
 with the output of `grint.f90` with default parameters, are provided in the
 file `grint_data.zip` in the [Data repository](https://github.com/Allen-Tildesley/data).
 
@@ -1294,7 +1293,7 @@ it will be equal to the correct ground-state energy for the system which, in thi
 The updating scheme, and several of the default parameters,
 are taken from the following paper
 
-* I Kostin, B Faber, K Schulten, _Amer J Phys,_ __64,__ 633 (1996).
+* [I Kosztin, B Faber, K Schulten, _Amer J Phys,_ __64,__ 633 (1996)](https://doi.org/10.1119/1.18168).
 
 Reasonable results for the energy and the ground-state wavefunction,
 which is accumulated as a histogram of walker positions,
@@ -1313,8 +1312,8 @@ Larger values of _P_ give energies closer to the exact quantum mechanical canoni
 For this simple model,
 exact results can also be calculated for the finite values of _P_ used in the simulation
 
-* KS Schweizer, RM Stratt, D Chandler, PG Wolynes, _J Chem Phys,_ __75,__ 1347 (1981),
-* M Takahashi, M Imada, _J Phys Soc Japan,_ __53,__ 3765 (1984),
+* [KS Schweizer, RM Stratt, D Chandler, PG Wolynes, _J Chem Phys,_ __75,__ 1347 (1981)](https://doi.org/10.1063/1.442141),
+* [M Takahashi, M Imada, _J Phys Soc Japan,_ __53,__ 3765 (1984)](https://doi.org/10.1143/JPSJ.53.3765),
 
 and a routine to evaluate these is included in the example.
 No special techniques are used to accelerate the simulation;
@@ -1359,7 +1358,7 @@ after which all the output files `cnf##.out` may be renamed to `cnf##.inp`.
 
 For testing, we compare with a set of simulations of neon,
 
-* M Neumann, M Zoppi, _Phys Rev E,_ __65,__ 031203 (2002),
+* [M Neumann, M Zoppi, _Phys Rev E,_ __65,__ 031203 (2002)](https://doi.org/10.1103/PhysRevE.65.031203),
 
 which are mainly based on an empirical pair potential,
 but include selected results for Lennard-Jones for the case _P_=32.
@@ -1397,7 +1396,7 @@ _P_         | _R_        | _E_(spring) |  _KE_      |  _E_      |  _p_
 
 &dagger; For completeness the _P_=1 runs were performed using `mc_nvt_lj`.
 
-&Dagger; These results are taken from Table I of Neumann and Zoppi (2002),
+&Dagger; These results are taken from Table I of [Neumann and Zoppi (2002)](https://doi.org/10.1103/PhysRevE.65.031203),
 converted into LJ reduced units.
 
 A drawback of this state point is that the pressure is negative,
