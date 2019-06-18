@@ -205,7 +205,7 @@ we use our default liquid state point (&rho;,_T_)=(0.75,1.0) for testing,
 with _N_=256 atoms, _R_<sub>c</sub>=2.5&sigma;,
 and compare with the same equations of state due to Thol et al
 
-* [M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)](https://doi.org/10.1007/s10765-014-1764-4).
+* [M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)](https://doi.org/10.1007/s10765-014-1764-4),
 * [M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, _J Phys Chem Ref Data,_ __45,__ 023101 (2016)](https://doi.org/10.1063/1.4945000).
 
 We provide a Python version of the equation-of-state program `eos_lj.py` based on
@@ -438,7 +438,7 @@ an algorithm for integrating the SLLOD equations of motion with constrained kine
 The program uses the short-ranged WCA Lennard-Jones potential,
 in order to compare results with the following papers:
 
-* [G Pan, JF Ely, C McCabe, DJ Isbister, _J Chem Phys,_ __122,__ 094114 (2005)](https://doi.org/10.1063/1.1858861).
+* [G Pan, JF Ely, C McCabe, DJ Isbister, _J Chem Phys,_ __122,__ 094114 (2005)](https://doi.org/10.1063/1.1858861),
 * [KP Travis, DJ Searles, DJ Evans, _Mol Phys,_ __95,__ 195 (1998)](https://doi.org/10.1080/00268979809483151).
 
 Testing was performed at the state point used in those papers: &rho;=0.8442, _T_=0.722.
@@ -488,8 +488,8 @@ and hence closely related to the temperature.
 Equations of state for this model have been reported many times.
 Here we refer to some fairly recent, useful, sources of data and/or fitted equations
 
-* [H Hansen-Goos, _J Chem Phys,_ __144,__ 164506 (2016)](https://doi.org/10.1063/1.4947534).
-* [MN Bannerman, L Lue, LV Woodcock, _J Chem Phys,_ __132,__ 084507 (2010)](https://doi.org/10.1063/1.3328823).
+* [H Hansen-Goos, _J Chem Phys,_ __144,__ 164506 (2016)](https://doi.org/10.1063/1.4947534),
+* [MN Bannerman, L Lue, LV Woodcock, _J Chem Phys,_ __132,__ 084507 (2010)](https://doi.org/10.1063/1.3328823),
 * [J Kolafa, S Labik, A Malijevsky, _Phys Chem Chem Phys,_ __6,__ 2335 (2004)](https://doi.org/10.1039/B402792B).
 
 The paper of [Kolafa et al (2004)](https://doi.org/10.1039/B402792B) is particularly careful to discuss corrections
@@ -527,10 +527,12 @@ Configurations may be prepared as described in the Fortran example [GUIDE](../GU
 Test runs were performed using 10 blocks of 10000 steps (as for the Fortran examples);
 the program default is 10&times;1000.
 For _L_=5, _N_=256 (a very small system, not recommended for serious work)
-we compare with the results of [McGrother et al (1996)](https://doi.org/10.1063/1.471343).
+we compare with the results of
+
+* [SC McGrother, DC Williamson, G Jackson, _J Chem Phys,_ __104,__ 6755 (1996)](https://doi.org/10.1063/1.471343).
+
 See the Fortran [GUIDE](../GUIDE.md) for comments about units, and other literature values.
 
-* [SC McGrother, DC Williamson, G Jackson, _J Chem Phys,_ __104,__ 6755 (1996)](https://doi.org/10.1063/1.471343)
 
 _P_ _v_<sub>mol</sub> | &rho; _v_<sub>mol</sub> | _P_ | &rho; | _S_ | &rho; | _S_ | _P_ | _S_
 ----- | ----- | ----- | ----- | ----- | -----       | -----       | -----       | -----
@@ -737,11 +739,11 @@ which are used to calculate the rotation matrix
 and hence the interaction site positions.
 
 We test this with the three-site model of orthoterphenyl, a fragile glassformer,
-described in the following publications amongst others.
+described in the following publications amongst others
 
-* [LJ Lewis, G Wahnstrom, _Sol State Commun,_ __86,__ 295 (1993)](https://doi.org/10.1016/0038-1098(93)90376-X).
-* [LJ Lewis, G Wahnstrom, _Phys Rev E,_ __50,__ 3865 (1994)](https://doi.org/10.1103/PhysRevE.50.3865).
-* [S Mossa, E La Nave, HE Stanley, C Donati, F Sciortino, P Tartaglia, _Phys Rev E,_ __65,__ 041205 (2002)](https://doi.org/10.1103/PhysRevE.65.041205).
+* [LJ Lewis, G Wahnstrom, _Sol State Commun,_ __86,__ 295 (1993)](https://doi.org/10.1016/0038-1098(93)90376-X),
+* [LJ Lewis, G Wahnstrom, _Phys Rev E,_ __50,__ 3865 (1994)](https://doi.org/10.1103/PhysRevE.50.3865),
+* [S Mossa, E La Nave, HE Stanley, C Donati, F Sciortino, P Tartaglia, _Phys Rev E,_ __65,__ 041205 (2002)](https://doi.org/10.1103/PhysRevE.65.041205),
 * [E La Nave, S Mossa, F Sciortino, P Tartaglia, _J Chem Phys,_ __120,__ 6128 (2004)](https://doi.org/10.1063/1.1650295).
 
 We compare with the results of [Mossa et al (2002)](https://doi.org/10.1103/PhysRevE.65.041205).
@@ -872,9 +874,9 @@ using the `initialize.py` program, with JSON input similar to the following
 ```
 The above value of the density is typical when using this method to model water.
 
-For testing we compare with an approximate DPD equation of state for _P_.
+For testing we compare with an approximate DPD equation of state for _P_
 
-* [RD Groot, PB Warren, _J Chem Phys,_ __107,__ 4423 (1997)](https://doi.org/10.1063/1.474784).
+* [RD Groot, PB Warren, _J Chem Phys,_ __107,__ 4423 (1997)](https://doi.org/10.1063/1.474784),
 * [TP Liyana-Arachchi, SN Jamadagni, D Eike, PH Koenig, JI Siepmann, _J Chem Phys,_ __142,__ 044902 (2015)](https://doi.org/10.1063/1.4905918).
 
 The paper of [Liyana-Arachchi et al (2015)](https://doi.org/10.1063/1.4905918) gives an improvement of the original
@@ -980,7 +982,7 @@ using the solution of Poisson's equation in Fourier space.
 In doing so, accuracy is improved by optimizing the so-called influence function G.
 In this example, we use a simple sharpening function discussed by
 
-* [V Ballenegger, JJ Cerda, C Holm, _J Chem Theo Comp,_ __8,__ 936 (2012)](https://doi.org/10.1021/ct2001792).
+* [V Ballenegger, JJ Cerda, C Holm, _J Chem Theo Comp,_ __8,__ 936 (2012)](https://doi.org/10.1021/ct2001792),
 
 but more sophisticated optimized functions are possible. It is easy to comment out
 this sharpening function, to see the extent of the correction; it is reasonably
@@ -994,7 +996,7 @@ The program `mesh.py` generates a random configuration of a small number of char
 and illustrates the way this may be assigned to a regular cubic mesh using the
 triangular-shaped cloud distribution described in
 
-* RW Hockney, JW Eastwood, _Computer simulation using particles_ (Adam Hilger, Bristol, 1988)
+* RW Hockney, JW Eastwood, _Computer simulation using particles_ (Adam Hilger, Bristol, 1988).
 
 The function generating the charge density is provided in `mesh_module.py`. The mesh dimension
 is, by default, kept small enough to print out the whole array for inspection afterwards.
@@ -1131,7 +1133,7 @@ Only `n//2` shifts are needed to cover every distinct `ij` pair.
 There is a slight subtlety on the last shift, if `n` is even:
 both `ij` and `ji` pairs appear,
 and so the usual incrementing factor 2 is replaced by a factor 1.
-The idea dates back to S Brode and R Ahlrichs, _Comput Phys Commun,_ __42,__ 51 (1986).
+The idea dates back to [S Brode and R Ahlrichs, _Comput Phys Commun,_ __42,__ 51 (1986)](https://doi.org/10.1016/0010-4655(86)90230-4).
 The actual histogramming is conveniently performed
 by the built-in NumPy `histogram` routine.
 
@@ -1186,7 +1188,7 @@ The program was tested on a system of _N_=10000 atoms, interacting through
 the Lennard-Jones potential cut (but not shifted) at _R_<sub>c</sub>=2.5&sigma;,
 in a cubic box of side 30&sigma;, at a temperature _T_=0.90.
 For this system, &rho;<sub>G</sub> &asymp; 0.024, &rho;<sub>L</sub> &asymp; 0.713
-(see [Trokhymchuk, op. cit.](https://doi.org/10.1063/1.480192)). A set of 100 configurations from this run, together
+(see [A Trokhymchuk, J Alejandre, _J Chem Phys,_ __111,__ 8510 (1999)](https://doi.org/10.1063/1.480192)). A set of 100 configurations from this run, together
 with the output of the Fortran example, `grint.f90`, with default parameters,
 are provided in the file `grint_data.zip` in the [Data repository](https://github.com/Allen-Tildesley/data).
 The output of `grint.py` is very similar to that of `grint.f90`.

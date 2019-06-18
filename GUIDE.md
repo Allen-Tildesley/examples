@@ -146,15 +146,14 @@ lies in the liquid region of the phase diagram for all these variants of the mod
 
 Approximate equations of state for the full LJ potential have been presented by
 
-* [JK Johnson, JA Zollweg, KE Gubbins, _Mol Phys_, __78,__ 591 (1993)](https://doi.org/10.1080/00268979300100411).
-* [J Kolafa and I Nezbeda, _Fluid Phase Equil,_ __100,__ 1 (1994)](https://doi.org/10.1016/0378-3812(94)80001-4).
-* [M Mecke, A Muller, J Winkelmann, J Vrabec, J Fischer, R Span, W Wagner,
-_Int J Thermophys,_ __17,__ 391 (1996)](https://doi.org/10.1007/BF01443399) and [__19,__ 1493(E) (1998)](https://doi.org/10.1023/A:1021995905315).
+* [JK Johnson, JA Zollweg, KE Gubbins, _Mol Phys_, __78,__ 591 (1993)](https://doi.org/10.1080/00268979300100411),
+* [J Kolafa and I Nezbeda, _Fluid Phase Equil,_ __100,__ 1 (1994)](https://doi.org/10.1016/0378-3812(94)80001-4),
+* [M Mecke, A Muller, J Winkelmann, J Vrabec, J Fischer, R Span, W Wagner, _Int J Thermophys,_ __17,__ 391 (1996)](https://doi.org/10.1007/BF01443399) and [__19,__ 1493(E) (1998)](https://doi.org/10.1023/A:1021995905315).
 
 For testing our programs we used the more recent fitted equations of state presented by
 
-* [M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)](https://doi.org/10.1007/s10765-014-1764-4).
-* [M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, _J Phys Chem Ref Data,_ __45,__ 023101 (2016)](https://doi.org/10.1063/1.4945000).
+* [M Thol, G Rutkai, R Span, J Vrabec and R Lustig, _Int J Thermophys,_ __36,__ 25 (2015)](https://doi.org/10.1007/s10765-014-1764-4),
+* [M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, _J Phys Chem Ref Data,_ __45,__ 023101 (2016)](https://doi.org/10.1063/1.4945000),
 
 for both the cut-and-shifted potential (denoted cs below), at _R_<sub>c</sub>=2.5&sigma;,
 and the full potential (denoted f).
@@ -367,7 +366,7 @@ The production run corresponded to default parameters in the program.
 Source  | &rho;<sub>L</sub> | &rho;<sub>G</sub> | _P_<sub>L</sub> | _P_<sub>G</sub> | _E_<sub>L</sub> (c) | _E_<sub>G</sub> (c)
 -------              | -------- | -------- | -------  | -------- | --------------  | --------------
 [Trokhymchuk et al](https://doi.org/10.1063/1.480192) MC | 0.6542   | 0.0439   | 0.0336   | 0.0336   |                 |
-[Trokhymchuk et al MD](https://doi.org/10.1063/1.480192) | 0.6507   | 0.0500   | 0.0380   | 0.0380   | -2.713 &Dagger; | 1.047 &Dagger;
+[Trokhymchuk et al](https://doi.org/10.1063/1.480192) MD | 0.6507   | 0.0500   | 0.0380   | 0.0380   | -2.713 &Dagger; | 1.047 &Dagger;
 `mc_gibbs_lj`        | 0.653(1) | 0.050(1) | 0.031(2) | 0.038(1) | -2.731(5)       | 1.049(9)
 
 &Dagger; Indicates values for given &rho; and _T_ from the [Thol et al (2016)](https://doi.org/10.1063/1.4945000) EOS (f) with cutoff correction.
@@ -435,7 +434,7 @@ and an adapted link-cell method required to handle the modified boundaries.
 These programs both use the short-ranged WCA Lennard-Jones potential,
 in order to compare results with the following papers:
 
-* [G Pan, JF Ely, C McCabe, DJ Isbister, _J Chem Phys,_ __122,__ 094114 (2005)](https://doi.org/10.1063/1.1858861).
+* [G Pan, JF Ely, C McCabe, DJ Isbister, _J Chem Phys,_ __122,__ 094114 (2005)](https://doi.org/10.1063/1.1858861),
 * [KP Travis, DJ Searles, DJ Evans, _Mol Phys,_ __95,__ 195 (1998)](https://doi.org/10.1080/00268979809483151).
 
 Testing was performed at the state point used in those papers: &rho;=0.8442, _T_=0.722.
@@ -473,8 +472,8 @@ and hence closely related to the temperature.
 Equations of state for this model have been reported many times.
 Here we refer to some fairly recent, useful, sources of data and/or fitted equations
 
-* [H Hansen-Goos, _J Chem Phys,_ __144,__ 164506 (2016)](https://doi.org/10.1063/1.4947534).
-* [MN Bannerman, L Lue, LV Woodcock, _J Chem Phys,_ __132,__ 084507 (2010)](https://doi.org/10.1063/1.3328823).
+* [H Hansen-Goos, _J Chem Phys,_ __144,__ 164506 (2016)](https://doi.org/10.1063/1.4947534),
+* [MN Bannerman, L Lue, LV Woodcock, _J Chem Phys,_ __132,__ 084507 (2010)](https://doi.org/10.1063/1.3328823),
 * [J Kolafa, S Labik, A Malijevsky, _Phys Chem Chem Phys,_ __6,__ 2335 (2004)](https://doi.org/10.1039/B402792B).
 
 The paper of [Kolafa et al (2004)](https://doi.org/10.1039/B402792B) is particularly careful to discuss corrections
@@ -528,7 +527,7 @@ but allows us to explore up to &rho;=0.148
 which is sufficient for our purposes.
 Equations of state from MC simulations are presented in two papers
 
-* [SC McGrother, DC Williamson, G Jackson, _J Chem Phys,_ __104,__ 6755 (1996)](https://doi.org/10.1063/1.471343)
+* [SC McGrother, DC Williamson, G Jackson, _J Chem Phys,_ __104,__ 6755 (1996)](https://doi.org/10.1063/1.471343),
 * [PG Bolhuis, D Frenkel, _J Chem Phys,_ __106,__ 666 (1997)](https://doi.org/10.1063/1.473404).
 
 In making comparisons, care must be taken with the units.
@@ -842,11 +841,11 @@ which are used to calculate the rotation matrix
 and hence the interaction site positions.
 
 We test this with the three-site model of orthoterphenyl, a fragile glassformer,
-described in the following publications amongst others.
+described in the following publications amongst others
 
-* [LJ Lewis, G Wahnstrom, _Sol State Commun,_ __86,__ 295 (1993)](https://doi.org/10.1016/0038-1098(93)90376-X).
-* [LJ Lewis, G Wahnstrom, _Phys Rev E,_ __50,__ 3865 (1994)](https://doi.org/10.1103/PhysRevE.50.3865).
-* [S Mossa, E La Nave, HE Stanley, C Donati, F Sciortino, P Tartaglia, _Phys Rev E,_ __65,__ 041205 (2002)](https://doi.org/10.1103/PhysRevE.65.041205).
+* [LJ Lewis, G Wahnstrom, _Sol State Commun,_ __86,__ 295 (1993)](https://doi.org/10.1016/0038-1098(93)90376-X),
+* [LJ Lewis, G Wahnstrom, _Phys Rev E,_ __50,__ 3865 (1994)](https://doi.org/10.1103/PhysRevE.50.3865),
+* [S Mossa, E La Nave, HE Stanley, C Donati, F Sciortino, P Tartaglia, _Phys Rev E,_ __65,__ 041205 (2002)](https://doi.org/10.1103/PhysRevE.65.041205),
 * [E La Nave, S Mossa, F Sciortino, P Tartaglia, _J Chem Phys,_ __120,__ 6128 (2004)](https://doi.org/10.1063/1.1650295).
 
 We compare with the results of [Mossa et al (2002)](https://doi.org/10.1103/PhysRevE.65.041205).
@@ -973,9 +972,9 @@ velocities = .true., soft=.true. /
 ```
 The above value of the density is typical when using this method to model water.
 
-For testing we compare with an approximate DPD equation of state for _P_.
+For testing we compare with an approximate DPD equation of state for _P_
 
-* [RD Groot, PB Warren, _J Chem Phys,_ __107,__ 4423 (1997)](https://doi.org/10.1063/1.474784).
+* [RD Groot, PB Warren, _J Chem Phys,_ __107,__ 4423 (1997)](https://doi.org/10.1063/1.474784),
 * [TP Liyana-Arachchi, SN Jamadagni, D Eike, PH Koenig, JI Siepmann, _J Chem Phys,_ __142,__ 044902 (2015)](https://doi.org/10.1063/1.4905918).
 
 The paper of [Liyana-Arachchi et al (2015)](https://doi.org/10.1063/1.4905918) gives an improvement of the original
@@ -1075,7 +1074,7 @@ using the solution of Poisson's equation in Fourier space.
 In doing so, accuracy is improved by optimizing the so-called influence function G.
 In this example, we use a simple sharpening function discussed by
 
-* [V Ballenegger, JJ Cerda, C Holm, _J Chem Theo Comp,_ __8,__ 936 (2012)](https://doi.org/10.1021/ct2001792).
+* [V Ballenegger, JJ Cerda, C Holm, _J Chem Theo Comp,_ __8,__ 936 (2012)](https://doi.org/10.1021/ct2001792),
 
 but more sophisticated optimized functions are possible. It is easy to comment out
 this sharpening function, to see the extent of the correction; it is reasonably
@@ -1089,7 +1088,7 @@ The program `mesh` generates a random configuration of a small number of charges
 and illustrates the way this may be assigned to a regular cubic mesh using the
 triangular-shaped cloud distribution described in
 
-* RW Hockney, JW Eastwood, _Computer simulation using particles_ (Adam Hilger, Bristol, 1988)
+* RW Hockney, JW Eastwood, _Computer simulation using particles_ (Adam Hilger, Bristol, 1988).
 
 The function generating the charge density is provided in `mesh_module`. The mesh dimension
 is, by default, kept small enough to print out the whole array for inspection afterwards.
@@ -1248,7 +1247,7 @@ The program was tested on a system of _N_=10000 atoms, interacting through
 the Lennard-Jones potential cut (but not shifted) at _R_<sub>c</sub>=2.5&sigma;,
 in a cubic box of side 30&sigma;, at a temperature _T_=0.90.
 For this system, &rho;<sub>G</sub> &asymp; 0.024, &rho;<sub>L</sub> &asymp; 0.713
-(see [Trokhymchuk, op. cit.](https://doi.org/10.1063/1.480192)). A set of 100 configurations from this run, together
+(see [A Trokhymchuk, J Alejandre, _J Chem Phys,_ __111,__ 8510 (1999)](https://doi.org/10.1063/1.480192)). A set of 100 configurations from this run, together
 with the output of `grint.f90` with default parameters, are provided in the
 file `grint_data.zip` in the [Data repository](https://github.com/Allen-Tildesley/data).
 
