@@ -502,7 +502,7 @@ CONTAINS
     rij(:,1:k) = r(:,1:k) - r(:,2:n)
     rhs(:) = - SUM ( vij*rij, dim=1 )
 
-    ! Elements of tridiagonal matrix (dot products of old and new vectors)
+    ! Elements of tridiagonal matrix (dot products of bond vectors)
     ! In this example, all masses are equal to unity
     dl(1:k-1) = -SUM ( rij(:,1:k-1)*rij(:,2:k),   dim=1 )       ! k-1 elements of lower-diagonal
     dd(1:k)   =  SUM ( rij(:,1:k)  *rij(:,1:k),   dim=1 ) / 0.5 ! k elements of diagonal
