@@ -101,3 +101,7 @@ Unfortunately, due to the enormous variety of computing platforms and compilers,
 __we cannot offer more specific advice on the build process.__
 
 The Python versions do not require building, they are simply run through the Python interpreter.
+
+## Reporting errors
+If you spot an error in these program files, or the accompanying documentation, please raise an "Issue" (you will need to be logged in to GitHub to do this).
+Please check the [CONTRIBUTING](CONTRIBUTING.md) guidelines first.
