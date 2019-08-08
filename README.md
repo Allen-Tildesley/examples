@@ -103,5 +103,7 @@ __we cannot offer more specific advice on the build process.__
 The Python versions do not require building, they are simply run through the Python interpreter.
 
 ## Reporting errors
-If you spot an error in these program files, or the accompanying documentation, please raise an "Issue" (you will need to be logged in to GitHub to do this).
-Please check the [CONTRIBUTING](CONTRIBUTING.md) guidelines first.
+If you spot an error in these program files, or the accompanying documentation,
+please check the [CONTRIBUTING](CONTRIBUTING.md) guidelines first,
+and then raise an "issue" using the [Issues](https://github.com/Allen-Tildesley/examples/issues) tab.
+(You will need to be logged in to GitHub to do this).
