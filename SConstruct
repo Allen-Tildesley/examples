@@ -38,6 +38,8 @@ OMP_LINKFLAGS='-fopenmp'
 env_normal=Environment(ENV=os.environ)
 env_normal.Append(F90FLAGS=MY_FLAGS,FORTRANMODDIR='${TARGET.dir}',F90PATH=['${TARGET.dir}'])
 # Earlier versions also needed FORTRANMODDIRPREFIX='-J'
+# May also need LINKFLAGS='-L/usr/lib' as a temporary workaround on MacOS with XCode 11 and MacPorts
+#   Problem arose Sept 2019, see e.g. https://trac.macports.org/ticket/59083
 
 env_lapack=env_normal.Clone()
 env_lapack.Append(LIBPATH=[LAPACK_LIBPATH],LIBS=LAPACK_LIBS)
