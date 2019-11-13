@@ -400,7 +400,10 @@ an option for each process to write to separate files, similar to the following:
 ```
 mpiexec -n 4 -output-filename out ./mc_nvt_lj_re.py < mc.inp
 ```
-whereby the standard output files are named `out##`, the `##` part being determined by the process rank.
+whereby the output files are placed in subdirectories,
+identified by process rank,
+beneath the specified directory `out`
+(in earlier versions of Open MPI, standard output would be directed to files named `out##`, the `##` part being determined by the process rank).
 If your implementation does not have this option, you should edit the code to explicitly open a file for
 standard output, with a process-rank-dependent name, and associate the output channel with it.
 
