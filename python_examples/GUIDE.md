@@ -714,9 +714,10 @@ _E_    | _S(E)_ (exact) | _S(E)_ (WL) | _S(E)_ (WL)
 
 As a further check, we ran a set of canonical ensemble calculations for the same system
 with `mc_chain_nvt_sw` at selected temperatures.
-The program default is to run for 10 blocks, each of 100000 steps;
-this was increased to 10 blocks of 500000 steps for temperatures
-below 0.25.
+The program default is to run for 10 blocks, each of 10000 steps,
+but the results here were obtained with 10&times;500000 steps
+for temperatures below 0.25,
+and 10&times;100000 steps for higher temperatures.
 The results may be compared with values reconstructed using the
 `wl_hist` program from the simulation histograms.
 Below we show the heat capacity per atom from the above two WL runs (red),
