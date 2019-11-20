@@ -30,5 +30,5 @@ and are written in Python3 using the NumPy and SciPy libraries.
 The [User Guide](./GUIDE.md) contains some comments on the Python language,
 some notes to assist in running the programs,
 and some typical results.
-We have used Python 3.6.0 for testing.
+We have used Python 3.7.5 (and before that, 3.6.0) for testing.
 The Python versions do not require building, they are simply run through the Python interpreter.

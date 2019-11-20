@@ -59,8 +59,8 @@ A few examples consist of individual routines or modules,
 rather than working programs,
 so there is no need to build them.
 
-The build process for the Fortran examples has been tested using SCons v3.0.4
-(and before that, v2.5.1, with a minor change to the `SConstruct` file;
+The build process for the Fortran examples has been tested using SCons v3.1.1
+(and before that, v3.0.4; and also v2.5.1 with a minor change to the `SConstruct` file;
 older versions might not work properly).
 If you don't like using SCons, or can't get it to work,
 it is not difficult to compile the programs using other methods.
@@ -78,7 +78,7 @@ it is advisable to __compile each example in its own build directory__
 (which is what the `SConstruct` file is configured to do)
 or to delete all intermediate files before each individual compilation.
 
-We have used gfortran v8.2 (and before that, v6.3, v7.2) for testing,
+We have used gfortran v9.2 (and before that, v6.3, v7.2, v8.2) for testing,
 but have attempted to stick to code which conforms to the Fortran 2008 standard.
 In gfortran v6, calling the intrinsic `random_seed()` function would
 generate the same sequence of random numbers every time.
