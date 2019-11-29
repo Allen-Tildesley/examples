@@ -26,11 +26,7 @@ MODULE mc_module
   !------------------------------------------------------------------------------------------------!
 
   ! This (together with link_list_module.f90) functions as a drop-in replacement
-  ! for mc_lj_module.f90 which should work in our constant-NVT and zVT programs.
-  ! However, we have adopted a simple approach of setting up the list structure,
-  ! by calling initialize_list (in allocate_arrays) and make_list (in potential),
-  ! just once at the start of the run. Consequently some modifications would be
-  ! needed to make it work with the constant-NPT program, with varying box length.
+  ! for mc_lj_module.f90 which should work in our constant-NVT NPT and zVT programs.
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
@@ -120,7 +116,6 @@ CONTAINS
        STOP 'Error in allocate_arrays'
     END IF
 
-    ! We assume that box will not change during the run
     CALL initialize_list ( n, r_cut_box )
 
   END SUBROUTINE allocate_arrays
