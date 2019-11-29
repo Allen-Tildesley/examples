@@ -54,7 +54,7 @@ PROGRAM mc_npt_lj
   USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               maths_module,     ONLY : metropolis, random_translate_vector
   USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                                     potential_1, potential, move, n, r, potential_type
+       &                                     box_check, potential_1, potential, move, n, r, potential_type
 
   IMPLICIT NONE
 
@@ -143,6 +143,7 @@ PROGRAM mc_npt_lj
 
      DO stp = 1, nstep ! Begin loop over steps
 
+        CALL box_check ( box, r_cut ) ! Prepare for single-particle moves
         moves = 0
 
         DO i = 1, n ! Begin loop over atoms

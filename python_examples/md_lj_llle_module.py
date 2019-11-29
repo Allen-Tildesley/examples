@@ -105,6 +105,7 @@ def force ( box, strain, r ):
 
     # Calculate cell index triplets
     sc = math.floor(box/r_cut)                          # Number of cells along box edge
+    assert sc >= 3, 'System is too small for cells'     # Guard against box being too small
     c  = np.floor((r+0.5)*sc).astype(np.int_)           # N*3 array of cell indices for all atoms
     assert np.all(c>=0) and np.all(c<sc), 'Index error' # Simplistic "guard" against roundoff
 

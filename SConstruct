@@ -92,6 +92,7 @@ variants['build_md_chain_mts_lj']      = (['md_chain_mts_lj.f90','md_chain_lj_mo
 variants['build_md_chain_nve_lj']      = (['md_chain_nve_lj.f90','md_chain_lj_module.f90']+utilities,env_lapack)
 variants['build_md_lj_mts']            = (['md_lj_mts.f90','md_lj_mts_module.f90','lrc_lj_module.f90']+utnomaths,env_normal)
 variants['build_md_npt_lj']            = (['md_npt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
+variants['build_md_npt_lj_ll']         = (['md_npt_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utilities,env_normal)
 variants['build_md_nve_hs']            = (['md_nve_hs.f90','md_nve_hs_module.f90']+utnomaths,env_normal)
 variants['build_md_nve_lj']            = (['md_nve_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+utnomaths,env_normal)
 variants['build_md_nve_lj_vl']         = (['md_nve_lj.f90','md_lj_vl_module.f90','lrc_lj_module.f90','verlet_list_module.f90']+utnomaths,env_normal)

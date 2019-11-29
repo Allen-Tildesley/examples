@@ -163,7 +163,7 @@ CONTAINS
     ! Lees-Edwards periodic boundaries
     r(1,:) = r(1,:) - ANINT ( r(2,:) ) * strain ! Extra correction in box=1 units
     r(:,:) = r(:,:) - ANINT ( r(:,:) )          ! Standard correction in box=1 units
-    CALL make_list ( n, r )
+    CALL make_list ( n, r_cut_box, r )
 
     shift = FLOOR ( strain * REAL ( sc ) ) ! Strain measured in cell lengths
 

@@ -32,7 +32,7 @@ MODULE mc_module
 
   ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: potential_1, potential, force_sq
+  PUBLIC :: box_check, potential_1, potential, force_sq
   PUBLIC :: move, create, destroy
 
   ! Public data
@@ -120,6 +120,21 @@ CONTAINS
 
   END SUBROUTINE deallocate_arrays
 
+  SUBROUTINE box_check ( box, r_cut )
+    IMPLICIT NONE
+    REAL, INTENT(in) :: box   ! Simulation box length
+    REAL, INTENT(in) :: r_cut ! Potential cutoff distance
+
+    REAL :: r_cut_box
+
+    r_cut_box = r_cut / box
+    IF ( r_cut_box > 0.5 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,f15.6)') 'r_cut/box too large ', r_cut_box
+       STOP 'Error in box_check'
+    END IF
+
+  END SUBROUTINE box_check
+
   FUNCTION potential ( box, r_cut ) RESULT ( total )
     IMPLICIT NONE
     TYPE(potential_type) :: total ! Returns a composite of pot, vir etc
@@ -133,11 +148,20 @@ CONTAINS
     ! If this flag is .true., the values of total%pot etc should not be used
     ! Actual calculation is performed by function potential_1
 
+    ! We assume that the box length may vary, so we check r_cut/box at the start.
+
     TYPE(potential_type) :: partial ! Atomic contribution to total
     INTEGER              :: i
+    REAL                 :: r_cut_box
 
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
+       STOP 'Error in potential'
+    END IF
+
+    r_cut_box = r_cut / box
+    IF ( r_cut_box > 0.5 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,f15.6)') 'r_cut/box too large ', r_cut_box
        STOP 'Error in potential'
     END IF
 
@@ -179,6 +203,9 @@ CONTAINS
 
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
+
+    ! We assume that the box length may vary, but that r_cut/box
+    ! has been checked since the last change in box length.
 
     INTEGER              :: j, j1, j2
     REAL                 :: r_cut_box, r_cut_box_sq, box_sq
@@ -270,6 +297,10 @@ CONTAINS
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
+    IF ( r_cut_box > 0.5 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,f15.6)') 'r_cut/box too large ', r_cut_box
+       STOP 'Error in force_sq'
+    END IF
 
     f = 0.0 ! Initialize
 

@@ -135,6 +135,10 @@ CONTAINS
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
+    IF ( r_cut_box > 0.5 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,f15.6)' ) 'r_cut/box too large ', r_cut_box
+       STOP 'Error in force'
+    END IF
 
     ! Calculate potential at cutoff
     sr2     = 1.0 / r_cut**2 ! in sigma=1 units

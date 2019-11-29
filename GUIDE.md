@@ -208,6 +208,7 @@ Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs
 `md_nve_lj_vl`         | 0.75      | 1.0023(3) | -2.9278    | 0.992(2) |  2.24(1)  | -3.7274    | 0.391(2) |
 `md_nve_lj_ll`&Dagger; | 0.75      | 1.0010(1) | -2.9272    | 0.992(1) |  2.28(1)  | -3.7268    | 0.391(1) |
 `md_nvt_lj_ll`&Dagger; | 0.75      | 1.00      | -2.927(2)  | 0.994(3) |  2.3(1)   | -3.727(2)  | 0.392(3) | 2.3(1)
+`md_npt_lj_ll`&sect;&Dagger; | 0.7501(4) | 1.00 | -2.931(4) | 0.991(1) |           | -3.731(4)  | 0.389(1) |
 `smc_nvt_lj`&sharp;(a) | 0.75      | 1.00      | -2.9300(5) | 0.971(2) |  2.263(5) | -3.7296(5) | 0.369(2) | 2.270(5)
 `smc_nvt_lj`&sharp;(b) | 0.75      | 1.00      | -2.928(2)  | 0.99(1)  |  2.26(2)  | -3.728(2)  | 0.39(1)  | 2.27(2)
 `smc_nvt_lj`&sharp;(c) | 0.75      | 1.00      | -2.930(3)  | 0.98(2)  |  2.26(3)  | -3.729(3)  | 0.38(2)  | 2.27(3)
@@ -216,7 +217,7 @@ Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs
 &Dagger; Indicates a larger system size, _N_=864, needed to make the link-list method viable. Note that
 the speedup is not enormous for this system size, corresponding to 4&times;4&times;4 cells.
 
-&sect; The constant-pressure simulation was run at _P_=0.99, the program default.
+&sect; The constant-pressure simulations were run at _P_=0.99, the program default.
 
 &sharp; The `smc_nvt_lj` program was tested (a) in default, single-particle-move, mode, with &delta;t=0.1;
 (b) in multi-particle mode, moving 100% of particles, with &delta;t=0.02;
@@ -295,12 +296,11 @@ The [Thol et al (2016)](https://doi.org/10.1063/1.4945000) LRC-corrected value t
 For `mc_zvt_lj` the box length was _L_=7&sigma;; for `mc_zvt_lj_ll` _L_=10.5&sigma;.
 Acceptance rate of creation/destruction moves is quite small, at about 0.3%.
 For other state points see below.
+These programs could be improved to use array reallocation (available in Fortran)
+to make them more resilient against large increases in the number of particles.
+For simplicity we have not included this feature.
 
 &sharp; The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
-
-Several of these programs could be improved to use array reallocation (available in Fortran)
-to make them more resilient against changes in box size or number of particles.
-For simplicity we have not included these features.
 
 The measured pressures _P_ (c) are systematically a little low;
 this is particularly noticeable for the constant-pressure programs,

@@ -39,7 +39,7 @@ MODULE mc_module
 
   ! Public routines
   PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
-  PUBLIC :: potential_1, potential, force_sq
+  PUBLIC :: box_check, potential_1, potential, force_sq
   PUBLIC :: move, create, destroy
 
   ! Public data
@@ -134,6 +134,19 @@ CONTAINS
 
   END SUBROUTINE deallocate_arrays
 
+  SUBROUTINE box_check ( box, r_cut )
+    USE link_list_module, ONLY : make_list
+    IMPLICIT NONE
+    REAL, INTENT(in) :: box   ! Simulation box length
+    REAL, INTENT(in) :: r_cut ! Potential cutoff distance
+
+    REAL :: r_cut_box
+
+    r_cut_box = r_cut / box
+    CALL make_list ( n, r_cut_box, r )
+
+  END SUBROUTINE box_check
+
   FUNCTION potential ( box, r_cut ) RESULT ( total )
     USE link_list_module, ONLY : make_list
     IMPLICIT NONE
@@ -148,26 +161,23 @@ CONTAINS
     ! If this flag is .true., the values of total%pot etc should not be used
     ! Actual calculation is performed by function potential_1
 
-    ! We assume that the main program calls this function at the start,
-    ! and hence use this opportunity to call the make_list function.
-    ! We also assume that the box length remains constant throughout
-    ! The list is maintained by create_in_list, destroy_in_list, move_in_list
-    ! which are called in other routines below.
+    ! This routine uses linked lists.
+    ! We assume that the box length may vary, so we call the make_list function at the start.
+    ! The list for fixed box length is maintained by create_in_list, destroy_in_list,
+    ! and move_in_list which are called in other routines below.
 
     TYPE(potential_type) :: partial
     INTEGER              :: i
-    LOGICAL, SAVE        :: first_call = .TRUE.
-    
+    REAL                 :: r_cut_box
+
     IF ( n > SIZE(r,dim=2) ) THEN ! should never happen
        WRITE ( unit=error_unit, fmt='(a,2i15)' ) 'Array bounds error for r', n, SIZE(r,dim=2)
        STOP 'Impossible error in potential'
     END IF
 
-    IF ( first_call ) THEN
-       r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
-       CALL make_list ( n, r )
-       first_call = .FALSE.
-    END IF
+    r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
+    r_cut_box = r_cut / box
+    CALL make_list ( n, r_cut_box, r )
 
     total = potential_type ( pot=0.0, vir=0.0, lap=0.0, ovr=.FALSE. ) ! Initialize
 
@@ -209,6 +219,10 @@ CONTAINS
 
     ! It is assumed that r has been divided by box
     ! Results are in LJ units where sigma = 1, epsilon = 1
+
+    ! This routine uses linked lists.
+    ! We assume that the box length may vary, but that the make_list function
+    ! has been called since the last change in box length.
 
     INTEGER               :: j, jj
     LOGICAL               :: half
@@ -285,7 +299,7 @@ CONTAINS
   END FUNCTION potential_1
 
   FUNCTION force_sq ( box, r_cut ) RESULT ( fsq )
-    USE link_list_module, ONLY : c, neighbours
+    USE link_list_module, ONLY : make_list, c, neighbours
     IMPLICIT NONE
     REAL             :: fsq   ! Returns total squared force
     REAL, INTENT(in) :: box   ! Simulation box length
@@ -293,6 +307,7 @@ CONTAINS
 
     ! Calculates total squared force (using array f)
     ! Uses link lists
+    ! We assume that the box length may vary, so we call the make_list function at the start.
 
     INTEGER               :: i, j, jj
     REAL                  :: r_cut_box, r_cut_box_sq, box_sq, rij_sq
@@ -302,6 +317,7 @@ CONTAINS
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
+    CALL make_list ( n, r_cut_box, r )
 
     ! Initialize
     f = 0.0

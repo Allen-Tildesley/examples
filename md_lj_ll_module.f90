@@ -158,7 +158,7 @@ CONTAINS
     pot_cut = sr12 - sr6 ! Without numerical factor 4
 
     r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundary conditions in box=1 units
-    CALL make_list ( n, r )
+    CALL make_list ( n, r_cut_box, r )
 
     ! Initialize
     f     = 0.0
@@ -278,7 +278,7 @@ CONTAINS
     hes = 0.0
 
     r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundary conditions in box=1 units
-    CALL make_list ( n, r )
+    CALL make_list ( n, r_cut_box, r )
 
     ! Triple loop over cells
     DO ci1 = 0, sc-1

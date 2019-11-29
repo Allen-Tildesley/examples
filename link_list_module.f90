@@ -45,11 +45,12 @@ CONTAINS
   SUBROUTINE initialize_list ( n, r_cut_box ) ! Routine to allocate list arrays
     IMPLICIT NONE
     INTEGER, INTENT(in) :: n         ! Number of particles
-    REAL,    INTENT(in) :: r_cut_box ! rcut/box, assume never changes
+    REAL,    INTENT(in) :: r_cut_box ! rcut/box
 
-    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)') 'Link cells based on r_cut/box =', r_cut_box
+    WRITE ( unit=output_unit, fmt='(a,t40,f15.6)') 'Link cells based on r_cut/box', r_cut_box
 
     sc = FLOOR ( 1.0 / r_cut_box ) ! Number of cells in each dimension
+    WRITE ( unit=output_unit, fmt='(a,t40,i15)') 'Number of cells in box', sc
     IF ( sc < 3 ) THEN
        WRITE ( unit=error_unit, fmt='(a,i15)') 'System is too small to use link cells', sc
        STOP 'Error in initialize_list'
@@ -68,13 +69,25 @@ CONTAINS
 
   END SUBROUTINE finalize_list
 
-  SUBROUTINE make_list ( n, r ) ! Routine to make list
+  SUBROUTINE make_list ( n, r_cut_box, r ) ! Routine to make list
     IMPLICIT NONE
-    INTEGER,                 INTENT(in) :: n ! Number of atoms
-    REAL,    DIMENSION(3,n), INTENT(in) :: r ! Atom coordinates
+    INTEGER,                 INTENT(in) :: n         ! Number of atoms
+    REAL,                    INTENT(in) :: r_cut_box ! rcut/box
+    REAL,    DIMENSION(3,n), INTENT(in) :: r         ! Atom coordinates
 
     INTEGER :: i
-    
+
+    ! Allow for possibility of box size change
+    sc = FLOOR ( 1.0 / r_cut_box )
+    IF ( sc < 3 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,i15)') 'System is too small to use link cells', sc
+       STOP 'Error in make_list'
+    END IF
+    IF ( sc > SIZE ( head, dim=1 ) ) THEN
+       DEALLOCATE ( head )
+       ALLOCATE ( head(0:sc-1,0:sc-1,0:sc-1) )
+    END IF
+
     head(:,:,:) = 0
 
     DO i = 1, n ! Loop over all atoms

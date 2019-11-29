@@ -137,6 +137,10 @@ CONTAINS
     r_cut_box    = r_cut / box
     r_cut_box_sq = r_cut_box ** 2
     box_sq       = box ** 2
+    IF ( r_cut_box > 0.5 ) THEN
+       WRITE ( unit=error_unit, fmt='(a,f15.6)' ) 'r_cut/box too large ', r_cut_box
+       STOP 'Error in force'
+    END IF
 
     ! Initialize
     f     = 0.0
