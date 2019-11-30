@@ -56,7 +56,7 @@ or just `python sample_mean.py`,
 depending on your particular installation of Python.
 (Of course, in most cases, it will also be necessary to input data to the program.)
 The examples _will not work_ with Python 2!
-They have been tested with Python 3.6.0.
+They have been tested with Python 3.7.5 (and before that, 3.6.0).
 For an introduction to the differences between Python 2 and Python 3,
 see the [What's New in Python 3.0](https://docs.python.org/3/whatsnew/3.0.html "What's New in Python 3.0") page.
 The most obvious changes are
