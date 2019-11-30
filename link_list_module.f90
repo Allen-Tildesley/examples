@@ -31,7 +31,7 @@ MODULE link_list_module
   PRIVATE
 
   ! Public routines
-  PUBLIC :: initialize_list, finalize_list, make_list, check_list
+  PUBLIC :: initialize_list, extend_list, finalize_list, make_list, check_list
   PUBLIC :: move_in_list, create_in_list, destroy_in_list, c_index, neighbours
 
   ! Public (protected) data
@@ -40,6 +40,10 @@ MODULE link_list_module
   INTEGER, DIMENSION(:),     ALLOCATABLE, PROTECTED, SAVE, PUBLIC :: list   ! list(n)
   INTEGER, DIMENSION(:,:),   ALLOCATABLE, PROTECTED, SAVE, PUBLIC :: c      ! c(3,n) 3D cell index of each atom
 
+  ! Private data
+  INTEGER, DIMENSION(:),     ALLOCATABLE :: tmp_list ! for dynamic reallocation of list(n)
+  INTEGER, DIMENSION(:,:),   ALLOCATABLE :: tmp_c    ! for dynamic reallocation of c(3,n)
+  
 CONTAINS
 
   SUBROUTINE initialize_list ( n, r_cut_box ) ! Routine to allocate list arrays
@@ -60,6 +64,33 @@ CONTAINS
     ALLOCATE ( head(0:sc-1,0:sc-1,0:sc-1) )
 
   END SUBROUTINE initialize_list
+
+  SUBROUTINE extend_list ( n_new )
+    IMPLICIT NONE
+    INTEGER, INTENT(in) :: n_new ! New size of arrays
+
+    INTEGER :: n_old
+
+    n_old = SIZE ( list )
+
+    IF ( n_new <= n_old ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)') 'Unexpected array size ', n_old, n_new
+       STOP 'Error in extend_list'
+    END IF
+
+    ! Reallocate list array, preserving existing data
+    ALLOCATE ( tmp_list(n_new) )
+    tmp_list(1:n_old)  = list
+    tmp_list(n_old+1:) = 0
+    CALL MOVE_ALLOC ( tmp_list, list )
+
+    ! Reallocate c array, preserving existing data
+    ALLOCATE ( tmp_c(3,n_new) )
+    tmp_c(:,1:n_old)  = c
+    tmp_c(:,n_old+1:) = 0
+    CALL MOVE_ALLOC ( tmp_c, c )
+
+  END SUBROUTINE extend_list
 
   SUBROUTINE finalize_list ! Routine to deallocate list arrays
     IMPLICIT NONE

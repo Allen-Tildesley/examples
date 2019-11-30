@@ -296,9 +296,6 @@ The [Thol et al (2016)](https://doi.org/10.1063/1.4945000) LRC-corrected value t
 For `mc_zvt_lj` the box length was _L_=7&sigma;; for `mc_zvt_lj_ll` _L_=10.5&sigma;.
 Acceptance rate of creation/destruction moves is quite small, at about 0.3%.
 For other state points see below.
-These programs could be improved to use array reallocation (available in Fortran)
-to make them more resilient against large increases in the number of particles.
-For simplicity we have not included this feature.
 
 &sharp; The `mc_nvt_lj_re` program was run for four temperatures, see below for details.
 

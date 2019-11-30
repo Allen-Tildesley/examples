@@ -48,7 +48,7 @@ PROGRAM mc_zvt_lj
   USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
   USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
   USE               maths_module,     ONLY : metropolis, random_integer, random_translate_vector
-  USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
+  USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, extend_arrays, deallocate_arrays, &
        &                                     potential_1, potential, move, create, destroy, n, r, potential_type
 
   IMPLICIT NONE
@@ -116,12 +116,11 @@ PROGRAM mc_zvt_lj
   WRITE ( unit=output_unit, fmt='(a,t40,i15)'   ) 'Number of particles',   n
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Simulation box length', box
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Density',               REAL(n) / box**3
-  n = n * 2 ! Increase n for array allocation
   CALL allocate_arrays ( box, r_cut ) ! Allocate r
-  n = n / 2 ! Restore value of n
   CALL read_cnf_atoms ( cnf_prefix//inp_tag, n, box, r ) ! Second call is to get r
   r(:,:) = r(:,:) / box              ! Convert positions to box units
   r(:,:) = r(:,:) - ANINT ( r(:,:) ) ! Periodic boundaries
+  CALL extend_arrays ( 2*n )         ! Extend arrays to allow for particle creation
 
   ! Initial energy and overlap check
   total = potential ( box, r_cut ) 
@@ -191,8 +190,7 @@ PROGRAM mc_zvt_lj
               c_try = c_try + 1
 
               IF ( n+1 > SIZE(r,dim=2) ) THEN
-                 WRITE ( unit=error_unit, fmt='(a,2i5)') 'n has grown too large', n+1, SIZE(r,dim=2)
-                 STOP 'Error in mc_zvt_lj'
+                 CALL extend_arrays ( 2*n ) ! Extend arrays to allow for particle creation
               END IF
 
               CALL RANDOM_NUMBER ( ri ) ! Three uniform random numbers in range (0,1)

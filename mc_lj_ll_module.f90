@@ -34,7 +34,7 @@ MODULE mc_module
   PRIVATE
 
   ! Public routines
-  PUBLIC :: introduction, conclusion, allocate_arrays, deallocate_arrays
+  PUBLIC :: introduction, conclusion, allocate_arrays, extend_arrays, deallocate_arrays
   PUBLIC :: box_check, potential_1, potential, force_sq
   PUBLIC :: move, create, destroy
 
@@ -45,6 +45,7 @@ MODULE mc_module
   ! Private data
   REAL,    DIMENSION(:,:), ALLOCATABLE :: f      ! Forces for force_sq calculation (3,n)
   INTEGER, DIMENSION(:),   ALLOCATABLE :: j_list ! List of j-neighbours (n)
+  REAL,    DIMENSION(:,:), ALLOCATABLE :: tmp_r  ! Temporary array for dynamic reallocation of r
 
   INTEGER, PARAMETER :: lt = -1, gt = 1 ! Options for j-range
 
@@ -119,6 +120,38 @@ CONTAINS
     CALL initialize_list ( n, r_cut_box )
 
   END SUBROUTINE allocate_arrays
+
+  SUBROUTINE extend_arrays ( n_new )
+    USE link_list_module, ONLY : extend_list
+    IMPLICIT NONE
+    INTEGER, INTENT(in) :: n_new ! New size of arrays
+
+    INTEGER :: n_old
+
+    n_old = SIZE ( r, dim=2 )
+
+    IF ( n_new <= n_old ) THEN
+       WRITE ( unit=error_unit, fmt='(a,2i15)') 'Unexpected array size ', n_old, n_new
+       STOP 'Error in extend_arrays'
+    END IF
+
+    ! Reallocate r array, preserving existing data
+    ALLOCATE ( tmp_r(3,n_new) )
+    tmp_r(:,1:n_old)  = r
+    tmp_r(:,n_old+1:) = 0.0
+    CALL MOVE_ALLOC ( tmp_r, r )
+
+    ! Reallocate f array, no need to preserve data
+    DEALLOCATE ( f )
+    ALLOCATE ( f(3,n_new) )
+
+    ! Reallocate j_list array, no need to preserve data
+    DEALLOCATE ( j_list )
+    ALLOCATE ( j_list(n_new) )
+
+    CALL extend_list ( n_new )
+
+  END SUBROUTINE extend_arrays
 
   SUBROUTINE deallocate_arrays
     USE link_list_module, ONLY : finalize_list
