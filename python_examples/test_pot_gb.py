@@ -24,7 +24,7 @@
 # the software, you should not imply endorsement by the authors or publishers.                   #
 #------------------------------------------------------------------------------------------------#
 
-"""Quadrupole-quadrupole potential and forces."""
+"""Gay-Berne potential and forces."""
 
 import numpy as np
 n = 2 # Two-molecule potential
