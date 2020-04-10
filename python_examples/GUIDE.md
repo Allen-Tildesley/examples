@@ -222,8 +222,9 @@ we supply two versions of the code in the main module:
 a _slow_ version built around the standard Python loops,
 which may be directly compared with the Fortran examples;
 and a _fast_ version which uses NumPy library routines to replace the inner loop.
-This is tantamount to _vectorizing_ the calculation in a very simple way
-(and another approach to the same problem appears in `pair_distribution.py`).
+This is tantamount to _vectorizing_ the calculation in a very simple way.
+(We do not claim to have chosen the _fastest_ NumPy method in our Python simulation codes;
+for examples of other approaches to the same problem, see the `pair_distribution.py` program).
 The variable `fast` controls which version is used, and by default is set to `True`,
 at the start of the main module; the user may override this by editing this statement,
 but the program will then run (yet another) order of magnitude more slowly,
@@ -1131,14 +1132,27 @@ simply so as to use a fixed naming scheme for the input configurations;
 in a practical application, a trajectory file would be used instead.
 The sum over all pairs is performed using a vectorized approach,
 so as to take advantage of NumPy routines.
-The coordinate array `r` is compared with a cyclically-shifted copy,
+Two versions appear here as examples,
+both different from the methods used in our MD programs.
+
+In the simplest version,
+a matrix of all pair distances is computed from the coordinate array `r`,
+and a NumPy indexing function is used to extract the upper triangle
+of _N(N-1)/2_ values which are processed together.
+For the cases tested,
+this proved significantly faster than an alternative
+(commented out in the code)
+based on
+[S Brode and R Ahlrichs, _Comput Phys Commun,_ __42,__ 51 (1986)](https://doi.org/10.1016/0010-4655(86)90230-4).
+In the alternative version,
+the coordinate array `r` is compared with a cyclically-shifted copy,
 to give `n` (that is, _N_) separation vectors `rij` which are processed all at once.
 Only `n//2` shifts are needed to cover every distinct `ij` pair.
 There is a slight subtlety on the last shift, if `n` is even:
 both `ij` and `ji` pairs appear,
 and so the usual incrementing factor 2 is replaced by a factor 1.
-The idea dates back to [S Brode and R Ahlrichs, _Comput Phys Commun,_ __42,__ 51 (1986)](https://doi.org/10.1016/0010-4655(86)90230-4).
-The actual histogramming is conveniently performed
+For either version of the code,
+the actual histogramming is conveniently performed
 by the built-in NumPy `histogram` routine.
 
 We have tested this on a set of 500 configurations

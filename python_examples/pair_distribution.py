@@ -83,18 +83,28 @@ while True: # Loop until configurations or naming scheme exhausted
     print('Processing '+file_name)
     r = r / box # Convert to box=1 units
 
+    # Simple approach calculating all pairs at once
+    rij        = r[:,np.newaxis,:] - r[np.newaxis,:,:]           # Set of all distance vectors
+    rij        = rij - np.rint(rij)                              # Apply periodic boundaries
+    rij_mag    = np.sqrt(np.sum(rij**2,axis=-1))                 # Separation distances
+    rij_mag    = rij_mag[np.triu_indices_from(rij_mag,k=1)]      # Extract upper triangle
+    hist,edges = np.histogram(rij_mag,bins=nk,range=(0.0,r_max)) # Accumulate histogram of separations
+    h          = h + 2*hist                                      # Accumulate histogram
+
+    # This section now replaced by the simple approach above
     # To make best use of NumPy, we loop over cyclic offset shifts and process N rij pairs at once.
     # factor=2 accounts for both ij and ji, but if N is even, the last shift 
     # includes both ij and ji pairs already, so factor=1
     # The idea dates back to S Brode and R Ahlrichs Comput Phys Commun 42, 51 (1986)
-    nshift=n//2
-    for shift in range(nshift):
-        rij        = r - np.roll(r,shift+1,axis=0)                   # Difference between N pairs of coordinates
-        rij        = rij - np.rint(rij)                              # Apply periodic boundaries
-        rij_mag    = np.sqrt(np.sum(rij**2,axis=1))                  # Separation distances
-        hist,edges = np.histogram(rij_mag,bins=nk,range=(0.0,r_max)) # Accumulate histogram of separations
-        factor     = 1 if n%2==0 and shift==nshift-1 else 2          # Normally 2 except possibly on last shift
-        h          = h + factor*hist                                 # Accumulate histogram
+#    nshift=n//2
+#    for shift in range(nshift):
+#        rij        = r - np.roll(r,shift+1,axis=0)                   # Difference between N pairs of coordinates
+#        rij        = rij - np.rint(rij)                              # Apply periodic boundaries
+#        rij_mag    = np.sqrt(np.sum(rij**2,axis=1))                  # Separation distances
+#        hist,edges = np.histogram(rij_mag,bins=nk,range=(0.0,r_max)) # Accumulate histogram of separations
+#        factor     = 1 if n%2==0 and shift==nshift-1 else 2          # Normally 2 except possibly on last shift
+#        h          = h + factor*hist                                 # Accumulate histogram
+
     nstep=nstep+1 # Increment configuration counter ready for next time
 
 rho  = float(n) # Our calculation is done in box=1 units
