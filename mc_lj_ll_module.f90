@@ -209,7 +209,7 @@ CONTAINS
 
     total = potential_type ( pot=0.0, vir=0.0, lap=0.0, ovr=.FALSE. ) ! Initialize
 
-    DO i = 1, n-1
+    DO i = 1, n
 
        partial = potential_1 ( r(:,i), i, box, r_cut, gt )
 
@@ -350,7 +350,7 @@ CONTAINS
     ! Initialize
     f = 0.0
 
-    DO i = 1, n-1 ! Outer loop over i
+    DO i = 1, n ! Outer loop over i
 
        j_list = neighbours ( n, i, c(:,i), half=.TRUE. ) ! Put neighbours in j_list
 

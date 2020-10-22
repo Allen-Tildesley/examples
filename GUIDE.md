@@ -276,20 +276,20 @@ Source                       | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (
 [Thol et al (2016)](https://doi.org/10.1063/1.4945000) (f)        | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630
 `mc_nvt_lj`                  | 0.75      | 1.00  | -3.332(1)  | 0.651(3) | -3.734(1)  | 0.350(3) |  2.28(1)
 `mc_nvt_lj_re`&sharp;        | 0.75      | 1.00  | -3.332(1)  | 0.648(2) | -3.734(1)  | 0.347(2) |  2.258(4)
-`mc_nvt_lj_ll`&Dagger;       | 0.75      | 1.00  | -3.3230(3) | 0.669(1) | -3.7246(3) | 0.367(1) |  2.27(1)
+`mc_nvt_lj_ll`&Dagger;       | 0.75      | 1.00  | -3.3320(3) | 0.659(2) | -3.7336(3) | 0.358(2) |  2.275(7)
 `mc_npt_lj`&sect;            | 0.7501(2) | 1.00  | -3.331(1)  | 0.666(2) | -3.733(1)  | 0.364(2) |
-`mc_npt_lj_ll`&Dagger;&sect; | 0.7506(4) | 1.00  | -3.332(3)  | 0.660(3) | -3.734(3)  | 0.358(3) |
+`mc_npt_lj_ll`&Dagger;&sect; | 0.7499(2) | 1.00  | -3.330(1)  | 0.663(1) | -3.732(1)  | 0.362(1) |
 `mc_zvt_lj`&para;            | 0.7504(4) | 1.00  | -3.333(3)  | 0.668(4) | -3.735(3)  | 0.366(4) |
-`mc_zvt_lj_ll`&Dagger;&para; | 0.7501(3) | 1.00  | -3.328(2)  | 0.669(2) | -3.729(2)  | 0.368(2) |
+`mc_zvt_lj_ll`&Dagger;&para; | 0.7506(3) | 1.00  | -3.335(2)  | 0.671(3) | -3.736(2)  | 0.370(3) |
 
 &Dagger; Indicates a larger system size, _N_=864 (or approximately so for `mc_zvt_lj_ll`).
 Note that the linked lists do not give an enormous speedup for this system size,
 which corresponds to 4&times;4&times;4 cells.
 
 &sect; The constant pressure simulations were run at _P_=0.69, the program default.
-The measured _C<sub>p</sub>_ (full) values were 5.28(7) for `mc_npt_lj` and 5.04(16) for `mc_npt_lj_ll`,
+The measured _C<sub>p</sub>_ (full) values were 5.28(7) for `mc_npt_lj` and 5.34(14) for `mc_npt_lj_ll`,
 compared with [Thol et al (2016)](https://doi.org/10.1063/1.4945000) EOS giving 5.22.
-The `mc_npt_lj_ll` program was run with non-default value `db_max`=0.015 to give a volume acceptance ratio around 9%.
+The `mc_npt_lj_ll` program was run with non-default value `db_max`=0.015 to give a volume acceptance ratio around 20%.
 
 &para; The grand canonical programs were run at activity _z_=0.0795, the program default value.
 The [Thol et al (2016)](https://doi.org/10.1063/1.4945000) LRC-corrected value to give &rho;=0.75 would be _z_=0.080627.
