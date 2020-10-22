@@ -59,7 +59,7 @@ A few examples consist of individual routines or modules,
 rather than working programs,
 so there is no need to build them.
 
-The build process for the Fortran examples has been tested using SCons v3.1.1
+The build process for the Fortran examples has been tested using SCons v3.1.2
 (and before that, v3.0.4; and also v2.5.1 with a minor change to the `SConstruct` file;
 older versions might not work properly).
 If you don't like using SCons, or can't get it to work,
@@ -78,15 +78,15 @@ it is advisable to __compile each example in its own build directory__
 (which is what the `SConstruct` file is configured to do)
 or to delete all intermediate files before each individual compilation.
 
-We have used gfortran v9.2 (and before that, v6.3, v7.2, v8.2) for testing,
+We have used gfortran v10.2 (and before that, v6.3, v7.2, v8.2, v9.2) for testing,
 but have attempted to stick to code which conforms to the Fortran 2008 standard.
 In gfortran v6, calling the intrinsic `random_seed()` function would
 generate the same sequence of random numbers every time.
 In a few examples it is important to generate different sequences each time the program is run,
 and for this purpose a subroutine `init_random_seed` was provided in the file `maths_module.f90`;
 this routine, however, included some GNU extensions.
-With gfortran v7, the random number generator has been changed,
-and the intrinsic `random_seed()` function behaves in the desired fashion.
+With gfortran v7, the random number generator was changed,
+and the intrinsic `random_seed()` function now behaves in the desired fashion.
 Therefore, the GNU-specific code has been transferred to a separate file, `gnu_v6_init_random_seed.f90`,
 which is not included in the build process,
 but may be of interest to those still using gfortran v6.
