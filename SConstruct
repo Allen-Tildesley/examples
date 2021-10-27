@@ -4,8 +4,8 @@
 
 import os, sys
 
-# This has been tested using SCons v3.0.4, gfortran v8.2.0,
-# using MacOS Mojave (10.14.2) with compilers and libraries installed through MacPorts.
+# This has been tested using SCons v4.2.0, gfortran v10.3.0,
+# using MacOS Big Sur (11.6) with compilers and libraries installed through MacPorts.
 # It may not work on your system. It is possible that you can get it to work by
 # changing the flags and library/include paths defined in the following few statements.
 # The most likely trouble spots are the programs that use the non-standard
@@ -121,5 +121,5 @@ variants['build_t_tensor']             = (['t_tensor.f90','maths_module.f90'],en
 variants['build_wl_hist']              = (['wl_hist.f90'],env_normal)
 
 # Build each variant in appropriate variant directory
-for variant_dir,(sources,env) in variants.iteritems():
+for variant_dir,(sources,env) in variants.items():
     SConscript('SConscript', variant_dir=variant_dir,exports={'env':env,'sources':sources},duplicate=1)
