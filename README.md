@@ -60,7 +60,7 @@ rather than working programs,
 so there is no need to build them.
 
 The build process for the Fortran examples has been tested using SCons v4.2.0
-(and some earlier versions with minor changes to the `SConstruct` file).
+(and some earlier versions back to v2.5.1 with minor changes to the `SConstruct` file).
 If you don't like using SCons, or can't get it to work,
 it is not difficult to compile the programs using other methods.
 Bear in mind that, with Fortran, it is usually essential to compile any
@@ -77,7 +77,7 @@ it is advisable to __compile each example in its own build directory__
 (which is what the `SConstruct` file is configured to do)
 or to delete all intermediate files before each individual compilation.
 
-We have used gfortran v10.3 (and some earlier versions) for testing,
+We have used gfortran v11.2.0 (and earlier versions back to v6.3) for testing,
 but have attempted to stick to code which conforms to the Fortran 2008 standard.
 In gfortran v6, calling the intrinsic `random_seed()` function would
 generate the same sequence of random numbers every time.

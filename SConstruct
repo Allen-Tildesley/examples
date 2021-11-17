@@ -4,7 +4,7 @@
 
 import os, sys
 
-# This has been tested using SCons v4.2.0, gfortran v10.3.0,
+# This has been tested using SCons v4.2.0, gfortran v11.2.0,
 # using MacOS Big Sur (11.6) with compilers and libraries installed through MacPorts.
 # It may not work on your system. It is possible that you can get it to work by
 # changing the flags and library/include paths defined in the following few statements.
