@@ -184,7 +184,7 @@ def run_end ( variables ):
     run_err = run_err - run_avg**2 # Compute fluctuations of block averages
 
     # Normalize and get estimated errors guarding against roundoff
-    run_err = np.where ( run_err > 0.0, np.sqrt(run_err/run_nrm), 0.0 )
+    run_err = np.where ( run_err > 0.0, np.sqrt(np.fabs(run_err/run_nrm)), 0.0 )
 
     print('-'*line_width)
     print((col1a_fmt+line_fmt).format('Run averages',*run_avg))
