@@ -40,10 +40,10 @@ the main aim of these examples is to illustrate ideas in the text,
 not to provide programs for practical use.
 The reader should feel free to experiment with ways to make the programs run faster!
 
-In the past few years, the community has been making the transition from Python 2 to Python 3.
+In the past few years, the community has made the transition from Python 2 to Python 3.
 There are some incompatibilities between the two,
 and since a choice had to be made,
-we have settled on __Python 3__ for these examples.
+we settled on __Python 3__ for these examples.
 We indicate this by the string
 ```
 #!/usr/bin/env python3
@@ -56,7 +56,6 @@ or just `python sample_mean.py`,
 depending on your particular installation of Python.
 (Of course, in most cases, it will also be necessary to input data to the program.)
 The examples _will not work_ with Python 2!
-They have been tested with Python 3.7.5 (and before that, 3.6.0).
 For an introduction to the differences between Python 2 and Python 3,
 see the [What's New in Python 3.0](https://docs.python.org/3/whatsnew/3.0.html "What's New in Python 3.0") page.
 The most obvious changes are
