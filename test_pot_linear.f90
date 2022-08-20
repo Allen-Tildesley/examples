@@ -27,7 +27,7 @@ PROGRAM test_pot_linear
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE               test_pot_module, ONLY : n, force
-  USE               maths_module,    ONLY : init_random_seed, rotate_vector, cross_product
+  USE               maths_module,    ONLY : rotate_vector, cross_product
 
   IMPLICIT NONE
 
@@ -50,7 +50,7 @@ PROGRAM test_pot_linear
   NAMELIST /nml/ delta, d_min, d_max, pot_max, ntry, npos
 
   ! Initialize random number generator (hopefully different every time!)
-  CALL init_random_seed
+  CALL RANDOM_SEED ()
 
   ! Default values: any of the following could be empirically adjusted
   delta   = 1.e-5 ! Small displacement

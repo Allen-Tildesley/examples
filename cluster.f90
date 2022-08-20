@@ -114,7 +114,7 @@ PROGRAM cluster
 
      IF ( ALL ( done > 0 ) ) EXIT ! Loop until all done
 
-     i = MINLOC ( done, dim = 1 ) ! Find first zero (FINDLOC is not implemented in gfortran at the time of writing)
+     i = FINDLOC ( done, 0, dim = 1 ) ! Find first zero (FINDLOC was implemented in gfortran v9)
      cluster_id = cluster_id + 1
      WRITE ( unit=output_unit, fmt='(a,i5,a)', advance='no' ) 'Cluster ', cluster_id, ' = '
      j = i

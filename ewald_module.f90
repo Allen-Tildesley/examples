@@ -210,8 +210,8 @@ CONTAINS
 
     INTEGER                             :: ix, iy, iz
     REAL                                :: kx, ky, kz, fx, fxy, fxyz, g, k_sq, dr
-    real, DIMENSION(:,:,:), ALLOCATABLE :: rho_sq ! Square modulus of charge density (0:sc-1,0:sc-1,0:sc-1)
-    real, dimension(:),     allocatable :: kmesh  ! k-values in wraparound convention (0:sc-1)
+    REAL, DIMENSION(:,:,:), ALLOCATABLE :: rho_sq ! Square modulus of charge density (0:sc-1,0:sc-1,0:sc-1)
+    REAL, DIMENSION(:),     ALLOCATABLE :: kmesh  ! k-values in wraparound convention (0:sc-1)
 
     REAL, PARAMETER    :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi, fourpi = 4.0*pi, dk = twopi
 
@@ -220,7 +220,7 @@ CONTAINS
     ! Use nk to determine mesh dimension
     sc = 2*nk
     ALLOCATE ( fft_inp(0:sc-1,0:sc-1,0:sc-1), fft_out(0:sc-1,0:sc-1,0:sc-1) )
-    allocate ( rho_sq(0:sc-1,0:sc-1,0:sc-1), kmesh(0:sc-1) )
+    ALLOCATE ( rho_sq(0:sc-1,0:sc-1,0:sc-1), kmesh(0:sc-1) )
 
     ! Assign charge density to complex array ready for FFT
     ! Assume r in unit box with range (-0.5,0.5)
@@ -231,10 +231,10 @@ CONTAINS
     CALL fftw_destroy_plan ( fft_plan )                                                      ! Release plan
 
     fft_out = fft_out / REAL(sc**3)           ! Incorporate scaling by number of grid points
-    rho_sq  = real ( fft_out*conjg(fft_out) ) ! Convert to square modulus of charge density
+    rho_sq  = REAL ( fft_out*CONJG(fft_out) ) ! Convert to square modulus of charge density
 
-    kmesh      = [ ( real(ix)*dk, ix = 0, sc-1 ) ] ! Set up k-components
-    kmesh(nk:) = kmesh(nk:) - real(sc)*dk          ! in wraparound convention
+    kmesh      = [ ( REAL(ix)*dk, ix = 0, sc-1 ) ] ! Set up k-components
+    kmesh(nk:) = kmesh(nk:) - REAL(sc)*dk          ! in wraparound convention
     pot = 0.0
 
     ! Triple loop over xyz grid points (uses wraparound indexing)

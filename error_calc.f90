@@ -32,7 +32,7 @@ PROGRAM error_calc
   ! and AD Baczewski and SD Bond J Chem Phys 139 044107 (2013)
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               maths_module,    ONLY : random_normal, init_random_seed
+  USE               maths_module,    ONLY : random_normal
 
   IMPLICIT NONE
 
@@ -105,7 +105,7 @@ PROGRAM error_calc
      d = x * ( d1 + x * ( d2 + x * ( d3 + x * d4 ) ) )
   END IF
   b      = SQRT ( b )
-  b      = b * sqrt ( kappa/2.0 ) ! alpha in B&B paper  
+  b      = b * SQRT ( kappa/2.0 ) ! alpha in B&B paper  
   stddev = SQRT(2.0*variance)     ! NB stddev of random forces, not data
 
   ! For this process, the results of interest can be calculated exactly
@@ -123,7 +123,7 @@ PROGRAM error_calc
 
   ! Data generation
 
-  CALL init_random_seed
+  CALL RANDOM_SEED()
 
   ! For comparison, we do n_repeat independent runs and estimate the error in run averages directly from these
   ! This is to give an empirical idea of the distribution from which the run average is sampled

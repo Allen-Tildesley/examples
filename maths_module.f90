@@ -31,7 +31,7 @@ MODULE maths_module
   PRIVATE
 
   ! Public random number routines
-  PUBLIC :: init_random_seed, random_integer, random_normal, random_normals, pick
+  PUBLIC :: random_integer, random_normal, random_normals, pick
   PUBLIC :: random_vector
   PUBLIC :: random_vector_1, random_vector_2, random_vector_3
   PUBLIC :: random_perpendicular_vector
@@ -83,27 +83,6 @@ MODULE maths_module
 CONTAINS
 
   ! Routines associated with random number generation
-
-  SUBROUTINE init_random_seed
-    IMPLICIT NONE
-
-    ! Initializes random number generator differently each time
-    
-    ! Prior to gfortran v7, calling the intrinsic RANDOM_SEED() routine initializes the
-    ! random number generator with the same random seed to a default state, 
-    ! which may result in the same sequence being generated every time.
-    ! If you have gfortran v6, you may like to replace this routine init_random_seed 
-    ! with the contents of file gnu_v6_init_random_seed.f90
-
-    ! In gfortran v7 the random number generator was changed.
-    ! Now, calling RANDOM_SEED() initializes the random number generator with random data
-    ! retrieved from the operating system. Various other compilers behave the same way.
-    ! We assume that this applies here.
-
-    ! YOU SHOULD INVESTIGATE THE BEHAVIOUR FOR YOUR OWN COMPILER AND MACHINE IMPLEMENTATION 
-
-    CALL RANDOM_SEED()
-  END SUBROUTINE init_random_seed
 
   FUNCTION random_integer ( k1, k2 ) RESULT ( k )
     IMPLICIT NONE
