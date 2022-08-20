@@ -61,6 +61,7 @@ so there is no need to build them.
 
 The build process for the Fortran examples has been tested using SCons v4.4.0
 (and some earlier versions back to v2.5.1 with minor changes to the `SConstruct` file).
+
 If you don't like using SCons, or can't get it to work,
 it is not difficult to compile the programs using other methods.
 Bear in mind that, with Fortran, it is usually essential to compile any
@@ -79,18 +80,6 @@ or to delete all intermediate files before each individual compilation.
 
 We have used gfortran v12.1.0 (and earlier versions back to v6.3) for testing,
 but have attempted to stick to code which conforms to the Fortran 2008 standard.
-In gfortran v6, calling the intrinsic `random_seed()` function would
-generate the same sequence of random numbers every time.
-In a few examples it is important to generate different sequences each time the program is run,
-and for this purpose a subroutine `init_random_seed` was provided in the file `maths_module.f90`;
-this routine, however, included some GNU extensions.
-With gfortran v7, the random number generator was changed,
-and the intrinsic `random_seed()` function now behaves in the desired fashion.
-Therefore, the GNU-specific code has been transferred to a separate file, `gnu_v6_init_random_seed.f90`,
-which is not included in the build process,
-but may be of interest to those still using gfortran v6.
-The current `init_random_seed` routine simply calls `random_seed()`.
-__You should check the behaviour of the random number generator on your own system.__
 Note that, by default, we do not select any optimization options in compilation.
 If you are using a different compiler,
 then the compiler and linker options in the `SConstruct` file will most likely need changing.
@@ -102,6 +91,38 @@ __we cannot offer more specific advice on the build process.__
 The Python versions do not require building, they are simply run through the Python interpreter.
 They have been tested with Python 3.10.6
 (and before that, versions back to 3.6.0).
+
+## Random number generators
+
+The Fortran examples use, for simplicity,
+the built-in intrinsic subroutines
+`random_seed` and `random_number` respectively to
+initialize and generate sequences of random numbers.
+From gfortran v7 onwards,
+calling `random_seed()` generates different, non-reproducible, sequences each time,
+and the examples assume this behaviour.
+Prior to gfortran v7,
+it was necessary to do something more complicated to generate different sequences each time,
+as exemplified by the routine `init_random_seed`
+contained in the file `gnu_v6_init_random_seed.f90`;
+but this file is now retained only for historical reference
+and is not included in the build process.
+
+The Python examples use, for simplicity,
+NumPy convenience routines such as
+`random.seed()` and `random.rand()`
+for the same purpose.
+Since NumPy v1.17.0,
+this random number generator is classified as "legacy":
+a different, and more flexible, approach is now provided and recommended
+in the NumPy documentation.
+Nonetheless, the legacy generator continues to be supported within NumPy,
+for backwards compatibility,
+and so we continue to use it in these examples.
+
+We do not recommend the above choices (using built-in and/or legacy random number generators) for production work.
+In any case, quite generally,
+__you should check the behaviour of the random number generator on your own system.__
 
 ## Reporting errors
 If you spot an error in these program files, or the accompanying documentation,

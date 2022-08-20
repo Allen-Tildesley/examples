@@ -30,8 +30,8 @@
 ! For this version, calling RANDOM_SEED() initializes the random number generator
 ! with the same random seed to a default state, which may result in the same sequence
 ! being generated every time. The routines below are intended to generate different
-! sequences on different calls. If you have this compiler version, you may like to replace the
-! routine init_random_seed in maths_module.f90 with the following two routines.
+! sequences on different calls. If you have this compiler version, you may like to replace any
+! call of RANDOM_SEED() with the following two routines.
 
 ! In gfortran v7 the random number generator was changed.
 ! Now, calling RANDOM_SEED() initializes the random number generator with random data

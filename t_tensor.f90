@@ -44,7 +44,7 @@ PROGRAM t_tensor
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
-  USE maths_module,    ONLY : init_random_seed, random_vector, outer_product, cross_product
+  USE maths_module, ONLY : random_vector, outer_product, cross_product
 
   IMPLICIT NONE
 
@@ -65,7 +65,7 @@ PROGRAM t_tensor
   WRITE ( unit=output_unit, fmt='(a)' ) 'using T-tensors and Euler angles'
 
   ! Initialize random number generator                          
-  CALL init_random_seed
+  CALL RANDOM_SEED ()
 
   ! Default parameters
   d_min     = 0.5 ! Minimum separation
