@@ -4,8 +4,8 @@
 
 import os, sys
 
-# This has been tested using SCons v4.2.0, gfortran v11.2.0,
-# using MacOS Big Sur (11.6) with compilers and libraries installed through MacPorts.
+# This has been tested using SCons v4.5.2, gfortran v12.3.0,
+# using MacOS Ventura (13.3.1) with compilers and libraries installed through MacPorts.
 # It may not work on your system. It is possible that you can get it to work by
 # changing the flags and library/include paths defined in the following few statements.
 # The most likely trouble spots are the programs that use the non-standard
@@ -18,13 +18,13 @@ import os, sys
 # Bear in mind that, with Fortran, it is usually essential to compile any
 # modules that are used by the main program, before compiling the main program itself.
 # Take a look at this file in any case, as it shows the file dependencies for each example.
+# You should build each example in its own directory.
 
 # If you see an error in this file, or a specific improvement that would improve robustness
 # or portability, please feel free to raise an issue on the GitHub examples repository.
 # Unfortunately, due to the enormous variety of computing platforms and compilers,
 # we cannot offer more specific advice on the build process.
 
-# Assume that gfortran will be used as the default compiler
 # NB by default we do not invoke any optimization
 MY_FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2008 -Wall'
 LAPACK_LIBPATH='/opt/local/lib/lapack'
@@ -37,6 +37,10 @@ OMP_LINKFLAGS='-fopenmp'
 
 env_normal=Environment(ENV=os.environ)
 env_normal.Append(F90FLAGS=MY_FLAGS,FORTRANMODDIR='${TARGET.dir}',F90PATH=['${TARGET.dir}'])
+# Use the gfortran compiler
+env_normal.Replace(FORTRAN='gfortran')
+# The above statement addressed some issues of SCons v4.5 with Fortran compiling/linking,
+# and works as of May 2023, but the situation may still not be settled.
 # Earlier versions also needed FORTRANMODDIRPREFIX='-J'
 # May also need LINKFLAGS='-L/usr/lib' as a temporary workaround on MacOS with XCode 11 and MacPorts
 #   Problem arose Sept 2019, see e.g. https://trac.macports.org/ticket/59083, seemingly fixed Jan 2020
