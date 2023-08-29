@@ -238,8 +238,8 @@ print( "{:40}{:15.6f}".format('Bond length (in sigma units)', bond)  )
 nq = 6*n
 
 # Set number of crankshaft and pivot moves per step
-n_crank = np.rint(crank_fraction*n).astype(np.int)
-n_pivot = np.rint(pivot_fraction*n).astype(np.int)
+n_crank = np.rint(crank_fraction*n).astype(np.int_)
+n_pivot = np.rint(pivot_fraction*n).astype(np.int_)
 print( "{:40}{:15d}".format('Number of crankshaft tries per step', n_crank) )
 print( "{:40}{:15d}".format('Number of pivot tries per step',      n_pivot) )
 

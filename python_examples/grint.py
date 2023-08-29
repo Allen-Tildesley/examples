@@ -152,7 +152,7 @@ if ( nz*dz + nr*dr ) > 0.25*box:
     print ( "{:40}{:15.6f}{:15.6f}".format('Warning: max z > box/4 = ', (nz*dz+nr*dr), 0.25*box)  )
 
 # We define dz_box to fit the box exactly
-nk     = np.rint(box/dz).astype(np.int)
+nk     = np.rint(box/dz).astype(np.int_)
 dz_box = box / nk
 area   = box**2
 z_box  = np.linspace ( (-box+dz_box)/2, (box-dz_box)/2, nk )

@@ -40,7 +40,7 @@ def fcc_positions ( n, box, length, soft, quaternions ):
 
     print('Close-packed fcc lattice positions')
 
-    nc = np.rint ( (n/4)**(1.0/3.0) ).astype(np.int)
+    nc = np.rint ( (n/4)**(1.0/3.0) ).astype(np.int_)
     assert n==4*nc**3, "{}{:d}{:d}".format('n, nc mismatch ',n,4*nc**3)
     cell = box / nc  # Unit cell
     box2 = box / 2.0 # Half box length
