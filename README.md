@@ -89,8 +89,8 @@ Unfortunately, due to the enormous variety of computing platforms and compilers,
 __we cannot offer more specific advice on the build process.__
 
 The Python versions do not require building, they are simply run through the Python interpreter.
-They have been tested with Python 3.10.6
-(and before that, versions back to 3.6.0).
+They have been tested with Python 3.11.5 and NumPy 1.25.2
+(and previously, Python versions back to 3.6.0).
 
 ## Random number generators
 
