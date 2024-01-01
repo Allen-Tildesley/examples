@@ -4,8 +4,8 @@
 
 import os, sys
 
-# This has been tested using SCons v4.5.2, gfortran v12.3.0,
-# using MacOS Ventura (13.3.1) with compilers and libraries installed through MacPorts.
+# This has been tested using SCons v4.6.0, gfortran v13.2.0,
+# using MacOS (Ventura 13.6.3, Xcode 15.1) with compilers and libraries installed through MacPorts.
 # It may not work on your system. It is possible that you can get it to work by
 # changing the flags and library/include paths defined in the following few statements.
 # The most likely trouble spots are the programs that use the non-standard
@@ -52,7 +52,7 @@ env_fftw=env_normal.Clone()
 env_fftw.Append(F90PATH=[FFTW_INCLUDE])
 env_fftw.Append(LIBPATH=[FFTW_LIBPATH],LIBS=FFTW_LIBS)
 
-env_mpi=env_normal.Clone(F90='mpif90',LINK='mpif90')
+env_mpi=env_normal.Clone(F90='mpifort',LINK='mpifort')
 
 env_omp=env_normal.Clone()
 env_omp.Append(F90FLAGS=OMP_FLAGS,LINKFLAGS=OMP_LINKFLAGS)
