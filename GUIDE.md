@@ -353,7 +353,7 @@ and so one should not place blind trust in the separate box averages reported by
 but refer to histograms of density, energy etc.,
 illustrative examples of which appear here.
 
-![mc_gibbs_lj histograms](mc_gibbs_lj_his.png "mc_gibbs_lj histograms")
+![mc_gibbs_lj histograms](mc_gibbs_lj.png "mc_gibbs_lj histograms")
 
 At _T_=1.0, however, these exchanges of box identity
 are expected to be infrequent, were not observed in the test runs,
@@ -757,11 +757,11 @@ this was increased to 10 blocks of 500000 steps for temperatures
 below 0.25.
 The results may be compared with values reconstructed using the
 `wl_hist` program from the simulation histograms.
-Below we show the heat capacity per atom from the above two WL runs (red),
-from the exact density of states of [Taylor (2003)](https://doi.org/10.1063/1.1523914) (black),
-and from the canonical ensemble calculations (blue error bars).
+Below we show the heat capacity per atom from the WL runs (shaded region, bounded by the two runs mentioned above),
+from the exact density of states of [Taylor (2003)](https://doi.org/10.1063/1.1523914) (line),
+and from the canonical ensemble calculations (points).
 
-![Wang-Landau test results](wl.png "Wang-Landau test results")
+![Wang-Landau test results](mc_chain_wl_sw.png "Wang-Landau test results")
 
 It is also straightforward to compare average energies and radii of gyration,
 but we do not do that here.
@@ -1137,8 +1137,8 @@ by selecting origins less frequently,
 and in this case the results obtained by the two methods may differ a little.
 
 Sample results using default program parameters are shown here.
-The direct method is indicated in black, plotting only every fifth point for clarity.
-The FFT result is shown as a red line: it matches the direct method as expected.
+The direct method (orange line) is overlayed perfectly by
+the FFT result (dashed green line), as expected.
 The exactly known function is a blue line.
 There are very small discrepancies with the results of the simulation,
 due to the finite length of the latter.
@@ -1183,8 +1183,7 @@ and hence the diffusion coefficient.
 The exact results for the vacf, rvcf and msd are written out to `diffusion_exact.out`
 for easy comparison with `diffusion.out`.
 Here are some typical results using default program parameters throughout.
-The vacf is in red, rvcf in blue, and msd in green;
-every fifth point is shown for the results of `diffusion`,
+The results of the Langevin simulation are shown as points, plotting only every 10th value for clarity,
 while the exact results are indicated as lines.
 For the default program parameters, the diffusion coefficient is _D_=1.
 
@@ -1206,7 +1205,7 @@ file `pair_distribution_data.zip` in the [Data repository](https://github.com/Al
 Using the default resolution of 0.02&sigma;,
 the results shown below were obtained for _g(r)_.
 
-![g(r) test results](gr.png "g(r) test results")
+![g(r) test results](pair_distribution.png "g(r) test results")
 
 ## Interface pair correlation function
 The program `grint.f90` reads in a set of configurations and calculates
