@@ -1147,13 +1147,13 @@ due to the finite length of the latter.
 
 ## Diffusion program
 The program `diffusion` reads in a sequence of configurations and calculates
-the velocity auto correlation function $\langle\mathbf{v}(0)\cdot\mathbf{v}(t)\rangle$ (vacf),
+the velocity autocorrelation function $\langle\mathbf{v}(0)\cdot\mathbf{v}(t)\rangle$ (vacf),
 the mean square displacement $\langle |\Delta\mathbf{r}(t)|^2\rangle$ (msd),
 where $\Delta\mathbf{r}(t)=\mathbf{r}(t)-\mathbf{r}(0)$, and
 the cross-correlation between velocity and displacement $\langle\mathbf{v}(0)\cdot\Delta\mathbf{r}(t)\rangle$.
 Any of these may be used to estimate the diffusion coefficient,
 as described in the text.
-The output appears in `diffusion.out`
+The output appears in `diffusion.out`.
 It is instructive to plot all three curves vs time.
 
 The input trajectory is handled in a crude way,

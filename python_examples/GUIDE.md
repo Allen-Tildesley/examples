@@ -1079,12 +1079,13 @@ to obtain more accurate results.
 
 ## Diffusion program
 The program `diffusion.py` reads in a sequence of configurations and calculates
-the velocity auto correlation function (vacf),
-the mean square displacement (msd), and
-the cross-correlation between velocity and displacement (rvcf).
+the velocity autocorrelation function $\langle\mathbf{v}(0)\cdot\mathbf{v}(t)\rangle$ (vacf),
+the mean square displacement $\langle |\Delta\mathbf{r}(t)|^2\rangle$ (msd),
+where $\Delta\mathbf{r}(t)=\mathbf{r}(t)-\mathbf{r}(0)$, and
+the cross-correlation between velocity and displacement $\langle\mathbf{v}(0)\cdot\Delta\mathbf{r}(t)\rangle$.
 Any of these may be used to estimate the diffusion coefficient,
 as described in the text.
-The output appears in `diffusion.out`
+The output appears in `diffusion.out`.
 It is instructive to plot all three curves vs time.
 
 The input trajectory is handled in a crude way,
@@ -1108,11 +1109,11 @@ to quantify the results.
 To make it easier to test this program,
 we have also supplied a self-contained program `diffusion_test.py`,
 which generates an appropriate trajectory by numerically solving
-the simple Langevin equation for _N_ non-interacting atoms (_N_=250 by default).
+the simple Langevin equation for _N_ non-interacting atoms (_N_=250 by default) in 3D.
 For this model, one specifies the temperature and friction coefficient,
 which dictates the rate of exponential decay of the vacf,
 and hence the diffusion coefficient.
-The exact results for the vacf, rvcf and msd are written out to `diffusion_exact.out`
+The exact results for the above three functions are written out to `diffusion_exact.out`
 for easy comparison with `diffusion.out`.
 Here are some typical results using default program parameters throughout.
 The results of the Langevin simulation are shown as points, plotting only every 10th value for clarity,
