@@ -1,7 +1,7 @@
 # Brief Guide
 Here are some notes to assist in running the programs.
 Some details of tests carried out on the programs are also given.
-Do not expect to duplicate these results,
+Do not expect to duplicate these results exactly,
 they are simply a guide as to the kind of behaviour to expect.
 If you find a definite programming error,
 please report it via the [Issues](https://github.com/Allen-Tildesley/examples/issues) tab above
