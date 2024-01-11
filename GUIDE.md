@@ -186,7 +186,7 @@ except for some small deviations at the smallest timestep.
 Now we compare EOS data
 with typical test runs from our programs using default parameters, _N_=256, except where stated.
 Note that _E_ is the total internal energy per atom,
-that _C_ is short for _C<sub>v</sub>_ (per atom) and _P_ is the pressure,
+_C<sub>v</sub>_ is the constant-volume heat capacity per atom, and _P_ is the pressure,
 all including the ideal gas contributions.
 The Smart Monte Carlo code `smc_nvt_lj` is included here since it uses the
 cut-and-shifted potential which corresponds to the force calculation
@@ -197,7 +197,7 @@ Numbers in parentheses (here and in the following tables)
 indicate errors in the last quoted digit, estimated from block averages.
 Results without error estimates are fixed (such as the temperature or density) or conserved.
 
-Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  | _C_ (f)
+Source                 | &rho;     | _T_       | _E_ (cs)   | _P_ (cs) | _C<sub>v</sub>_ (cs)  | _E_ (f)    | _P_ (f)  | _C<sub>v</sub>_ (f)
 ------                 | -----     | -----     | --------   | -------- | --------- | -------    | -------  | --------
 [Thol et al (2015)](https://doi.org/10.1007/s10765-014-1764-4) (cs) | 0.75      | 1.00      | -2.9286    | 0.9897   |  2.2787   |            |          |
 [Thol et al (2016)](https://doi.org/10.1063/1.4945000) (f)  | 0.75      | 1.00      |            |          |           | -3.7212    | 0.3996   | 2.2630
@@ -243,7 +243,7 @@ The first line in the table below is from a run of `md_nve_lj` with the same sys
 This example is just to illustrate the idea:
 most of the test runs are actually slower, not faster, than `md_nve_lj`.
 
-Source          | &delta;t    | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | _E_ (f)    | _P_ (f)  |  _E_ (MSD)
+Source          | &delta;t    | _T_       | _E_ (cs)   | _P_ (cs) | _C<sub>v</sub>_ (cs)  | _E_ (f)    | _P_ (f)  |  _E_ (MSD)
 -------         | --------    | -------   | ---------  | -------- | --------- | -------    | -------  |  ------
 `md_nve_lj`     | 0.005       | 1.0038(1) | -3.5199    | 0.557(2) | 2.26(1)   | -3.7157    | 0.410(2) | 1.7&times;10<sup>-8</sup>
 `md_lj_mts`&dagger; | 0.005 (111) | 1.002(3)  | -3.5199    | 0.58(1)  | 2.4(1)  | -3.7157    | 0.43(2)  | 1.6&times;10<sup>-8</sup>
@@ -262,7 +262,7 @@ Source          | &delta;t    | _T_       | _E_ (cs)   | _P_ (cs) | _C_ (cs)  | 
 ### Lennard-Jones MC programs
 Our MC programs use the cut (but not shifted) potential
 (which means that there is a delta correction, in the program, for the pressure).
-In this case, the value of _C<sub>v</sub>_ (reported as _C_ below)
+In this case, the value of _C<sub>v</sub>_
 should be equal to the value for the full potential,
 since the energy LRC is independent of temperature.
 The [Thol et al (2016)](https://doi.org/10.1063/1.4945000) EOS for the full potential
@@ -271,7 +271,7 @@ at _R_<sub>c</sub>=2.5&sigma;, using the same LRC and delta corrections as in th
 Once again, all values in the table include the ideal gas contribution.
 Except where indicated, tests are performed for _N_=256.
 
-Source                       | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C_ (f)
+Source                       | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C<sub>v</sub>_ (f)
 ------                       | -----     | ----- | -------    | -------  | -------    | -------  | --------
 [Thol et al (2016)](https://doi.org/10.1063/1.4945000) (f)        | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630
 `mc_nvt_lj`                  | 0.75      | 1.00  | -3.332(1)  | 0.651(3) | -3.734(1)  | 0.350(3) |  2.28(1)
