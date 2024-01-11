@@ -213,6 +213,7 @@ CONTAINS
     REAL, INTENT(in) :: gamma_step  ! Pair selection probability = Gamma * timestep
 
     ! Apply pairwise Lowe-Andersen thermostat to velocities stored in array v
+    ! CP Lowe, Europhys Lett, 47, 145 (1999).
 
     ! It is assumed that positions in the array r are in units where box = 1
     ! and that the array ij contains a list of all np pairs within range
@@ -262,6 +263,7 @@ CONTAINS
     REAL, INTENT(in) :: gamma_step  ! Gamma * timestep
 
     ! Implements the Shardlow integration algorithm for velocities stored in array v
+    ! T Shardlow, SIAM J Sci Comput, 24, 1267 (2003).
 
     ! It is assumed that positions in the array r are in units where box = 1
     ! and that the array ij contains a list of all np pairs within range

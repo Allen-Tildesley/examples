@@ -131,6 +131,8 @@ def lowe ( box, temperature, gamma_step, v, pairs ):
     (but necessary, since the operations are supposed to be sequential).
     """
 
+    # CP Lowe, Europhys Lett, 47, 145 (1999).
+    
     # It is assumed that the pairs list contains all pairs within range
 
     import numpy as np
@@ -157,6 +159,8 @@ def shardlow ( box, temperature, gamma_step, v, pairs ):
     (but necessary, since the operations are supposed to be sequential).
     """
 
+    # T Shardlow, SIAM J Sci Comput, 24, 1267 (2003).
+    
     # It is assumed that the pairs list contains all pairs within range
 
     import numpy as np

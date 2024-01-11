@@ -984,7 +984,8 @@ The function is included in the `dpd` program,
 and the expected value of _P_ (labelled EOS below)
 is printed for comparison at the end.
 We give results obtained by both
-the Lowe thermostat (L) and the Shardlow algorithm (S).
+the [Lowe thermostat](https://doi.org/10.1209/epl/i1999-00365-x) (L) 
+and the [Shardlow algorithm](https://doi.org/10.1137/S1064827501392879) (S).
 We take the default values of _a_ &rho;/T=75, and of other parameters not mentioned below.
 
  _T_   | &rho; | _P_ (EOS) | _P_ (L)   | _P_ (S)
