@@ -260,7 +260,7 @@ Numbers in parentheses (here and in the following tables)
 indicate errors in the last quoted digit, estimated from block averages.
 Results without error estimates are fixed (such as the temperature or density) or conserved.
 
-Source                       | &rho;     | _T_       | _E_ (cs)   | _P_ (cs)  | _C_ (cs)  | _E_ (f)    | _P_ (f)   | _C_ (f)
+Source                       | &rho;     | _T_       | _E_ (cs)   | _P_ (cs)  | _C<sub>v</sub>_ (cs)  | _E_ (f)    | _P_ (f)   | _C<sub>v</sub>_ (f)
 ------                       | -----     | -----     | --------   | --------  | --------- | -------    | -------   | --------
 [Thol et al (2015)](https://doi.org/10.1007/s10765-014-1764-4) (cs)       | 0.75      | 1.00      | -2.9286    | 0.9897    |  2.2787   |            |           |
 [Thol et al (2016)](https://doi.org/10.1063/1.4945000) (f)        | 0.75      | 1.00      |            |           |           | -3.7212    | 0.3996    | 2.2630
@@ -296,7 +296,7 @@ However, the module illustrates the basic idea of this approach.
 The results in the following table use the same run lengths
 as for the Fortran examples, and default parameters otherwise.
 
-Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C_ (f)
+Source                 | &rho;     | _T_   | _E_ (c)    | _P_ (c)  | _E_ (f)    | _P_ (f)  | _C<sub>v</sub>_ (f)
 ------                 | -----     | ----- | -------    | -------  | -------    | -------  | --------
 [Thol et al (2016)](https://doi.org/10.1063/1.4945000) (f)  | 0.75      | 1.00  | -3.3197    | 0.7008   | -3.7212    | 0.3996   |  2.2630
 `mc_nvt_lj.py`         | 0.75      | 1.00  | -3.3315(7) | 0.653(4) | -3.7331(7) | 0.352(4) |  2.274(9)
