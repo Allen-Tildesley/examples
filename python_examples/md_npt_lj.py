@@ -113,7 +113,7 @@ def u1_propagator ( t ):
     # this program are divided by the box length, which is itself updated in this routine.
 
     x = t * p_eps / w_eps # Time step * time derivative of strain
-    c = (1.0-np.exp(-x))/x if x>0.001 else np.polyval([-1/24,1/6,-1/2,1.0],x) # Guard against small values
+    c = (1.0-np.exp(-x))/x if np.fabs(x)>0.001 else np.polyval([-1/24,1/6,-1/2,1.0],x) # Guard against small values
 
     r = r + c * t * v / box   # Positions in box=1 units
     r = r - np.rint ( r ) # Periodic boundaries
@@ -137,7 +137,7 @@ def u2_propagator ( t ):
 
     alpha = 1.0 + 3 / g
     x = t * alpha * p_eps / w_eps
-    c = (1.0-np.exp(-x))/x if x>0.001 else np.polyval([-1/24,1/6,-1/2,1.0],x) # Guard against small values
+    c = (1.0-np.exp(-x))/x if np.fabs(x)>0.001 else np.polyval([-1/24,1/6,-1/2,1.0],x) # Guard against small values
 
     v = v*np.exp(-x) + c * t * f
 
@@ -197,7 +197,7 @@ def u4_propagator ( t, j_list ):
             p_eta[j]  = p_eta[j] + t * gj # The equation for p_eta[M-1] is different
         else:
             x = t * p_eta[j+1]/q[j+1]
-            c = (1.0-np.exp(-x))/x if x>0.001 else np.polyval([-1/24,1/6,-1/2,1.0],x) # Guard against small values
+            c = (1.0-np.exp(-x))/x if np.fabs(x)>0.001 else np.polyval([-1/24,1/6,-1/2,1.0],x) # Guard against small values
             p_eta[j] = p_eta[j]*np.exp(-x) + t * gj * c
 
     # U4' part
@@ -211,7 +211,7 @@ def u4_propagator ( t, j_list ):
             p_eta_baro[j]  = p_eta_baro[j] + t * gj # The equation for p_eta_baro[M-1] is different
         else:
             x = t * p_eta_baro[j+1]/q_baro[j+1]
-            c = (1.0-np.exp(-x))/x if x>0.001 else np.polyval([-1/24,1/6,-1/2,1.0],x) # Guard against small values
+            c = (1.0-np.exp(-x))/x if np.fabs(x)>0.001 else np.polyval([-1/24,1/6,-1/2,1.0],x) # Guard against small values
             p_eta_baro[j] = p_eta_baro[j]*np.exp(-x) + t * gj * c
   
 # Takes in a configuration of atoms (positions, velocities)

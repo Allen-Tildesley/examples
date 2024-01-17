@@ -235,7 +235,7 @@ CONTAINS
 
     x = t * p_eps / w_eps ! Time step * time derivative of strain
 
-    IF ( x < 0.001 ) THEN ! Guard against small values
+    IF ( ABS(x) < 0.001 ) THEN ! Guard against small values
        c = 1.0 + x * ( c1 + x * ( c2 + x * c3 ) ) ! Taylor series to order 3
     ELSE
        c = (1.0-EXP(-x))/x
@@ -263,7 +263,7 @@ CONTAINS
     alpha = 1.0 + 3.0 / g
     x = t * alpha * p_eps / w_eps
 
-    IF ( x < 0.001 ) THEN ! Guard against small values
+    IF ( ABS(x) < 0.001 ) THEN ! Guard against small values
        c = 1.0 + x * ( c1 + x * ( c2 + x * c3 ) ) ! Taylor series to order 3
     ELSE
        c = (1.0-EXP(-x))/x
@@ -334,7 +334,7 @@ CONTAINS
 
           x = t * p_eta(j+1)/q(j+1)
 
-          IF ( x < 0.001 ) THEN ! Guard against small values
+          IF ( ABS(x) < 0.001 ) THEN ! Guard against small values
              c = 1.0 + x * ( c1 + x * ( c2 + x * c3 ) ) ! Taylor series to order 3
           ELSE
              c = (1.0-EXP(-x))/x
@@ -364,7 +364,7 @@ CONTAINS
 
           x = t * p_eta_baro(j+1)/q_baro(j+1)
 
-          IF ( x < 0.001 ) THEN ! Guard against small values
+          IF ( ABS(x) < 0.001 ) THEN ! Guard against small values
              c = 1.0 + x * ( c1 + x * ( c2 + x * c3 ) ) ! Taylor series to order 3
           ELSE
              c = (1.0-EXP(-x))/x

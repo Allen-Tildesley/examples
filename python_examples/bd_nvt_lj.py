@@ -122,7 +122,7 @@ def o_propagator ( t ):
     import numpy as np
 
     x = gamma*t
-    c = 1-np.exp(-2*x) if x > 0.0001 else np.polyval([-2/3,4/3,-2.0,2.0,0.0],x)
+    c = 1-np.exp(-2*x) if np.fabs(x) > 0.0001 else np.polyval([-2/3,4/3,-2.0,2.0,0.0],x)
     c = np.sqrt(c)
     v = v*np.exp(-x) + c*np.sqrt(temperature)*np.random.randn(n,3)
  

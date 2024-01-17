@@ -97,7 +97,7 @@ PROGRAM error_calc
   ! Coefficients used in algorithm
   x = delta*kappa
   e = EXP(-x) ! theta in B&B paper
-  IF ( x > 0.0001 ) THEN
+  IF ( ABS(x) > 0.0001 ) THEN
      b = 1.0 - EXP(-2.0*x)
      d = 1.0 - EXP(-x)
   ELSE ! Taylor expansions for low x

@@ -198,7 +198,7 @@ CONTAINS
     REAL, PARAMETER :: c1 = 2.0, c2 = -2.0, c3 = 4.0/3.0, c4 = -2.0/3.0 ! Taylor series coefficients
 
     x = gamma * t
-    IF ( x > 0.0001 ) THEN ! Use formula
+    IF ( ABS(x) > 0.0001 ) THEN ! Use formula
        c = 1-EXP(-2.0*x)
     ELSE ! Use Taylor expansion for low x
        c = x * ( c1 + x * ( c2 + x * ( c3 + x * c4 ) ) ) 

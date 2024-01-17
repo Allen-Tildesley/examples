@@ -48,7 +48,7 @@ def o_propagator ( t, v ):
     
     x = gamma*t
     # Taylor expansion for small x
-    c = 1.0-math.exp(-2.0*x) if x>0.0001 else np.polyval([-2.0/3.0,4.0/3.0,-2.0,2.0,0.0],x)
+    c = 1.0-math.exp(-2.0*x) if math.fabs(x)>0.0001 else np.polyval([-2.0/3.0,4.0/3.0,-2.0,2.0,0.0],x)
     c = math.sqrt(c)
     return np.exp(-x) * v + c * np.sqrt(temperature) * np.random.randn(n,3)
 

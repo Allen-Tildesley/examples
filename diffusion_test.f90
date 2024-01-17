@@ -146,7 +146,7 @@ CONTAINS
     REAL, PARAMETER :: c1 = 2.0, c2 = -2.0, c3 = 4.0/3.0, c4 = -2.0/3.0
 
     x = gamma * t
-    IF ( x > 0.0001 ) THEN
+    IF ( ABS(x) > 0.0001 ) THEN
        c = 1-EXP(-2.0*x)
     ELSE
        c = x * ( c1 + x * ( c2 + x * ( c3 + x * c4 )) ) ! Taylor expansion for low x

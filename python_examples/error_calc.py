@@ -84,7 +84,7 @@ print( "{:40}{:15.6f}".format('kappa', kappa) )
 # Coefficients used in algorithm
 x = delta*kappa
 e = math.exp(-x) # theta in B&B paper
-if x > 0.0001:
+if math.fabs(x) > 0.0001:
    b = 1.0 - math.exp(-2.0*x)
    d = 1.0 - math.exp(-x)
 else: # Taylor expansions for low x (coefficients of decreasing powers)
