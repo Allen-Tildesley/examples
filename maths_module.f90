@@ -41,7 +41,8 @@ MODULE maths_module
   PUBLIC :: metropolis
 
   ! Public low-level mathematical routines and string operations
-  PUBLIC :: rotate_vector, rotate_quaternion, cross_product, outer_product, q_to_a, lowercase, solve
+  PUBLIC :: rotate_vector, rotate_quaternion, cross_product, outer_product, q_to_a
+  PUBLIC :: lowercase, solve, polyval, expm1, expm1o
 
   ! Public order parameter calculations
   PUBLIC :: orientational_order, translational_order, nematic_order
@@ -901,5 +902,65 @@ CONTAINS
     a(2,:) = [     2*(q(1)*q(2)-q(0)*q(3)),   q(0)**2-q(1)**2+q(2)**2-q(3)**2,   2*(q(2)*q(3)+q(0)*q(1))     ] ! 2nd row
     a(3,:) = [     2*(q(1)*q(3)+q(0)*q(2)),       2*(q(2)*q(3)-q(0)*q(1)),   q(0)**2-q(1)**2-q(2)**2+q(3)**2 ] ! 3rd row
   END FUNCTION q_to_a
+
+  FUNCTION polyval ( x, c ) RESULT ( f )
+    IMPLICIT NONE
+    REAL                            :: f ! Returns polynomial in ...
+    REAL,                INTENT(in) :: x ! argument
+    REAL, DIMENSION(0:), INTENT(in) :: c ! given coefficients (ascending powers of x)
+
+    ! Uses Horner's rule
+    
+    INTEGER :: i
+
+    f = c(UBOUND(c,1))
+    DO i = UBOUND(c,1)-1, 0, -1
+       f = f * x + c(i)
+    END DO
+  END FUNCTION polyval
+
+  FUNCTION expm1 ( x ) RESULT ( f )
+    IMPLICIT NONE
+    REAL, INTENT(in) :: x ! Argument
+    REAL             :: f ! Returns value of exp(x)-1
+
+    ! At small x, imprecision may arise through subtraction of two values O(1).
+    ! There are various ways of avoiding this.
+    ! We follow some others and use the identity: exp(x)-1 = x*exp(x/2)*[sinh(x/2)/(x/2)].
+    ! For small x, sinh(x)/x = g0 + g1*x**2 + g2*x**4 + ...
+    ! where the coefficient of x**(2n) is gn = 1/(2*n+1)!
+
+    REAL, DIMENSION(0:4), PARAMETER :: g = 1.0 / [1,6,120,5040,362880]
+    REAL,                 PARAMETER :: tol = 0.01
+
+    IF ( ABS(x) > tol ) THEN
+       f = EXP(x) - 1.0
+    ELSE
+       f = x * EXP(x/2) * polyval ( (x/2)**2, g )
+    END IF
+
+  END FUNCTION expm1
+
+  FUNCTION expm1o ( x ) RESULT ( f )
+    IMPLICIT NONE
+    REAL, INTENT(in) :: x ! Argument
+    REAL             :: f ! Returns value of (exp(x)-1)/x
+
+    ! At small x, we must guard against the ratio of imprecise small values.
+    ! There are various ways of avoiding this.
+    ! We follow some others and use the identity: (exp(x)-1)/x = exp(x/2)*[sinh(x/2)/(x/2)].
+    ! For small x, sinh(x)/x = g0 + g1*x**2 + g2*x**4 + ...
+    ! where the coefficient of x**(2n) is gn = 1/(2*n+1)!
+
+    REAL, DIMENSION(0:4), PARAMETER :: g = 1.0 / [1,6,120,5040,362880]
+    REAL,                 PARAMETER :: tol = 0.01
+
+    IF ( ABS(x) > tol ) THEN
+       f = ( EXP(x) - 1.0 ) / x
+    ELSE
+       f = EXP(x/2) * polyval ( (x/2)**2, g )
+    END IF
+
+  END FUNCTION expm1o
 
 END MODULE maths_module

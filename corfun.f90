@@ -41,7 +41,7 @@ PROGRAM corfun
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
   USE, INTRINSIC :: iso_c_binding
-  USE               maths_module,    ONLY : random_normal
+  USE               maths_module,    ONLY : random_normal, expm1
 
   IMPLICIT NONE
   INCLUDE 'fftw3.f03'
@@ -77,10 +77,6 @@ PROGRAM corfun
   COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_inp  ! data to be transformed (0:fft_len-1)
   COMPLEX(C_DOUBLE_COMPLEX), DIMENSION(:), ALLOCATABLE :: fft_out  ! data to be transformed (0:fft_len-1)
   TYPE(C_PTR)                                          :: fft_plan ! plan needed for FFTW
-
-  ! Taylor series coefficients
-  REAL, PARAMETER :: b1 = 2.0, b2 = -2.0,     b3 = 4.0/3.0, b4 = -2.0/3.0  ! b = 1.0 - EXP(-2.0*x)
-  REAL, PARAMETER :: d1 = 1.0, d2 = -1.0/2.0, d3 = 1.0/6.0, d4 = -1.0/24.0 ! d = 1.0 - EXP(-x)
 
   NAMELIST /nml/ nt, origin_interval, nstep, nequil, delta, temperature
 
@@ -136,15 +132,10 @@ PROGRAM corfun
   ! Coefficients used in algorithm
   x = delta*kappa
   e = EXP(-x) ! theta in B&B paper
-  IF ( ABS(x) > 0.0001 ) THEN
-     b = 1.0 - EXP(-2.0*x)
-     d = 1.0 - EXP(-x)
-  ELSE  ! Taylor expansions for low x
-     b = x * ( b1 + x * ( b2 + x * ( b3 + x * b4 ) ) )
-     d = x * ( d1 + x * ( d2 + x * ( d3 + x * d4 ) ) )
-  END IF
-  b      = SQRT ( b )
-  b      = b * SQRT ( kappa/2.0 ) ! alpha in B&B paper
+  b = -expm1(-2*x) ! 1-exp(-2*x)
+  d = -expm1(-x)   ! 1-exp(-x)
+  b = SQRT ( b )
+  b = b * SQRT ( kappa/2.0 ) ! alpha in B&B paper
   stddev = SQRT(2.0*temperature)
 
   ! Data generation

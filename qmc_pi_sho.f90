@@ -202,6 +202,7 @@ CONTAINS
   END FUNCTION calc_variables
 
   FUNCTION e_pi_sho ( p, beta ) RESULT ( e )
+    USE maths_module, ONLY : polyval
     IMPLICIT NONE
     INTEGER, INTENT(in) :: p
     REAL,    INTENT(in) :: beta
@@ -234,36 +235,36 @@ CONTAINS
        e = t
 
     CASE (2)
-       e = 1.0 + 1.0 / polynomial ( [1,4], s )
+       e = 1.0 + 1.0 / polyval ( s, [1.,4.] )
        e = e * t
 
     CASE (3)
-       e = 1.0 + 2.0 / polynomial ( [1,3], s )
+       e = 1.0 + 2.0 / polyval ( s, [1.,3.] )
        e = e * t
 
     CASE (4)
-       e = 1.0 + 1.0 / polynomial ( [1,4], s )
-       e = e + 2.0 / polynomial ( [1,2], s )
+       e = 1.0 + 1.0 / polyval ( s, [1.,4.] )
+       e = e + 2.0 / polyval ( s, [1.,2.] )
        e = e * t
 
     CASE (5)
-       e = 1.0 + polynomial ( [4,10], s ) / polynomial ( [1,5,5], s )
+       e = 1.0 + polyval ( s, [4.,10.] ) / polyval ( s, [1.,5.,5.] )
        e = e * t
 
     CASE (6)
-       e = 1.0 + 1.0 / polynomial ( [1,4], s )
-       e = e + 2.0 / polynomial ( [1,1], s )
-       e = e + 2.0 / polynomial ( [1,3], s )
+       e = 1.0 + 1.0 / polyval ( s, [1.,4.] )
+       e = e + 2.0 / polyval ( s, [1.,1.] )
+       e = e + 2.0 / polyval ( s, [1.,3.] )
        e = e * t
 
     CASE (7)
-       e = 1.0 + polynomial ( [6,28,28], s ) / polynomial ( [1,7,14,7], s )
+       e = 1.0 + polyval ( s, [6.,28.,28.] ) / polyval ( s, [1.,7.,14.,7.] )
        e = e * t
 
     CASE (8)
-       e = 1.0 + 1.0 / polynomial ( [1,4], s )
-       e = e + 2.0 / polynomial ( [1,2], s )
-       e = e + polynomial ( [4,8], s ) / polynomial ( [1,4,2], s )
+       e = 1.0 + 1.0 / polyval ( s, [1.,4.] )
+       e = e + 2.0 / polyval ( s, [1.,2.] )
+       e = e + polyval ( s, [4.,8.] ) / polyval ( s, [1.,4.,2.] )
        e = e * t
 
     CASE default
@@ -276,21 +277,6 @@ CONTAINS
     END SELECT
 
   END FUNCTION e_pi_sho
-
-  FUNCTION polynomial ( c, x ) RESULT ( f )
-    IMPLICIT NONE
-    INTEGER, DIMENSION(:), INTENT(in) :: c ! coefficients of x**0, x**1, x**2 etc
-    REAL,                  INTENT(in) :: x ! argument
-    REAL                              :: f ! result
-
-    INTEGER :: i
-
-    f = 0.0
-    DO i = SIZE(c), 1, -1
-       f = f * x + REAL ( c(i) )
-    END DO
-
-  END FUNCTION polynomial
 
 END PROGRAM qmc_pi_sho
 

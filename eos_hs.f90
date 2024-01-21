@@ -32,6 +32,8 @@ PROGRAM eos_hs
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
 
+  USE maths_module, ONLY : polyval
+
   IMPLICIT NONE
 
   REAL            :: density, p, z, eta
@@ -62,25 +64,9 @@ PROGRAM eos_hs
 
   ! Equation (6) of Hansen-Goos (2016)
   z = a * LOG ( 1.0-eta ) / eta
-  z = z + polynomial ( b, eta ) / ( 1.0 - eta ) ** 3 ! Compressibility factor P/(rho*kT)
-  p = z * density                                    ! Pressure P / kT
+  z = z + polyval ( eta, b ) / ( 1.0 - eta ) ** 3 ! Compressibility factor P/(rho*kT)
+  p = z * density                                 ! Pressure P / kT
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Pressure P',                            p
   WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Compressibility factor Z = P/(rho*kT)', z
-
-CONTAINS
-
-  FUNCTION polynomial ( c, x ) RESULT ( f )
-    REAL, DIMENSION(:), INTENT(in) :: c ! coefficients of x**0, x**1, x**2 etc
-    REAL,               INTENT(in) :: x ! argument
-    REAL                           :: f ! result
-
-    INTEGER :: i
-
-    f = 0.0
-    DO i = SIZE(c), 1, -1
-       f = f * x + c(i)
-    END DO
-
-  END FUNCTION polynomial
 
 END PROGRAM eos_hs

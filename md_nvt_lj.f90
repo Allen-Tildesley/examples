@@ -221,13 +221,13 @@ CONTAINS
   END SUBROUTINE u3_propagator
 
   SUBROUTINE u4_propagator ( t, j_start, j_stop ) ! U4: thermostat propagator
+    USE maths_module, ONLY : expm1o
     IMPLICIT NONE
     REAL,    INTENT(in) :: t               ! Time over which to propagate (typically dt/4)
     INTEGER, INTENT(in) :: j_start, j_stop ! Order in which to tackle variables
 
-    INTEGER         :: j, j_stride
-    REAL            :: gj, x, c
-    REAL, PARAMETER :: c1 = -1.0/2.0, c2 = 1.0/6.0, c3 = -1.0/24.0
+    INTEGER :: j, j_stride
+    REAL    :: gj, x, c
 
     IF ( j_start > j_stop ) THEN
        j_stride = -1
@@ -250,12 +250,7 @@ CONTAINS
        ELSE
 
           x = t * p_eta(j+1)/q(j+1)
-
-          IF ( ABS(x) < 0.001 ) THEN ! Guard against small values
-             c = 1.0 + x * ( c1 + x * ( c2 + x * c3 ) ) ! Taylor series to order 3
-          ELSE
-             c = (1.0-EXP(-x))/x
-          END IF ! End guard against small values
+          c = expm1o(-x) ! (1-exp(-x))/x
 
           p_eta(j) = p_eta(j)*EXP(-x) + t * gj * c
 

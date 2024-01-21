@@ -187,6 +187,7 @@ CONTAINS
   END SUBROUTINE b_propagator
 
   SUBROUTINE o_propagator ( t )
+    USE maths_module, ONLY : expm1
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt)
 
@@ -195,14 +196,8 @@ CONTAINS
     REAL                 :: x, c
     REAL, DIMENSION(3,n) :: zeta
 
-    REAL, PARAMETER :: c1 = 2.0, c2 = -2.0, c3 = 4.0/3.0, c4 = -2.0/3.0 ! Taylor series coefficients
-
     x = gamma * t
-    IF ( ABS(x) > 0.0001 ) THEN ! Use formula
-       c = 1-EXP(-2.0*x)
-    ELSE ! Use Taylor expansion for low x
-       c = x * ( c1 + x * ( c2 + x * ( c3 + x * c4 ) ) ) 
-    END IF
+    c = -expm1(-2*x) ! 1-exp(-2*x)
     c = SQRT ( c )
 
     CALL random_normals ( 0.0, SQRT(temperature), zeta ) ! Random momenta

@@ -43,13 +43,11 @@ def o_propagator ( t, v ):
     gamma and temperature are accessed from the calling program
     The function returns the new velocities.
     """
-    import math
     import numpy as np
     
     x = gamma*t
-    # Taylor expansion for small x
-    c = 1.0-math.exp(-2.0*x) if math.fabs(x)>0.0001 else np.polyval([-2.0/3.0,4.0/3.0,-2.0,2.0,0.0],x)
-    c = math.sqrt(c)
+    c = -np.expm1(-2*x) # 1-exp(-2*x)
+    c = np.sqrt(c)
     return np.exp(-x) * v + c * np.sqrt(temperature) * np.random.randn(n,3)
 
 # diffusion_test program

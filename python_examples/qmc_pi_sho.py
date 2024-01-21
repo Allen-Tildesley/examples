@@ -68,7 +68,8 @@ def e_pi_sho ( p, beta ):
 
     import math
     import numpy as np
-    
+    from numpy.polynomial.polynomial import polyval
+
     assert p>0, 'Error in value of p'
 
     t = 1 / beta
@@ -77,30 +78,30 @@ def e_pi_sho ( p, beta ):
     if p==1:
         e = t
     elif p==2:
-        e = 1.0 + 1.0 / np.polyval([4,1],s)
+        e = 1.0 + 1.0 / polyval ( s, [1.,4.] )
         e = e * t
     elif p==3:
-        e = 1.0 + 2.0 / np.polyval([3,1],s)
+        e = 1.0 + 2.0 / polyval ( s, [1.,3.] )
         e = e * t
     elif p==4:
-        e = 1.0 + 1.0 / np.polyval([4,1],s)
-        e = e + 2.0 / np.polyval([2,1],s)
+        e = 1.0 + 1.0 / polyval ( s, [1.,4.] )
+        e = e + 2.0 / polyval ( s, [1.,2.] )
         e = e * t
     elif p==5:
-        e = 1.0 + np.polyval([10,4],s)/np.polyval([5,5,1],s)
+        e = 1.0 + polyval ( s, [4.,10.] )/polyval ( s, [1.,5.,5.] )
         e = e * t
     elif p==6:
-        e = 1.0 + 1.0 / np.polyval([4,1],s)
-        e = e + 2.0 / np.polyval([1,1],s)
-        e = e + 2.0 / np.polyval([3,1],s)
+        e = 1.0 + 1.0 / polyval ( s, [1.,4.] )
+        e = e + 2.0 / polyval ( s, [1.,1.] )
+        e = e + 2.0 / polyval ( s, [1.,3.] )
         e = e * t
     elif p==7:
-        e = 1.0 + np.polyval([28,28,6],s) / np.polyval([7,14,7,1],s)
+        e = 1.0 + polyval ( s, [6.,28.,28.] ) / polyval ( s, [1.,7.,14.,7.] )
         e = e * t
     elif p==8:
-        e = 1.0 + 1.0 / np.polyval([4,1],s)
-        e = e + 2.0 / np.polyval([2,1],s)
-        e = e + np.polyval ([8,4],s) / np.polyval([2,4,1],s)
+        e = 1.0 + 1.0 / polyval ( s, [1.,4.] )
+        e = e + 2.0 / polyval ( s, [1.,2.] )
+        e = e + polyval ( s, [4.,8.] ) / polyval ( s, [1.,4.,2.] )
         e = e * t
     else:
         alpha = 0.5 * beta / p

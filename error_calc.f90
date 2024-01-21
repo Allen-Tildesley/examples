@@ -32,7 +32,7 @@ PROGRAM error_calc
   ! and AD Baczewski and SD Bond J Chem Phys 139 044107 (2013)
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               maths_module,    ONLY : random_normal
+  USE               maths_module,    ONLY : random_normal, expm1
 
   IMPLICIT NONE
 
@@ -50,10 +50,6 @@ PROGRAM error_calc
   INTEGER :: ioerr, tblock, i_repeat, nblock, blk, stp1, stp2, trun, n_repeat
   REAL    :: average, variance, stddev, err, si, tcor, x, e, b, d
   REAL    :: a_blk, a_run, a_avg, a_var, a_var_1, a_err
-
-  ! Taylor series coefficients
-  REAL, PARAMETER :: b1 = 2.0, b2 = -2.0,     b3 = 4.0/3.0, b4 = -2.0/3.0  ! b = 1.0 - EXP(-2.0*x)
-  REAL, PARAMETER :: d1 = 1.0, d2 = -1.0/2.0, d3 = 1.0/6.0, d4 = -1.0/24.0 ! d = 1.0 - EXP(-x)
 
   NAMELIST /nml/ nstep, nequil, n_repeat, delta, variance, average
 
@@ -97,15 +93,10 @@ PROGRAM error_calc
   ! Coefficients used in algorithm
   x = delta*kappa
   e = EXP(-x) ! theta in B&B paper
-  IF ( ABS(x) > 0.0001 ) THEN
-     b = 1.0 - EXP(-2.0*x)
-     d = 1.0 - EXP(-x)
-  ELSE ! Taylor expansions for low x
-     b = x * ( b1 + x * ( b2 + x * ( b3 + x * b4 ) ) ) 
-     d = x * ( d1 + x * ( d2 + x * ( d3 + x * d4 ) ) )
-  END IF
-  b      = SQRT ( b )
-  b      = b * SQRT ( kappa/2.0 ) ! alpha in B&B paper  
+  b = -expm1(-2*x) ! 1-exp(-2*x)
+  d = -expm1(-x)   ! 1-exp(-x)
+  b = SQRT ( b )
+  b = b * SQRT ( kappa/2.0 ) ! alpha in B&B paper  
   stddev = SQRT(2.0*variance)     ! NB stddev of random forces, not data
 
   ! For this process, the results of interest can be calculated exactly

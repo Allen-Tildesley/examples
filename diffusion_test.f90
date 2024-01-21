@@ -139,18 +139,14 @@ CONTAINS
   END SUBROUTINE a_propagator
 
   SUBROUTINE o_propagator ( t ) ! O propagator (friction and random contributions)
+    USE maths_module, ONLY : expm1
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt)
 
     REAL            :: x, c
-    REAL, PARAMETER :: c1 = 2.0, c2 = -2.0, c3 = 4.0/3.0, c4 = -2.0/3.0
 
     x = gamma * t
-    IF ( ABS(x) > 0.0001 ) THEN
-       c = 1-EXP(-2.0*x)
-    ELSE
-       c = x * ( c1 + x * ( c2 + x * ( c3 + x * c4 )) ) ! Taylor expansion for low x
-    END IF
+    c = -expm1(-2*x) ! 1-exp(-2*x)
     c = SQRT ( c )
 
     CALL random_normals ( 0.0, SQRT(temperature), zeta ) ! Random momenta

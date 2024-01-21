@@ -29,6 +29,7 @@
 import json
 import sys
 import numpy as np
+from numpy.polynomial.polynomial import polyval
 
 # This program uses the function derived by H Hansen-Goos, J Chem Phys, 16, 164506 (2016)
 # which is claimed to be an excellent fit to simulation data over the whole fluid density range
@@ -38,7 +39,7 @@ import numpy as np
 # The coefficients appear in Table I of Hansen-Goos (2016)
 
 a = 8.0
-b = [ -0.096495, 0.248245, 0.041212, -1.265575, -2.635232, 47.0/3.0, -19.0, 9.0 ]
+b = [ 9.0, -19.0, 47.0/3.0, -2.635232, -1.265575, 0.041212, 0.248245, -0.096495 ]
 
 # Read parameters in JSON format
 try:
@@ -65,7 +66,7 @@ print ( "{:40}{:15.6f}".format('Packing fraction eta', eta    ) )
 
 # Equation (6) of Hansen-Goos (2016)
 z = a * np.log ( 1.0-eta ) / eta
-z = z + np.polyval ( b, eta ) / ( 1.0 - eta ) ** 3 # Compressibility factor P/(rho*kT)
-p = z * density                                    # Pressure P / kT
+z = z + polyval ( eta, b ) / ( 1.0 - eta ) ** 3 # Compressibility factor P/(rho*kT)
+p = z * density                                 # Pressure P / kT
 print ( "{:40}{:15.6f}".format('Pressure P',                     p ) )
 print ( "{:40}{:15.6f}".format('Compressibility factor Z = P/(rho*kT)', z ) )

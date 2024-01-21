@@ -84,15 +84,10 @@ print( "{:40}{:15.6f}".format('kappa', kappa) )
 # Coefficients used in algorithm
 x = delta*kappa
 e = math.exp(-x) # theta in B&B paper
-if math.fabs(x) > 0.0001:
-   b = 1.0 - math.exp(-2.0*x)
-   d = 1.0 - math.exp(-x)
-else: # Taylor expansions for low x (coefficients of decreasing powers)
-   b = np.polyval([-2.0/3.0,4.0/3.0,-2.0,2.0,0.0],x)
-   d = np.polyval([-1.0/24.0,1.0/6.0,-1.0/2.0,1.0,0.0],x)
-
-b      = math.sqrt ( b )
-b      = b * math.sqrt ( kappa/2.0 ) # alpha in B&B paper
+b = -np.expm1(-2*x) # 1-exp(-2*x)
+d = -np.expm1(-x)   # 1-exp(-x)
+b = math.sqrt ( b )
+b = b * math.sqrt ( kappa/2.0 ) # alpha in B&B paper
 stddev = math.sqrt(2.0*variance)     # NB stddev of random forces, not data
 
 # For this process, the results of interest can be calculated exactly

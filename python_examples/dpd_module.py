@@ -195,14 +195,19 @@ def shardlow ( box, temperature, gamma_step, v, pairs ):
 def p_approx ( a, rho, temperature ):
     """Returns approximate pressure."""
 
+    import numpy as np
+    from numpy.polynomial.polynomial import polyval
+
     # Original expression given by Groot and Warren, J Chem Phys 107, 4423 (1997), alpha = 0.101
+
     # This is the revised formula due to Liyana-Arachchi, Jamadagni, Elke, Koenig, Siepmann,
     # J Chem Phys 142, 044902 (2015)
 
-    import numpy as np
-
     c1, c2 = 0.0802, 0.7787
-    b = [1.705e-8,-2.585e-6,1.556e-4,-4.912e-3,9.755e-2]
-    b2 = np.polyval (b,a)                                           # This is B2/a, eqn (10) of above paper
-    alpha = b2 / ( 1 + rho**3 ) + ( c1*rho**2 ) / ( 1 + c2*rho**2 ) # This is eqn (14) of above paper
+    b = [ 9.755e-2, -4.912e-3, 1.556e-4, -2.585e-6, 1.705e-8 ]
+    # Eqn (10) of above paper, B2/a
+    b2 = polyval (a,b)
+    # Eqn (14) of above paper
+    alpha = b2 / ( 1 + rho**3 ) + ( c1*rho**2 ) / ( 1 + c2*rho**2 )
+    
     return rho * temperature + alpha * a * rho**2
