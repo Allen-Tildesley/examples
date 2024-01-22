@@ -222,7 +222,7 @@ PROGRAM md_npt_lj
 CONTAINS
 
   SUBROUTINE u1_propagator ( t ) ! U1 and U1' combined: position and strain drift propagator
-    USE maths_module, ONLY : expm1o
+    USE maths_module, ONLY : exprel
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt)
 
@@ -234,7 +234,7 @@ CONTAINS
     ! this program are divided by the box length, which is itself updated in this routine.
 
     x = t * p_eps / w_eps ! Time step * time derivative of strain
-    c = expm1o(-x) ! (1-exp(-x))/x
+    c = exprel(-x) ! (1-exp(-x))/x
 
     r(:,:) = r(:,:) + c * t * v(:,:) / box ! Positions in box=1 units
     r(:,:) = r(:,:) - ANINT ( r(:,:) )     ! Periodic boundaries
@@ -249,7 +249,7 @@ CONTAINS
   END SUBROUTINE u1_propagator
 
   SUBROUTINE u2_propagator ( t ) ! U2: velocity kick step propagator
-    USE maths_module, ONLY : expm1o
+    USE maths_module, ONLY : exprel
     IMPLICIT NONE
     REAL, INTENT(in) :: t ! Time over which to propagate (typically dt/2)
 
@@ -257,7 +257,7 @@ CONTAINS
 
     alpha = 1.0 + 3.0 / g
     x = t * alpha * p_eps / w_eps
-    c = expm1o(-x) ! (1-exp(-x))/x
+    c = exprel(-x) ! (1-exp(-x))/x
 
     v(:,:) = v(:,:)*EXP(-x) + c * t * f(:,:)
 
@@ -292,7 +292,7 @@ CONTAINS
   END SUBROUTINE u3_propagator
 
   SUBROUTINE u4_propagator ( t, j_start, j_stop ) ! U4 and U4' combined: thermostat propagator
-    USE maths_module, ONLY : expm1o
+    USE maths_module, ONLY : exprel
     IMPLICIT NONE
     REAL,    INTENT(in) :: t               ! Time over which to propagate (typically dt/4)
     INTEGER, INTENT(in) :: j_start, j_stop ! Order in which to tackle variables
@@ -323,7 +323,7 @@ CONTAINS
        ELSE
 
           x = t * p_eta(j+1)/q(j+1)
-          c = expm1o(-x) ! (1-exp(-x))/x
+          c = exprel(-x) ! (1-exp(-x))/x
 
           p_eta(j) = p_eta(j)*EXP(-x) + t * gj * c
 
@@ -348,7 +348,7 @@ CONTAINS
        ELSE
 
           x = t * p_eta_baro(j+1)/q_baro(j+1)
-          c = expm1o(-x) ! (1-exp(-x))/x
+          c = exprel(-x) ! (1-exp(-x))/x
 
           p_eta_baro(j) = p_eta_baro(j)*EXP(-x) + t * gj * c
 

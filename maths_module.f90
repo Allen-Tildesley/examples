@@ -42,7 +42,7 @@ MODULE maths_module
 
   ! Public low-level mathematical routines and string operations
   PUBLIC :: rotate_vector, rotate_quaternion, cross_product, outer_product, q_to_a
-  PUBLIC :: lowercase, solve, polyval, expm1, expm1o
+  PUBLIC :: lowercase, solve, polyval, expm1, exprel
 
   ! Public order parameter calculations
   PUBLIC :: orientational_order, translational_order, nematic_order
@@ -925,10 +925,12 @@ CONTAINS
     REAL             :: f ! Returns value of exp(x)-1
 
     ! At small x, imprecision may arise through subtraction of two values O(1).
-    ! There are various ways of avoiding this.
+    ! There are various ways of doing this.
     ! We follow some others and use the identity: exp(x)-1 = x*exp(x/2)*[sinh(x/2)/(x/2)].
     ! For small x, sinh(x)/x = g0 + g1*x**2 + g2*x**4 + ...
     ! where the coefficient of x**(2n) is gn = 1/(2*n+1)!
+    ! Alternatively, the function is available in the GNU Scientific Library (GSL).
+    ! See https://www.gnu.org/software/gsl/.
 
     REAL, DIMENSION(0:4), PARAMETER :: g = 1.0 / [1,6,120,5040,362880]
     REAL,                 PARAMETER :: tol = 0.01
@@ -941,16 +943,18 @@ CONTAINS
 
   END FUNCTION expm1
 
-  FUNCTION expm1o ( x ) RESULT ( f )
+  FUNCTION exprel ( x ) RESULT ( f )
     IMPLICIT NONE
     REAL, INTENT(in) :: x ! Argument
     REAL             :: f ! Returns value of (exp(x)-1)/x
 
     ! At small x, we must guard against the ratio of imprecise small values.
-    ! There are various ways of avoiding this.
+    ! There are various ways of doing this.
     ! We follow some others and use the identity: (exp(x)-1)/x = exp(x/2)*[sinh(x/2)/(x/2)].
     ! For small x, sinh(x)/x = g0 + g1*x**2 + g2*x**4 + ...
     ! where the coefficient of x**(2n) is gn = 1/(2*n+1)!
+    ! Alternatively, the function is available in the GNU Scientific Library (GSL).
+    ! See https://www.gnu.org/software/gsl/.
 
     REAL, DIMENSION(0:4), PARAMETER :: g = 1.0 / [1,6,120,5040,362880]
     REAL,                 PARAMETER :: tol = 0.01
@@ -961,6 +965,6 @@ CONTAINS
        f = EXP(x/2) * polyval ( (x/2)**2, g )
     END IF
 
-  END FUNCTION expm1o
+  END FUNCTION exprel
 
 END MODULE maths_module

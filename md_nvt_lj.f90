@@ -221,7 +221,7 @@ CONTAINS
   END SUBROUTINE u3_propagator
 
   SUBROUTINE u4_propagator ( t, j_start, j_stop ) ! U4: thermostat propagator
-    USE maths_module, ONLY : expm1o
+    USE maths_module, ONLY : exprel
     IMPLICIT NONE
     REAL,    INTENT(in) :: t               ! Time over which to propagate (typically dt/4)
     INTEGER, INTENT(in) :: j_start, j_stop ! Order in which to tackle variables
@@ -250,7 +250,7 @@ CONTAINS
        ELSE
 
           x = t * p_eta(j+1)/q(j+1)
-          c = expm1o(-x) ! (1-exp(-x))/x
+          c = exprel(-x) ! (1-exp(-x))/x
 
           p_eta(j) = p_eta(j)*EXP(-x) + t * gj * c
 

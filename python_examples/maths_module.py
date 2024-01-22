@@ -248,22 +248,3 @@ def q_to_a ( q ):
     a[2,:] = [     2*(q[1]*q[3]+q[0]*q[2]),       2*(q[2]*q[3]-q[0]*q[1]),   q[0]**2-q[1]**2-q[2]**2+q[3]**2 ]
 
     return a
-
-def expm1o ( x ):
-    """Returns (exp(x)-1)/x."""
-    
-    # At small x, we must guard against the ratio of imprecise small values.
-    # There are various ways of avoiding this.
-    # We follow some others and use the identity: (exp(x)-1)/x = exp(x/2)*[sinh(x/2)/(x/2)].
-    # For small x, sinh(x)/x = g0 + g1*x**2 + g2*x**4 + ...
-    # where the coefficient of x**(2n) is gn = 1/(2*n+1)!
-    # NB for the related function exp(x)-1 we rely on the built-in expm1(x)
-
-    import numpy as np
-    from numpy.polynomial.polynomial import polyval
-    g = 1.0 / np.array([1,6,120,5040,362880],dtype=np.float_)
-    tol = 0.01
-    if abs(x) > tol:
-        return np.expm1(x)/x
-    else:
-        return np.exp(x/2)*polyval((x/2)**2,g)
