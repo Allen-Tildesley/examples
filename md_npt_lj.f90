@@ -234,7 +234,7 @@ CONTAINS
     ! this program are divided by the box length, which is itself updated in this routine.
 
     x = t * p_eps / w_eps ! Time step * time derivative of strain
-    c = exprel(-x) ! (1-exp(-x))/x
+    c = exprel(-x) ! (1-exp(-x))/x, preserving accuracy for small x
 
     r(:,:) = r(:,:) + c * t * v(:,:) / box ! Positions in box=1 units
     r(:,:) = r(:,:) - ANINT ( r(:,:) )     ! Periodic boundaries
@@ -257,7 +257,7 @@ CONTAINS
 
     alpha = 1.0 + 3.0 / g
     x = t * alpha * p_eps / w_eps
-    c = exprel(-x) ! (1-exp(-x))/x
+    c = exprel(-x) ! (1-exp(-x))/x, preserving accuracy for small x
 
     v(:,:) = v(:,:)*EXP(-x) + c * t * f(:,:)
 
@@ -323,7 +323,7 @@ CONTAINS
        ELSE
 
           x = t * p_eta(j+1)/q(j+1)
-          c = exprel(-x) ! (1-exp(-x))/x
+          c = exprel(-x) ! (1-exp(-x))/x, preserving accuracy for small x
 
           p_eta(j) = p_eta(j)*EXP(-x) + t * gj * c
 
@@ -348,7 +348,7 @@ CONTAINS
        ELSE
 
           x = t * p_eta_baro(j+1)/q_baro(j+1)
-          c = exprel(-x) ! (1-exp(-x))/x
+          c = exprel(-x) ! (1-exp(-x))/x, preserving accuracy for small x
 
           p_eta_baro(j) = p_eta_baro(j)*EXP(-x) + t * gj * c
 

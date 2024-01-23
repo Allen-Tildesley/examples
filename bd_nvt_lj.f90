@@ -197,7 +197,7 @@ CONTAINS
     REAL, DIMENSION(3,n) :: zeta
 
     x = gamma * t
-    c = -expm1(-2*x) ! 1-exp(-2*x)
+    c = -expm1(-2*x) ! 1-exp(-2*x), preserving accuracy for small x
     c = SQRT ( c )
 
     CALL random_normals ( 0.0, SQRT(temperature), zeta ) ! Random momenta

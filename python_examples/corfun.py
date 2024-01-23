@@ -113,8 +113,8 @@ print( "{:40}{:15.6f}".format('kappa', kappa) )
 # Coefficients used in algorithm
 x = delta*kappa
 e = math.exp(-x) # theta in B&B paper
-b = -np.expm1(-2*x) # 1-exp(-2*x)
-d = -np.expm1(-x)   # 1-exp(-x)
+b = -np.expm1(-2*x) # 1-exp(-2*x), preserving accuracy for small x
+d = -np.expm1(-x)   # 1-exp(-x), preserving accuracy for small x
 b = math.sqrt ( b )
 b = b * math.sqrt ( kappa/2.0 ) # alpha in B&B paper
 stddev = math.sqrt(2.0*temperature)

@@ -929,8 +929,7 @@ CONTAINS
     ! We follow some others and use the identity: exp(x)-1 = x*exp(x/2)*[sinh(x/2)/(x/2)].
     ! For small x, sinh(x)/x = g0 + g1*x**2 + g2*x**4 + ...
     ! where the coefficient of x**(2n) is gn = 1/(2*n+1)!
-    ! Alternatively, the function is available in the GNU Scientific Library (GSL).
-    ! See https://www.gnu.org/software/gsl/.
+    ! Alternatively, the expm1 function is available in some math and scientific libraries.
 
     REAL, DIMENSION(0:4), PARAMETER :: g = 1.0 / [1,6,120,5040,362880]
     REAL,                 PARAMETER :: tol = 0.01
@@ -953,8 +952,7 @@ CONTAINS
     ! We follow some others and use the identity: (exp(x)-1)/x = exp(x/2)*[sinh(x/2)/(x/2)].
     ! For small x, sinh(x)/x = g0 + g1*x**2 + g2*x**4 + ...
     ! where the coefficient of x**(2n) is gn = 1/(2*n+1)!
-    ! Alternatively, the function is available in the GNU Scientific Library (GSL).
-    ! See https://www.gnu.org/software/gsl/.
+    ! Alternatively, the exprel function is available in some math and scientific libraries.
 
     REAL, DIMENSION(0:4), PARAMETER :: g = 1.0 / [1,6,120,5040,362880]
     REAL,                 PARAMETER :: tol = 0.01

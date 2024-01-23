@@ -155,7 +155,7 @@ def u4_propagator ( t, j_list ):
             p_eta[j]  = p_eta[j] + t * gj # The equation for p_eta[M-1] is different
         else:
             x = t * p_eta[j+1]/q[j+1]
-            c = exprel(-x) # (1-exp(-x))/x
+            c = exprel(-x) # (1-exp(-x))/x, preserving accuracy for small x
             p_eta[j] = p_eta[j]*np.exp(-x) + t * gj * c
   
 # Takes in a configuration of atoms (positions, velocities)

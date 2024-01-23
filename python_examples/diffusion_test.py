@@ -46,7 +46,7 @@ def o_propagator ( t, v ):
     import numpy as np
     
     x = gamma*t
-    c = -np.expm1(-2*x) # 1-exp(-2*x)
+    c = -np.expm1(-2*x) # 1-exp(-2*x), preserving accuracy for small x
     c = np.sqrt(c)
     return np.exp(-x) * v + c * np.sqrt(temperature) * np.random.randn(n,3)
 

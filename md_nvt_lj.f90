@@ -250,7 +250,7 @@ CONTAINS
        ELSE
 
           x = t * p_eta(j+1)/q(j+1)
-          c = exprel(-x) ! (1-exp(-x))/x
+          c = exprel(-x) ! (1-exp(-x))/x, preserving accuracy for small x
 
           p_eta(j) = p_eta(j)*EXP(-x) + t * gj * c
 

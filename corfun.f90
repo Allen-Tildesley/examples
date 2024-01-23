@@ -132,8 +132,8 @@ PROGRAM corfun
   ! Coefficients used in algorithm
   x = delta*kappa
   e = EXP(-x) ! theta in B&B paper
-  b = -expm1(-2*x) ! 1-exp(-2*x)
-  d = -expm1(-x)   ! 1-exp(-x)
+  b = -expm1(-2*x) ! 1-exp(-2*x), preserving accuracy for small x
+  d = -expm1(-x)   ! 1-exp(-x), preserving accuracy for small x
   b = SQRT ( b )
   b = b * SQRT ( kappa/2.0 ) ! alpha in B&B paper
   stddev = SQRT(2.0*temperature)
