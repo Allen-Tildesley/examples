@@ -164,9 +164,9 @@ cos_vals = np.linspace ( -1.0+dc/2, 1.0-dc/2, 2*nc+1 )
 r_vals   = np.linspace ( dr/2, (nr-0.5)*dr, nr )
 
 # Zero the accumulator arrays
-dens = np.zeros ( nk, dtype=np.float_ )
-rho1 = np.zeros ( 2*nz+1, dtype=np.float_ )
-rho2 = np.zeros ( ( 2*nz+1, 2*nc+1, nr ), dtype=np.float_ )
+dens = np.zeros ( nk, dtype=np.float64 )
+rho1 = np.zeros ( 2*nz+1, dtype=np.float64 )
+rho2 = np.zeros ( ( 2*nz+1, 2*nc+1, nr ), dtype=np.float64 )
 
 norm = 0
 t    = 0

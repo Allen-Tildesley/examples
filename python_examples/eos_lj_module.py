@@ -43,7 +43,7 @@ def power ( tau, delta, c ):
     # f[i,:] is differentiated i times with respect to tau, and then multiplied by tau**i
     # f[:,j] is differentiated j times with respect to delta, and then multiplied by delta**j
 
-    f = np.full ( (3,3), c['n'] * (tau**c['t']) * (delta**c['d']), dtype=np.float_ )
+    f = np.full ( (3,3), c['n'] * (tau**c['t']) * (delta**c['d']), dtype=np.float64 )
     f[1,:] = f[1,:] * c['t']
     f[2,:] = f[2,:] * c['t'] * ( c['t'] - 1.0 )
     f[:,1] = f[:,1] * c['d']
@@ -60,7 +60,7 @@ def expon ( tau, delta, c ):
     # f[i,:] is differentiated i times with respect to tau, and then multiplied by tau**i
     # f[:,j] is differentiated j times with respect to delta, and then multiplied by delta**j
 
-    f = np.full ( (3,3), c['n'] * (tau**c['t']) * (delta**c['d']) * np.exp(-delta**c['l']), dtype=np.float_ )
+    f = np.full ( (3,3), c['n'] * (tau**c['t']) * (delta**c['d']) * np.exp(-delta**c['l']), dtype=np.float64 )
     f[1,:] = f[1,:] * c['t']
     f[2,:] = f[2,:] * c['t'] * ( c['t'] - 1.0 )
     f[:,1] = f[:,1] * (c['d']-c['l']*delta**c['l'])
@@ -78,7 +78,7 @@ def gauss ( tau, delta, c ):
     # f[:,j] is differentiated j times with respect to delta, and then multiplied by delta**j
 
     f = np.full ( (3,3), c['n']*(tau**c['t'])*np.exp(-c['beta']*(tau-c['gamma'])**2)
-                      *(delta**c['d'])*np.exp(-c['eta']*(delta-c['epsilon'])**2), dtype=np.float_)
+                      *(delta**c['d'])*np.exp(-c['eta']*(delta-c['epsilon'])**2), dtype=np.float64)
     f[1,:] = f[1,:] * ( c['t'] - 2.0*c['beta']*tau*(tau-c['gamma']) )
     f[2,:] = f[2,:] * ( ( c['t'] - 2.0*c['beta']*tau*(tau-c['gamma']) )**2 - c['t'] - 2*c['beta']*tau**2 )
     f[:,1] = f[:,1] * ( c['d'] - 2.0*c['eta']*delta*(delta-c['epsilon']) )
@@ -104,19 +104,19 @@ def a_res_full ( temp, rho ):
     tau   = temp_crit / temp # Reduced inverse temperature
     delta = rho / rho_crit   # Reduced density
 
-    a = np.zeros ( (3,3), dtype=np.float_ )
+    a = np.zeros ( (3,3), dtype=np.float64 )
 
     # Coefficients taken from Table 2 of 
     # M Thol, G Rutkai, A Koester, R Lustig, R Span, J Vrabec, J Phys Chem Ref Data 45, 023101 (2016)
 
-    cp = np.empty ( 6, dtype = [ ('n',np.float_), ('t',np.float_), ('d',np.float_) ] )
+    cp = np.empty ( 6, dtype = [ ('n',np.float64), ('t',np.float64), ('d',np.float64) ] )
     cp['n'] = [ 0.005208073, 2.186252, -2.161016, 1.452700, -2.041792, 0.18695286 ]
     cp['t'] = [ 1.000, 0.320, 0.505, 0.672, 0.843, 0.898 ]
     cp['d'] = [ 4.0,   1.0,   1.0,   2.0,   2.0,   3.0   ]
     for c in cp:
         a = a + power ( tau, delta, c )
 
-    ce = np.empty ( 6, dtype = [ ('n',np.float_), ('t',np.float_), ('d',np.float_), ('l',np.float_) ] )
+    ce = np.empty ( 6, dtype = [ ('n',np.float64), ('t',np.float64), ('d',np.float64), ('l',np.float64) ] )
     ce['n'] = [ -0.090988445, -0.49745610, 0.10901431, -0.80055922, -0.56883900, -0.62086250 ]
     ce['t'] = [ 1.294, 2.590, 1.786, 2.770, 1.786, 1.205 ]
     ce['d'] = [ 5.0,   2.0,   2.0,   3.0,   1.0,   1.0   ]
@@ -124,8 +124,8 @@ def a_res_full ( temp, rho ):
     for c in ce:
         a = a + expon ( tau, delta, c )
 
-    cg = np.empty ( 11, dtype = [ ('n',np.float_), ('t',np.float_), ('d',np.float_), ('eta',np.float_),
-                                  ('beta',np.float_), ('gamma',np.float_), ('epsilon',np.float_)] )
+    cg = np.empty ( 11, dtype = [ ('n',np.float64), ('t',np.float64), ('d',np.float64), ('eta',np.float64),
+                                  ('beta',np.float64), ('gamma',np.float64), ('epsilon',np.float64)] )
     cg['n']       = [ -1.4667177,  1.8914690,  -0.13837010, -0.38696450, 0.12657020, 0.6057810,
                        1.1791890, -0.47732679, -9.9218575,  -0.57479320, 0.0037729230 ]
     cg['t']       = [ 2.830,  2.548, 4.650, 1.385, 1.460, 1.351, 0.660, 1.496,   1.830, 1.616, 4.970 ]
@@ -157,19 +157,19 @@ def a_res_cutshift ( temp, rho ):
     tau   = temp_crit / temp # Reduced inverse temperature
     delta = rho / rho_crit   # Reduced density
 
-    a = np.zeros ( (3,3), dtype=np.float_ )
+    a = np.zeros ( (3,3), dtype=np.float64 )
 
     # Coefficients taken from Table 1 of 
     # M Thol, G Rutkai, R Span, J Vrabec, R Lustig, Int J Thermophys 36, 25 (2015) 
 
-    cp = np.empty ( 6, dtype = [ ('n',np.float_), ('t',np.float_), ('d',np.float_) ] )
+    cp = np.empty ( 6, dtype = [ ('n',np.float64), ('t',np.float64), ('d',np.float64) ] )
     cp['n'] = [ 0.015606084, 1.7917527, -1.9613228, 1.3045604, -1.8117673, 0.15483997 ]
     cp['t'] = [ 1.000, 0.304, 0.583, 0.662, 0.870, 0.870 ]
     cp['d'] = [ 4.0,   1.0,   1.0,   2.0,   2.0,   3.0   ]
     for c in cp:
         a = a + power ( tau, delta, c )
 
-    ce = np.empty ( 6, dtype = [ ('n',np.float_), ('t',np.float_), ('d',np.float_), ('l',np.float_) ] )
+    ce = np.empty ( 6, dtype = [ ('n',np.float64), ('t',np.float64), ('d',np.float64), ('l',np.float64) ] )
     ce['n'] = [ -0.094885204, -0.20092412,  0.11639644, -0.50607364, -0.58422807, -0.47510982 ]
     ce['t'] = [  1.250, 3.000, 1.700, 2.400, 1.960, 1.286 ]
     ce['d'] = [  5.0,   2.0,   2.0,   3.0,   1.0,   1.0   ]
@@ -177,8 +177,8 @@ def a_res_cutshift ( temp, rho ):
     for c in ce:
         a = a + expon ( tau, delta, c )
 
-    cg = np.empty ( 9, dtype = [ ('n',np.float_), ('t',np.float_), ('d',np.float_), ('eta',np.float_),
-                                 ('beta',np.float_), ('gamma',np.float_), ('epsilon',np.float_)] )
+    cg = np.empty ( 9, dtype = [ ('n',np.float64), ('t',np.float64), ('d',np.float64), ('eta',np.float64),
+                                 ('beta',np.float64), ('gamma',np.float64), ('epsilon',np.float64)] )
     cg['n']       = [  0.0094333106, 0.30444628,  -0.0010820946, -0.099693391, 0.0091193522,
                        0.12970543,   0.023036030, -0.082671073,  -2.2497821 ]
     cg['t']       = [  3.600, 2.080, 5.240, 0.960, 1.360, 1.655, 0.900, 0.860,  3.950 ]

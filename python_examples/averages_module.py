@@ -103,12 +103,12 @@ def run_begin ( variables ):
 
     # Store method options and add-constants in module variables
     method=np.array([variable.method for variable in variables],dtype=np.int_)
-    add   =np.array([variable.add    for variable in variables],dtype=np.float_)
+    add   =np.array([variable.add    for variable in variables],dtype=np.float64)
 
     # Zero averages and error accumulators at start of run
     run_nrm = 0.0
-    run_avg = np.zeros(n_avg,dtype=np.float_)
-    run_err = np.zeros(n_avg,dtype=np.float_)
+    run_avg = np.zeros(n_avg,dtype=np.float64)
+    run_err = np.zeros(n_avg,dtype=np.float64)
 
     # Write headings
     print()
@@ -127,8 +127,8 @@ def blk_begin():
     global blk_nrm, blk_avg, blk_msd
 
     blk_nrm = 0.0
-    blk_avg = np.zeros(n_avg,dtype=np.float_)
-    blk_msd = np.zeros(n_avg,dtype=np.float_)
+    blk_avg = np.zeros(n_avg,dtype=np.float64)
+    blk_msd = np.zeros(n_avg,dtype=np.float64)
 
 def blk_add ( variables ):
     """Increment block-average variables."""
@@ -138,7 +138,7 @@ def blk_add ( variables ):
 
     assert len(variables)==n_avg, 'Mismatched variable arrays'
     
-    values = np.array([variable.val for variable in variables],dtype=np.float_)
+    values = np.array([variable.val for variable in variables],dtype=np.float64)
     blk_avg = blk_avg + values
     blk_msd = blk_msd + values**2
     blk_nrm = blk_nrm + 1.0

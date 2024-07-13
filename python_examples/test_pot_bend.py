@@ -48,7 +48,7 @@ def force ( r ):
     # Store C coefficients in a matrix
     # In the general case we would not need to calculate every pair
     # and also we would make use of the symmetry cc[a,b]=cc[b,a]
-    cc = np.zeros((n,n),dtype=np.float_)  # Create C array (scalar products)
+    cc = np.zeros((n,n),dtype=np.float64)  # Create C array (scalar products)
     for a in range(1,n):
         for b in range(1,n):
             cc[a,b]=np.dot(d[a,:],d[b,:]) # Compute C array (zero indices not used)

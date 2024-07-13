@@ -197,7 +197,7 @@ n, box, r = read_cnf_atoms ( cnf_prefix+'00.'+inp_tag) #  Read first LJ configur
 print( "{:40}{:15d}  ".format('Number of particles',          n) )
 print( "{:40}{:15.6f}".format('Box length', box)  )
 print( "{:40}{:15.6f}".format('Density', n/box**3)  )
-r = np.empty( (p,n,3), dtype=np.float_ )
+r = np.empty( (p,n,3), dtype=np.float64 )
 for k in range(p):
     n, box, r[k,:,:] = read_cnf_atoms ( cnf_prefix+str(k).zfill(2)+'.'+inp_tag)
 r = r / box           # Convert positions to box units
@@ -225,7 +225,7 @@ for blk in range(1,nblock+1): # Loop over blocks
         for i in range(n): # Loop over atoms
 
             # Centre of mass move
-            dc = random_translate_vector ( dc_max/box, np.zeros(3,dtype=np.float_) )
+            dc = random_translate_vector ( dc_max/box, np.zeros(3,dtype=np.float64) )
             partial_old = PotentialType ( 0.0, 0.0, False )
             partial_new = PotentialType ( 0.0, 0.0, False )
             for k in range(p): # Loop over ring polymer indices

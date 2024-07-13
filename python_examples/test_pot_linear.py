@@ -34,7 +34,7 @@ def random_positions(n):
     from maths_module import random_vector
     import sys
     
-    r = np.zeros((n,3),dtype=np.float_)
+    r = np.zeros((n,3),dtype=np.float64)
     # molecule 0 is always at the origin, now place the others randomly
     for i in range(1,r.shape[0]):
         for pos_try in range(npos):
@@ -56,7 +56,7 @@ def random_orientations(n):
     """Returns n random 3-d vectors in a numpy array (n,3)."""
     import numpy as np
     from maths_module import random_vector
-    e = np.empty((n,3),dtype=np.float_)
+    e = np.empty((n,3),dtype=np.float64)
     for i in range(e.shape[0]):
         e[i,:] = random_vector()
     return e
@@ -152,8 +152,8 @@ for (i,xyz), f_exact in np.ndenumerate(f):
     print( "{:5d}{:>10}{:15.6f}{:15.6f}{:15.4e}".format(i,cf[xyz],f_exact,fnum,f_exact-fnum) )
 
 ct = ['Tx','Ty','Tz']
-axis = np.empty(3,dtype=np.float_)
-esave = np.empty(3,dtype=np.float_)
+axis = np.empty(3,dtype=np.float64)
+esave = np.empty(3,dtype=np.float64)
 
 for (i,xyz), t_exact in np.ndenumerate(t):
     axis[:]   = 0.0

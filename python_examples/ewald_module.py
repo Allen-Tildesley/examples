@@ -79,7 +79,7 @@ def pot_k_ewald ( nk, r, q, kappa ):
 
         b = 1.0 / 4.0 / kappa / kappa
         k_sq_max = nk**2            # Store this in module data
-        kfac = np.zeros(k_sq_max+1,dtype=np.float_)
+        kfac = np.zeros(k_sq_max+1,dtype=np.float64)
        
         # Lazy triple loop, which over-writes the same values of ksq several times
         # and leaves some locations empty (those which are not the sum of three squared integers)
@@ -97,9 +97,9 @@ def pot_k_ewald ( nk, r, q, kappa ):
     # Double-check value on later calls
     assert k_sq_max == nk**2, 'nk error'
 
-    eikx = np.zeros((n,nk+1),  dtype=np.complex_) # omits negative k indices
-    eiky = np.zeros((n,2*nk+1),dtype=np.complex_) # includes negative k indices
-    eikz = np.zeros((n,2*nk+1),dtype=np.complex_) # includes negative k indices
+    eikx = np.zeros((n,nk+1),  dtype=np.complex128) # omits negative k indices
+    eiky = np.zeros((n,2*nk+1),dtype=np.complex128) # includes negative k indices
+    eikz = np.zeros((n,2*nk+1),dtype=np.complex128) # includes negative k indices
 
     # Calculate kx, ky, kz = 0, 1 explicitly
     eikx[:,   0] = 1.0 + 0.0j
@@ -165,7 +165,7 @@ def pot_k_pm_ewald ( nk, r, q, kappa ):
     # Assign charge density to complex array ready for FFT
     # Assume r in unit box with range (-0.5,0.5)
     # Mesh function expects coordinates in range 0..1 so we add 0.5
-    fft_inp = mesh_function ( r+0.5, q, 2*nk ).astype(np.complex_)
+    fft_inp = mesh_function ( r+0.5, q, 2*nk ).astype(np.complex128)
 
     # Forward FFT incorporating scaling by number of grid points
     fft_out = np.fft.fftn(fft_inp) / (sc**3)

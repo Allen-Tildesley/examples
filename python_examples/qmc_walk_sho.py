@@ -96,9 +96,9 @@ print( "{:40}{:15d}  ".format('Number of bins for wavefunction',         n_bin) 
 
 assert n_target <= n_max, 'n_target exceeds n_max at start'
 
-x       = np.empty(n_max,dtype=np.float_) # position of each walker
-v       = np.empty(n_max,dtype=np.float_) # potential energy of each walker
-k       = np.empty(n_max,dtype=np.float_) # floating point number of replicas to make
+x       = np.empty(n_max,dtype=np.float64) # position of each walker
+v       = np.empty(n_max,dtype=np.float64) # potential energy of each walker
+k       = np.empty(n_max,dtype=np.float64) # floating point number of replicas to make
 replica = np.empty(n_max,dtype=np.int_)   # integer number of replicas to make
 alive   = np.empty(n_max,dtype=np.bool_)  # flag those walkers still alive
 bin     = np.zeros(n_bin,dtype=np.int_)   # histogram bins for wavefunction
@@ -166,7 +166,7 @@ for step in range(-equilibration_steps,production_steps):
 
 # Normalize the wavefunction so that the integral over psi**2 = 1.0
 dx     = edges[1]-edges[0]
-psi    = bin.astype(np.float_)   # un-normalized wave function
+psi    = bin.astype(np.float64)   # un-normalized wave function
 factor = np.sum ( psi**2 ) * dx  # integral, assuming that -x_max .. +x_max catches everything
 psi    = psi / np.sqrt( factor ) # normalizing factor
 

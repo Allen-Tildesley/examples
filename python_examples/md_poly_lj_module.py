@@ -38,7 +38,7 @@ alpha2 = alpha / 2.0
 na = 3
 db = np.array([[-np.sin(alpha2), 0.0,   -np.cos(alpha2)/3.0],
                [0.0,            0.0, 2.0*np.cos(alpha2)/3.0],
-               [np.sin(alpha2), 0.0,    -np.cos(alpha2)/3.0]], dtype=np.float_)
+               [np.sin(alpha2), 0.0,    -np.cos(alpha2)/3.0]], dtype=np.float64)
 diameter = 2.0 * np.sqrt ( np.max ( np.sum(db**2,axis=1) ) ) # Molecular diameter
 
 # Cutoff distance and force-shift parameters (all private) chosen as per the reference:
@@ -50,7 +50,7 @@ sr_cut12 = sr_cut6**2
 lambda1  = 4.0*(7.0*sr_cut6-13.0*sr_cut12)
 lambda2  = -24.0*(sr_cut6-2.0*sr_cut12)*sr_cut
 
-m = np.array([ 1.0/3.0, 1.0/3.0, 1.0/3.0 ],dtype=np.float_) # Masses add up to 1.0
+m = np.array([ 1.0/3.0, 1.0/3.0, 1.0/3.0 ],dtype=np.float64) # Masses add up to 1.0
 
 # The following section sets the diagonal moments of inertia "realistically"
 # based on the values of atomic masses and bond vectors (above), with some checking

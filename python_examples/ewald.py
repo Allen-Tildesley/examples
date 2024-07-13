@@ -73,7 +73,7 @@ print("{:40}{:15.6f}".format('Box (in sigma units)',box))
 r = r / box        # Work throughout in unit box
 r = r - np.rint(r) # Apply periodic boundaries
 assert n%2 == 0, 'Error, we require even N for charge balance'
-q = np.empty(n,dtype=np.float_)
+q = np.empty(n,dtype=np.float64)
 q[::2] = 1.0
 q[1::2] = -1.0
 print ( "{:40}{:15.6f}".format('Net charge', np.sum(q)) )
@@ -101,13 +101,13 @@ print ( "{:40}{:15.6f}".format('total   potential energy (PME)', pot)   )
 # Potentials are stored according to squared distance of neighbouring box
 print('Brute force method')
 
-pot_shell = np.zeros(nbox_sq+1, dtype=np.float_) # Zero array of potentials (not all the elements of this array will be filled)
+pot_shell = np.zeros(nbox_sq+1, dtype=np.float64) # Zero array of potentials (not all the elements of this array will be filled)
 
 for xbox, ybox, zbox in product ( range(-nbox,nbox+1), repeat=3 ): # Triple loop over surrounding periodic boxes
     rbox_sq = xbox**2 + ybox**2 + zbox**2
     if rbox_sq > nbox_sq: # Skip if outside maximum sphere of boxes
         continue
-    rbox_vec = np.array([xbox,ybox,zbox], dtype=np.float_)
+    rbox_vec = np.array([xbox,ybox,zbox], dtype=np.float64)
     start_shift = 0 if rbox_sq>0 else 1 # Skip all i==j if in central box
     for shift in range(start_shift,n):
         # Bare Coulomb term, including box vector, no periodic box correction

@@ -34,7 +34,7 @@ import numpy as np
 print('hit_and_miss')
 np.random.seed()
 
-r_0 = np.array([1.0,2.0,3.0],dtype=np.float_)
+r_0 = np.array([1.0,2.0,3.0],dtype=np.float64)
 v_0 = np.prod ( r_0 )
 
 tau_hit  = 0

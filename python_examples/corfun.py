@@ -125,7 +125,7 @@ cpu_1 = time.process_time()
 # Initial values
 vt = 0.0
 s  = 0.0
-v  = np.empty(nstep,dtype=np.float_)
+v  = np.empty(nstep,dtype=np.float64)
 np.random.seed()
 
 for t in range(-nequil, nstep): # Loop over steps including an equilibration period
@@ -144,10 +144,10 @@ print( "{:40}{:15.6f}".format('CPU time to generate data', cpu_2-cpu_1 ) )
 # This is very slow.
 # A much faster direct method uses the NumPy correlate function (see below)
 
-c  = np.zeros(nt+1,dtype=np.float_)
-n  = np.zeros(nt+1,dtype=np.float_)
+c  = np.zeros(nt+1,dtype=np.float64)
+n  = np.zeros(nt+1,dtype=np.float64)
 t0 = np.empty(n0,dtype=np.int_)
-v0 = np.empty(n0,dtype=np.float_)
+v0 = np.empty(n0,dtype=np.float64)
 mk   = -1 # Storage location of time origin
 full = False
 
@@ -179,7 +179,7 @@ print( "{:40}{:15.6f}".format('CPU time for direct method', cpu_3-cpu_2 ) )
 fft_len = 2*nstep # Actual length of FFT data
 
 # Prepare data for FFT
-fft_inp = np.zeros(fft_len,dtype=np.complex_) # Fill input array with zeros
+fft_inp = np.zeros(fft_len,dtype=np.complex128) # Fill input array with zeros
 fft_inp[0:nstep] = v                          # Put data into first part (real only)
 
 fft_out = np.fft.fft(fft_inp) # Forward FFT
@@ -189,7 +189,7 @@ fft_out = fft_out * np.conj ( fft_out ) # Square modulus
 fft_inp = np.fft.ifft(fft_out) # Backward FFT (the factor of 1/fft_len is built in)
 
 # Normalization factors associated with number of time origins
-n = np.linspace(nstep,nstep-nt,nt+1,dtype=np.float_)
+n = np.linspace(nstep,nstep-nt,nt+1,dtype=np.float64)
 assert np.all(n>0.5), 'Normalization array error' # Should never happen
 c_fft = fft_inp[0:nt+1].real / n
 

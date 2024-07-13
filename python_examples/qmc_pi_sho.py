@@ -172,7 +172,7 @@ beta     = 1.0 / temperature
 k_spring = p * temperature**2
 
 np.random.seed()
-x = np.zeros(p,dtype=np.float_) # Set up initial positions at origin
+x = np.zeros(p,dtype=np.float64) # Set up initial positions at origin
 
 # Calculate initial values
 pot_cl = 0.5 * np.sum ( x**2 ) / p                         # Classical potential energy

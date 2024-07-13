@@ -244,7 +244,7 @@ print( "{:40}{:15d}".format('Number of crankshaft tries per step', n_crank) )
 print( "{:40}{:15d}".format('Number of pivot tries per step',      n_pivot) )
 
 # Calculate energy histogram and Boltzmann exponents, s(q), which are just values of E/kT
-e = -np.arange(nq+1,dtype=np.float_)
+e = -np.arange(nq+1,dtype=np.float64)
 e[0]=0.0
 s = np.zeros_like(e)
 h = np.zeros_like(e)

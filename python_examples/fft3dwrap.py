@@ -85,7 +85,7 @@ kprint = kmesh[:imax]
 # For a function of the form f(x)*f(y)*f(z) such as this, there are faster ways of initializing the array
 # However, we retain the generic triple loop to make it easy to choose a different function
 
-fft_inp = np.empty((sc,sc,sc),dtype=np.complex_)
+fft_inp = np.empty((sc,sc,sc),dtype=np.complex128)
 
 print()
 print("Initial real-space Gaussian")

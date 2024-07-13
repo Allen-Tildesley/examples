@@ -139,7 +139,7 @@ r = r / box           # Convert positions to box units
 r = r - np.rint ( r ) # Periodic boundaries
 
 # Calculate all bond vectors
-d  = np.empty ( (n,na,3), dtype=np.float_ )
+d  = np.empty ( (n,na,3), dtype=np.float64 )
 for i, ei in enumerate(e):
     ai = q_to_a ( ei ) # Rotation matrix for i
     d[i,:,:] = np.dot ( db, ai ) # NB: equivalent to ai_T*db, ai_T=transpose of ai

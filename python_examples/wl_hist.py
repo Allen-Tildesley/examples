@@ -38,7 +38,7 @@ import math
 
 hist_file = input("Enter histogram file name: ")
 print('Reading histograms from '+hist_file)
-e,h,g,s = np.loadtxt(hist_file,dtype=np.float_,unpack=True)
+e,h,g,s = np.loadtxt(hist_file,dtype=np.float64,unpack=True)
 
 n = input("Enter number of atoms: ")
 n = int(n)

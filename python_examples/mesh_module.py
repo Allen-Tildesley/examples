@@ -42,8 +42,8 @@ def mesh_function ( r, q, sc ):
 
     h  = 1.0 / sc # mesh spacing
 
-    rho = np.zeros( (sc,sc,sc), dtype=np.float_ ) # Zero mesh
-    v   = np.empty( (3,3), dtype=np.float_ )      # Array of weights
+    rho = np.zeros( (sc,sc,sc), dtype=np.float64 ) # Zero mesh
+    v   = np.empty( (3,3), dtype=np.float64 )      # Array of weights
 
     for i in range(n): # Loop over charges
         nr = np.rint(r[i,:]*sc).astype(np.int_) # Nearest mesh point indices

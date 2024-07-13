@@ -68,7 +68,7 @@ np.random.seed()
 r = np.random.random_sample( (n,3) )
 
 # For illustration we choose +1 and -1 charges, alternately
-q = np.empty(n,dtype=np.float_)
+q = np.empty(n,dtype=np.float64)
 q[::2] = 1.0
 q[1::2] = -1.0
 
