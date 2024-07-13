@@ -347,7 +347,7 @@ def milcshake_a ( dt, bond, r_old, r, v ):
 
     # Elements of tridiagonal matrix (dot products of old and new bond vectors)
     # In this example, all masses are equal to unity. Let k=n-1 be number of constraints
-    tridiag = np.zeros((3,k), dtype=np.float_)
+    tridiag = np.zeros((3,k), dtype=np.float64)
     tridiag[0,1:]  = -2.0*np.sum ( rij_old[1:,:] *rij_new[:-1,:], axis=1 )       # leading zero to pad, then k-1 elements of upper-diagonal
     tridiag[1,:]   =  2.0*np.sum ( rij_old[:,:]  *rij_new[:,:],   axis=1 ) / 0.5 # k elements of diagonal
     tridiag[2,:-1] = -2.0*np.sum ( rij_old[:-1,:]*rij_new[1:,:],  axis=1 )       # k-1 elements of lower-diagonal, then trailing zero to pad
@@ -422,7 +422,7 @@ def milcshake_b ( dt, bond, r, v ):
 
     # Elements of tridiagonal matrix (dot products of bond vectors)
     # In this example, all masses are equal to unity. Let k=n-1 be number of constraints
-    tridiag = np.zeros((3,k), dtype=np.float_)
+    tridiag = np.zeros((3,k), dtype=np.float64)
     tridiag[0,1:]  = -np.sum ( rij[1:,:] *rij[:-1,:], axis=1 )       # leading zero to pad, then k-1 elements of upper-diagonal
     tridiag[1,:]   =  np.sum ( rij[:,:]  *rij[:,:],   axis=1 ) / 0.5 # k elements of diagonal
     tridiag[2,:-1] = -np.sum ( rij[:-1,:]*rij[1:,:],  axis=1 )       # k-1 elements of lower-diagonal, then trailing zero to pad

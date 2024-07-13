@@ -38,10 +38,10 @@ def read_cnf_atoms ( filename, with_v=False ):
     rows, cols = rv.shape
     assert rows == n, "{:d}{}{:d}".format(rows,' rows not equal to ',n)
     assert cols >= 3, "{:d}{}".format(cols,' cols less than 3')
-    r = rv[:,0:3].astype(np.float_) # Coordinate array
+    r = rv[:,0:3].astype(np.float64) # Coordinate array
     if with_v:
         assert cols >= 6, "{:d}{}".format(cols,' cols less than 6')
-        v = rv[:,3:6].astype(np.float_) # Velocity array
+        v = rv[:,3:6].astype(np.float64) # Velocity array
         return n, box, r, v
     else:
         return n, box, r
@@ -59,12 +59,12 @@ def read_cnf_mols ( filename, with_v=False, quaternions=False ):
     assert rows == n, "{:d}{}{:d}".format(rows,' rows not equal to ',n)
     cols_re = 7 if quaternions else 6
     assert cols >= cols_re, "{:d}{}{:d}".format(cols,' cols less than ',cols_re)
-    r = revw[:,0:3].astype(np.float_) # Coordinate array
-    e = revw[:,3:cols_re].astype(np.float_) # Orientation array
+    r = revw[:,0:3].astype(np.float64) # Coordinate array
+    e = revw[:,3:cols_re].astype(np.float64) # Orientation array
     if with_v:
         assert cols >= cols_re+6, "{:d}{}{:d}".format(cols,' cols less than',cols_re+6)
-        v = revw[:,cols_re  :cols_re+3].astype(np.float_) # Velocity array
-        w = revw[:,cols_re+3:cols_re+6].astype(np.float_) # Angular velocity/momentum array
+        v = revw[:,cols_re  :cols_re+3].astype(np.float64) # Velocity array
+        w = revw[:,cols_re+3:cols_re+6].astype(np.float64) # Angular velocity/momentum array
         return n, box, r, e, v, w
     else:
         return n, box, r, e

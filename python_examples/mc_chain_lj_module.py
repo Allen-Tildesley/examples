@@ -87,8 +87,8 @@ def regrow ( temperature, m_max, k_max, bond, k_spring, r ):
     w_tol = 1.e-10 # Min weight tolerance
     n, d = r.shape
     assert d==3, 'Dimension error in regrow'
-    r_try = np.empty((k_max,3),dtype=np.float_)
-    w     = np.empty(k_max,dtype=np.float_)
+    r_try = np.empty((k_max,3),dtype=np.float64)
+    w     = np.empty(k_max,dtype=np.float64)
 
     std   = np.sqrt(temperature/k_spring) # Spring bond standard deviation
     d_max = 3.0*std                       # Impose a limit on variation, say 3*std

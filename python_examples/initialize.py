@@ -44,17 +44,17 @@ def fcc_positions ( n, box, length, soft, quaternions ):
     assert n==4*nc**3, "{}{:d}{:d}".format('n, nc mismatch ',n,4*nc**3)
     cell = box / nc  # Unit cell
     box2 = box / 2.0 # Half box length
-    r = np.empty((n,3),dtype=np.float_)
-    e = np.empty((n,3),dtype=np.float_)
+    r = np.empty((n,3),dtype=np.float64)
+    e = np.empty((n,3),dtype=np.float64)
 
-    r_fcc = np.array ( [ [0.25,0.25,0.25],[0.25,0.75,0.75],[0.75,0.75,0.25],[0.75,0.25,0.75] ], dtype=np.float_ )
-    e_fcc = np.array ( [ [1.0,1.0,1.0],[1.0,-1.0,-1.0],[-1.0,1.0,-1.0],[-1.0,-1.0,1.0] ],dtype=np.float_)*np.sqrt(1.0/3.0)
+    r_fcc = np.array ( [ [0.25,0.25,0.25],[0.25,0.75,0.75],[0.75,0.75,0.25],[0.75,0.25,0.75] ], dtype=np.float64 )
+    e_fcc = np.array ( [ [1.0,1.0,1.0],[1.0,-1.0,-1.0],[-1.0,1.0,-1.0],[-1.0,-1.0,1.0] ],dtype=np.float64)*np.sqrt(1.0/3.0)
 
     i = 0
     
     for ix, iy, iz in product(range(nc),repeat=3): # triple loop over unit cells
         for a in range(4): # loop over atoms in unit cell
-            r[i,:] = r_fcc[a,:] + np.array ( [ix,iy,iz] ).astype(np.float_) # in range 0..nc
+            r[i,:] = r_fcc[a,:] + np.array ( [ix,iy,iz] ).astype(np.float64) # in range 0..nc
             r[i,:] = r[i,:] * cell                                          # in range 0..box
             r[i,:] = r[i,:] - box2                                          # in range -box2..box2
             e[i,:] = e_fcc[a]
@@ -81,11 +81,11 @@ def ran_positions ( n, box, length, soft, quaternions ):
 
     print('Random positions')
 
-    r = np.empty((n,3),dtype=np.float_)
+    r = np.empty((n,3),dtype=np.float64)
     if quaternions:
-        e = np.empty((n,4),dtype=np.float_)
+        e = np.empty((n,4),dtype=np.float64)
     else:
-        e = np.empty((n,3),dtype=np.float_)
+        e = np.empty((n,3),dtype=np.float64)
 
     for i in range(n):
         
@@ -148,7 +148,7 @@ def ran_velocities ( nn, e, temperature, inertia, quaternions ):
         w = np.random.randn ( n, 3 ) * w_std_dev
     else:
         w_sq_mean = 2.0 * temperature / inertia
-        w = np.empty ( (n,3), dtype=np.float_ )
+        w = np.empty ( (n,3), dtype=np.float64 )
         for i in range(n):
             w[i,:] = random_perpendicular_vector ( e[i,:] ) # Set direction of angular velocity
             w[i,:] = w[i,:] * np.sqrt(np.random.exponential(w_sq_mean))
@@ -166,7 +166,7 @@ def chain_positions ( n, bond, soft ):
 
     print("{:40}{:15.6f}".format('Chain, randomly oriented bonds = ',bond) )
 
-    r = np.empty ( (n,3), dtype=np.float_ )
+    r = np.empty ( (n,3), dtype=np.float64 )
 
     r[0,:] = [0.0,0.0,0.0] # First atom at origin
     r[1,:] = bond*random_vector() # Second atom at random position (bond length away)
@@ -233,7 +233,7 @@ def chain_velocities ( nn, temperature, constraints, r ):
 
     # Compute total angular momentum and moment of inertia tensor
     ang_mom = np.sum ( np.cross ( r, v ), axis=0 )
-    inertia = np.zeros ( (3,3), dtype=np.float_ )
+    inertia = np.zeros ( (3,3), dtype=np.float64 )
     for i in range(n):
         inertia = inertia - np.outer ( r[i,:], r[i,:] )
         for xyz in range(3):

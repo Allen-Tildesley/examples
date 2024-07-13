@@ -34,7 +34,7 @@ def random_positions(n):
     from maths_module import random_vector
     import sys
     
-    r = np.zeros((n,3),dtype=np.float_)
+    r = np.zeros((n,3),dtype=np.float64)
     # atom 0 is always at the origin, now place the others randomly
     for i in range(1,r.shape[0]):
         for pos_try in range(npos):

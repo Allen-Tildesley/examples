@@ -242,7 +242,7 @@ r = r / box           # Convert positions to box units
 r = r - np.rint ( r ) # Periodic boundaries
 
 # Calculate all bond vectors
-d    = np.empty ( (n,na,3), dtype=np.float_ )
+d    = np.empty ( (n,na,3), dtype=np.float64 )
 norm = np.sqrt ( np.sum(e**2,axis=1) ) # Quaternion norms
 e    = e / norm[:,np.newaxis]          # Ensure normalized quaternions
 for i, ei in enumerate(e):

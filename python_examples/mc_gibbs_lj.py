@@ -190,10 +190,10 @@ run_begin ( calc_variables() )
 nh = 300
 rho_min, rho_max = 0.0, 0.9
 eng_min, eng_max = -3.3, 1.2
-rho_vals = np.zeros ( (nstep,2), dtype = np.float_ ) # Stores density values for both boxes
-eng_vals = np.zeros ( (nstep,2), dtype = np.float_ ) # Stores energy values for both boxes
-rho_hist = np.zeros ( nh, dtype = np.float_ ) # Density histogram
-eng_hist = np.zeros ( nh, dtype = np.float_ ) # Energy histogram
+rho_vals = np.zeros ( (nstep,2), dtype = np.float64 ) # Stores density values for both boxes
+eng_vals = np.zeros ( (nstep,2), dtype = np.float64 ) # Stores energy values for both boxes
+rho_hist = np.zeros ( nh, dtype = np.float64 ) # Density histogram
+eng_hist = np.zeros ( nh, dtype = np.float64 ) # Energy histogram
 
 for blk in range(1,nblock+1): # Loop over blocks
 

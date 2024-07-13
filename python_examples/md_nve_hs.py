@@ -148,7 +148,7 @@ print( "{:40}{:15.6f}".format('Temperature', temp_kinet)  )
 assert not overlap ( box, r ), 'Particle overlap in initial configuration'
 
 # Initial search for collision partners >i
-coltime = np.full ( n, 1.0e9, dtype=np.float_ )
+coltime = np.full ( n, 1.0e9, dtype=np.float64 )
 partner = np.full ( n, n-1, dtype=np.int_ )
 for i in range(n-1):
   coltime[i], partner[i] = update ( i, box, r[i:,:], v[i:,:] )

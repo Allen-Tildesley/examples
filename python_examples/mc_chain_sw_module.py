@@ -63,8 +63,8 @@ def regrow ( s, m_max, k_max, bond, q_range, r, q ):
     w_tol = 1.e-10 # Min weight tolerance
     n, d = r.shape
     assert d==3, 'Dimension error in regrow'
-    r_try = np.empty((k_max,3),dtype=np.float_)
-    w     = np.empty(k_max,dtype=np.float_)
+    r_try = np.empty((k_max,3),dtype=np.float64)
+    w     = np.empty(k_max,dtype=np.float64)
 
     r_old = np.copy(r) # Store copy of r
     q_old = q          # Store old q
@@ -93,7 +93,7 @@ def regrow ( s, m_max, k_max, bond, q_range, r, q ):
     r0        = np.copy(r[0,:])
     r[:n-m,:] = r[:n-m,:] - r0
 
-    w_new = np.float_(1.0)
+    w_new = np.float64(1.0)
     for i in range(n-m,n): # Loop to regrow last m atoms, computing new weight
         for k in range(k_max): # Loop over k_max tries
             r_try[k,:] = r[i-1,:] + bond * random_vector()  # Trial position in random direction from i-1
@@ -121,7 +121,7 @@ def regrow ( s, m_max, k_max, bond, q_range, r, q ):
     else: # Remove and reconstruct at start
         r[:,:] = r_old[::-1,:] # Copy and reverse all n atoms
 
-    w_old = np.float_(1.0)
+    w_old = np.float64(1.0)
     for i in range(n-m,n):
 
         # Old position and weight are stored as try 0
@@ -387,7 +387,7 @@ def accept ( s, q_old, q_new, w_old=1.0, w_new=1.0 ):
     # For Wang-Landau, s(q) is the entropy function, which is updated through the run
     # In either case, weights (real, but taking positive integer values here) may optionally appear
 
-    w_tol = np.float_(0.5)
+    w_tol = np.float64(0.5)
     
     # Check that we are within bounds for the entropy table
     assert q_new>=0 and q_new<s.size, 'q_new out of bounds'

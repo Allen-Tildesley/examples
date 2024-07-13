@@ -111,13 +111,13 @@ n, box, r = read_cnf_atoms(cnf_prefix+'000') # Just to get N
 print("{:40}{:15d}  ".format('Number of particles', n)   )
 print("{:40}{:15.6f}".format('Box (in sigma units)',box) )
 
-msd  = np.zeros(nt+1,dtype=np.float_)
-rvcf = np.zeros(nt+1,dtype=np.float_)
-vacf = np.zeros(nt+1,dtype=np.float_)
-norm = np.zeros(nt+1,dtype=np.float_)
+msd  = np.zeros(nt+1,dtype=np.float64)
+rvcf = np.zeros(nt+1,dtype=np.float64)
+vacf = np.zeros(nt+1,dtype=np.float64)
+norm = np.zeros(nt+1,dtype=np.float64)
 t0 = np.empty(n0,dtype=np.int_)
-v0 = np.empty((n0,n,3),dtype=np.float_)
-r0 = np.empty((n0,n,3),dtype=np.float_)
+v0 = np.empty((n0,n,3),dtype=np.float64)
+r0 = np.empty((n0,n,3),dtype=np.float64)
 mk   = -1 # Storage location of time origin
 full = False
 

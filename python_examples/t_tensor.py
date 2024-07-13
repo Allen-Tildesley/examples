@@ -93,7 +93,7 @@ def t4_tensor ( r, r5 ):
     from itertools import product
 
     # Define 3x3 unit matrix or Kronecker delta
-    u = np.zeros((3,3),dtype=np.float_)
+    u = np.zeros((3,3),dtype=np.float64)
     u[0,0]=u[1,1]=u[2,2]=1.0
 
     t4 = 105.0 * np.einsum('i,j,k,l->ijkl',r,r,r,r) # Starting point: outer product of four vectors
@@ -120,7 +120,7 @@ def t5_tensor ( r, r6 ):
     from itertools import product
 
     # Define 3x3 unit matrix or Kronecker delta
-    u = np.zeros((3,3),dtype=np.float_)
+    u = np.zeros((3,3),dtype=np.float64)
     u[0,0]=u[1,1]=u[2,2]=1.0
 
     t5 = 945.0 * np.einsum('i,j,k,l,m->ijklm',r,r,r,r,r) # Starting point: outer product of five vectors
@@ -147,7 +147,7 @@ def t5_tensor ( r, r6 ):
 def skew ( a ):
     """Returns contraction of supplied 3x3 matrix with Levi-Civita tensor."""
 
-    b = np.empty(3,dtype=np.float_)
+    b = np.empty(3,dtype=np.float64)
     b[0] = a[1,2] - a[2,1]
     b[1] = a[2,0] - a[0,2]
     b[2] = a[0,1] - a[1,0]

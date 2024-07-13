@@ -104,7 +104,7 @@ print( "{:40}{:15.6f}".format('Exact error estimate',            err       ) )
 
 # Data generation
 np.random.seed()
-a = np.empty(nstep,dtype=np.float_)
+a = np.empty(nstep,dtype=np.float64)
 a_avg = 0.0 # Zero average accumulator
 a_var = 0.0 # Zero mean-squared accumulator
 

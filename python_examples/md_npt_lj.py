@@ -307,17 +307,17 @@ v = v - vcm                    # Set COM velocity to zero
 
 # Initial values of thermal variables
 g    = 3*(n-1)
-q    = np.full(m,temperature * tau**2,dtype=np.float_) 
+q    = np.full(m,temperature * tau**2,dtype=np.float64) 
 q[0] = g * temperature * tau**2
 fmt_string = "{:15.6f}"*m
 fmt_string = "{:40}"+fmt_string
 print(fmt_string.format('Thermal inertias Q',*q))
-eta   = np.zeros(m,dtype=np.float_)
+eta   = np.zeros(m,dtype=np.float64)
 p_eta = np.random.randn(m)*np.sqrt(temperature)
 p_eta = p_eta * np.sqrt(q)
-q_baro = np.full(m,temperature * tau_baro**2,dtype=np.float_)
+q_baro = np.full(m,temperature * tau_baro**2,dtype=np.float64)
 print(fmt_string.format("Barostat thermal inertias Q'",*q_baro))
-eta_baro = np.zeros(m,dtype=np.float_)
+eta_baro = np.zeros(m,dtype=np.float64)
 p_eta_baro = np.random.randn(m)*np.sqrt(temperature)
 p_eta_baro = p_eta_baro * np.sqrt(q_baro)
 w_eps = g * temperature * tau_baro**2

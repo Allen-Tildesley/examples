@@ -95,10 +95,10 @@ print( "{:40}{:15.6f}".format('Ideal diffusion coefft',    temperature/gamma) )
 
 np.random.seed()
 
-r = np.random.rand(n,3).astype(np.float_)  # Random positions
+r = np.random.rand(n,3).astype(np.float64)  # Random positions
 r = r - 0.5                                # Now in range (-1/2,1/2)
 r = r * box                                # Now in range (-box/2,box/2)
-v = np.random.randn(n,3).astype(np.float_) # Random velocities
+v = np.random.randn(n,3).astype(np.float64) # Random velocities
 v = v * np.sqrt(temperature)               # At desired temperature
 
 cnf_prefix = 'cnf.'

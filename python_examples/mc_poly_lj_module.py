@@ -38,7 +38,7 @@ alpha2 = alpha / 2.0
 na = 3
 db = np.array([[-np.sin(alpha2), 0.0,   -np.cos(alpha2)/3.0],
                [0.0,            0.0, 2.0*np.cos(alpha2)/3.0],
-               [np.sin(alpha2), 0.0,    -np.cos(alpha2)/3.0]], dtype=np.float_)
+               [np.sin(alpha2), 0.0,    -np.cos(alpha2)/3.0]], dtype=np.float64)
 diameter = 2.0 * np.sqrt ( np.max ( np.sum(db**2,axis=1) ) ) # Molecular diameter
 
 # Cutoff distance and force-shift parameters (all private) chosen as per the reference:

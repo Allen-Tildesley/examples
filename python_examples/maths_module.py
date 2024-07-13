@@ -42,7 +42,7 @@ def random_vector():
 
     phi = zeta[1] * 2.0*np.pi # Random angle uniformly sampled in range (0,2*pi)
 
-    return np.array ( ( s*np.cos(phi), s*np.sin(phi), c ), dtype=np.float_ ) # Random unit vector
+    return np.array ( ( s*np.cos(phi), s*np.sin(phi), c ), dtype=np.float64 ) # Random unit vector
 
 def random_perpendicular_vector ( old ):
     """Returns a uniformly sampled unit vector perpendicular to the old vector.""" 
@@ -88,7 +88,7 @@ def random_quaternion():
             break
 
     f = np.sqrt ( ( 1.0 - norm1 ) / norm2 )
-    return np.array ( ( zeta[0], zeta[1], beta[0]*f, beta[1]*f ), dtype=np.float_ ) # Random quaternion
+    return np.array ( ( zeta[0], zeta[1], beta[0]*f, beta[1]*f ), dtype=np.float64 ) # Random quaternion
 
 def random_rotate_quaternion ( angle_max, old ):
     """Returns a unit quaternion rotated by a maximum angle (in radians) relative to the old quaternion."""
@@ -185,7 +185,7 @@ def rotate_quaternion ( angle, axis, old ):
 
     # Standard formula for rotation quaternion, using half angles
     rot = np.sin(0.5*angle) * axis
-    rot = np.array([np.cos(0.5*angle),rot[0],rot[1],rot[2]],dtype=np.float_)
+    rot = np.array([np.cos(0.5*angle),rot[0],rot[1],rot[2]],dtype=np.float64)
 
     e = quatmul ( rot, old ) # Apply rotation to old quaternion
     return e
@@ -201,7 +201,7 @@ def quatmul ( a, b ):
     return np.array ( [ a[0]*b[0] - a[1]*b[1] - a[2]*b[2] - a[3]*b[3],
                         a[1]*b[0] + a[0]*b[1] - a[3]*b[2] + a[2]*b[3],
                         a[2]*b[0] + a[3]*b[1] + a[0]*b[2] - a[1]*b[3],
-                        a[3]*b[0] - a[2]*b[1] + a[1]*b[2] + a[0]*b[3] ], dtype=np.float_ )
+                        a[3]*b[0] - a[2]*b[1] + a[1]*b[2] + a[0]*b[3] ], dtype=np.float64 )
 
 def nematic_order ( e ):
     """Returns a nematic orientational order parameter."""
@@ -242,7 +242,7 @@ def q_to_a ( q ):
     assert np.isclose(np.sum(q**2),1.0), 'quaternion normalization error {} {} {} {}'.format(*q)
 
     # Write out row by row, for clarity
-    a = np.empty( (3,3), dtype=np.float_ )
+    a = np.empty( (3,3), dtype=np.float64 )
     a[0,:] = [ q[0]**2+q[1]**2-q[2]**2-q[3]**2,   2*(q[1]*q[2]+q[0]*q[3]),       2*(q[1]*q[3]-q[0]*q[2])     ]
     a[1,:] = [     2*(q[1]*q[2]-q[0]*q[3]),   q[0]**2-q[1]**2+q[2]**2-q[3]**2,   2*(q[2]*q[3]+q[0]*q[1])     ]
     a[2,:] = [     2*(q[1]*q[3]+q[0]*q[2]),       2*(q[2]*q[3]-q[0]*q[1]),   q[0]**2-q[1]**2-q[2]**2+q[3]**2 ]
