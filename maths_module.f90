@@ -802,7 +802,7 @@ CONTAINS
 
     ! Note that this is not the same as the order parameter characterizing a crystal
 
-    INTEGER              :: i, n
+    INTEGER              :: n
     REAL, DIMENSION(3,3) :: q         ! order tensor
     REAL                 :: h, g, psi ! used in eigenvalue calculation
 
@@ -813,9 +813,12 @@ CONTAINS
     n = SIZE(e,dim=2)
 
     ! Order tensor: outer product of each orientation vector, summed over n molecules
+    ! Then normalized and made traceless
     q = SUM ( SPREAD ( e, dim=2, ncopies=3) * SPREAD ( e, dim=1, ncopies=3 ), dim = 3 )
-    q = 1.5 * q / REAL(n)                ! Normalize
-    FORALL (i=1:3) q(i,i) = q(i,i) - 0.5 ! Make traceless
+    q = 1.5 * q / REAL(n)
+    q(1,1) = q(1,1) - 0.5
+    q(2,2) = q(2,2) - 0.5
+    q(3,3) = q(3,3) - 0.5
 
     ! Trigonometric solution of characteristic cubic equation, assuming real roots
 

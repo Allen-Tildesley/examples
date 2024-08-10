@@ -302,12 +302,12 @@ CONTAINS
     ! in which case both these quantities are conserved
     ! NB there is at present no check for a singular inertia tensor in the angular momentum fix!
     ! We assume centre of mass is already at the origin
-    ! We assume unit molecular mass and employ Lennard-Jones units
+    ! We assume unit atom mass and employ Lennard-Jones units
 
-    REAL                 :: temp
+    REAL                 :: temp, r_sq
     REAL, DIMENSION(3)   :: v_cm, r_cm, ang_mom, ang_vel
     REAL, DIMENSION(3,3) :: inertia
-    INTEGER              :: i, xyz
+    INTEGER              :: i
     REAL, PARAMETER      :: tol = 1.e-6
 
     WRITE ( unit=output_unit, fmt='(a,t40,f15.6)' ) 'Chain velocities at temperature', temperature
@@ -331,7 +331,10 @@ CONTAINS
     DO i = 1, n
        ang_mom = ang_mom + cross_product ( r(:,i), v(:,i) )
        inertia = inertia - outer_product ( r(:,i), r(:,i) )
-       FORALL ( xyz=1:3 ) inertia(xyz,xyz) = inertia(xyz,xyz) + DOT_PRODUCT ( r(:,i), r(:,i) )
+       r_sq = DOT_PRODUCT ( r(:,i), r(:,i) )
+       inertia(1,1) = inertia(1,1) + r_sq
+       inertia(2,2) = inertia(2,2) + r_sq
+       inertia(3,3) = inertia(3,3) + r_sq
     END DO
 
     ! Solve linear system to get angular velocity

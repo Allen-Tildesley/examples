@@ -55,7 +55,7 @@ PROGRAM t_tensor
   REAL, DIMENSION(3,3,3,3,3) :: tt5
 
   REAL    :: r12_mag, c1, c2, c12, v12t, v12e
-  INTEGER :: i, ioerr
+  INTEGER :: ioerr
   REAL    :: d_min, d_max, mu1_mag, mu2_mag, quad1_mag, quad2_mag
 
   NAMELIST /nml/ d_min, d_max, mu1_mag, mu2_mag, quad1_mag, quad2_mag
@@ -116,11 +116,15 @@ PROGRAM t_tensor
   mu2 = mu2_mag * e2
 
   ! Quadrupole tensors in space-fixed frame (traceless)
-  quad1 = 1.5 * outer_product ( e1, e1 )        
-  FORALL (i=1:3) quad1(i,i) = quad1(i,i) - 0.5
+  quad1 = 1.5 * outer_product ( e1, e1 )
+  quad1(1,1) = quad1(1,1) - 0.5
+  quad1(2,2) = quad1(2,2) - 0.5
+  quad1(3,3) = quad1(3,3) - 0.5
   quad1 = quad1_mag * quad1
   quad2 = 1.5 * outer_product ( e2, e2 )
-  FORALL (i=1:3) quad2(i,i) = quad2(i,i) - 0.5
+  quad2(1,1) = quad2(1,1) - 0.5
+  quad2(2,2) = quad2(2,2) - 0.5
+  quad2(3,3) = quad2(3,3) - 0.5
   quad2 = quad2_mag * quad2
 
   ! The T tensors of each rank: T2, T3, T4, T5
@@ -259,11 +263,12 @@ CONTAINS
     REAL, DIMENSION(3),   INTENT(in)  :: r  ! Unit vector from 2 to 1
     REAL,                 INTENT(in)  :: r3 ! Third power of the modulus of r12
 
-    INTEGER :: i
-
     t2 = 3.0 * outer_product ( r, r ) ! Starting point
 
-    FORALL (i=1:3) t2(i,i) = t2(i,i) - 1.0 ! Make traceless
+    ! Make traceless
+    t2(1,1) = t2(1,1) - 1.0
+    t2(2,2) = t2(2,2) - 1.0
+    t2(3,3) = t2(3,3) - 1.0
 
     t2 = t2 / r3 ! Scale by third power of distance
 

@@ -155,7 +155,9 @@ CONTAINS
        IF ( change > 0.0 ) THEN ! Better fit
 
           c = c_new
-          FORALL ( t = 1:nterms ) sigma(t) = SQRT ( array(t,t) / alpha(t,t) )
+          DO t = 1, nterms
+             sigma(t) = SQRT ( array(t,t) / alpha(t,t) )
+          END DO
 
           IF ( verbose ) THEN
              WRITE ( unit=output_unit, fmt='(i5)', advance='no' ) iter
