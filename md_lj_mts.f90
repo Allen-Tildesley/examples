@@ -116,17 +116,15 @@ PROGRAM md_lj_mts
      WRITE ( unit=error_unit, fmt='(a,*(i15))' ) 'n_mts values must be positive', n_mts
      STOP 'Error in md_lj_mts'
   END IF
-  DO k = 1, k_max
+  dt(1) = dt1 ! n_mts(1) equals 1
+  vol_shell(1) = (4.0/3.0)*pi * r_cut(1)**3
+  DO k = 2, k_max
      dt(k) = PRODUCT(n_mts(1:k))*dt1 ! Define time steps cumulatively
-     IF ( k == 1 ) THEN
-        vol_shell(k) = (4.0/3.0)*pi * r_cut(k)**3
-     ELSE
-        IF ( r_cut(k)-r_cut(k-1) < lambda ) THEN
-           WRITE ( unit=error_unit, fmt='(a,3f15.6)' ) 'r_cut interval error', r_cut(k-1), r_cut(k), lambda
-           STOP 'Error in md_lj_mts'
-        END IF
-        vol_shell(k) = (4.0/3.0)*pi * ( r_cut(k)**3 - r_cut(k-1)**3 )
+     IF ( r_cut(k)-r_cut(k-1) < lambda ) THEN
+        WRITE ( unit=error_unit, fmt='(a,3f15.6)' ) 'r_cut interval error', r_cut(k-1), r_cut(k), lambda
+        STOP 'Error in md_lj_mts'
      END IF
+     vol_shell(k) = (4.0/3.0)*pi * ( r_cut(k)**3 - r_cut(k-1)**3 )
   END DO
   WRITE ( unit=output_unit, fmt='(a,t40,*(f15.6))' ) 'Time step for each shell', dt(:)
   WRITE ( unit=output_unit, fmt='(a,t40,*(f15.6))' ) 'Volume of each shell',     vol_shell(:)

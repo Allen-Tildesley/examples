@@ -26,7 +26,7 @@ When using or citing the software, you should not imply endorsement by the autho
 
 ## Language
 The programs contain some explanatory comments,
-and are written, in the main, in Fortran 2003/2008.
+and are written, in the main, in Fortran 2003/2008/2018.
 This has some advantages: a built-in syntax for array operations,
 a straightforward approach to modular programming, and a basic simplicity.
 It is also a compiled language, which means that it is quite efficient,
@@ -59,7 +59,7 @@ A few examples consist of individual routines or modules,
 rather than working programs,
 so there is no need to build them.
 
-The build process for the Fortran examples has been tested using SCons v4.6.0
+The build process for the Fortran examples has been tested using SCons v4.8.0
 (and some earlier versions back to v2.5.1 with minor changes to the `SConstruct` file).
 
 If you don't like using SCons, or can't get it to work,
@@ -79,7 +79,7 @@ it is advisable to __compile each example in its own build directory__
 or to delete all intermediate files before each individual compilation.
 
 We have used gfortran v13.2.0 (and earlier versions back to v6.3) for testing,
-but have attempted to stick to code which conforms to the Fortran 2008 standard.
+but have attempted to stick to code which conforms to the Fortran 2018 standard.
 Note that, by default, we do not select any optimization options in compilation.
 If you are using a different compiler,
 then the compiler and linker options in the `SConstruct` file will most likely need changing.

@@ -26,7 +26,7 @@ import os, sys
 # we cannot offer more specific advice on the build process.
 
 # NB by default we do not invoke any optimization
-MY_FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2008 -Wall'
+MY_FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2018 -Wall'
 LAPACK_LIBPATH='/opt/local/lib/lapack'
 LAPACK_LIBS='lapack'
 FFTW_LIBPATH='/opt/local/lib'

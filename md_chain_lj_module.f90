@@ -334,7 +334,7 @@ CONTAINS
     LOGICAL            :: done
     REAL               :: dot, g
     INTEGER            :: i, j, iter
-    REAL,    PARAMETER :: tol = 1.0e-9,  tol2 = 2.0 * tol, dot_tol = 1.0e-9
+    REAL,    PARAMETER :: tol = 1.0e-9
     INTEGER, PARAMETER :: iter_max = 500
 
     iter     = 0
