@@ -77,7 +77,7 @@ PROGRAM mesh
 
   ! For illustration we choose random charge positions with coordinates in range (0,1)
   ! In a real application, we would convert positions into this range
-  CALL RANDOM_SEED() ! same random number sequence every time
+  CALL RANDOM_INIT ( .FALSE., .TRUE. )  ! Initialize random number generator
   CALL RANDOM_NUMBER ( r )
 
   ! For illustration we choose +1 and -1 charges, alternately

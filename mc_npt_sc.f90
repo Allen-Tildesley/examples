@@ -70,7 +70,7 @@ PROGRAM mc_npt_sc
   WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NPT, hard linear molecules'
   CALL introduction
 
-  CALL RANDOM_SEED () ! Initialize random number generator
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! Set sensible default run parameters for testing
   nblock   = 10

@@ -68,7 +68,7 @@ PROGRAM initialize
   WRITE ( unit=output_unit, fmt='(a)' ) 'Options for molecules are "atom", "linear", "nonlinear", "chain"'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass m=1 throughout'
 
-  CALL RANDOM_SEED()
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! Set default parameters
   n           = 0        ! nc takes precedence unless n is explicitly specified

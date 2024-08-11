@@ -97,7 +97,7 @@ PROGRAM diffusion_test
   ALLOCATE ( r(3,n), v(3,n), zeta(3,n) )
 
   ! Set random positions
-  CALL RANDOM_SEED ()
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
   CALL RANDOM_NUMBER ( r )
   r = r - 0.5 ! Now in range (-1/2,1/2)
   r = r * box ! Now in range (-box/2,box/2)

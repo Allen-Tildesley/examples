@@ -75,7 +75,7 @@ PROGRAM mc_nvt_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'Simulation uses cut (but not shifted) potential'
   CALL introduction
 
-  CALL RANDOM_SEED () ! Initialize random number generator
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! Set sensible default run parameters for testing
   nblock      = 10

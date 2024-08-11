@@ -114,7 +114,7 @@ PROGRAM error_calc
 
   ! Data generation
 
-  CALL RANDOM_SEED()
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! For comparison, we do n_repeat independent runs and estimate the error in run averages directly from these
   ! This is to give an empirical idea of the distribution from which the run average is sampled

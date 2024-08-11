@@ -64,8 +64,7 @@ PROGRAM t_tensor
   WRITE ( unit=output_unit, fmt='(a)' ) 'Calculation of electrostatic interactions between linear molecules' 
   WRITE ( unit=output_unit, fmt='(a)' ) 'using T-tensors and Euler angles'
 
-  ! Initialize random number generator                          
-  CALL RANDOM_SEED ()
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! Default parameters
   d_min     = 0.5 ! Minimum separation

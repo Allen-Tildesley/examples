@@ -68,7 +68,7 @@ PROGRAM qmc_pi_sho
   WRITE ( unit=output_unit, fmt='(a)' ) 'Path Integral Monte Carlo simulation of a quantum oscillator'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Results in atomic units'
 
-  CALL RANDOM_SEED() ! Initialize random number generator
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! Set sensible default run parameters for testing
   p           = 8

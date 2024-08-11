@@ -84,7 +84,7 @@ PROGRAM corfun
   WRITE( unit=output_unit, fmt='(a)' ) 'Illustrates methods for calculating time correlation functions'
   WRITE( unit=output_unit, fmt='(a)' ) 'using synthetic data from a generalized Langevin equation'
 
-  CALL RANDOM_SEED () ! Initialize random number generator
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! Example default values
   ! Agreement (to numerical precision) of direct and FFT methods is expected if origin_interval=1

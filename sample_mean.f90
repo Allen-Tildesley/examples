@@ -35,7 +35,7 @@ PROGRAM sample_mean
   REAL,               PARAMETER :: a_0 = PRODUCT(r_0)
   INTEGER                       :: tau, tau_max
 
-  CALL RANDOM_SEED()
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
   tau_max = 1000000
 
   f = 0.0

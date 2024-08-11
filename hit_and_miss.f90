@@ -35,7 +35,7 @@ PROGRAM hit_and_miss
   REAL,               PARAMETER :: v_0 = PRODUCT(r_0)
   INTEGER                       :: tau, tau_shot, tau_hit
 
-  CALL RANDOM_SEED()
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
   tau_hit  = 0
   tau_shot = 1000000
 

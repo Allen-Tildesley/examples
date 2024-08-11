@@ -123,7 +123,7 @@ PROGRAM mc_nvt_lj_re
   WRITE( unit=output_unit, fmt='(a,t40,i15)') 'This is process rank',   m
   WRITE( unit=output_unit, fmt='(a,t40,i15)') 'Number of processes is', nproc
 
-  CALL RANDOM_SEED () ! Initialize random number generator (hopefully differently on each process)
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator (hopefully differently on each process)
   CALL RANDOM_NUMBER ( zeta )
   WRITE( unit=output_unit, fmt='(a,t40,f15.6)') 'Random # (different for each process?)', zeta
 

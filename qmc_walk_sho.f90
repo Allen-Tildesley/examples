@@ -111,7 +111,7 @@ PROGRAM qmc_walk_sho
   ALLOCATE ( x(n_max), v(n_max), replica(n_max), alive(n_max) )
   ALLOCATE ( psi(n_bin), bin(n_bin) )
 
-  CALL RANDOM_SEED()
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! Set up an initial delta distribution of walkers at origin
   n = n_target

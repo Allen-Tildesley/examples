@@ -89,7 +89,7 @@ PROGRAM mc_chain_nvt_sw
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, chain molecule, square wells'
   CALL introduction
 
-  CALL RANDOM_SEED () ! Initialize random number generator
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! Set sensible default run parameters for testing
   nblock         = 10     ! Number of blocks

@@ -71,7 +71,7 @@ PROGRAM mc_chain_nvt_cbmc_lj
   WRITE ( unit=output_unit, fmt='(a)' ) 'Simulation uses full nonbonded potential (no cutoff)'
   CALL introduction
 
-  CALL RANDOM_SEED () ! Initialize random number generator
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! Set sensible default run parameters for testing
   nblock      = 10     ! Number of blocks

@@ -46,8 +46,7 @@ PROGRAM test_pot_atom
 
   NAMELIST /nml/ delta, d_min, d_max, pot_max, ntry, npos
 
-  ! Initialize random number generator (hopefully different every time!)
-  CALL RANDOM_SEED ()
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! Default values: any of the following could be empirically adjusted
   delta   = 1.e-5 ! Small displacement

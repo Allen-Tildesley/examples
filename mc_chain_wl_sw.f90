@@ -103,7 +103,7 @@ PROGRAM mc_chain_wl_sw
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, Wang-Landau method, chain molecule, square wells'
   CALL introduction
 
-  CALL RANDOM_SEED () ! Initialize random number generator
+  CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 
   ! Set sensible default run parameters for testing
   nstage         = 20    ! 2**(-20) = approx 10**(-6) for smallest modification factor

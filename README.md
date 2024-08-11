@@ -96,11 +96,12 @@ They have been tested with Python 3.12.2 and NumPy 1.26.4
 
 The Fortran examples use, for simplicity,
 the built-in intrinsic subroutines
-`random_seed` and `random_number` respectively to
-initialize and generate sequences of random numbers.
-From gfortran v7 onwards,
-calling `random_seed()` generates different, non-reproducible, sequences each time,
-and the examples assume this behaviour.
+`random_init` and `random_number` respectively to
+initialize and generate different, non-reproducible, sequences of random numbers every time.
+In Fortran 2018 `random_init`  was introduced into the standard for this purpose.
+Previously, we would call `random_seed()` with no argument,
+which served the same function in recent versions of gfortran (v7 and above),
+but was not part of the standard (and hence, potentially, compiler dependent).
 Prior to gfortran v7,
 it was necessary to do something more complicated to generate different sequences each time,
 as exemplified by the routine `init_random_seed`
