@@ -30,8 +30,13 @@ import json
 import sys
 import numpy as np
 import math
+from platform import python_version
 
 print('fft3dwrap')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Illustrates calling of functions from FFTW library')
 
 # Read parameters in JSON format
 try:

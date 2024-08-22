@@ -58,8 +58,13 @@ import json
 import sys
 import importlib
 import numpy as np
+from platform import python_version
 
 print('test_pot_atom')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Tests potential and forces for atoms')
 
 # Read parameters in JSON format
 try:

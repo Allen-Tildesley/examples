@@ -34,9 +34,16 @@
 import json
 import sys
 import numpy as np
+from platform import python_version
 from mesh_module import mesh_function
 
 print('mesh')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('3-D mesh assignment of charges')
+print('Unit box length, coordinates in range (0,1)')
+
 # Read parameters in JSON format
 try:
     nml = json.load(sys.stdin)

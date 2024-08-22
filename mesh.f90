@@ -30,7 +30,8 @@ PROGRAM mesh
   ! The charges are positioned in a box of unit length.
   ! The charge mesh is indexed from 0 to sc-1 in each coordinate direction
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
 
   USE mesh_module, ONLY : mesh_function
 
@@ -47,7 +48,10 @@ PROGRAM mesh
 
   NAMELIST /nml/ n, sc
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'mesh'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'mesh'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+
   WRITE ( unit=output_unit, fmt='(a)' ) '3-D mesh assignment of charges'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Unit box length, coordinates in range (0,1)'
 

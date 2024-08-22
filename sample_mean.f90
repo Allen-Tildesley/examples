@@ -25,7 +25,10 @@ PROGRAM sample_mean
   ! the software, you should not imply endorsement by the authors or publishers.                   !
   !------------------------------------------------------------------------------------------------!
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit
+  ! No parameters need be supplied by the user. The exact value of the integral is 5/3.
+  ! For details, see Chapter 4 of the text.
+
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, COMPILER_VERSION, COMPILER_OPTIONS
 
   IMPLICIT NONE
 
@@ -34,6 +37,12 @@ PROGRAM sample_mean
   REAL, DIMENSION(2), PARAMETER :: r_0 = [1.0, 2.0]
   REAL,               PARAMETER :: a_0 = PRODUCT(r_0)
   INTEGER                       :: tau, tau_max
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'sample_mean'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Estimates integral by sample-mean Monte Carlo'
 
   CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
   tau_max = 1000000
@@ -48,5 +57,6 @@ PROGRAM sample_mean
   END DO
   v = a_0 * f / REAL ( tau_max ) 
   WRITE ( unit=output_unit, fmt='(a,f10.5)' ) 'Estimate = ', v
+  WRITE ( unit=output_unit, fmt='(a,f10.5)' ) 'Exact    = ', 5.0/3.0
 
 END PROGRAM sample_mean

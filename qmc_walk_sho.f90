@@ -47,9 +47,11 @@ PROGRAM qmc_walk_sho
   ! Many of the parameters, and the updating scheme for et, are taken from the following paper:
   ! I Kostin, B Faber and K Schulten, Amer J Phys, 64, 633 (1996)
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               averages_module, ONLY : time_stamp
-  USE               maths_module,    ONLY : random_normal
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+  
+  USE averages_module, ONLY : time_stamp
+  USE maths_module,    ONLY : random_normal
 
   IMPLICIT NONE
 
@@ -70,9 +72,12 @@ PROGRAM qmc_walk_sho
 
   NAMELIST /nml/ production_steps, equilibration_steps, output_interval, x_max, et, ds, n_bin, n_max, n_target
 
-  WRITE ( unit=output_unit, fmt='(a)') 'qmc_walk_sho'
-  WRITE ( unit=output_unit, fmt='(a)') 'Diffusion Monte Carlo simulation of a quantum oscillator'
-  WRITE ( unit=output_unit, fmt='(a)') 'Results in atomic units'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'qmc_walk_sho'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Diffusion Monte Carlo simulation of a quantum oscillator'
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Results in atomic units'
   CALL time_stamp
 
   ! Set up default parameters for the simulation

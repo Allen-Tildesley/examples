@@ -119,6 +119,7 @@ import json
 import sys
 import numpy as np
 import math
+from platform import python_version
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add
 from dpd_module       import introduction, conclusion, force, lowe, shardlow, p_approx, PotentialType
@@ -129,6 +130,9 @@ out_tag    = 'out'
 sav_tag    = 'sav'
 
 print('dpd')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
 print('Dissipative particle dynamics, constant-NVT ensemble')
 print('Particle mass=1 and cutoff=1 throughout')
 

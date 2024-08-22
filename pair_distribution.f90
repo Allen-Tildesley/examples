@@ -44,8 +44,10 @@ PROGRAM pair_distribution
 
   ! Results are written to a file 'pair_distribution.out' with diagnostics to standard output
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_atoms
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+  
+  USE config_io_module, ONLY : read_cnf_atoms
 
   IMPLICIT NONE
 
@@ -68,6 +70,12 @@ PROGRAM pair_distribution
   LOGICAL                     :: exists
 
   NAMELIST /nml/ dr
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'pair_distribution'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Computes pair distribution function from set of configurations'
 
   ! Example default values
   dr = 0.02

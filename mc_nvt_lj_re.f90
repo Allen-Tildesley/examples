@@ -59,13 +59,16 @@ PROGRAM mc_nvt_lj_re
   ! Despite the program name, there is nothing here specific to Lennard-Jones
   ! The model is defined in mc_module
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
-  USE               maths_module,     ONLY : metropolis, random_translate_vector
-  USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                                     potential_1, potential, move, n, r, potential_type
-  USE               mpi
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+  
+  USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
+  USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
+  USE maths_module,     ONLY : metropolis, random_translate_vector
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
+       &                       potential_1, potential, move, n, r, potential_type
+
+  USE mpi
 
   IMPLICIT NONE
 
@@ -116,7 +119,10 @@ PROGRAM mc_nvt_lj_re
   WRITE(m_tag,fmt='(i2.2)') m ! Convert rank into character form
   cnf_prefix(4:5) = m_tag     ! Insert process rank into configuration filename
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'mc_nvt_lj_re'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'mc_nvt_lj_re'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT, replica exchange'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Simulation uses cut (but not shifted) potential'
   CALL introduction

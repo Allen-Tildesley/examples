@@ -30,11 +30,18 @@ import json
 import sys
 import numpy as np
 from numpy.polynomial.polynomial import polyval
+from platform import python_version
 
 # This program uses the function derived by H Hansen-Goos, J Chem Phys, 16, 164506 (2016)
 # which is claimed to be an excellent fit to simulation data over the whole fluid density range
 # That paper also gives references to previous approximate equations of state (such as the
 # venerable Carnahan-Starling equation).
+
+print('eos_hs')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Approximate hard sphere pressure at given density')
 
 # The coefficients appear in Table I of Hansen-Goos (2016)
 

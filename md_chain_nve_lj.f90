@@ -40,13 +40,14 @@ PROGRAM md_chain_nve_lj
   ! Despite the program name, there is nothing here specific to Lennard-Jones
   ! The model is defined in md_module
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
-  USE               maths_module,     ONLY : lowercase
-  USE               md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                                     zero_cm, force, worst_bond, r, r_old, v, f, n, potential_type, &
-       &                                     milcshake_a, milcshake_b, rattle_a, rattle_b
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+  
+  USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
+  USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
+  USE maths_module,     ONLY : lowercase
+  USE md_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, zero_cm, force, worst_bond, &
+       &                       r, r_old, v, f, n, potential_type, milcshake_a, milcshake_b, rattle_a, rattle_b
 
   IMPLICIT NONE
 
@@ -71,7 +72,10 @@ PROGRAM md_chain_nve_lj
 
   NAMELIST /nml/ nblock, nstep, dt, constraints
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'md_chain'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'md_chain'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
   WRITE ( unit=output_unit, fmt='(a)' ) 'Molecular dynamics, constant-NVE ensemble, chain molecule'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass=1 throughout'
   WRITE ( unit=output_unit, fmt='(a)' ) 'No periodic boundaries'

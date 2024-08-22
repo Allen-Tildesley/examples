@@ -52,8 +52,14 @@ import json
 import sys
 import importlib
 import numpy as np
+from platform import python_version
 
 print('qmc_walk_sho')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Diffusion Monte Carlo simulation of a quantum oscillator')
+print('Results in atomic units')
 
 # Read parameters in JSON format
 try:

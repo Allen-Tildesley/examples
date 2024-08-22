@@ -135,6 +135,7 @@ def rad_gyr ( r ):
 import json
 import sys
 import numpy as np
+from platform import python_version
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add
 from maths_module     import random_translate_vector, metropolis
@@ -146,6 +147,9 @@ out_tag    = 'out'
 sav_tag    = 'sav'
 
 print('qmc_pi_lj')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
 print('Path-integral Monte Carlo, constant-NVT ensemble')
 print('Simulation uses cut (but not shifted) potential')
 

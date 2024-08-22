@@ -42,7 +42,8 @@ PROGRAM t_tensor
   ! NB in the text, eqn (1.15), the signs of the odd-rank terms in the energy are wrong.
   ! See https://github.com/Allen-Tildesley/corrections. The correct formulae are used here.
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
 
   USE maths_module, ONLY : random_vector, outer_product, cross_product
 
@@ -60,7 +61,10 @@ PROGRAM t_tensor
 
   NAMELIST /nml/ d_min, d_max, mu1_mag, mu2_mag, quad1_mag, quad2_mag
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'T-tensor'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 't_tensor'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+
   WRITE ( unit=output_unit, fmt='(a)' ) 'Calculation of electrostatic interactions between linear molecules' 
   WRITE ( unit=output_unit, fmt='(a)' ) 'using T-tensors and Euler angles'
 

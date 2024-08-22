@@ -25,9 +25,11 @@ PROGRAM test_pot_linear
   ! the software, you should not imply endorsement by the authors or publishers.                   !
   !------------------------------------------------------------------------------------------------!
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               test_pot_module, ONLY : n, force
-  USE               maths_module,    ONLY : rotate_vector, cross_product
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+  
+  USE test_pot_module, ONLY : n, force
+  USE maths_module,    ONLY : rotate_vector, cross_product
 
   IMPLICIT NONE
 
@@ -48,6 +50,12 @@ PROGRAM test_pot_linear
   CHARACTER(len=2), DIMENSION(3), PARAMETER :: cf = ['Fx','Fy','Fz'], ct = ['Tx','Ty','Tz']
 
   NAMELIST /nml/ delta, d_min, d_max, pot_max, ntry, npos
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'test_pot_linear'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Tests potential, forces, and torques, for linear molecules' 
 
   CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 

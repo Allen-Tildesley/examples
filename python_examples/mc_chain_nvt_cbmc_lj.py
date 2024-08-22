@@ -91,6 +91,7 @@ import json
 import sys
 import numpy as np
 import math
+from platform import python_version
 from config_io_module   import read_cnf_atoms, write_cnf_atoms
 from averages_module    import run_begin, run_end, blk_begin, blk_end, blk_add
 from mc_chain_lj_module import introduction, conclusion, regrow
@@ -101,6 +102,9 @@ out_tag    = 'out'
 sav_tag    = 'sav'
 
 print('mc_chain_nvt_cbmc_lj')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
 print('Monte Carlo, constant-NVT ensemble, CBMC, chain molecule')
 print('Simulation uses full nonbonded potential (no cutoff)')
 

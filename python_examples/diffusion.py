@@ -46,9 +46,14 @@ import json
 import sys
 import os
 import numpy as np
+from platform import python_version
 from config_io_module import read_cnf_atoms
 
 print('diffusion')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Calculates diffusion correlations from sequence of configurations')
 
 # Reads a trajectory from a sequence of configuration files
 # Calculates velocity autocorrelation function, mean square displacement,

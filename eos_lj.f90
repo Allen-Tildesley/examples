@@ -35,9 +35,11 @@ PROGRAM eos_lj
   ! Formulae for P, E/N etc in terms of the scaled free energy derivatives a_res(0,1) etc
   ! may be found in the above papers
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               lrc_module,      ONLY : potential_lrc, pressure_lrc, pressure_delta
-  USE               eos_lj_module,   ONLY : a_res_full, a_res_cutshift
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+
+  USE lrc_module,    ONLY : potential_lrc, pressure_lrc, pressure_delta
+  USE eos_lj_module, ONLY : a_res_full, a_res_cutshift
 
   IMPLICIT NONE
 
@@ -49,6 +51,12 @@ PROGRAM eos_lj
   REAL, PARAMETER :: r_cut = 2.5 ! The cut-and-shifted subroutine applies only to this value
 
   NAMELIST /nml/ temperature, density
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'eos_lj'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Approximate Lennard-Jones EOS data at given density, temperature'
 
   ! Set sensible default values
   temperature = 1.0

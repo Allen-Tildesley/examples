@@ -29,6 +29,7 @@
 import json
 import sys
 import numpy as np
+from platform import python_version
 from eos_lj_module import a_res_full, a_res_cutshift
 from lrc_module    import potential_lrc, pressure_lrc, pressure_delta
 
@@ -41,6 +42,12 @@ from lrc_module    import potential_lrc, pressure_lrc, pressure_delta
 
 # Formulae for P, E/N etc in terms of the scaled free energy derivatives a_res(0,1) etc
 # may be found in the above papers
+
+print('eos_lj')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Approximate Lennard-Jones EOS data at given density, temperature')
 
 r_cut = 2.5
 

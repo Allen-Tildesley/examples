@@ -416,6 +416,7 @@ import json
 import sys
 import numpy as np
 import math
+from platform import python_version
 from config_io_module import write_cnf_atoms, write_cnf_mols
 
 filename = 'cnf.inp'
@@ -423,6 +424,9 @@ atom, linear, nonlinear, chain = 0, 1, 2, 3 # User options
 tol = 1.e-6
 
 print('initialize')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
 print('Sets up initial configuration file for various simulations')
 print('Options for molecules are "atom", "linear", "nonlinear", "chain"')
 print('Particle mass m=1 throughout')

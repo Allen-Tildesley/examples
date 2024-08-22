@@ -49,9 +49,11 @@ PROGRAM grint
 
   ! Values of basic parameters are read from standard input using a namelist nml
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_atoms
-  USE               grint_module,     ONLY : fit
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+  
+  USE config_io_module, ONLY : read_cnf_atoms
+  USE grint_module,     ONLY : fit
 
   IMPLICIT NONE
 
@@ -94,6 +96,12 @@ PROGRAM grint
   REAL, PARAMETER             :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
 
   NAMELIST /nml/ dz, dr, z_mid, nz, nc, nr, zskip, cskip, iz_max
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'grint'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Pair distribution functions at a planar interface'
 
   ! Example default values
   dz    = 0.2  ! Spacing in z-direction

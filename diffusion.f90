@@ -48,8 +48,10 @@ PROGRAM diffusion
   ! Although a default value of delta=0.05 is supplied, it is really only a place-holder
   ! for the correct user-supplied value (time interval between configurations)
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_atoms
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+
+  USE config_io_module, ONLY : read_cnf_atoms
 
   IMPLICIT NONE
 
@@ -79,6 +81,12 @@ PROGRAM diffusion
   REAL                        :: box
 
   NAMELIST /nml/ nt, origin_interval, delta
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'diffusion'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Calculates diffusion correlations from sequence of configurations'
 
   ! Example default values
   nt              = 500  ! Max correlation time (as a multiple of interval between configurations)

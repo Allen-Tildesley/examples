@@ -42,11 +42,13 @@ PROGRAM mc_chain_nvt_sw
   ! Configurational weights are calculated on the basis of the athermal interactions
   ! only, i.e. weight=1 if no overlap, weight=0 if any overlap
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
-  USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                                     regrow, crank, pivot, qcount, weight, n, r
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+
+  USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
+  USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
+       &                       regrow, crank, pivot, qcount, weight, n, r
 
   IMPLICIT NONE
 
@@ -85,7 +87,10 @@ PROGRAM mc_chain_nvt_sw
   NAMELIST /nml/ nblock, nstep, m_max, k_max, crank_max, crank_fraction, pivot_max, pivot_fraction, &
        &         temperature, range
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'mc_chain_nvt_sw'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'mc_chain_nvt_sw'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, chain molecule, square wells'
   CALL introduction
 
@@ -286,7 +291,6 @@ CONTAINS
   END SUBROUTINE update_histogram
 
   SUBROUTINE write_histogram ( filename )
-    USE, INTRINSIC :: iso_fortran_env, ONLY : iostat_end, iostat_eor
     IMPLICIT NONE
 
     CHARACTER(len=*), INTENT(in) :: filename

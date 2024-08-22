@@ -26,7 +26,7 @@ MODULE config_io_module
   !------------------------------------------------------------------------------------------------!
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit, iostat_end, iostat_eor
-
+  
   IMPLICIT NONE
   PRIVATE
 

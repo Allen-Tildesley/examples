@@ -41,9 +41,11 @@ PROGRAM qmc_pi_sho
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               averages_module, ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
-  USE               maths_module,    ONLY : metropolis
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+  
+  USE averages_module, ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
+  USE maths_module,    ONLY : metropolis
 
   IMPLICIT NONE
 
@@ -64,7 +66,10 @@ PROGRAM qmc_pi_sho
 
   NAMELIST /nml/ p, temperature, nstep, nblock, nequil, dx_max
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'qmc_pi_sho'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'qmc_pi_sho'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+
   WRITE ( unit=output_unit, fmt='(a)' ) 'Path Integral Monte Carlo simulation of a quantum oscillator'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Results in atomic units'
 

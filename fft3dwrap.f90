@@ -30,7 +30,8 @@ PROGRAM fft3dwrap
   ! We assume that compiler flags are set such that real and integer Fortran variables
   ! have the appropriate precision to match their C counterparts
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
   USE, INTRINSIC :: iso_c_binding
 
   IMPLICIT NONE
@@ -55,6 +56,12 @@ PROGRAM fft3dwrap
   INTEGER, PARAMETER :: out_max = 15
 
   NAMELIST /nml/ sc2, box
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'fft3dwrap'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Illustrates calling of functions from FFTW library'
 
   ! Set sensible default values for testing
   sc2 = 2**6 ! Not essential to be a power of 2, but usually more efficient

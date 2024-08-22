@@ -29,7 +29,14 @@
 import json
 import sys
 import numpy as np
+from platform import python_version
 from config_io_module import read_cnf_atoms, read_cnf_mols, write_cnf_atoms, write_cnf_mols
+
+print('adjust')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Adjusts kinetic energy and/or density of configuration')
 
 # Takes in a configuration of atoms or molecules
 # positions, possibly orientations, and optionally, velocities and angular velocities

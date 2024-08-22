@@ -40,9 +40,15 @@ def in_range ( j, k ):
 import json
 import sys
 import numpy as np
+from platform import python_version
 from config_io_module import read_cnf_atoms
 
 print('cluster')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Identifies clusters in configuration')
+
 # Read parameters in JSON format
 try:
     nml = json.load(sys.stdin)

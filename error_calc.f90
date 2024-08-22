@@ -31,8 +31,10 @@ PROGRAM error_calc
   ! See G Ciccotti and JP Ryckaert Mol Phys 40 141 (1980)
   ! and AD Baczewski and SD Bond J Chem Phys 139 044107 (2013)
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               maths_module,    ONLY : random_normal, expm1
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+
+  USE maths_module, ONLY : random_normal, expm1
 
   IMPLICIT NONE
 
@@ -52,6 +54,12 @@ PROGRAM error_calc
   REAL    :: a_blk, a_run, a_avg, a_var, a_var_1, a_err
 
   NAMELIST /nml/ nstep, nequil, n_repeat, delta, variance, average
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'error_calc'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Error estimation in average of correlated synthetic data series'
 
   ! Example default values
   nstep    = 2**16 ! Number of steps, about 60,000 for example

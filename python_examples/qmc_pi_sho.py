@@ -133,10 +133,16 @@ import json
 import sys
 import numpy as np
 import math
+from platform import python_version
 from averages_module import run_begin, run_end, blk_begin, blk_end, blk_add
 from maths_module import metropolis
 
 print('qmc_pi_sho')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Path Integral Monte Carlo simulation of a quantum oscillator')
+print('Results in atomic units')
 
 # Read parameters in JSON format
 try:

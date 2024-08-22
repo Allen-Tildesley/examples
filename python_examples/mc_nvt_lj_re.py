@@ -128,7 +128,8 @@ import sys
 import os
 import numpy as np
 import math
-from mpi4py           import MPI
+from mpi4py import MPI
+from platform import python_version
 from config_io_module import read_cnf_atoms, write_cnf_atoms
 from averages_module  import run_begin, run_end, blk_begin, blk_end, blk_add
 from maths_module     import random_translate_vector, metropolis
@@ -146,6 +147,9 @@ cnf_prefix = 'cnf'+m_tag+'.' # Configuration filename includes process rank and 
 msg1_id, msg2_id, msg3_id, msg4_id = 999, 888, 777, 666 # MPI message identifiers
 
 print('mc_nvt_lj_re')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
 print('Monte Carlo, constant-NVT, replica exchange')
 print('Simulation uses cut (but not shifted) potential')
 print( "{:40}{:15d}".format('This is process rank', m)       )

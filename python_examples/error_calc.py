@@ -36,8 +36,13 @@ import json
 import sys
 import numpy as np
 import math
+from platform import python_version
 
 print('error_calc')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Error estimation in average of correlated synthetic data series')
 
 # Read parameters in JSON format
 try:

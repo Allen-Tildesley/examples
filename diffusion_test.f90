@@ -38,9 +38,11 @@ PROGRAM diffusion_test
   ! are given in simulation units defined by the model
   ! We assume mass m=1 throughout
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : write_cnf_atoms
-  USE               maths_module,     ONLY : random_normals
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+
+  USE config_io_module, ONLY : write_cnf_atoms
+  USE maths_module,     ONLY : random_normals
 
   IMPLICIT NONE
 
@@ -62,7 +64,10 @@ PROGRAM diffusion_test
 
   NAMELIST /nml/ n, nblock, nstep, dt, gamma, temperature, box
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'diffusion_test'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'diffusion_test'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+
   WRITE ( unit=output_unit, fmt='(a)' ) 'Brownian dynamics without interactions, constant-NVT ensemble'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass m=1 throughout'
 

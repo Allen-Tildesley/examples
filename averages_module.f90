@@ -25,7 +25,7 @@ MODULE averages_module
   ! the software, you should not imply endorsement by the authors or publishers.                   !
   !------------------------------------------------------------------------------------------------!
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit, iostat_end, iostat_eor
+  USE, INTRINSIC :: iso_fortran_env, ONLY : output_unit, error_unit
 
   IMPLICIT NONE
   PRIVATE

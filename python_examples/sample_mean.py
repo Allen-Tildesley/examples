@@ -30,8 +30,14 @@
 # For details, see Chapter 4 of the text.
 
 import numpy as np
+from platform import python_version
 
 print('sample_mean')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Estimates integral by sample-mean Monte Carlo')
+
 np.random.seed()
 
 r_0 = np.array([1.0,2.0],dtype=np.float64)
@@ -48,4 +54,5 @@ for tau in range(tau_max):
 
 v = a_0 * f / tau_max
 print ( "{}{:10.5f}".format('Estimate =', v) )
+print ( "{}{:10.5f}".format('Exact    =', 5/3) )
 

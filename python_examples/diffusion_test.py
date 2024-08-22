@@ -56,9 +56,15 @@ import json
 import sys
 import numpy as np
 import math
+from platform import python_version
 from config_io_module import write_cnf_atoms
 
 print('diffusion_test')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Brownian dynamics without interactions, constant-NVT ensemble')
+print('Particle mass m=1 throughout')
 
 # Read parameters in JSON format
 try:

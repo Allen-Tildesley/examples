@@ -62,8 +62,14 @@ import sys
 import numpy as np
 import math
 import time
+from platform import python_version
 
 print('corfun')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Illustrates methods for calculating time correlation functions')
+print('using synthetic data from a generalized Langevin equation')
 
 # Read parameters in JSON format
 try:

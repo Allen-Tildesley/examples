@@ -45,12 +45,14 @@ PROGRAM mc_gibbs_lj
   ! Despite the program name, there is nothing here specific to Lennard-Jones
   ! The model is defined in mc_module
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
-  USE               maths_module,     ONLY : metropolis, random_integer, random_translate_vector
-  USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                                     potential_1, potential, move, swap, n, r, potential_type
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+
+  USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
+  USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
+  USE maths_module,     ONLY : metropolis, random_integer, random_translate_vector
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
+       &                       potential_1, potential, move, swap, n, r, potential_type
 
   IMPLICIT NONE
 
@@ -86,8 +88,11 @@ PROGRAM mc_gibbs_lj
 
   NAMELIST /nml/ nblock, nstep, nswap, temperature, r_cut, dr_max, dv_max
 
-  WRITE( unit=output_unit, fmt='(a)' ) 'mc_gibbs_lj'
-  WRITE( unit=output_unit, fmt='(a)' ) 'Monte Carlo, Gibbs ensemble'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'mc_gibbs_lj'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, Gibbs ensemble'
   CALL introduction
 
   CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator

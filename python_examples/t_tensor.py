@@ -156,9 +156,13 @@ def skew ( a ):
 import json
 import sys
 import numpy as np
+from platform import python_version
 from maths_module import random_vector
 
 print('t_tensor')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
 print('Calculation of electrostatic interactions between linear molecules')
 print('using T-tensors and Euler angles')
 

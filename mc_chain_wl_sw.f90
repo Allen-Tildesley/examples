@@ -50,11 +50,13 @@ PROGRAM mc_chain_wl_sw
   ! The model is the same one studied by
   ! MP Taylor, W Paul, K Binder, J Chem Phys, 131, 114907 (2009)
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
-  USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                                     regrow, crank, pivot, qcount, weight, n, r
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+
+  USE config_io_module, ONLY : read_cnf_atoms, write_cnf_atoms
+  USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
+       &                       regrow, crank, pivot, qcount, weight, n, r
 
   IMPLICIT NONE
 
@@ -99,7 +101,10 @@ PROGRAM mc_chain_wl_sw
   NAMELIST /nml/ nstep, nstage, m_max, k_max, crank_max, crank_fraction, pivot_max, pivot_fraction, &
        &         range, flatness
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'mc_chain_wl_sw'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'mc_chain_wl_sw'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, Wang-Landau method, chain molecule, square wells'
   CALL introduction
 
@@ -340,7 +345,6 @@ CONTAINS
   END FUNCTION histogram_flat
 
   SUBROUTINE write_histogram ( filename )
-    USE, INTRINSIC :: iso_fortran_env, ONLY : iostat_end, iostat_eor
     IMPLICIT NONE
     CHARACTER(len=*), INTENT(in) :: filename
 

@@ -36,8 +36,10 @@ PROGRAM cluster
   ! Reference: SD Stoddard J Comp Phys, 27, 291 (1978)
   ! This simple algorithm does not scale well to large N
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_atoms
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+
+  USE config_io_module, ONLY : read_cnf_atoms
 
   IMPLICIT NONE
 
@@ -52,6 +54,12 @@ PROGRAM cluster
   INTEGER                      :: i, j, k
 
   NAMELIST /nml/ r_cl
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'cluster'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Identifies clusters in configuration'
 
   r_cl = 1.5 ! default value
   

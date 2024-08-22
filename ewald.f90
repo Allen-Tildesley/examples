@@ -32,9 +32,11 @@ PROGRAM ewald
   ! Compares with brute force summation in real space over shells of periodic boxes
   ! Leave namelist empty to accept supplied defaults
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_atoms
-  USE               ewald_module,     ONLY : pot_r_ewald, pot_k_ewald, pot_k_pm_ewald
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+  
+  USE config_io_module, ONLY : read_cnf_atoms
+  USE ewald_module,     ONLY : pot_r_ewald, pot_k_ewald, pot_k_pm_ewald
 
   IMPLICIT NONE
 
@@ -51,6 +53,12 @@ PROGRAM ewald
   REAL,             PARAMETER :: pi = 4.0*ATAN(1.0), twopi = 2.0*pi
 
   NAMELIST /nml/ kappa, nk, nbox
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'ewald'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Energy of system of charges by Ewald summation'
 
   ! Sensible default values
   kappa = 6.0

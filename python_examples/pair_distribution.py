@@ -30,10 +30,16 @@ import json
 import sys
 import numpy as np
 import math
-from config_io_module import read_cnf_atoms
 import os.path
+from platform import python_version
+from config_io_module import read_cnf_atoms
 
 print('pair_distribution')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Computes pair distribution function from set of configurations')
+
 # Read parameters in JSON format
 try:
     nml = json.load(sys.stdin)

@@ -29,7 +29,8 @@
 import json
 import sys
 import numpy as np
-from itertools        import product
+from itertools import product
+from platform import python_version
 from config_io_module import read_cnf_atoms
 from ewald_module     import pot_r_ewald, pot_k_ewald, pot_k_pm_ewald
 
@@ -40,6 +41,11 @@ from ewald_module     import pot_r_ewald, pot_k_ewald, pot_k_pm_ewald
 # Compares with brute force summation in real space over shells of periodic boxes
 
 print('ewald')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Energy of system of charges by Ewald summation')
+
 # Read parameters in JSON format
 try:
     nml = json.load(sys.stdin)

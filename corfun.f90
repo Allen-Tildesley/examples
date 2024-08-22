@@ -39,9 +39,11 @@ PROGRAM corfun
   ! Advantage can be taken of the fact that the data is real, but for clarity
   ! we just use the complex FFT with imaginary parts of the data set to zero
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
   USE, INTRINSIC :: iso_c_binding
-  USE               maths_module,    ONLY : random_normal, expm1
+
+  USE maths_module, ONLY : random_normal, expm1
 
   IMPLICIT NONE
   INCLUDE 'fftw3.f03'
@@ -80,7 +82,10 @@ PROGRAM corfun
 
   NAMELIST /nml/ nt, origin_interval, nstep, nequil, delta, temperature
 
-  WRITE( unit=output_unit, fmt='(a)' ) 'corfun'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'corfun'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
   WRITE( unit=output_unit, fmt='(a)' ) 'Illustrates methods for calculating time correlation functions'
   WRITE( unit=output_unit, fmt='(a)' ) 'using synthetic data from a generalized Langevin equation'
 

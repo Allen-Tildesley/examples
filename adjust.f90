@@ -36,9 +36,11 @@ PROGRAM adjust
   ! There is nothing here specific to Lennard-Jones
   ! We assume unit mass and adjust only the translational kinetic energy
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_atoms, read_cnf_mols, write_cnf_atoms, write_cnf_mols
-  USE               maths_module,     ONLY : lowercase
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+
+  USE config_io_module, ONLY : read_cnf_atoms, read_cnf_mols, write_cnf_atoms, write_cnf_mols
+  USE maths_module,     ONLY : lowercase
 
   IMPLICIT NONE
 
@@ -67,6 +69,12 @@ PROGRAM adjust
   REAL, PARAMETER :: tol = 1.e-9
 
   NAMELIST /nml/ delta_rho, delta_kin, velocities, molecules
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'adjust'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Adjusts kinetic energy and/or density of configuration'
 
   ! Set default parameters
   velocities = .FALSE. ! By default, assume MC configuration

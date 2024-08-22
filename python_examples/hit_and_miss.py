@@ -30,8 +30,14 @@
 # For details, see Chapter 4 of the text.
 
 import numpy as np
+from platform import python_version
 
 print('hit_and_miss')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Estimates integral by crude hit-and-miss Monte Carlo')
+
 np.random.seed()
 
 r_0 = np.array([1.0,2.0,3.0],dtype=np.float64)
@@ -48,4 +54,5 @@ for tau in range(tau_shot):
 
 v = v_0 * tau_hit / tau_shot
 print ( "{}{:10.5f}".format('Estimate =', v) )
+print ( "{}{:10.5f}".format('Exact    =', 5/3) )
 

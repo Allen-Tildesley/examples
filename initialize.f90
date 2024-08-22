@@ -28,13 +28,15 @@ PROGRAM initialize
   ! Reads several variables and options from standard input using a namelist nml
   ! Leave namelist empty to accept supplied defaults
 
-  USE, INTRINSIC :: iso_fortran_env,   ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module,  ONLY : write_cnf_atoms, write_cnf_mols
-  USE               maths_module,      ONLY : lowercase
-  USE               initialize_module, ONLY : allocate_arrays, deallocate_arrays, &
-       &                                      fcc_positions, ran_positions, ran_velocities, &
-       &                                      chain_positions, chain_velocities, &
-       &                                      n, r, e, v, w
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+  
+  USE config_io_module,  ONLY : write_cnf_atoms, write_cnf_mols
+  USE maths_module,      ONLY : lowercase
+  USE initialize_module, ONLY : allocate_arrays, deallocate_arrays, &
+       &                        fcc_positions, ran_positions, ran_velocities, &
+       &                        chain_positions, chain_velocities, &
+       &                        n, r, e, v, w
 
   IMPLICIT NONE
 
@@ -63,7 +65,10 @@ PROGRAM initialize
 
   NAMELIST /nml/ nc, n, temperature, inertia, density, length, velocities, molecules, lattice, soft, constraints
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'initialize'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'initialize'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
   WRITE ( unit=output_unit, fmt='(a)' ) 'Sets up initial configuration file for various simulations'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Options for molecules are "atom", "linear", "nonlinear", "chain"'
   WRITE ( unit=output_unit, fmt='(a)' ) 'Particle mass m=1 throughout'

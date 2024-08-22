@@ -41,12 +41,14 @@ PROGRAM mc_nvt_poly_lj
   ! Despite the program name, there is nothing here specific to Lennard-Jones
   ! The model (including the cutoff distance) is defined in mc_module
 
-  USE, INTRINSIC :: iso_fortran_env,  ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
-  USE               config_io_module, ONLY : read_cnf_mols, write_cnf_mols
-  USE               averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
-  USE               maths_module,     ONLY : metropolis, random_rotate_quaternion, random_translate_vector, q_to_a
-  USE               mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
-       &                                     potential_1, potential, n, na, db, r, e, d, potential_type
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
+  
+  USE config_io_module, ONLY : read_cnf_mols, write_cnf_mols
+  USE averages_module,  ONLY : run_begin, run_end, blk_begin, blk_end, blk_add
+  USE maths_module,     ONLY : metropolis, random_rotate_quaternion, random_translate_vector, q_to_a
+  USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
+       &                       potential_1, potential, n, na, db, r, e, d, potential_type
 
   IMPLICIT NONE
 
@@ -73,7 +75,10 @@ PROGRAM mc_nvt_poly_lj
 
   NAMELIST /nml/ nblock, nstep, temperature, dr_max, de_max
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'mc_nvt_poly_lj'
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'mc_nvt_poly_lj'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
   WRITE ( unit=output_unit, fmt='(a)' ) 'Monte Carlo, constant-NVT ensemble, polyatomic molecule'
   CALL introduction
 

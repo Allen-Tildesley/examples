@@ -67,9 +67,14 @@ import json
 import sys
 import importlib
 import numpy as np
+from platform import python_version
 from maths_module import rotate_vector
 
 print('test_pot_linear')
+print('Python: '+python_version())
+print('NumPy:  '+np.__version__)
+print()
+print('Tests potential, forces, and torques, for linear molecules')
 
 # Read parameters in JSON format
 try:

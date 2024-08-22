@@ -30,7 +30,8 @@ PROGRAM eos_hs
   ! That paper also gives references to previous approximate equations of state (such as the
   ! venerable Carnahan-Starling equation).
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor
+  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
+       &                                    COMPILER_VERSION, COMPILER_OPTIONS
 
   USE maths_module, ONLY : polyval
 
@@ -46,6 +47,12 @@ PROGRAM eos_hs
        &                                  -1.265575,  0.041212, 0.248245, -0.096495 ]
 
   NAMELIST /nml/ density
+
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'eos_hs'
+  WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
+  WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
+  
+  WRITE ( unit=output_unit, fmt='(a)' ) 'Approximate hard sphere pressure at given density'
 
   ! Set sensible default values
   density = 0.75
