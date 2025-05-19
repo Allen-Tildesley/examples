@@ -392,7 +392,7 @@ for all this output to be collated (in an undefined order) and written to a sing
 was carried out using Open MPI, which allows the program to be run with a command line which includes
 an option for each process to write to separate files, similar to the following:
 ```
-mpirun -np 4 -output-filename out ./mc_nvt_lj_re < mc.inp
+mpirun -np 4 --output dir=out ./mc_nvt_lj_re < mc.inp
 ```
 whereby the output files are placed in subdirectories,
 identified by process rank,

@@ -4,8 +4,8 @@
 
 import os, sys
 
-# This has been tested using SCons v4.6.0, gfortran v13.2.0,
-# using MacOS (Ventura 13.6.3, Xcode 15.1) with compilers and libraries installed through MacPorts.
+# This has been tested using SCons v4.8.1, gfortran v14.2.0,
+# using MacOS (Sequoia 15.5.3, Xcode 16.3) with compilers and libraries installed through MacPorts.
 # It may not work on your system. It is possible that you can get it to work by
 # changing the flags and library/include paths defined in the following few statements.
 # The most likely trouble spots are the programs that use the non-standard

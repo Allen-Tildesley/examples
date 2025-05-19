@@ -28,6 +28,9 @@ especially for combining arrays.
 On top of this, NumPy and the [SciPy](https://www.scipy.org/ "SciPy home page") package
 provide a huge variety of scientific libraries,
 and our Python examples make extensive use of these.
+Our codes were originally written using NumPy v1,
+but the transition to NumPy v2 has involved very few, minor, changes to them.
+
 Nonetheless,
 any code which cannot be handled in vectorized form by NumPy will still run slowly.
 Several strategies are available to address these issues
@@ -398,7 +401,7 @@ for all this output to be collated (in an undefined order) and written to a sing
 was carried out using Open MPI, which allows the program to be run with a command line which includes
 an option for each process to write to separate files, similar to the following:
 ```
-mpiexec -n 4 -output-filename out ./mc_nvt_lj_re.py < mc.inp
+mpiexec -n 4 --output dir=out ./mc_nvt_lj_re.py < mc.inp
 ```
 whereby the output files are placed in subdirectories,
 identified by process rank,
