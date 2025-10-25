@@ -59,7 +59,7 @@ A few examples consist of individual routines or modules,
 rather than working programs,
 so there is no need to build them.
 
-The build process for the Fortran examples has been tested using SCons v4.8.1
+The build process for the Fortran examples has been tested using SCons v4.10.0
 (and some earlier versions back to v2.5.1 with minor changes to the `SConstruct` file).
 
 If you don't like using SCons, or can't get it to work,
@@ -78,7 +78,7 @@ it is advisable to __compile each example in its own build directory__
 (which is what the `SConstruct` file is configured to do)
 or to delete all intermediate files before each individual compilation.
 
-We have used gfortran v14.2.0 (and earlier versions back to v6.3) for testing,
+We have used gfortran v15.2.0 (and earlier versions back to v6.3) for testing,
 but have attempted to stick to code which conforms to the Fortran 2018 standard.
 Note that, by default, we do not select any optimization options in compilation.
 If you are using a different compiler,
@@ -89,8 +89,8 @@ Unfortunately, due to the enormous variety of computing platforms and compilers,
 __we cannot offer more specific advice on the build process.__
 
 The Python versions do not require building, they are simply run through the Python interpreter.
-They have been tested with Python 3.13.3 and NumPy 2.2.5
-(and previously, Python versions back to 3.6.0, and NumPy v1 up to 1.26.4).
+They have been tested with Python 3.13.7 and NumPy 2.3.3
+(and previously, Python versions back to 3.6.0, with compatible versions of NumPy v1 and v2).
 
 ## Random number generators
 
