@@ -126,4 +126,4 @@ variants['build_wl_hist']              = (['wl_hist.f90'],env_normal)
 
 # Build each variant in appropriate variant directory
 for variant_dir,(sources,env) in variants.items():
-    SConscript('SConscript', variant_dir=variant_dir,exports={'env':env,'sources':sources},duplicate=1)
+    SConscript('SConscript', variant_dir=variant_dir,exports={'env':env,'sources':sources},duplicate=0)
