@@ -25,104 +25,102 @@ import os, sys
 # Unfortunately, due to the enormous variety of computing platforms and compilers,
 # we cannot offer more specific advice on the build process.
 
+# SCons default Fortran compiler (currently) is gfortran, and we assume this in setting flags
 # NB by default we do not invoke any optimization
-MY_FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2018 -Wall'
-LAPACK_LIBPATH='/opt/local/lib/lapack'
-LAPACK_LIBS='lapack'
-FFTW_LIBPATH='/opt/local/lib'
-FFTW_LIBS='fftw3'
-FFTW_INCLUDE='/opt/local/include'
-OMP_FLAGS='-fopenmp'
-OMP_LINKFLAGS='-fopenmp'
-
 env_normal=Environment(ENV=os.environ)
-env_normal.Append(F90FLAGS=MY_FLAGS,FORTRANMODDIR='${TARGET.dir}',F90PATH=['${TARGET.dir}'])
-# Use the gfortran compiler
-env_normal.Replace(FORTRAN='gfortran')
-# The above statement addressed some issues of SCons v4.5 with Fortran compiling/linking,
-# and works as of May 2023, but the situation may still not be settled.
-# Earlier versions also needed FORTRANMODDIRPREFIX='-J'
-# May also need LINKFLAGS='-L/usr/lib' as a temporary workaround on MacOS with XCode 11 and MacPorts
-#   Problem arose Sept 2019, see e.g. https://trac.macports.org/ticket/59083, seemingly fixed Jan 2020
+env_normal.Append(F90FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2018 -Wall')
+env_normal.Append(FORTRANMODDIR='${TARGET.dir}',F90PATH='${TARGET.dir}')
 
 env_lapack=env_normal.Clone()
-env_lapack.Append(LIBPATH=[LAPACK_LIBPATH],LIBS=LAPACK_LIBS)
+env_lapack.ParseConfig("pkg-config lapack --cflags --libs")
+# If ParseConfig cannot find lapack, maybe try something like the following
+#LAPACK_LIBPATH='/opt/local/lib/lapack'
+#LAPACK_LIBS='lapack'
+#env_lapack.Append(LIBPATH='/opt/local/lib/lapack',LIBS='lapack')
 
 env_fftw=env_normal.Clone()
-env_fftw.Append(F90PATH=[FFTW_INCLUDE])
-env_fftw.Append(LIBPATH=[FFTW_LIBPATH],LIBS=FFTW_LIBS)
+env_fftw.ParseConfig("pkg-config fftw3 --cflags --libs")
+env_fftw.Append(F90PATH=env_fftw['CPPPATH']) # This is a hack, SCons ParseConfig does not set F90PATH
+# If ParseConfig cannot find fftw3, maybe try something like the following
+#FFTW_LIBPATH='/opt/local/lib'
+#FFTW_LIBS='fftw3'
+#FFTW_INCLUDE='/opt/local/include'
+#env_fftw.Append(F90PATH='/opt/local/include')
+#env_fftw.Append(LIBPATH='/opt/local/lib',LIBS='fftw3')
 
 env_mpi=env_normal.Clone(F90='mpifort',LINK='mpifort')
 
 env_omp=env_normal.Clone()
-env_omp.Append(F90FLAGS=OMP_FLAGS,LINKFLAGS=OMP_LINKFLAGS)
+#OMP_FLAGS='-fopenmp'
+#OMP_LINKFLAGS='-fopenmp'
+env_omp.Append(F90FLAGS='-fopenmp',LINKFLAGS='-fopenmp')
 
 utilities=['config_io_module.f90','averages_module.f90','maths_module.f90']
 utnomaths=['config_io_module.f90','averages_module.f90']
 utnoavrgs=['config_io_module.f90','maths_module.f90']
 variants={}
-variants['build_adjust']               = (['adjust.f90']+utnoavrgs,env_normal)
-variants['build_bd_nvt_lj']            = (['bd_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
-variants['build_dpd']                  = (['dpd.f90','dpd_module.f90']+utilities,env_normal)
-variants['build_cluster']              = (['cluster.f90','config_io_module.f90'],env_normal)
-variants['build_corfun']               = (['corfun.f90','maths_module.f90'],env_fftw)
-variants['build_diffusion']            = (['diffusion.f90','config_io_module.f90'],env_normal)
-variants['build_diffusion_test']       = (['diffusion_test.f90']+utnoavrgs,env_normal)
-variants['build_eos_lj']               = (['eos_lj.f90','eos_lj_module.f90','lrc_lj_module.f90'],env_normal)
-variants['build_eos_hs']               = (['eos_hs.f90','maths_module.f90'],env_normal)
-variants['build_error_calc']           = (['error_calc.f90','maths_module.f90'],env_normal)
-variants['build_ewald']                = (['ewald.f90','ewald_module.f90','mesh_module.f90','config_io_module.f90'],env_fftw)
-variants['build_fft3dwrap']            = (['fft3dwrap.f90'],env_fftw)
-variants['build_grint']                = (['grint.f90','grint_module.f90','config_io_module.f90'],env_normal)
-variants['build_hit_and_miss']         = (['hit_and_miss.f90'],env_normal)
-variants['build_initialize']           = (['initialize.f90','initialize_module.f90']+utnoavrgs,env_normal)
-variants['build_mc_chain_nvt_cbmc_lj'] = (['mc_chain_nvt_cbmc_lj.f90','mc_chain_lj_module.f90']+utilities,env_normal)
-variants['build_mc_chain_nvt_sw']      = (['mc_chain_nvt_sw.f90','mc_chain_sw_module.f90']+utilities,env_normal)
-variants['build_mc_chain_wl_sw']       = (['mc_chain_wl_sw.f90','mc_chain_sw_module.f90']+utilities,env_normal)
-variants['build_mc_gibbs_lj']          = (['mc_gibbs_lj.f90','mc_gibbs_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
-variants['build_mc_npt_hs']            = (['mc_npt_hs.f90','mc_hs_module.f90']+utilities,env_normal)
-variants['build_mc_npt_lj']            = (['mc_npt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
-variants['build_mc_npt_lj_ll']         = (['mc_npt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utilities,env_normal)
-variants['build_mc_npt_sc']            = (['mc_npt_sc.f90','mc_sc_module.f90']+utilities,env_normal)
-variants['build_mc_nvt_hs']            = (['mc_nvt_hs.f90','mc_hs_module.f90']+utilities,env_normal)
-variants['build_mc_nvt_lj']            = (['mc_nvt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
-variants['build_mc_nvt_lj_ll']         = (['mc_nvt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utilities,env_normal)
-variants['build_mc_nvt_lj_re']         = (['mc_nvt_lj_re.f90','mc_lj_module.f90','lrc_lj_module.f90']+utilities,env_mpi)
-variants['build_mc_nvt_poly_lj']       = (['mc_nvt_poly_lj.f90','mc_poly_lj_module.f90']+utilities,env_normal)
-variants['build_mc_nvt_sc']            = (['mc_nvt_sc.f90','mc_sc_module.f90']+utilities,env_normal)
-variants['build_mc_zvt_lj']            = (['mc_zvt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
-variants['build_mc_zvt_lj_ll']         = (['mc_zvt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utilities,env_normal)
-variants['build_md_chain_mts_lj']      = (['md_chain_mts_lj.f90','md_chain_lj_module.f90']+utnomaths,env_lapack)
-variants['build_md_chain_nve_lj']      = (['md_chain_nve_lj.f90','md_chain_lj_module.f90']+utilities,env_lapack)
-variants['build_md_lj_mts']            = (['md_lj_mts.f90','md_lj_mts_module.f90','lrc_lj_module.f90']+utnomaths,env_normal)
-variants['build_md_npt_lj']            = (['md_npt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
-variants['build_md_npt_lj_ll']         = (['md_npt_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utilities,env_normal)
-variants['build_md_nve_hs']            = (['md_nve_hs.f90','md_nve_hs_module.f90']+utnomaths,env_normal)
-variants['build_md_nve_lj']            = (['md_nve_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+utnomaths,env_normal)
-variants['build_md_nve_lj_vl']         = (['md_nve_lj.f90','md_lj_vl_module.f90','lrc_lj_module.f90','verlet_list_module.f90']+utnomaths,env_normal)
-variants['build_md_nve_lj_ll']         = (['md_nve_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utnomaths,env_normal)
-variants['build_md_nve_lj_omp']        = (['md_nve_lj.f90','md_lj_omp_module.f90','lrc_lj_module.f90']+utnomaths,env_omp)
-variants['build_md_nvt_lj']            = (['md_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
-variants['build_md_nvt_lj_ll']         = (['md_nvt_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utilities,env_normal)
-variants['build_md_nvt_lj_le']         = (['md_nvt_lj_le.f90','md_lj_le_module.f90']+utnomaths,env_normal)
-variants['build_md_nvt_lj_llle']       = (['md_nvt_lj_le.f90','md_lj_llle_module.f90','link_list_module.f90']+utnomaths,env_normal)
-variants['build_md_nvt_poly_lj']       = (['md_nvt_poly_lj.f90','md_poly_lj_module.f90']+utilities,env_normal)
-variants['build_mesh']                 = (['mesh.f90','mesh_module.f90'],env_normal)
-variants['build_pair_distribution']    = (['pair_distribution.f90','config_io_module.f90'],env_normal)
-variants['build_qmc_pi_sho']           = (['qmc_pi_sho.f90','averages_module.f90','maths_module.f90'],env_normal)
-variants['build_qmc_pi_lj']            = (['qmc_pi_lj.f90','qmc_pi_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
-variants['build_qmc_walk_sho']         = (['qmc_walk_sho.f90','averages_module.f90','maths_module.f90'],env_normal)
-variants['build_sample_mean']          = (['sample_mean.f90'],env_normal)
-variants['build_smc_nvt_lj']           = (['smc_nvt_lj.f90','smc_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
-variants['build_test_pot_at']          = (['test_pot_atom.f90','test_pot_at.f90','maths_module.f90'],env_normal)
-variants['build_test_pot_bend']        = (['test_pot_atom.f90','test_pot_bend.f90','maths_module.f90'],env_normal)
-variants['build_test_pot_twist']       = (['test_pot_atom.f90','test_pot_twist.f90','maths_module.f90'],env_normal)
-variants['build_test_pot_dd']          = (['test_pot_linear.f90','test_pot_dd.f90','maths_module.f90'],env_normal)
-variants['build_test_pot_dq']          = (['test_pot_linear.f90','test_pot_dq.f90','maths_module.f90'],env_normal)
-variants['build_test_pot_qq']          = (['test_pot_linear.f90','test_pot_qq.f90','maths_module.f90'],env_normal)
-variants['build_test_pot_gb']          = (['test_pot_linear.f90','test_pot_gb.f90','maths_module.f90'],env_normal)
-variants['build_t_tensor']             = (['t_tensor.f90','maths_module.f90'],env_normal)
-variants['build_wl_hist']              = (['wl_hist.f90'],env_normal)
+variants['build/adjust']               = (['adjust.f90']+utnoavrgs,env_normal)
+variants['build/bd_nvt_lj']            = (['bd_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
+variants['build/dpd']                  = (['dpd.f90','dpd_module.f90']+utilities,env_normal)
+variants['build/cluster']              = (['cluster.f90','config_io_module.f90'],env_normal)
+variants['build/corfun']               = (['corfun.f90','maths_module.f90'],env_fftw)
+variants['build/diffusion']            = (['diffusion.f90','config_io_module.f90'],env_normal)
+variants['build/diffusion_test']       = (['diffusion_test.f90']+utnoavrgs,env_normal)
+variants['build/eos_lj']               = (['eos_lj.f90','eos_lj_module.f90','lrc_lj_module.f90'],env_normal)
+variants['build/eos_hs']               = (['eos_hs.f90','maths_module.f90'],env_normal)
+variants['build/error_calc']           = (['error_calc.f90','maths_module.f90'],env_normal)
+variants['build/ewald']                = (['ewald.f90','ewald_module.f90','mesh_module.f90','config_io_module.f90'],env_fftw)
+variants['build/fft3dwrap']            = (['fft3dwrap.f90'],env_fftw)
+variants['build/grint']                = (['grint.f90','grint_module.f90','config_io_module.f90'],env_normal)
+variants['build/hit_and_miss']         = (['hit_and_miss.f90'],env_normal)
+variants['build/initialize']           = (['initialize.f90','initialize_module.f90']+utnoavrgs,env_normal)
+variants['build/mc_chain_nvt_cbmc_lj'] = (['mc_chain_nvt_cbmc_lj.f90','mc_chain_lj_module.f90']+utilities,env_normal)
+variants['build/mc_chain_nvt_sw']      = (['mc_chain_nvt_sw.f90','mc_chain_sw_module.f90']+utilities,env_normal)
+variants['build/mc_chain_wl_sw']       = (['mc_chain_wl_sw.f90','mc_chain_sw_module.f90']+utilities,env_normal)
+variants['build/mc_gibbs_lj']          = (['mc_gibbs_lj.f90','mc_gibbs_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
+variants['build/mc_npt_hs']            = (['mc_npt_hs.f90','mc_hs_module.f90']+utilities,env_normal)
+variants['build/mc_npt_lj']            = (['mc_npt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
+variants['build/mc_npt_lj_ll']         = (['mc_npt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utilities,env_normal)
+variants['build/mc_npt_sc']            = (['mc_npt_sc.f90','mc_sc_module.f90']+utilities,env_normal)
+variants['build/mc_nvt_hs']            = (['mc_nvt_hs.f90','mc_hs_module.f90']+utilities,env_normal)
+variants['build/mc_nvt_lj']            = (['mc_nvt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
+variants['build/mc_nvt_lj_ll']         = (['mc_nvt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utilities,env_normal)
+variants['build/mc_nvt_lj_re']         = (['mc_nvt_lj_re.f90','mc_lj_module.f90','lrc_lj_module.f90']+utilities,env_mpi)
+variants['build/mc_nvt_poly_lj']       = (['mc_nvt_poly_lj.f90','mc_poly_lj_module.f90']+utilities,env_normal)
+variants['build/mc_nvt_sc']            = (['mc_nvt_sc.f90','mc_sc_module.f90']+utilities,env_normal)
+variants['build/mc_zvt_lj']            = (['mc_zvt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
+variants['build/mc_zvt_lj_ll']         = (['mc_zvt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utilities,env_normal)
+variants['build/md_chain_mts_lj']      = (['md_chain_mts_lj.f90','md_chain_lj_module.f90']+utnomaths,env_lapack)
+variants['build/md_chain_nve_lj']      = (['md_chain_nve_lj.f90','md_chain_lj_module.f90']+utilities,env_lapack)
+variants['build/md_lj_mts']            = (['md_lj_mts.f90','md_lj_mts_module.f90','lrc_lj_module.f90']+utnomaths,env_normal)
+variants['build/md_npt_lj']            = (['md_npt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
+variants['build/md_npt_lj_ll']         = (['md_npt_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utilities,env_normal)
+variants['build/md_nve_hs']            = (['md_nve_hs.f90','md_nve_hs_module.f90']+utnomaths,env_normal)
+variants['build/md_nve_lj']            = (['md_nve_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+utnomaths,env_normal)
+variants['build/md_nve_lj_vl']         = (['md_nve_lj.f90','md_lj_vl_module.f90','lrc_lj_module.f90','verlet_list_module.f90']+utnomaths,env_normal)
+variants['build/md_nve_lj_ll']         = (['md_nve_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utnomaths,env_normal)
+variants['build/md_nve_lj_omp']        = (['md_nve_lj.f90','md_lj_omp_module.f90','lrc_lj_module.f90']+utnomaths,env_omp)
+variants['build/md_nvt_lj']            = (['md_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
+variants['build/md_nvt_lj_ll']         = (['md_nvt_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+utilities,env_normal)
+variants['build/md_nvt_lj_le']         = (['md_nvt_lj_le.f90','md_lj_le_module.f90']+utnomaths,env_normal)
+variants['build/md_nvt_lj_llle']       = (['md_nvt_lj_le.f90','md_lj_llle_module.f90','link_list_module.f90']+utnomaths,env_normal)
+variants['build/md_nvt_poly_lj']       = (['md_nvt_poly_lj.f90','md_poly_lj_module.f90']+utilities,env_normal)
+variants['build/mesh']                 = (['mesh.f90','mesh_module.f90'],env_normal)
+variants['build/pair_distribution']    = (['pair_distribution.f90','config_io_module.f90'],env_normal)
+variants['build/qmc_pi_sho']           = (['qmc_pi_sho.f90','averages_module.f90','maths_module.f90'],env_normal)
+variants['build/qmc_pi_lj']            = (['qmc_pi_lj.f90','qmc_pi_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
+variants['build/qmc_walk_sho']         = (['qmc_walk_sho.f90','averages_module.f90','maths_module.f90'],env_normal)
+variants['build/sample_mean']          = (['sample_mean.f90'],env_normal)
+variants['build/smc_nvt_lj']           = (['smc_nvt_lj.f90','smc_lj_module.f90','lrc_lj_module.f90']+utilities,env_normal)
+variants['build/test_pot_at']          = (['test_pot_atom.f90','test_pot_at.f90','maths_module.f90'],env_normal)
+variants['build/test_pot_bend']        = (['test_pot_atom.f90','test_pot_bend.f90','maths_module.f90'],env_normal)
+variants['build/test_pot_twist']       = (['test_pot_atom.f90','test_pot_twist.f90','maths_module.f90'],env_normal)
+variants['build/test_pot_dd']          = (['test_pot_linear.f90','test_pot_dd.f90','maths_module.f90'],env_normal)
+variants['build/test_pot_dq']          = (['test_pot_linear.f90','test_pot_dq.f90','maths_module.f90'],env_normal)
+variants['build/test_pot_qq']          = (['test_pot_linear.f90','test_pot_qq.f90','maths_module.f90'],env_normal)
+variants['build/test_pot_gb']          = (['test_pot_linear.f90','test_pot_gb.f90','maths_module.f90'],env_normal)
+variants['build/t_tensor']             = (['t_tensor.f90','maths_module.f90'],env_normal)
+variants['build/wl_hist']              = (['wl_hist.f90'],env_normal)
 
 # Build each variant in appropriate variant directory
 for variant_dir,(sources,env) in variants.items():
