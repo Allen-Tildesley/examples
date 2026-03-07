@@ -26,6 +26,7 @@ import os, sys
 # we cannot offer more specific advice on the build process.
 
 # SCons default Fortran compiler (currently) is gfortran, and we assume this in setting flags
+# Filetypes are .f90
 # NB by default we do not invoke any optimization
 env_normal=Environment(ENV=os.environ)
 env_normal.Append(F90FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2018 -Wall')
@@ -34,25 +35,23 @@ env_normal.Append(FORTRANMODDIR='${TARGET.dir}',F90PATH='${TARGET.dir}')
 env_lapack=env_normal.Clone()
 env_lapack.ParseConfig("pkg-config lapack --cflags --libs")
 # If ParseConfig cannot find lapack, maybe try something like the following
-#LAPACK_LIBPATH='/opt/local/lib/lapack'
-#LAPACK_LIBS='lapack'
-#env_lapack.Append(LIBPATH='/opt/local/lib/lapack',LIBS='lapack')
+# env_lapack.Append(LIBPATH='/opt/local/lib/lapack',LIBS='lapack')
 
+# Workaround applied, see https://github.com/SCons/scons/issues/4835
 env_fftw=env_normal.Clone()
 env_fftw.ParseConfig("pkg-config fftw3 --cflags --libs")
-env_fftw.Append(F90PATH=env_fftw['CPPPATH']) # This is a hack, SCons ParseConfig does not set F90PATH
+
+# If FFTW3 was installed in /usr/include, we need additional flags
+if env_fftw.get("CPPPATH") is None:
+    env_fftw.ParseConfig("pkg-config fftw3 --cflags --libs --keep-system-cflags")
+env_fftw.Append(F90PATH=env_fftw['CPPPATH'])
 # If ParseConfig cannot find fftw3, maybe try something like the following
-#FFTW_LIBPATH='/opt/local/lib'
-#FFTW_LIBS='fftw3'
-#FFTW_INCLUDE='/opt/local/include'
 #env_fftw.Append(F90PATH='/opt/local/include')
 #env_fftw.Append(LIBPATH='/opt/local/lib',LIBS='fftw3')
 
 env_mpi=env_normal.Clone(F90='mpifort',LINK='mpifort')
 
 env_omp=env_normal.Clone()
-#OMP_FLAGS='-fopenmp'
-#OMP_LINKFLAGS='-fopenmp'
 env_omp.Append(F90FLAGS='-fopenmp',LINKFLAGS='-fopenmp')
 
 utilities=['config_io_module.f90','averages_module.f90','maths_module.f90']
