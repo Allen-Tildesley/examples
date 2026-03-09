@@ -4,8 +4,8 @@
 
 import os, sys
 
-# This has been tested using SCons v4.8.1, gfortran v14.2.0,
-# using MacOS (Sequoia 15.5.3, Xcode 16.3) with compilers and libraries installed through MacPorts.
+# This has been tested using SCons v4.10.0, gfortran v15.2.0,
+# using MacOS (Tahoe 26.3.1, Xcode 26.3) with compilers and libraries installed through MacPorts.
 # It may not work on your system. It is possible that you can get it to work by
 # changing the flags and library/include paths defined in the following few statements.
 # The most likely trouble spots are the programs that use the non-standard
@@ -59,93 +59,95 @@ env_mpi=env.Clone(F90='mpifort',LINK='mpifort')
 env_omp=env.Clone()
 env_omp.Append(F90FLAGS='-fopenmp',LINKFLAGS='-fopenmp')
 
+# Each program is built in a subdirectory of the build directory
+
 # Abbreviations for commonly-used combinations of modules
 conavgmat=['config_io_module.f90','averages_module.f90','maths_module.f90']
 conavg=['config_io_module.f90','averages_module.f90']
 conmat=['config_io_module.f90','maths_module.f90']
 
 # Programs that are compiled in the default env environment
-variants={}
-variants['build/adjust']               = ['adjust.f90']+conmat
-variants['build/bd_nvt_lj']            = ['bd_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+conavgmat
-variants['build/dpd']                  = ['dpd.f90','dpd_module.f90']+conavgmat
-variants['build/cluster']              = ['cluster.f90','config_io_module.f90']
-variants['build/diffusion']            = ['diffusion.f90','config_io_module.f90']
-variants['build/diffusion_test']       = ['diffusion_test.f90']+conmat
-variants['build/eos_lj']               = ['eos_lj.f90','eos_lj_module.f90','lrc_lj_module.f90']
-variants['build/eos_hs']               = ['eos_hs.f90','maths_module.f90']
-variants['build/error_calc']           = ['error_calc.f90','maths_module.f90']
-variants['build/grint']                = ['grint.f90','grint_module.f90','config_io_module.f90']
-variants['build/hit_and_miss']         = ['hit_and_miss.f90']
-variants['build/initialize']           = ['initialize.f90','initialize_module.f90']+conmat
-variants['build/mc_chain_nvt_cbmc_lj'] = ['mc_chain_nvt_cbmc_lj.f90','mc_chain_lj_module.f90']+conavgmat
-variants['build/mc_chain_nvt_sw']      = ['mc_chain_nvt_sw.f90','mc_chain_sw_module.f90']+conavgmat
-variants['build/mc_chain_wl_sw']       = ['mc_chain_wl_sw.f90','mc_chain_sw_module.f90']+conavgmat
-variants['build/mc_gibbs_lj']          = ['mc_gibbs_lj.f90','mc_gibbs_lj_module.f90','lrc_lj_module.f90']+conavgmat
-variants['build/mc_npt_hs']            = ['mc_npt_hs.f90','mc_hs_module.f90']+conavgmat
-variants['build/mc_npt_lj']            = ['mc_npt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+conavgmat
-variants['build/mc_npt_lj_ll']         = ['mc_npt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavgmat
-variants['build/mc_npt_sc']            = ['mc_npt_sc.f90','mc_sc_module.f90']+conavgmat
-variants['build/mc_nvt_hs']            = ['mc_nvt_hs.f90','mc_hs_module.f90']+conavgmat
-variants['build/mc_nvt_lj']            = ['mc_nvt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+conavgmat
-variants['build/mc_nvt_lj_ll']         = ['mc_nvt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavgmat
-variants['build/mc_nvt_poly_lj']       = ['mc_nvt_poly_lj.f90','mc_poly_lj_module.f90']+conavgmat
-variants['build/mc_nvt_sc']            = ['mc_nvt_sc.f90','mc_sc_module.f90']+conavgmat
-variants['build/mc_zvt_lj']            = ['mc_zvt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+conavgmat
-variants['build/mc_zvt_lj_ll']         = ['mc_zvt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavgmat
-variants['build/md_lj_mts']            = ['md_lj_mts.f90','md_lj_mts_module.f90','lrc_lj_module.f90']+conavg
-variants['build/md_npt_lj']            = ['md_npt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+conavgmat
-variants['build/md_npt_lj_ll']         = ['md_npt_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavgmat
-variants['build/md_nve_hs']            = ['md_nve_hs.f90','md_nve_hs_module.f90']+conavg
-variants['build/md_nve_lj']            = ['md_nve_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+conavg
-variants['build/md_nve_lj_vl']         = ['md_nve_lj.f90','md_lj_vl_module.f90','lrc_lj_module.f90','verlet_list_module.f90']+conavg
-variants['build/md_nve_lj_ll']         = ['md_nve_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavg
-variants['build/md_nvt_lj']            = ['md_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+conavgmat
-variants['build/md_nvt_lj_ll']         = ['md_nvt_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavgmat
-variants['build/md_nvt_lj_le']         = ['md_nvt_lj_le.f90','md_lj_le_module.f90']+conavg
-variants['build/md_nvt_lj_llle']       = ['md_nvt_lj_le.f90','md_lj_llle_module.f90','link_list_module.f90']+conavg
-variants['build/md_nvt_poly_lj']       = ['md_nvt_poly_lj.f90','md_poly_lj_module.f90']+conavgmat
-variants['build/mesh']                 = ['mesh.f90','mesh_module.f90']
-variants['build/pair_distribution']    = ['pair_distribution.f90','config_io_module.f90']
-variants['build/qmc_pi_sho']           = ['qmc_pi_sho.f90','averages_module.f90','maths_module.f90']
-variants['build/qmc_pi_lj']            = ['qmc_pi_lj.f90','qmc_pi_lj_module.f90','lrc_lj_module.f90']+conavgmat
-variants['build/qmc_walk_sho']         = ['qmc_walk_sho.f90','averages_module.f90','maths_module.f90']
-variants['build/sample_mean']          = ['sample_mean.f90']
-variants['build/smc_nvt_lj']           = ['smc_nvt_lj.f90','smc_lj_module.f90','lrc_lj_module.f90']+conavgmat
-variants['build/test_pot_at']          = ['test_pot_atom.f90','test_pot_at.f90','maths_module.f90']
-variants['build/test_pot_bend']        = ['test_pot_atom.f90','test_pot_bend.f90','maths_module.f90']
-variants['build/test_pot_twist']       = ['test_pot_atom.f90','test_pot_twist.f90','maths_module.f90']
-variants['build/test_pot_dd']          = ['test_pot_linear.f90','test_pot_dd.f90','maths_module.f90']
-variants['build/test_pot_dq']          = ['test_pot_linear.f90','test_pot_dq.f90','maths_module.f90']
-variants['build/test_pot_qq']          = ['test_pot_linear.f90','test_pot_qq.f90','maths_module.f90']
-variants['build/test_pot_gb']          = ['test_pot_linear.f90','test_pot_gb.f90','maths_module.f90']
-variants['build/t_tensor']             = ['t_tensor.f90','maths_module.f90']
-variants['build/wl_hist']              = ['wl_hist.f90']
+builds={}
+builds['adjust']               = ['adjust.f90']+conmat
+builds['bd_nvt_lj']            = ['bd_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+conavgmat
+builds['dpd']                  = ['dpd.f90','dpd_module.f90']+conavgmat
+builds['cluster']              = ['cluster.f90','config_io_module.f90']
+builds['diffusion']            = ['diffusion.f90','config_io_module.f90']
+builds['diffusion_test']       = ['diffusion_test.f90']+conmat
+builds['eos_lj']               = ['eos_lj.f90','eos_lj_module.f90','lrc_lj_module.f90']
+builds['eos_hs']               = ['eos_hs.f90','maths_module.f90']
+builds['error_calc']           = ['error_calc.f90','maths_module.f90']
+builds['grint']                = ['grint.f90','grint_module.f90','config_io_module.f90']
+builds['hit_and_miss']         = ['hit_and_miss.f90']
+builds['initialize']           = ['initialize.f90','initialize_module.f90']+conmat
+builds['mc_chain_nvt_cbmc_lj'] = ['mc_chain_nvt_cbmc_lj.f90','mc_chain_lj_module.f90']+conavgmat
+builds['mc_chain_nvt_sw']      = ['mc_chain_nvt_sw.f90','mc_chain_sw_module.f90']+conavgmat
+builds['mc_chain_wl_sw']       = ['mc_chain_wl_sw.f90','mc_chain_sw_module.f90']+conavgmat
+builds['mc_gibbs_lj']          = ['mc_gibbs_lj.f90','mc_gibbs_lj_module.f90','lrc_lj_module.f90']+conavgmat
+builds['mc_npt_hs']            = ['mc_npt_hs.f90','mc_hs_module.f90']+conavgmat
+builds['mc_npt_lj']            = ['mc_npt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+conavgmat
+builds['mc_npt_lj_ll']         = ['mc_npt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavgmat
+builds['mc_npt_sc']            = ['mc_npt_sc.f90','mc_sc_module.f90']+conavgmat
+builds['mc_nvt_hs']            = ['mc_nvt_hs.f90','mc_hs_module.f90']+conavgmat
+builds['mc_nvt_lj']            = ['mc_nvt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+conavgmat
+builds['mc_nvt_lj_ll']         = ['mc_nvt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavgmat
+builds['mc_nvt_poly_lj']       = ['mc_nvt_poly_lj.f90','mc_poly_lj_module.f90']+conavgmat
+builds['mc_nvt_sc']            = ['mc_nvt_sc.f90','mc_sc_module.f90']+conavgmat
+builds['mc_zvt_lj']            = ['mc_zvt_lj.f90','mc_lj_module.f90','lrc_lj_module.f90']+conavgmat
+builds['mc_zvt_lj_ll']         = ['mc_zvt_lj.f90','mc_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavgmat
+builds['md_lj_mts']            = ['md_lj_mts.f90','md_lj_mts_module.f90','lrc_lj_module.f90']+conavg
+builds['md_npt_lj']            = ['md_npt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+conavgmat
+builds['md_npt_lj_ll']         = ['md_npt_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavgmat
+builds['md_nve_hs']            = ['md_nve_hs.f90','md_nve_hs_module.f90']+conavg
+builds['md_nve_lj']            = ['md_nve_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+conavg
+builds['md_nve_lj_vl']         = ['md_nve_lj.f90','md_lj_vl_module.f90','lrc_lj_module.f90','verlet_list_module.f90']+conavg
+builds['md_nve_lj_ll']         = ['md_nve_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavg
+builds['md_nvt_lj']            = ['md_nvt_lj.f90','md_lj_module.f90','lrc_lj_module.f90']+conavgmat
+builds['md_nvt_lj_ll']         = ['md_nvt_lj.f90','md_lj_ll_module.f90','lrc_lj_module.f90','link_list_module.f90']+conavgmat
+builds['md_nvt_lj_le']         = ['md_nvt_lj_le.f90','md_lj_le_module.f90']+conavg
+builds['md_nvt_lj_llle']       = ['md_nvt_lj_le.f90','md_lj_llle_module.f90','link_list_module.f90']+conavg
+builds['md_nvt_poly_lj']       = ['md_nvt_poly_lj.f90','md_poly_lj_module.f90']+conavgmat
+builds['mesh']                 = ['mesh.f90','mesh_module.f90']
+builds['pair_distribution']    = ['pair_distribution.f90','config_io_module.f90']
+builds['qmc_pi_sho']           = ['qmc_pi_sho.f90','averages_module.f90','maths_module.f90']
+builds['qmc_pi_lj']            = ['qmc_pi_lj.f90','qmc_pi_lj_module.f90','lrc_lj_module.f90']+conavgmat
+builds['qmc_walk_sho']         = ['qmc_walk_sho.f90','averages_module.f90','maths_module.f90']
+builds['sample_mean']          = ['sample_mean.f90']
+builds['smc_nvt_lj']           = ['smc_nvt_lj.f90','smc_lj_module.f90','lrc_lj_module.f90']+conavgmat
+builds['test_pot_at']          = ['test_pot_atom.f90','test_pot_at.f90','maths_module.f90']
+builds['test_pot_bend']        = ['test_pot_atom.f90','test_pot_bend.f90','maths_module.f90']
+builds['test_pot_twist']       = ['test_pot_atom.f90','test_pot_twist.f90','maths_module.f90']
+builds['test_pot_dd']          = ['test_pot_linear.f90','test_pot_dd.f90','maths_module.f90']
+builds['test_pot_dq']          = ['test_pot_linear.f90','test_pot_dq.f90','maths_module.f90']
+builds['test_pot_qq']          = ['test_pot_linear.f90','test_pot_qq.f90','maths_module.f90']
+builds['test_pot_gb']          = ['test_pot_linear.f90','test_pot_gb.f90','maths_module.f90']
+builds['t_tensor']             = ['t_tensor.f90','maths_module.f90']
+builds['wl_hist']              = ['wl_hist.f90']
 
-for variant_dir, sources in variants.items():
-    SConscript('SConscript', variant_dir=variant_dir,exports={'env':env,'sources':sources},duplicate=0)
+for name, sources in builds.items():
+    SConscript('SConscript', variant_dir='build/'+name,exports={'env':env,'name':name,'sources':sources},duplicate=0)
 
 # Programs that are compiled in the env_lapack environment
-variants={}
-variants['build/md_chain_mts_lj'] = ['md_chain_mts_lj.f90','md_chain_lj_module.f90']+conavg
-variants['build/md_chain_nve_lj'] = ['md_chain_nve_lj.f90','md_chain_lj_module.f90']+conavgmat
+builds={}
+builds['md_chain_mts_lj'] = ['md_chain_mts_lj.f90','md_chain_lj_module.f90']+conavg
+builds['md_chain_nve_lj'] = ['md_chain_nve_lj.f90','md_chain_lj_module.f90']+conavgmat
 
-for variant_dir, sources in variants.items():
-    SConscript('SConscript', variant_dir=variant_dir,exports={'env':env_lapack,'sources':sources},duplicate=0)
+for name, sources in builds.items():
+    SConscript('SConscript', variant_dir='build/'+name,exports={'env':env_lapack,'name':name,'sources':sources},duplicate=0)
 
 # Programs that are compiled in the env_fftw environment
-variants={}
-variants['build/corfun']    = ['corfun.f90','maths_module.f90']
-variants['build/ewald']     = ['ewald.f90','ewald_module.f90','mesh_module.f90','config_io_module.f90']
-variants['build/fft3dwrap'] = ['fft3dwrap.f90']
+builds={}
+builds['corfun']    = ['corfun.f90','maths_module.f90']
+builds['ewald']     = ['ewald.f90','ewald_module.f90','mesh_module.f90','config_io_module.f90']
+builds['fft3dwrap'] = ['fft3dwrap.f90']
 
-for variant_dir, sources in variants.items():
-    SConscript('SConscript', variant_dir=variant_dir,exports={'env':env_fftw,'sources':sources},duplicate=0)
+for name, sources in builds.items():
+    SConscript('SConscript', variant_dir='build/'+name,exports={'env':env_fftw,'name':name,'sources':sources},duplicate=0)
 
 # Program that is compiled in the env_mpi environment
-variant_dir, sources = 'build/mc_nvt_lj_re', ['mc_nvt_lj_re.f90','mc_lj_module.f90','lrc_lj_module.f90']+conavgmat
-SConscript('SConscript', variant_dir=variant_dir,exports={'env':env_mpi,'sources':sources},duplicate=0)
+name, sources = 'mc_nvt_lj_re', ['mc_nvt_lj_re.f90','mc_lj_module.f90','lrc_lj_module.f90']+conavgmat
+SConscript('SConscript', variant_dir='build/'+name,exports={'env':env_mpi,'name':name,'sources':sources},duplicate=0)
 
 # Program that is compiled in the env_omp environment
-variant_dir, sources = 'build/md_nve_lj_omp', ['md_nve_lj.f90','md_lj_omp_module.f90','lrc_lj_module.f90']+conavg
-SConscript('SConscript', variant_dir=variant_dir,exports={'env':env_omp,'sources':sources},duplicate=0)
+name, sources = 'md_nve_lj_omp', ['md_nve_lj.f90','md_lj_omp_module.f90','lrc_lj_module.f90']+conavg
+SConscript('SConscript', variant_dir='build/'+name,exports={'env':env_omp,'name':name,'sources':sources},duplicate=0)

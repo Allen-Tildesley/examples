@@ -1,2 +1,2 @@
-Import('env','sources')
-env.Program(sources)
+Import('env','name','sources')
+env.Program(target=name,source=sources)
