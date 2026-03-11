@@ -103,7 +103,7 @@ it is not difficult to compile the programs from the command line.
 Bear in mind that, with Fortran, it is usually essential to compile any
 modules that are used by the main program, before compiling the main program itself.
 Take a look at the `SConstruct` or `meson.build` file in any case,
-as it shows the file dependencies for each example.
+as they show the file dependencies for each example.
 Also bear in mind that several alternative module files
 (e.g. `md_lj_module.f90`, `md_lj_ll_module.f90`, `md_lj_omp_module.f90`)
 contain modules with the same name (`md_module` in this case),
