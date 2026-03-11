@@ -98,7 +98,7 @@ One way to do so is to include, for example, the flag `--optimization 2` in the 
 The build process for the Fortran examples has been tested using Meson v1.10.1 and Ninja 1.13.2.
 
 ### Building from the command line
-If you don't like using SCons, or can't get it to work,
+If you don't like using SCons or meson, or can't get them to work,
 it is not difficult to compile the programs from the command line.
 Bear in mind that, with Fortran, it is usually essential to compile any
 modules that are used by the main program, before compiling the main program itself.
