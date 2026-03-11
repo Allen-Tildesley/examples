@@ -1,33 +1,45 @@
-# SCons build file for the various programs
-# Run this by typing 'scons'
-# Clean the programs by 'scons -c' (i.e., remove object, module and executable files)
+# SConstruct: SCons build file for the various programs. See https://scons.org
+
+#------------------------------------------------------------------------------------------------#
+# This software was written                                                                      #
+# by Michael P. Allen <m.p.allen@warwick.ac.uk>/<m.p.allen@bristol.ac.uk>                        #
+# and Dominic J. Tildesley <d.tildesley7@gmail.com> ("the authors"),                             #
+# to accompany the book "Computer Simulation of Liquids", second edition, 2017 ("the text"),     #
+# published by Oxford University Press ("the publishers").                                       #
+#                                                                                                #
+# LICENCE                                                                                        #
+# Creative Commons CC0 Public Domain Dedication.                                                 #
+# To the extent possible under law, the authors have dedicated all copyright and related         #
+# and neighboring rights to this software to the PUBLIC domain worldwide.                        #
+# This software is distributed without any warranty.                                             #
+# You should have received a copy of the CC0 Public Domain Dedication along with this software.  #
+# If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.                               #
+#                                                                                                #
+# DISCLAIMER                                                                                     #
+# The authors and publishers make no warranties about the software, and disclaim liability       #
+# for all uses of the software, to the fullest extent permitted by applicable law.               #
+# The authors and publishers do not recommend use of this software for any purpose.              #
+# It is made freely available, solely to clarify points made in the text. When using or citing   #
+# the software, you should not imply endorsement by the authors or publishers.                   #
+#                                                                                                #
+# If you see an error in this file, or a specific improvement that would improve robustness      #
+# or portability, please feel free to raise an issue on the GitHub examples repository.          #
+#------------------------------------------------------------------------------------------------#
+
+# Build the programs, each in its own subdirectory of the build directory, by typing
+# scons
+# Clean the programs (i.e., remove object, module and executable files) by typing
+# scons -c
+# or just remove the build directory and all its subdirectories
 
 import os, sys
-
-# This has been tested using SCons v4.10.0, gfortran v15.2.0,
-# using MacOS (Tahoe 26.3.1, Xcode 26.3) with compilers and libraries installed through MacPorts.
-# It may not work on your system. It is possible that you can get it to work by
-# changing the flags and library/include paths defined in the following few statements.
-# The most likely trouble spots are the programs that use the non-standard
-# environments: env_lapack, env_fftw, env_mpi, and env_omp. You may be able to make
-# some progress by  compiling only the programs that use the environment env.
-
-# If you don't like using SCons, or can't get it to work,
-# it is not difficult to compile the programs using other methods.
-# Bear in mind that, with Fortran, it is usually essential to compile any
-# modules that are used by the main program, before compiling the main program itself.
-# Take a look at this file in any case, as it shows the file dependencies for each example.
-# You should build each example in its own directory.
-
-# If you see an error in this file, or a specific improvement that would improve robustness
-# or portability, please feel free to raise an issue on the GitHub examples repository.
-# Unfortunately, due to the enormous variety of computing platforms and compilers,
-# we cannot offer more specific advice on the build process.
 
 # SCons default Fortran compiler (currently) is gfortran, and we assume this in setting flags
 # Filetypes are .f90 but the language standard is more modern
 # NB by default we do not invoke any optimization
-env=Environment(ENV=os.environ)
+# You could add, for example, -O2 to the F90FLAGS string below
+
+env=Environment(ENV=os.environ.copy())
 env.Append(F90FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2018 -Wall')
 env.Append(FORTRANMODDIR='${TARGET.dir}',F90PATH='${TARGET.dir}')
 
@@ -52,14 +64,12 @@ env_fftw.Append(F90PATH=env_fftw['CPPPATH'])
 # env_fftw.Append(F90PATH='/opt/local/include')
 # env_fftw.Append(LIBPATH='/opt/local/lib',LIBS='fftw3')
 
-# The OpenMPI library is required for one program, but we only need the compiler wrapper
+# The OpenMPI library is required for one program, should just require the compiler wrapper
 env_mpi=env.Clone(F90='mpifort',LINK='mpifort')
 
 # The OpenMP library is required for one program, but we only need the compiler flags
 env_omp=env.Clone()
 env_omp.Append(F90FLAGS='-fopenmp',LINKFLAGS='-fopenmp')
-
-# Each program is built in a subdirectory of the build directory
 
 # Abbreviations for commonly-used combinations of modules
 conavgmat=['config_io_module.f90','averages_module.f90','maths_module.f90']
@@ -74,8 +84,8 @@ builds['dpd']                  = ['dpd.f90','dpd_module.f90']+conavgmat
 builds['cluster']              = ['cluster.f90','config_io_module.f90']
 builds['diffusion']            = ['diffusion.f90','config_io_module.f90']
 builds['diffusion_test']       = ['diffusion_test.f90']+conmat
-builds['eos_lj']               = ['eos_lj.f90','eos_lj_module.f90','lrc_lj_module.f90']
 builds['eos_hs']               = ['eos_hs.f90','maths_module.f90']
+builds['eos_lj']               = ['eos_lj.f90','eos_lj_module.f90','lrc_lj_module.f90']
 builds['error_calc']           = ['error_calc.f90','maths_module.f90']
 builds['grint']                = ['grint.f90','grint_module.f90','config_io_module.f90']
 builds['hit_and_miss']         = ['hit_and_miss.f90']
