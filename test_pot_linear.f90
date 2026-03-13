@@ -28,7 +28,7 @@ PROGRAM test_pot_linear
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
        &                                    COMPILER_VERSION, COMPILER_OPTIONS
   
-  USE test_pot_module, ONLY : n, force
+  USE test_pot_module, ONLY : n, force, description
   USE maths_module,    ONLY : rotate_vector, cross_product
 
   IMPLICIT NONE
@@ -55,7 +55,9 @@ PROGRAM test_pot_linear
   WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
   WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Tests potential, forces, and torques, for linear molecules' 
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'Tests potential, forces, and torques, for linear molecules' 
+  WRITE ( unit=output_unit, fmt='(i1,a)') n, '-molecule system'
+  WRITE ( unit=output_unit, fmt='(a)'   ) description
 
   CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 

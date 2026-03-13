@@ -34,7 +34,8 @@ MODULE test_pot_module
   PUBLIC :: force
 
   ! Public data
-  INTEGER, PARAMETER, PUBLIC :: n = 2 ! pair potential
+  INTEGER,          PARAMETER, PUBLIC :: n = 2 ! pair potential
+  CHARACTER(len=*), PARAMETER, PUBLIC :: description = 'dipole-quadrupole potential'
 
 CONTAINS
 

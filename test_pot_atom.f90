@@ -28,7 +28,7 @@ PROGRAM test_pot_atom
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit, iostat_end, iostat_eor, &
        &                                    COMPILER_VERSION, COMPILER_OPTIONS
   
-  USE test_pot_module, ONLY : n, force
+  USE test_pot_module, ONLY : n, force, description
   USE maths_module,    ONLY : cross_product
 
   IMPLICIT NONE
@@ -52,7 +52,9 @@ PROGRAM test_pot_atom
   WRITE ( unit=output_unit, fmt='(2a)'  ) 'Compiler: ', COMPILER_VERSION()
   WRITE ( unit=output_unit, fmt='(2a/)' ) 'Options:  ', COMPILER_OPTIONS()
 
-  WRITE ( unit=output_unit, fmt='(a)' ) 'Tests potential and forces for atoms' 
+  WRITE ( unit=output_unit, fmt='(a)'   ) 'Tests potential and forces for atoms' 
+  WRITE ( unit=output_unit, fmt='(i1,a)') n, '-atom system'
+  WRITE ( unit=output_unit, fmt='(a)'   ) description
 
   CALL RANDOM_INIT ( .FALSE., .TRUE. ) ! Initialize random number generator
 

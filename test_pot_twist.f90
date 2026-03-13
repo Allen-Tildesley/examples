@@ -34,7 +34,8 @@ MODULE test_pot_module
   PUBLIC :: force
 
   ! Public data
-  INTEGER, PARAMETER, PUBLIC :: n = 4 ! Four-body potential
+  INTEGER,          PARAMETER, PUBLIC :: n = 4 ! Four-body potential
+  CHARACTER(len=*), PARAMETER, PUBLIC :: description = 'twist angle, cos(phi) potential'
 
 CONTAINS
 

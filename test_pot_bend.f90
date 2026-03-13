@@ -34,7 +34,8 @@ MODULE test_pot_module
   PUBLIC :: force
 
   ! Public data
-  INTEGER, PARAMETER, PUBLIC :: n = 3 ! Three-body potential
+  INTEGER,          PARAMETER, PUBLIC :: n = 3 ! Three-body potential
+  CHARACTER(len=*), PARAMETER, PUBLIC :: description = 'bend angle, cos(theta) potential'
 
 CONTAINS
 
