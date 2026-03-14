@@ -77,7 +77,8 @@ Clean the programs (i.e., remove object, module and executable files) by typing
 or just remove the `build` directory and all its subdirectories.
 
 Note that, by default, we do not select any optimization options in compilation.
-One way to do so is to append a flag such as `-O2` to `F90FLAGS` in the `SConstruct` file.
+One way to do so is to use the command `scons F90FLAGS='-O2'`, 
+or similar, instead of `scons` above.
 
 The build process for the Fortran examples has been tested using SCons v4.10.0
 (and some earlier versions back to v2.5.1 with minor changes to the `SConstruct` file).
@@ -93,7 +94,8 @@ Clean the programs (i.e., remove object, module and executable files) by typing
 or just remove the `build` directory and all its subdirectories.
 
 Note that, by default, we do not select any optimization options in compilation.
-One way to do so is to include, for example, the flag `--optimization 2` in the `meson setup build` command. 
+One way to do so is to use the command `meson --optimization 2 setup build`, 
+or similar, instead of `meson setup build` above. 
 
 The build process for the Fortran examples has been tested using Meson v1.10.1 and Ninja 1.13.2.
 

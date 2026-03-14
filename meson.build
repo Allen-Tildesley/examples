@@ -38,7 +38,9 @@
 # Filetypes are .f90 but the language standard is more modern
 # NB by default we do not invoke any optimization
 # You could add, for example, 'optimization=2' to the list of default_options below
-# or alternatively use the command `meson setup --optimization 2 build` instead of `meson setup build`
+# or alternatively use the command
+# meson setup --optimization 2 build
+# instead of meson setup build
 
 project('build_all', 'fortran', meson_version: '>=1.10',default_options:['fortran_std=f2018','warning_level=1'])
 add_project_arguments('-fdefault-real-8','-fall-intrinsics',language:'fortran')

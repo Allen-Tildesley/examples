@@ -38,9 +38,13 @@ import os, sys
 # Filetypes are .f90 but the language standard is more modern
 # NB by default we do not invoke any optimization
 # You could add, for example, -O2 to the F90FLAGS string below
+# or alternatively use the command
+# scons F90FLAGS='-O2'
+# instead of scons
 
 env=Environment(ENV=os.environ.copy())
 env.Append(F90FLAGS='-fdefault-real-8 -fall-intrinsics -std=f2018 -Wall')
+env.Append(F90FLAGS=ARGUMENTS.get('F90FLAGS', ''))
 env.Append(FORTRANMODDIR='${TARGET.dir}',F90PATH='${TARGET.dir}')
 
 # The LAPACK library is required for some of the programs
