@@ -102,7 +102,7 @@ def write_histogram ( filename ):
     global h, s, g, e
 
     # Normalize radius of gyration entries
-    g = np.divide ( g, h, where = h>0.5 )
+    np.divide ( g, h, where = h>0.5, out = g )
 
     # Normalize h, converting it to a set of probabilities
     norm = np.sum(h)
