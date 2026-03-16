@@ -31,6 +31,6 @@ The [User Guide](./GUIDE.md) contains some comments on the Python language,
 some notes to assist in running the programs,
 and some typical results.
 The Python versions do not require building, they are simply run through the Python interpreter.
-They have been tested with Python 3.14.2 and NumPy 2.3.5
+They have been tested with Python 3.14.3 and NumPy 2.4.3
 (and previously, Python versions back to 3.6.0, with compatible versions of NumPy v1 and v2).
 
