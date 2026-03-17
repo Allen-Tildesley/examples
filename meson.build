@@ -141,12 +141,15 @@ foreach name, source : builds
 endforeach
 
 # Build MPI executable (should find compiler wrapper, e.g. mpifort)
-mpidep = dependency('mpi', language: 'fortran')
+mpidep = dependency('mpi',language:'fortran')
 name   = 'mc_nvt_lj_re'
 source = ['mc_nvt_lj_re.f90','mc_lj_module.f90','lrc_lj_module.f90',conavgmat]
 executable(name,source,build_subdir:name,dependencies:mpidep)
 
 # Build OpenMP executable (should just need compiler and linker options -fopenmp)
+openmpdep = dependency('openmp',language:'fortran')
+# If meson cannot find OpenMP, try something like
+# openmpdep = declare_dependency(compile_args:'-fopenmp',link_args:'-fopenmp')
 name   = 'md_nve_lj_omp'
 source = ['md_nve_lj.f90','md_lj_omp_module.f90','lrc_lj_module.f90',conavg]
-executable(name,source,build_subdir:name,fortran_args:'-fopenmp',link_args:'-fopenmp')
+executable(name,source,build_subdir:name,dependencies:openmpdep)
