@@ -68,7 +68,7 @@ PROGRAM mc_nvt_lj_re
   USE mc_module,        ONLY : introduction, conclusion, allocate_arrays, deallocate_arrays, &
        &                       potential_1, potential, move, n, r, potential_type
 
-  USE mpi
+  USE mpi_f08
 
   IMPLICIT NONE
 
@@ -95,17 +95,17 @@ PROGRAM mc_nvt_lj_re
   CHARACTER(len=3)             :: sav_tag    = 'sav'    ! May be overwritten with block number
   CHARACTER(len=2)             :: m_tag                 ! Will contain rank number
 
-  INTEGER                             :: m             ! MPI process rank (id of this process)
-  INTEGER                             :: nproc         ! MPI world size (number of processes)
-  INTEGER                             :: error         ! MPI error return
-  INTEGER                             :: msg_error     ! MPI error return
-  INTEGER, DIMENSION(MPI_STATUS_SIZE) :: msg_status    ! MPI status return
-  INTEGER, PARAMETER                  :: msg1_id = 999 ! MPI message identifier
-  INTEGER, PARAMETER                  :: msg2_id = 888 ! MPI message identifier
-  INTEGER, PARAMETER                  :: msg3_id = 777 ! MPI message identifier
-  INTEGER, PARAMETER                  :: msg4_id = 666 ! MPI message identifier
+  INTEGER             :: m             ! MPI process rank (id of this process)
+  INTEGER             :: nproc         ! MPI world size (number of processes)
+  INTEGER             :: error         ! MPI error return
+  INTEGER             :: msg_error     ! MPI error return
+  TYPE(MPI_Status)    :: msg_status    ! MPI status return
+  INTEGER, PARAMETER  :: msg1_id = 999 ! MPI message identifier
+  INTEGER, PARAMETER  :: msg2_id = 888 ! MPI message identifier
+  INTEGER, PARAMETER  :: msg3_id = 777 ! MPI message identifier
+  INTEGER, PARAMETER  :: msg4_id = 666 ! MPI message identifier
 
-  INTEGER, PARAMETER :: MY_MPI_REAL = MPI_DOUBLE_PRECISION ! Specifies precision of MPI reals
+  TYPE(MPI_Datatype), PARAMETER :: MY_MPI_REAL = MPI_DOUBLE_PRECISION ! Specifies precision of MPI reals
 
   NAMELIST /nml/ nblock, nstep, every_temperature, r_cut, every_dr_max
 
