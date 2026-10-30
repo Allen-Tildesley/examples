@@ -407,7 +407,8 @@ whereby the output files are placed in subdirectories,
 identified by process rank,
 beneath the specified directory `out`
 (in earlier versions of Open MPI, standard output would be directed to files named `out##`, the `##` part being determined by the process rank).
-If your implementation does not have this option, you should edit the code to explicitly open a file for
+However, this mechanism can be unreliable, occasionally resulting in interleaved, mixed up, output.
+If this is a problem, or if your implementation does not have this option, you should edit the code to explicitly open a file for
 standard output, with a process-rank-dependent name, and associate the output channel with it.
 
 The `mc_nvt_lj_re.py` program conducts runs at several temperatures: four were used in testing.

@@ -46,14 +46,14 @@ The [python-examples subdirectory](./python_examples) contains Python versions
 of several of these same examples, also with an accompanying
 [User Guide](./python_examples/GUIDE.md).
 The Python versions do not require building, they are simply run through the Python interpreter.
-They have been tested with Python 3.14.3 and NumPy 2.4.3
+They have been tested with Python 3.15.2 and NumPy 2.5.4
 (and previously, Python versions back to 3.6.0, with compatible versions of NumPy v1 and v2).
 
 ## Building the Fortran codes
 For the Fortran codes, we provide files to support two alternative build pathways, using either SCons or meson/ninja.
 Building the codes from the command line is also possible.
 
-We have used gfortran v15.2.0 (and earlier versions back to v6.3) for testing,
+We have used gfortran v16.2.0 (and earlier versions back to v6.3) for testing,
 but have attempted to stick to code which conforms to the Fortran 2018 standard.
 In the SCons and meson files, we assume for simplicity that the compiler will be gfortran.
 Some of the compiler flags may need to be changed, if this is not the case.
@@ -80,7 +80,7 @@ Note that, by default, we do not select any optimization options in compilation.
 One way to do so is to use the command `scons F90FLAGS='-O2'`, 
 or similar, instead of `scons` above.
 
-The build process for the Fortran examples has been tested using SCons v4.10.0
+The build process for the Fortran examples has been tested using SCons v4.11.1
 (and some earlier versions back to v2.5.1 with minor changes to the `SConstruct` file).
 
 ### Building via meson/ninja
@@ -94,10 +94,10 @@ Clean the programs (i.e., remove object, module and executable files) by typing
 or just remove the `build` directory and all its subdirectories.
 
 Note that, by default, we do not select any optimization options in compilation.
-One way to do so is to use the command `meson --optimization 2 setup build`, 
+One way to do so is to use the command `meson setup --optimization 2 build`, 
 or similar, instead of `meson setup build` above. 
 
-The build process for the Fortran examples has been tested using Meson v1.10.1 and Ninja 1.13.2.
+The build process for the Fortran examples has been tested using Meson v1.12.1 and Ninja 1.13.2.
 
 ### Building from the command line
 If you don't like using SCons or meson, or can't get them to work,
